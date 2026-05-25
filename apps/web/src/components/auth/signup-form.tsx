@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Github } from "lucide-react";
+import { GithubIcon } from "@/components/icons/github-icon";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/useLocale";
 import { getMessages } from "@/lib/messages";
@@ -50,7 +50,7 @@ export function SignupForm() {
         disabled={loading}
         className="btn btn-secondary w-full"
       >
-        <Github className="w-4 h-4" />
+        <GithubIcon className="w-4 h-4" />
         {loading ? t.auth.connecting : t.auth.continueWithGitHub}
       </button>
 

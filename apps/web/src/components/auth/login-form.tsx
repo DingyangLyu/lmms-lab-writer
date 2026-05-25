@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Github } from "lucide-react";
+import { GithubIcon } from "@/components/icons/github-icon";
 import { createClient as createSSRClient } from "@/lib/supabase/client";
 import { createClient as createStandardClient } from "@supabase/supabase-js";
 import { useLocale } from "@/lib/useLocale";
@@ -107,7 +107,7 @@ export function LoginForm() {
         disabled={loading}
         className="btn btn-secondary w-full"
       >
-        <Github className="w-4 h-4" />
+        <GithubIcon className="w-4 h-4" />
         {loading ? t.auth.connecting : t.auth.continueWithGitHub}
       </button>
 

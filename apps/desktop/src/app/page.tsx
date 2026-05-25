@@ -1178,7 +1178,7 @@ The AI assistant will read and update this file during compilation.
         }
       }
     },
-    [daemon.projectPath, splitPane?.selectedFile, handleFileSelect, toast],
+    [daemon.projectPath, splitPane, handleFileSelect, toast],
   );
 
   const handleSynctexInstallComplete = useCallback(() => {
@@ -2537,10 +2537,11 @@ The AI assistant will read and update this file during compilation.
     !!gitDiffPreview &&
     selectedFile === gitDiffPreview.path;
 
+  const gitDiffContent = gitDiffPreview?.content;
   const parsedGitDiff = useMemo(() => {
-    if (!gitDiffPreview?.content) return null;
-    return parseUnifiedDiffContent(gitDiffPreview.content);
-  }, [gitDiffPreview?.content]);
+    if (!gitDiffContent) return null;
+    return parseUnifiedDiffContent(gitDiffContent);
+  }, [gitDiffContent]);
 
   const primaryEditorPaneContent = (
     <div className="h-full min-h-0 flex flex-col overflow-hidden">

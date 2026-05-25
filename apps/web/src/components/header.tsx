@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Github, ChevronDown, Globe } from "lucide-react";
+import { ChevronDown, Globe } from "lucide-react";
 
+import { GithubIcon } from "@/components/icons/github-icon";
 import { UserDropdown } from "@/components/user-dropdown";
 import { getUserCacheFromCookie, type CachedUser } from "@/lib/user-cache";
 import {
@@ -153,7 +154,7 @@ export function Header({
             rel="noopener noreferrer"
             className="text-muted/60 hover:text-muted transition-colors flex items-center gap-1 sm:gap-1.5 text-xs"
           >
-            <Github className="w-3.5 h-3.5" />
+            <GithubIcon className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{messages.header.feedback}</span>
           </Link>
         </div>
