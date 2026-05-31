@@ -97,6 +97,10 @@ function sha256File(filePath) {
   return hash.digest("hex");
 }
 
+function toGithubReleaseAssetName(fileName) {
+  return fileName.replace(/\s+/g, ".");
+}
+
 function inferVersionFromTagOrArg(args) {
   const version = normalizeVersion(args.version || args.tag);
   if (!version) {
@@ -199,7 +203,8 @@ function main() {
   const allFiles = collectFiles(args.linuxArtifactsDir);
   const debPath = pickDebAsset(allFiles, version);
   const debAssetName = path.basename(debPath);
-  const encodedAssetName = encodeURIComponent(debAssetName);
+  const releaseAssetName = toGithubReleaseAssetName(debAssetName);
+  const encodedAssetName = encodeURIComponent(releaseAssetName);
   const sourceFileName = `lmms-lab-writer_${version}_amd64.deb`;
   const sourceUrl = `https://github.com/${args.repo}/releases/download/${tag}/${encodedAssetName}`;
   const sha256 = sha256File(debPath);
@@ -229,6 +234,7 @@ function main() {
 
   console.log(`[aur] generated AUR package files in ${args.outDir}`);
   console.log(`[aur] source asset: ${debAssetName}`);
+  console.log(`[aur] release asset: ${releaseAssetName}`);
   console.log(`[aur] sha256: ${sha256}`);
 }
 
