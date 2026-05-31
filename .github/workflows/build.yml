@@ -129,6 +129,7 @@ jobs:
           path: |
             aur-dist/lmms-lab-writer-bin/**
             aur-dist/*.tar.gz
+          include-hidden-files: true
           retention-days: 7
 
   release-github:
@@ -170,3 +171,124 @@ jobs:
             release-artifacts/**/*.json
             release-artifacts/**/PKGBUILD
             release-artifacts/**/.SRCINFO
+
+  publish-aur:
+    name: Publish AUR Package
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    needs:
+      - build-aur-package
+      - release-github
+    runs-on: ubuntu-latest
+    env:
+      AUR_HOME: /tmp/aur-home
+      AUR_WORKDIR: /tmp/aur-packages
+      AUR_PKGNAME: lmms-lab-writer-bin
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git openssh-client
+
+      - name: Download AUR package files
+        uses: actions/download-artifact@v4
+        with:
+          name: build-AUR
+          path: aur-package
+
+      - name: Locate AUR package files
+        id: aur-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pkgbuild="$(find aur-package -type f -name PKGBUILD | head -n 1 || true)"
+          srcinfo="$(find aur-package -type f -name .SRCINFO | head -n 1 || true)"
+
+          if [[ -z "$pkgbuild" || -z "$srcinfo" ]]; then
+            archive="$(find aur-package -type f -name 'lmms-lab-writer-bin-*-aur.tar.gz' | head -n 1 || true)"
+            if [[ -z "$archive" ]]; then
+              echo "AUR package files were not found in the build-AUR artifact." >&2
+              exit 1
+            fi
+
+            mkdir -p aur-package/extracted
+            tar -xzf "$archive" -C aur-package/extracted
+            pkgbuild="$(find aur-package/extracted -type f -name PKGBUILD | head -n 1 || true)"
+            srcinfo="$(find aur-package/extracted -type f -name .SRCINFO | head -n 1 || true)"
+          fi
+
+          if [[ -z "$pkgbuild" || -z "$srcinfo" ]]; then
+            echo "PKGBUILD or .SRCINFO is missing from the AUR package artifact." >&2
+            exit 1
+          fi
+
+          package_dir="$(dirname "$pkgbuild")"
+          if [[ "$(dirname "$srcinfo")" != "$package_dir" ]]; then
+            echo "PKGBUILD and .SRCINFO are in different directories." >&2
+            exit 1
+          fi
+
+          echo "package_dir=$package_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AUR SSH
+        shell: bash
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$AUR_SSH_PRIVATE_KEY" ]]; then
+            echo "Missing GitHub secret: AUR_SSH_PRIVATE_KEY" >&2
+            exit 1
+          fi
+
+          install -d -m 700 "$AUR_HOME/.ssh"
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" | tr -d '\r' > "$AUR_HOME/.ssh/aur"
+          chmod 600 "$AUR_HOME/.ssh/aur"
+          ssh-keygen -y -f "$AUR_HOME/.ssh/aur" > /dev/null
+
+          ssh-keyscan -t ed25519 aur.archlinux.org > "$AUR_HOME/.ssh/known_hosts"
+          chmod 600 "$AUR_HOME/.ssh/known_hosts"
+          {
+            printf '%s\n' "Host aur.archlinux.org"
+            printf '%s\n' "  HostName aur.archlinux.org"
+            printf '%s\n' "  User aur"
+            printf '%s\n' "  IdentityFile $AUR_HOME/.ssh/aur"
+            printf '%s\n' "  IdentitiesOnly yes"
+            printf '%s\n' "  UserKnownHostsFile $AUR_HOME/.ssh/known_hosts"
+            printf '%s\n' "  StrictHostKeyChecking yes"
+          } > "$AUR_HOME/.ssh/config"
+          chmod 600 "$AUR_HOME/.ssh/config"
+
+          ssh -F "$AUR_HOME/.ssh/config" -T aur.archlinux.org help
+
+      - name: Push package to AUR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export GIT_SSH_COMMAND="ssh -F $AUR_HOME/.ssh/config"
+          aur_url="ssh://aur@aur.archlinux.org/${AUR_PKGNAME}.git"
+          workdir="$AUR_WORKDIR/$AUR_PKGNAME"
+          package_dir="${{ steps.aur-files.outputs.package_dir }}"
+
+          rm -rf "$workdir"
+          if ! git clone "$aur_url" "$workdir"; then
+            echo "AUR repository $AUR_PKGNAME does not exist yet; preparing first publish."
+            mkdir -p "$workdir"
+            git init --initial-branch=master "$workdir"
+            git -C "$workdir" remote add origin "$aur_url"
+          fi
+
+          cp "$package_dir/PKGBUILD" "$package_dir/.SRCINFO" "$workdir/"
+          git -C "$workdir" config user.name "github-actions[bot]"
+          git -C "$workdir" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "$workdir" add PKGBUILD .SRCINFO
+
+          if git -C "$workdir" diff --cached --quiet; then
+            echo "AUR package $AUR_PKGNAME is already up to date."
+            exit 0
+          fi
+
+          git -C "$workdir" commit -m "Release ${{ github.ref_name }}"
+          git -C "$workdir" push origin HEAD:master
