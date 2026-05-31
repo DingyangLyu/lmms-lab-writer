@@ -133,7 +133,7 @@ jobs:
           retention-days: 7
 
   build-tauri-arch-release:
-    name: Release Build (Arch Linux)
+    name: Release Compile Check (Arch Linux)
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container:
@@ -166,25 +166,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: node scripts/sync-version.mjs --from-tag ${{ github.ref_name }}
 
-      - name: Build Tauri app on Arch Linux
-        run: pnpm --filter @lmms-lab/writer-desktop tauri build --ci -v
-
-      - name: Archive Arch Linux bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
-          mkdir -p arch-release
-          tar -czf "arch-release/lmms-lab-writer-v${version}-linux-arch-x64-bundle.tar.gz" \
-            -C apps/desktop/src-tauri/target/release/bundle \
-            .
-
-      - name: Upload Arch Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-Linux-Arch
-          path: arch-release/*.tar.gz
-          retention-days: 7
+      - name: Compile Tauri app on Arch Linux
+        run: pnpm --filter @lmms-lab/writer-desktop tauri build --ci -v --no-bundle
 
   release-github:
     name: Publish GitHub Release

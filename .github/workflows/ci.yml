@@ -97,5 +97,5 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app on Arch Linux
-        run: pnpm --filter @lmms-lab/writer-desktop tauri build --ci -v
+      - name: Compile Tauri app on Arch Linux
+        run: pnpm --filter @lmms-lab/writer-desktop tauri build --ci -v --no-bundle
