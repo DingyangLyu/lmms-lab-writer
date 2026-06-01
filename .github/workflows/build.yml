@@ -208,7 +208,8 @@ jobs:
           files: |
             release-artifacts/**/*.dmg
             release-artifacts/**/*.pkg
-            release-artifacts/**/*.tar.gz
+            release-artifacts/**/lmms-lab-writer-*-aur.tar.gz
+            release-artifacts/**/lmms-lab-writer-bin-*-aur.tar.gz
             release-artifacts/**/*.app.tar.gz
             release-artifacts/**/*.exe
             release-artifacts/**/*.msi
@@ -298,7 +299,7 @@ jobs:
             /tmp/arch-package/
           chown builder:builder /tmp/arch-package/PKGBUILD /tmp/arch-package/.SRCINFO
 
-          runuser -u builder -- bash -lc "cd /tmp/arch-package && makepkg --noconfirm --cleanbuild"
+          runuser -u builder -- bash -lc "cd /tmp/arch-package && makepkg --nodeps --noconfirm --cleanbuild"
 
           mkdir -p arch-package-output
           cp /tmp/arch-package/*.pkg.tar.zst arch-package-output/
