@@ -65,6 +65,10 @@ type Props = {
   className?: string;
 };
 
+type XTermDisposable = {
+  dispose: () => void;
+};
+
 export const Terminal = memo(function Terminal({
   projectPath,
   shellMode = "auto",
@@ -74,6 +78,7 @@ export const Terminal = memo(function Terminal({
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const themeRef = useRef(LIGHT_TERMINAL_THEME);
   // Client-side mount check - intentionally set in effect for hydration safety
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -84,9 +89,11 @@ export const Terminal = memo(function Terminal({
 
   // Reactively update terminal theme when app mode changes
   useEffect(() => {
+    const nextTheme = resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
+    themeRef.current = nextTheme;
+
     if (termRef.current) {
-      termRef.current.options.theme =
-        resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
+      termRef.current.options.theme = nextTheme;
     }
   }, [resolvedTheme]);
 
@@ -101,12 +108,15 @@ export const Terminal = memo(function Terminal({
     let ptyId: string | null = null;
     let unlistenOutput: UnlistenFn | null = null;
     let unlistenExit: UnlistenFn | null = null;
+    let dataDisposable: XTermDisposable | null = null;
+    let resizeDisposable: XTermDisposable | null = null;
+    let fitFrameId: number | null = null;
 
     const term = new XTerm({
       fontFamily: EDITOR_MONO_FONT_FAMILY,
       fontSize: 13,
       lineHeight: 1.4,
-      theme: resolvedTheme === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME,
+      theme: themeRef.current,
       cursorBlink: true,
       cursorStyle: "block",
       scrollback: 10000,
@@ -170,13 +180,13 @@ export const Terminal = memo(function Terminal({
           return;
         }
 
-        term.onData((data) => {
+        dataDisposable = term.onData((data) => {
           if (ptyId && !isCleanedUp) {
             invoke("write_pty", { id: ptyId, data }).catch(console.error);
           }
         });
 
-        term.onResize(({ cols, rows }) => {
+        resizeDisposable = term.onResize(({ cols, rows }) => {
           if (ptyId && !isCleanedUp) {
             invoke("resize_pty", { id: ptyId, cols, rows }).catch(console.error);
           }
@@ -191,13 +201,21 @@ export const Terminal = memo(function Terminal({
 
     setup();
 
-    const handleResize = () => {
-      fitAddonRef.current?.fit();
+    const fitTerminal = () => {
+      if (fitFrameId !== null) {
+        return;
+      }
+
+      fitFrameId = window.requestAnimationFrame(() => {
+        fitFrameId = null;
+        fitAddonRef.current?.fit();
+      });
     };
-    window.addEventListener("resize", handleResize);
+
+    window.addEventListener("resize", fitTerminal);
 
     const resizeObserver = new ResizeObserver(() => {
-      fitAddonRef.current?.fit();
+      fitTerminal();
     });
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
@@ -207,12 +225,17 @@ export const Terminal = memo(function Terminal({
       // Mark as cleaned up FIRST to prevent race conditions
       isCleanedUp = true;
 
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", fitTerminal);
       resizeObserver.disconnect();
+      if (fitFrameId !== null) {
+        window.cancelAnimationFrame(fitFrameId);
+      }
 
       // Clean up listeners
       unlistenOutput?.();
       unlistenExit?.();
+      dataDisposable?.dispose();
+      resizeDisposable?.dispose();
 
       // Kill PTY process if it exists
       if (ptyId) {
@@ -223,8 +246,7 @@ export const Terminal = memo(function Terminal({
       termRef.current = null;
       fitAddonRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedTheme intentionally excluded to avoid recreating PTY on theme change
-  }, [mounted, projectPath, shellMode, customShell, resolvedTheme]);
+  }, [mounted, projectPath, shellMode, customShell]);
 
   if (!mounted) {
     return (

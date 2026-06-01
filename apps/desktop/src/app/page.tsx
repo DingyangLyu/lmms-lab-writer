@@ -15,6 +15,7 @@ import { EditorSkeleton } from "@/components/editor/editor-skeleton";
 import { GitHubPublishDialog } from "@/components/editor/github-publish-dialog";
 import { FileSidebarPanel } from "@/components/editor/sidebar-file-panel";
 import { GitSidebarPanel } from "@/components/editor/sidebar-git-panel";
+import { TerminalPanel } from "@/components/editor/terminal-panel";
 import {
   LaTeXInstallPrompt,
   LaTeXSettingsDialog,
@@ -328,16 +329,6 @@ const GitMonacoDiffEditor = dynamic(
   },
 );
 
-const EditorTerminal = dynamic(
-  () => import("@/components/editor/terminal").then((mod) => mod.Terminal),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-full flex items-center px-4 text-sm text-muted">Loading terminal...</div>
-    ),
-  },
-);
-
 const OpenCodePanel = dynamic(
   () => import("@/components/opencode/opencode-panel").then((mod) => mod.OpenCodePanel),
   {
@@ -381,8 +372,6 @@ const _WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "https://writer.lmms-lab.com
 
 const MIN_PANEL_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 480;
-const MIN_TERMINAL_HEIGHT = 120;
-const MAX_TERMINAL_HEIGHT_RATIO = 0.5;
 
 export default function EditorPage() {
   const editorSettings = useEditorSettings();
@@ -422,14 +411,7 @@ export default function EditorPage() {
     }
     return 280;
   });
-  const [terminalHeight, setTerminalHeight] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("terminalHeight");
-      return saved ? parseInt(saved, 10) : 224;
-    }
-    return 224;
-  });
-  const [resizing, setResizing] = useState<"sidebar" | "right" | "bottom" | null>(null);
+  const [resizing, setResizing] = useState<"sidebar" | "right" | null>(null);
   const [sidebarTab, setSidebarTab] = useState<"files" | "git">("files");
   const [highlightedFile, _setHighlightedFile] = useState<string | null>(null);
 
@@ -476,8 +458,6 @@ export default function EditorPage() {
   // RAF-based resize refs for 60fps performance
   const sidebarWidthRef = useRef(sidebarWidth);
   const rightPanelWidthRef = useRef(rightPanelWidth);
-  const terminalHeightRef = useRef(terminalHeight);
-
   const rafIdRef = useRef<number | null>(null);
 
   const gitStatus = daemon.gitStatus;
@@ -752,10 +732,6 @@ The AI assistant will read and update this file during compilation.
   }, [rightPanelWidth]);
 
   useEffect(() => {
-    localStorage.setItem("terminalHeight", String(terminalHeight));
-  }, [terminalHeight]);
-
-  useEffect(() => {
     checkOpencodeStatus();
   }, [checkOpencodeStatus]);
 
@@ -812,19 +788,17 @@ The AI assistant will read and update this file during compilation.
   }, []);
 
   const startResize = useCallback(
-    (panel: "sidebar" | "right" | "bottom") => {
+    (panel: "sidebar" | "right") => {
       setResizing(panel);
       sidebarWidthRef.current = sidebarWidth;
       rightPanelWidthRef.current = rightPanelWidth;
-      terminalHeightRef.current = terminalHeight;
       document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
       document.documentElement.style.setProperty("--right-panel-width", `${rightPanelWidth}px`);
-      document.documentElement.style.setProperty("--terminal-height", `${terminalHeight}px`);
     },
-    [sidebarWidth, rightPanelWidth, terminalHeight],
+    [sidebarWidth, rightPanelWidth],
   );
 
-  const handleResizeDrag = useCallback((panel: "sidebar" | "right" | "bottom", info: PanInfo) => {
+  const handleResizeDrag = useCallback((panel: "sidebar" | "right", info: PanInfo) => {
     if (rafIdRef.current !== null) return;
 
     rafIdRef.current = requestAnimationFrame(() => {
@@ -840,14 +814,6 @@ The AI assistant will read and update this file during compilation.
         );
         rightPanelWidthRef.current = newWidth;
         document.documentElement.style.setProperty("--right-panel-width", `${newWidth}px`);
-      } else if (panel === "bottom") {
-        const maxHeight = Math.floor(window.innerHeight * MAX_TERMINAL_HEIGHT_RATIO);
-        const newHeight = Math.min(
-          Math.max(window.innerHeight - info.point.y, MIN_TERMINAL_HEIGHT),
-          maxHeight,
-        );
-        terminalHeightRef.current = newHeight;
-        document.documentElement.style.setProperty("--terminal-height", `${newHeight}px`);
       }
       rafIdRef.current = null;
     });
@@ -860,10 +826,8 @@ The AI assistant will read and update this file during compilation.
     }
     setSidebarWidth(sidebarWidthRef.current);
     setRightPanelWidth(rightPanelWidthRef.current);
-    setTerminalHeight(terminalHeightRef.current);
     document.documentElement.style.removeProperty("--sidebar-width");
     document.documentElement.style.removeProperty("--right-panel-width");
-    document.documentElement.style.removeProperty("--terminal-height");
     setResizing(null);
   }, []);
 
@@ -2885,49 +2849,14 @@ The AI assistant will read and update this file during compilation.
               </div>
             )}
 
-          <AnimatePresence>
-            {daemon.projectPath && showTerminal && (
-              <motion.div
-                key="terminal-container"
-                initial={
-                  prefersReducedMotion ? { opacity: 1, height: 0 } : { opacity: 0, height: 0 }
-                }
-                animate={{
-                  opacity: 1,
-                  height: resizing === "bottom" ? "var(--terminal-height)" : terminalHeight,
-                }}
-                exit={prefersReducedMotion ? { opacity: 0, height: 0 } : { opacity: 0, height: 0 }}
-                transition={prefersReducedMotion ? INSTANT_TRANSITION : PANEL_SPRING}
-                className="flex-shrink-0 border-t border-border flex flex-col overflow-hidden"
-                style={{
-                  willChange: prefersReducedMotion ? undefined : "height, opacity",
-                }}
-              >
-                <div className="relative group h-1 flex-shrink-0">
-                  <motion.div
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
-                    dragElastic={0}
-                    dragMomentum={false}
-                    onDragStart={() => startResize("bottom")}
-                    onDrag={(_event, info) => handleResizeDrag("bottom", info)}
-                    onDragEnd={endResize}
-                    className="absolute inset-x-0 -top-1 -bottom-1 cursor-row-resize z-10"
-                    style={{ y: 0 }}
-                  />
-                  <div
-                    className={`w-full h-full transition-colors ${resizing === "bottom" ? "bg-foreground/20" : "group-hover:bg-foreground/20"}`}
-                  />
-                </div>
-                <EditorTerminal
-                  projectPath={daemon.projectPath ?? undefined}
-                  shellMode={editorSettings.settings.terminalShellMode}
-                  customShell={editorSettings.settings.terminalShellPath}
-                  className="flex-1 min-h-0"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <TerminalPanel
+            projectPath={daemon.projectPath}
+            open={showTerminal}
+            shellMode={editorSettings.settings.terminalShellMode}
+            customShell={editorSettings.settings.terminalShellPath}
+            prefersReducedMotion={Boolean(prefersReducedMotion)}
+            onClose={() => setShowTerminal(false)}
+          />
         </div>
 
         <AnimatePresence>
