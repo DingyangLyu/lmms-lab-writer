@@ -118,9 +118,6 @@ jobs:
             --tag "${{ github.ref_name }}" \
             --linux-artifacts-dir aur-input \
             --out-dir aur-dist/lmms-lab-writer-bin
-          node scripts/generate-aur-source-package.mjs \
-            --tag "${{ github.ref_name }}" \
-            --out-dir aur-dist/lmms-lab-writer
 
       - name: Archive AUR package files
         if: ${{ !contains(github.ref_name, '-') }}
@@ -129,7 +126,6 @@ jobs:
           set -euo pipefail
           mkdir -p aur-dist
           tar -czf "aur-dist/lmms-lab-writer-bin-${{ github.ref_name }}-aur.tar.gz" -C aur-dist/lmms-lab-writer-bin .
-          tar -czf "aur-dist/lmms-lab-writer-${{ github.ref_name }}-aur.tar.gz" -C aur-dist/lmms-lab-writer .
 
       - name: Upload AUR package files
         if: ${{ !contains(github.ref_name, '-') }}
@@ -138,7 +134,6 @@ jobs:
           name: build-AUR
           path: |
             aur-dist/lmms-lab-writer-bin/**
-            aur-dist/lmms-lab-writer/**
             aur-dist/*.tar.gz
           include-hidden-files: true
           retention-days: 7
@@ -208,7 +203,6 @@ jobs:
           files: |
             release-artifacts/**/*.dmg
             release-artifacts/**/*.pkg
-            release-artifacts/**/lmms-lab-writer-*-aur.tar.gz
             release-artifacts/**/lmms-lab-writer-bin-*-aur.tar.gz
             release-artifacts/**/*.app.tar.gz
             release-artifacts/**/*.exe
@@ -332,7 +326,6 @@ jobs:
       matrix:
         aur_pkgname:
           - lmms-lab-writer-bin
-          - lmms-lab-writer
     steps:
       - name: Install dependencies
         run: |
