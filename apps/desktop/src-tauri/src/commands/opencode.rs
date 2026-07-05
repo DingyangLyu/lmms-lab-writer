@@ -7,6 +7,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child as TokioChild;
 use tokio::time::{sleep, Duration};
 
+const OPENCODE_ENABLE_EXA_ENV: &str = "OPENCODE_ENABLE_EXA";
+const OPENCODE_ENABLE_EXA_VALUE: &str = "1";
+
 pub struct OpenCodeState {
     pub process: Mutex<Option<TokioChild>>,
     pub port: Mutex<u16>,
@@ -27,6 +30,8 @@ pub struct OpenCodeStatus {
     pub port: u16,
     pub installed: bool,
     pub managed: bool,
+    #[serde(rename = "webSearchEnabled")]
+    pub web_search_enabled: bool,
 }
 
 async fn find_opencode() -> Option<String> {
@@ -134,6 +139,7 @@ pub async fn opencode_status(
         port,
         installed,
         managed: process_running,
+        web_search_enabled: process_running,
     })
 }
 
@@ -220,12 +226,24 @@ pub async fn opencode_start(
     let mut child = command(&opencode_path)
         .args(["serve", "--port", &port.to_string()])
         .current_dir(&directory)
-        .env("OPENCODE_ENABLE_EXA", "1")
+        .env(OPENCODE_ENABLE_EXA_ENV, OPENCODE_ENABLE_EXA_VALUE)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Failed to spawn OpenCode process: {}", e))?;
+
+    app.emit(
+        "opencode-log",
+        serde_json::json!({
+            "type": "info",
+            "message": format!(
+                "OpenCode websearch enabled with {}={}",
+                OPENCODE_ENABLE_EXA_ENV, OPENCODE_ENABLE_EXA_VALUE
+            ),
+        }),
+    )
+    .ok();
 
     // Spawn tasks to stream stdout/stderr to frontend
     if let Some(stdout) = child.stdout.take() {
@@ -314,6 +332,7 @@ pub async fn opencode_start(
         port,
         installed: true,
         managed: true,
+        web_search_enabled: true,
     })
 }
 
@@ -461,6 +480,7 @@ mod tests {
             port: 4096,
             installed: true,
             managed: true,
+            web_search_enabled: true,
         };
 
         let json = serde_json::to_string(&status).unwrap();
@@ -468,11 +488,13 @@ mod tests {
         assert!(json.contains("\"port\":4096"));
         assert!(json.contains("\"installed\":true"));
         assert!(json.contains("\"managed\":true"));
+        assert!(json.contains("\"webSearchEnabled\":true"));
 
         let deserialized: OpenCodeStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.running, status.running);
         assert_eq!(deserialized.port, status.port);
         assert_eq!(deserialized.installed, status.installed);
         assert_eq!(deserialized.managed, status.managed);
+        assert_eq!(deserialized.web_search_enabled, status.web_search_enabled);
     }
 }

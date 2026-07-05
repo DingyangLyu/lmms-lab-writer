@@ -74,6 +74,7 @@ type OpenCodeStatus = {
   port: number;
   installed: boolean;
   managed?: boolean;
+  webSearchEnabled?: boolean;
 };
 
 type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
