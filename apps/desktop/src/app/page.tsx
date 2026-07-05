@@ -231,6 +231,7 @@ type PreferredOpenCodeConfig = {
     providerID: string;
     modelID: string;
   };
+  variant?: string;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -272,12 +273,16 @@ function getPreferredOpenCodeConfig(): PreferredOpenCodeConfig {
       const savedModel = JSON.parse(savedModelRaw) as {
         providerId?: unknown;
         modelId?: unknown;
+        variant?: unknown;
       };
       if (typeof savedModel.providerId === "string" && typeof savedModel.modelId === "string") {
         model = {
           providerID: savedModel.providerId,
           modelID: savedModel.modelId,
         };
+        if (typeof savedModel.variant === "string" && savedModel.variant.length > 0) {
+          return { agent, model, variant: savedModel.variant };
+        }
       }
     }
   } catch {
@@ -2398,6 +2403,7 @@ The AI assistant will read and update this file during compilation.
           noReply: boolean;
           agent?: string;
           model?: { providerID: string; modelID: string };
+          variant?: string;
         } = {
           parts: [{ type: "text", text: prompt }],
           noReply: false,
@@ -2407,6 +2413,9 @@ The AI assistant will read and update this file during compilation.
         }
         if (preferred.model) {
           requestBody.model = preferred.model;
+        }
+        if (preferred.variant) {
+          requestBody.variant = preferred.variant;
         }
 
         const messageResponse = await fetch(`${baseUrl}/session/${sessionId}/message${query}`, {

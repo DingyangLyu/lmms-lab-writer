@@ -18,11 +18,18 @@ export type Model = {
     max?: boolean;
     reasoning?: boolean;
   };
+  variants?: Record<string, { disabled?: boolean; [key: string]: unknown }>;
 };
 export type Provider = {
   id: string;
   name: string;
   models: Model[];
+};
+
+export type SelectedModel = {
+  providerId: string;
+  modelId: string;
+  variant?: string;
 };
 
 export type UseOpenCodeReturn = {
@@ -42,7 +49,7 @@ export type UseOpenCodeReturn = {
   agents: Agent[];
   providers: Provider[];
   selectedAgent: string | null;
-  selectedModel: { providerId: string; modelId: string } | null;
+  selectedModel: SelectedModel | null;
 
   connect: () => void;
   disconnect: () => void;
@@ -58,7 +65,7 @@ export type UseOpenCodeReturn = {
   getPartsForMessage: (messageId: string) => Part[];
   resetReconnectState: () => void;
   setSelectedAgent: (agentId: string | null) => void;
-  setSelectedModel: (model: { providerId: string; modelId: string } | null) => void;
+  setSelectedModel: (model: SelectedModel | null) => void;
 };
 
 const DEFAULT_BASE_URL = "http://localhost:4096";
@@ -79,9 +86,14 @@ const PREFERRED_PROVIDER_ORDER = [
 ];
 
 const PREFERRED_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai: ["gpt-5-codex", "gpt-5.4", "gpt-5", "codex"],
-  codex: ["gpt-5-codex", "gpt-5.4", "gpt-5", "codex"],
+  openai: ["gpt-5.4", "gpt-5", "gpt-5-codex", "codex"],
+  codex: ["gpt-5.4", "gpt-5", "gpt-5-codex", "codex"],
   deepseek: ["deepseek-v4-pro", "v4-pro", "deepseek-v4-flash", "v4-flash"],
+};
+
+const FALLBACK_MODELS_BY_PROVIDER: Record<string, string[]> = {
+  openai: ["gpt-5.4", "gpt-5", "gpt-5.1"],
+  codex: ["gpt-5.4", "gpt-5", "gpt-5.1"],
 };
 
 function pickPreferredModel(provider: Provider): Model | undefined {
@@ -98,6 +110,41 @@ function pickPreferredModel(provider: Provider): Model | undefined {
   }
 
   return provider.models[0];
+}
+
+function pickFallbackModel(provider: Provider): Model | undefined {
+  const providerKey = `${provider.id} ${provider.name}`.toLowerCase();
+  const fallbackModels = Object.entries(FALLBACK_MODELS_BY_PROVIDER).find(([key]) =>
+    providerKey.includes(key),
+  )?.[1];
+
+  if (fallbackModels) {
+    for (const fallbackModel of fallbackModels) {
+      const exactMatch = provider.models.find((m) => m.id.toLowerCase() === fallbackModel);
+      if (exactMatch) return exactMatch;
+
+      const model = provider.models.find((m) => m.id.toLowerCase().includes(fallbackModel));
+      if (model) return model;
+    }
+  }
+
+  return undefined;
+}
+
+function isVariantSupported(model: Model | undefined, variant: string | undefined): boolean {
+  if (!model || !variant) return false;
+  const variantConfig = model.variants?.[variant];
+  return Boolean(variantConfig && variantConfig.disabled !== true);
+}
+
+function isUnsupportedModelError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("unsupported_model") ||
+    normalized.includes("model_not_supported") ||
+    normalized.includes("entitlement") ||
+    normalized.includes("not currently available")
+  );
 }
 
 export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn {
@@ -120,10 +167,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
   const [agents, setAgents] = useState<Agent[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<{
-    providerId: string;
-    modelId: string;
-  } | null>(null);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null);
 
   const currentSessionIdRef = useRef<string | null>(null);
   currentSessionIdRef.current = currentSessionId;
@@ -133,11 +177,17 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
 
   const selectedAgentRef = useRef<string | null>(null);
   selectedAgentRef.current = selectedAgent;
-  const selectedModelRef = useRef<{
-    providerId: string;
-    modelId: string;
-  } | null>(null);
+  const selectedModelRef = useRef<SelectedModel | null>(null);
   selectedModelRef.current = selectedModel;
+  const providersRef = useRef<Provider[]>([]);
+  providersRef.current = providers;
+  const lastSendRef = useRef<{
+    content: string;
+    files?: { url: string; mime: string; filename?: string }[];
+    agent?: string;
+    sessionId: string;
+    retriedUnsupportedModel: boolean;
+  } | null>(null);
 
   // Sync messages and parts only (not status) - used after sending messages
   const syncMessagesAndPartsRef = useRef<() => void>(() => {});
@@ -224,10 +274,95 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       if (event.type === "session.error") {
         const errorSessionId = event.properties.sessionID;
         if (errorSessionId === currentSessionIdRef.current) {
-          const errorData = event.properties.error;
+          const errorData = event.properties.error as
+            | { data?: { message?: string; providerID?: string }; name?: string }
+            | undefined;
 
           // Parse error message
           let errorMessage = errorData?.data?.message || errorData?.name || "Unknown error";
+
+          if (isUnsupportedModelError(errorMessage)) {
+            const selected = selectedModelRef.current;
+            const lastSend = lastSendRef.current;
+            const provider = selected
+              ? providersRef.current.find((p) => p.id === selected.providerId)
+              : undefined;
+            const fallbackModel = provider ? pickFallbackModel(provider) : undefined;
+
+            if (
+              selected &&
+              lastSend &&
+              fallbackModel &&
+              fallbackModel.id !== selected.modelId &&
+              lastSend.sessionId === errorSessionId &&
+              !lastSend.retriedUnsupportedModel
+            ) {
+              lastSend.retriedUnsupportedModel = true;
+              const fallbackSelection = {
+                providerId: selected.providerId,
+                modelId: fallbackModel.id,
+                variant: isVariantSupported(fallbackModel, selected.variant)
+                  ? selected.variant
+                  : undefined,
+              };
+              selectedModelRef.current = fallbackSelection;
+              setSelectedModel(fallbackSelection);
+              try {
+                localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(fallbackSelection));
+              } catch {
+                // Ignore localStorage errors
+              }
+
+              const client = clientRef.current;
+              if (client) {
+                setError(null);
+                setStatus({ type: "running" });
+                client
+                  .createSession()
+                  .then(async (newSession) => {
+                    if (!newSession) return;
+                    currentSessionIdRef.current = newSession.id;
+                    setCurrentSessionId(newSession.id);
+                    syncFromStoreRef.current();
+                    lastSendRef.current = {
+                      ...lastSend,
+                      sessionId: newSession.id,
+                      retriedUnsupportedModel: true,
+                    };
+                    await client.chat(newSession.id, lastSend.content, {
+                      agent: lastSend.agent,
+                      model: {
+                        providerID: fallbackSelection.providerId,
+                        modelID: fallbackSelection.modelId,
+                      },
+                      variant: fallbackSelection.variant,
+                      files: lastSend.files,
+                    });
+                    setTimeout(() => {
+                      syncMessagesAndPartsRef.current();
+                    }, 500);
+                  })
+                  .catch((err) => {
+                    if (isAbortError(err)) {
+                      setStatus({ type: "idle" });
+                      return;
+                    }
+                    console.error("[OpenCode] Unsupported model fallback failed:", err);
+                    setStatus({ type: "idle" });
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : `Model unavailable. Switched to ${fallbackSelection.modelId}; please retry.`,
+                    );
+                  });
+                return;
+              }
+            }
+
+            setStatus({ type: "idle" });
+            setError(errorMessage);
+            return;
+          }
 
           // Check if this is a non-recoverable error (billing, credits, etc.)
           const isNonRecoverable =
@@ -390,7 +525,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
 
       // Load saved preferences from localStorage
       let savedAgent: string | null = null;
-      let savedModel: { providerId: string; modelId: string } | null = null;
+      let savedModel: SelectedModel | null = null;
       try {
         savedAgent = localStorage.getItem(STORAGE_KEY_AGENT);
         const savedModelStr = localStorage.getItem(STORAGE_KEY_MODEL);
@@ -418,9 +553,17 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         // Check if saved model is still valid
         if (savedModel) {
           const savedProvider = safeProviders.find((p) => p.id === savedModel?.providerId);
-          const savedModelValid = savedProvider?.models?.some((m) => m.id === savedModel?.modelId);
-          if (savedModelValid) {
-            setSelectedModel(savedModel);
+          const savedProviderModel = savedProvider?.models?.find(
+            (m) => m.id === savedModel?.modelId,
+          );
+          if (savedProviderModel) {
+            setSelectedModel({
+              providerId: savedModel.providerId,
+              modelId: savedModel.modelId,
+              variant: isVariantSupported(savedProviderModel, savedModel.variant)
+                ? savedModel.variant
+                : undefined,
+            });
             return;
           }
         }
@@ -566,6 +709,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
             setSelectedModel({
               providerId: lastUserMessage.model.providerID,
               modelId: lastUserMessage.model.modelID,
+              variant: lastUserMessage.model.variant,
             });
           }
         }
@@ -617,6 +761,13 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       const agentToUse = selectedAgent || agents[0]?.id || undefined;
 
       try {
+        lastSendRef.current = {
+          content,
+          files,
+          agent: agentToUse,
+          sessionId: currentSessionId,
+          retriedUnsupportedModel: false,
+        };
         await client.chat(currentSessionId, content, {
           agent: agentToUse,
           model: selectedModel
@@ -625,6 +776,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
                 modelID: selectedModel.modelId,
               }
             : undefined,
+          variant: selectedModel?.variant,
           files,
         });
         // Sync messages/parts after a short delay, but NOT status
@@ -707,7 +859,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
   }, []);
 
   const handleSetSelectedModel = useCallback(
-    (model: { providerId: string; modelId: string } | null) => {
+    (model: SelectedModel | null) => {
       setSelectedModel(model);
       try {
         if (model) {

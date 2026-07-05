@@ -388,6 +388,7 @@ export class OpenCodeClient {
     options?: {
       agent?: string;
       model?: { providerID: string; modelID: string };
+      variant?: string;
       files?: { url: string; mime: string; filename?: string }[];
     },
   ): Promise<void> {
@@ -422,6 +423,9 @@ export class OpenCodeClient {
         providerID: options.model.providerID,
         modelID: options.model.modelID,
       };
+    }
+    if (options?.variant) {
+      body.variant = options.variant;
     }
 
     const url = `${this.baseUrl}/session/${sessionID}/message${this.getQueryParams()}`;
@@ -537,6 +541,7 @@ export class OpenCodeClient {
         id: string;
         name: string;
         options?: { max?: boolean; reasoning?: boolean };
+        variants?: Record<string, { disabled?: boolean; [key: string]: unknown }>;
       }[];
     }[]
   > {
@@ -570,6 +575,7 @@ export class OpenCodeClient {
                     id: string;
                     name: string;
                     options?: { max?: boolean; reasoning?: boolean };
+                    variants?: Record<string, { disabled?: boolean; [key: string]: unknown }>;
                   }
                 >,
               )
@@ -581,6 +587,7 @@ export class OpenCodeClient {
             id: String(m?.id || ""),
             name: String(m?.name || ""),
             options: m?.options,
+            variants: m?.variants,
           })),
         };
       });

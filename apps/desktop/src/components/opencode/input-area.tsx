@@ -17,6 +17,73 @@ interface SelectOptionGroup {
   options: SelectOption[];
 }
 
+type VariantMap = Record<string, { disabled?: boolean; [key: string]: unknown }>;
+
+type InputModel = {
+  id: string;
+  name: string;
+  options?: { max?: boolean; reasoning?: boolean };
+  variants?: VariantMap;
+};
+
+type InputProvider = {
+  id: string;
+  name: string;
+  models: InputModel[];
+};
+
+type SelectedModelChoice = {
+  providerId: string;
+  modelId: string;
+  variant?: string;
+};
+
+const VARIANT_LABELS: Record<string, string> = {
+  none: "None",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "XHigh",
+  fast: "Fast",
+};
+
+const VARIANT_ORDER = ["none", "low", "medium", "high", "xhigh", "fast"];
+
+function isVariantEnabled(variants: VariantMap | undefined, variant: string | undefined): boolean {
+  if (!variants || !variant) return false;
+  return variants[variant]?.disabled !== true;
+}
+
+function formatVariantLabel(variant: string): string {
+  return VARIANT_LABELS[variant] ?? variant;
+}
+
+function getVariantOptions(variants: VariantMap | undefined): SelectOption[] {
+  if (!variants) return [];
+
+  const available = Object.entries(variants)
+    .filter(([, config]) => config?.disabled !== true)
+    .map(([variant]) => variant)
+    .sort((a, b) => {
+      const aIndex = VARIANT_ORDER.indexOf(a);
+      const bIndex = VARIANT_ORDER.indexOf(b);
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+  if (available.length === 0) return [];
+
+  return [
+    { value: "", label: "Effort: Auto" },
+    ...available.map((variant) => ({
+      value: variant,
+      label: `Effort: ${formatVariantLabel(variant)}`,
+    })),
+  ];
+}
+
 function useDropdownPosition(
   triggerRef: React.RefObject<HTMLButtonElement | null>,
   menuRef: React.RefObject<HTMLDivElement | null>,
@@ -296,19 +363,11 @@ export function InputArea({
   onAbort: () => void;
   isWorking: boolean;
   agents: { id: string; name: string; description?: string }[];
-  providers: {
-    id: string;
-    name: string;
-    models: {
-      id: string;
-      name: string;
-      options?: { max?: boolean; reasoning?: boolean };
-    }[];
-  }[];
+  providers: InputProvider[];
   selectedAgent: string | null;
-  selectedModel: { providerId: string; modelId: string } | null;
+  selectedModel: SelectedModelChoice | null;
   onSelectAgent: (agentId: string | null) => void;
-  onSelectModel: (m: { providerId: string; modelId: string } | null) => void;
+  onSelectModel: (m: SelectedModelChoice | null) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -465,10 +524,12 @@ export function InputArea({
   }, [selectedAgent, agents]);
 
   let selectedModelInfo = { name: "Model", provider: "", isMax: false };
+  let selectedModelRecord: InputModel | undefined;
   if (selectedModel) {
     for (const provider of providers) {
       const model = provider.models?.find((m) => m.id === selectedModel.modelId);
       if (model) {
+        selectedModelRecord = model;
         selectedModelInfo = {
           name: model.name,
           provider: provider.name,
@@ -478,6 +539,7 @@ export function InputArea({
       }
     }
   }
+  const variantOptions = getVariantOptions(selectedModelRecord?.variants);
 
   return (
     <div className="border border-border rounded-xl bg-accent-hover focus-within:border-border-dark focus-within:bg-background transition-all">
@@ -556,7 +618,12 @@ export function InputArea({
             onChange={(v) => {
               const [providerId, modelId] = v.split(":");
               if (providerId && modelId) {
-                onSelectModel({ providerId, modelId });
+                const provider = providers.find((p) => p.id === providerId);
+                const model = provider?.models.find((m) => m.id === modelId);
+                const variant = isVariantEnabled(model?.variants, selectedModel?.variant)
+                  ? selectedModel?.variant
+                  : undefined;
+                onSelectModel({ providerId, modelId, variant });
               } else {
                 onSelectModel(null);
               }
@@ -565,6 +632,19 @@ export function InputArea({
           />
           {selectedModelInfo.isMax && (
             <span className="text-xs text-muted font-medium flex-shrink-0">Max</span>
+          )}
+          {selectedModel && variantOptions.length > 0 && (
+            <CustomSelect
+              value={selectedModel.variant ?? ""}
+              options={variantOptions}
+              onChange={(variant) =>
+                onSelectModel({
+                  ...selectedModel,
+                  variant: variant || undefined,
+                })
+              }
+              className="max-w-[110px]"
+            />
           )}
         </div>
 

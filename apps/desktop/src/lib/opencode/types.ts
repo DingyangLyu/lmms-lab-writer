@@ -38,6 +38,7 @@ export type UserMessage = {
   model: {
     providerID: string;
     modelID: string;
+    variant?: string;
   };
 };
 
