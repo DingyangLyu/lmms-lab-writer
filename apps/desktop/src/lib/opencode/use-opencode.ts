@@ -68,8 +68,9 @@ const STORAGE_KEY_MODEL = "opencode-selected-model";
 // Preferred providers order (first found with models will be selected)
 // Google often lacks API keys by default, so put it last
 const PREFERRED_PROVIDER_ORDER = [
-  "anthropic",
   "openai",
+  "codex",
+  "anthropic",
   "deepseek",
   "openrouter",
   "azure",
@@ -78,6 +79,8 @@ const PREFERRED_PROVIDER_ORDER = [
 ];
 
 const PREFERRED_MODELS_BY_PROVIDER: Record<string, string[]> = {
+  openai: ["gpt-5-codex", "gpt-5.4", "gpt-5", "codex"],
+  codex: ["gpt-5-codex", "gpt-5.4", "gpt-5", "codex"],
   deepseek: ["deepseek-v4-pro", "v4-pro", "deepseek-v4-flash", "v4-flash"],
 };
 
