@@ -312,6 +312,8 @@ export function InputArea({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const compositionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const handleFileSelect = useCallback(
@@ -393,10 +395,30 @@ export function InputArea({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const nativeEvent = e.nativeEvent;
+    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSend();
     }
+  };
+
+  const handleCompositionStart = () => {
+    if (compositionEndTimerRef.current) {
+      clearTimeout(compositionEndTimerRef.current);
+      compositionEndTimerRef.current = null;
+    }
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    compositionEndTimerRef.current = setTimeout(() => {
+      isComposingRef.current = false;
+      compositionEndTimerRef.current = null;
+    }, 0);
   };
 
   // Handle keyboard navigation for image preview modal
@@ -428,6 +450,14 @@ export function InputArea({
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (compositionEndTimerRef.current) {
+        clearTimeout(compositionEndTimerRef.current);
+      }
+    };
   }, []);
 
   const _selectedAgentName = useMemo(() => {
@@ -489,6 +519,8 @@ export function InputArea({
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         onPaste={handlePaste}
         placeholder='Ask anything... "Add unit tests for the user service"'
         disabled={isWorking}

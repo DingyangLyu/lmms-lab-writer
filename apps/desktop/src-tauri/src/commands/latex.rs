@@ -309,13 +309,30 @@ pub async fn latex_compile(
     let env_path = std::env::var("PATH").unwrap_or_default();
     #[cfg(target_os = "macos")]
     let env_path = {
-        if !env_path.contains("/Library/TeX/texbin") {
-            format!(
-                "/Library/TeX/texbin:/opt/homebrew/bin:/usr/local/bin:{}",
-                env_path
-            )
-        } else {
+        let mut prefixes = vec![
+            "/Library/TeX/texbin".to_string(),
+            "/opt/homebrew/bin".to_string(),
+            "/usr/local/bin".to_string(),
+        ];
+
+        if let Ok(home) = std::env::var("HOME") {
+            prefixes.insert(
+                0,
+                format!("{}/Library/TinyTeX/bin/universal-darwin", home),
+            );
+            prefixes.insert(1, format!("{}/Library/TinyTeX/bin/arm64-darwin", home));
+            prefixes.insert(2, format!("{}/Library/TinyTeX/bin/x86_64-darwin", home));
+        }
+
+        let missing_prefixes: Vec<String> = prefixes
+            .into_iter()
+            .filter(|path| !env_path.contains(path))
+            .collect();
+
+        if missing_prefixes.is_empty() {
             env_path
+        } else {
+            format!("{}:{}", missing_prefixes.join(":"), env_path)
         }
     };
     cmd.env("PATH", env_path);

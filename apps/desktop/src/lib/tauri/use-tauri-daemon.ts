@@ -313,6 +313,13 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
           console.warn(`File not found: ${relativePath}`);
           throw new Error(`FILE_NOT_FOUND:${relativePath}`);
         }
+        if (
+          errorStr.includes("stream did not contain valid UTF-8") ||
+          errorStr.includes("invalid utf-8") ||
+          errorStr.includes("invalid UTF-8")
+        ) {
+          throw new Error(`BINARY_FILE:${relativePath}`);
+        }
         console.error("Failed to read file:", error);
         throw error;
       }

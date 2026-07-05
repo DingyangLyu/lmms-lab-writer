@@ -30,9 +30,19 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     { url: string; mime: string; filename: string }[]
   >([]);
   const [showSessionList, setShowSessionList] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const lastSessionIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pendingMessageSentRef = useRef(false);
   const [panelParent] = useAutoAnimate({ duration: 200 });
+
+  useEffect(() => {
+    if (pendingMessage) {
+      pendingMessageSentRef.current = false;
+    }
+  }, [pendingMessage]);
 
   // Extract latest tasks from message history
   const latestTasks = useMemo(() => {
@@ -77,10 +87,50 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     return null;
   }, [opencode]);
 
-  // Auto-scroll to bottom when messages/parts update
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, []);
+
+  const updateShouldAutoScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 120;
+  }, []);
+
+  // Keep the stream pinned to the bottom unless the user intentionally scrolls up.
+  useEffect(() => {
+    if (lastSessionIdRef.current !== opencode.currentSessionId) {
+      lastSessionIdRef.current = opencode.currentSessionId;
+      shouldAutoScrollRef.current = true;
+      scrollToBottom("auto");
+      return;
+    }
+
+    if (!shouldAutoScrollRef.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      scrollToBottom("smooth");
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      if (shouldAutoScrollRef.current) {
+        scrollToBottom("smooth");
+      }
+    });
+    observer.observe(container);
+    if (scrollContentRef.current) observer.observe(scrollContentRef.current);
+
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
 
   // Handle pending message from external source
   useEffect(() => {
@@ -151,10 +201,12 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     const content = input.trim();
     if (!content && attachedFiles.length === 0) return;
     const filesToSend = [...attachedFiles];
+    shouldAutoScrollRef.current = true;
     setInput("");
     setAttachedFiles([]);
     await opencode.sendMessage(content, filesToSend.length > 0 ? filesToSend : undefined);
-  }, [input, attachedFiles, opencode]);
+    scrollToBottom("smooth");
+  }, [input, attachedFiles, opencode, scrollToBottom]);
 
   const handleAnswer = useCallback(
     async (_questionID: string, answers: string[][]) => {
@@ -295,18 +347,24 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       {/* Content Area */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div className="absolute inset-0 flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {opencode.messages.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <MessageList
-                messages={opencode.messages}
-                getPartsForMessage={opencode.getPartsForMessage}
-                onFileClick={onFileClick}
-                onAnswer={handleAnswer}
-              />
-            )}
-            <div ref={messagesEndRef} />
+          <div
+            ref={scrollContainerRef}
+            onScroll={updateShouldAutoScroll}
+            className="flex-1 overflow-y-auto px-4 py-4"
+          >
+            <div ref={scrollContentRef}>
+              {opencode.messages.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <MessageList
+                  messages={opencode.messages}
+                  getPartsForMessage={opencode.getPartsForMessage}
+                  onFileClick={onFileClick}
+                  onAnswer={handleAnswer}
+                />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
           <div className="border-t border-border bg-background p-3">

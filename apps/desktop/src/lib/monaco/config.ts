@@ -8,6 +8,8 @@
  * Import this file BEFORE using any Monaco components.
  */
 
+import "./workers";
+
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 

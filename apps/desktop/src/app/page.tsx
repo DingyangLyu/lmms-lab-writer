@@ -35,10 +35,11 @@ import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth";
 import { useEditorSettings } from "@/lib/editor";
 import { findMainTexFile, findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
-import {
-  COMPILE_PROMPT,
-  type MainFileDetectionResult,
-  type SynctexResult,
+import type {
+  CompilationResult,
+  LaTeXCompiler,
+  MainFileDetectionResult,
+  SynctexResult,
 } from "@/lib/latex/types";
 import { pathSync } from "@/lib/path";
 import { useRecentProjects } from "@/lib/recent-projects";
@@ -72,6 +73,7 @@ type OpenCodeStatus = {
   running: boolean;
   port: number;
   installed: boolean;
+  managed?: boolean;
 };
 
 type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
@@ -392,7 +394,7 @@ export default function EditorPage() {
   const [splitDropHint, setSplitDropHint] = useState<SplitPaneSide | null>(null);
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [binaryPreviewUrl, setBinaryPreviewUrl] = useState<string | null>(null);
-  const [pdfRefreshKey, _setPdfRefreshKey] = useState(0);
+  const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
   const [pendingGoToLine, setPendingGoToLine] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -530,6 +532,205 @@ The AI assistant will read and update this file during compilation.
     }
   }, [daemon]);
 
+  const queueCompileFailureForAgent = useCallback(
+    async ({
+      mainFile,
+      compiler,
+      compilerPath,
+      args,
+      error,
+      exitCode,
+    }: {
+      mainFile: string;
+      compiler: LaTeXCompiler;
+      compilerPath: string | null;
+      args: string[];
+      error: string;
+      exitCode?: number | null;
+    }) => {
+      if (!daemon.projectPath) return;
+
+      const logFile = mainFile.replace(/\.tex$/i, ".log");
+      let logTail = "";
+      try {
+        const logContent = await daemon.readFile(logFile);
+        if (logContent) {
+          const maxLogChars = 12000;
+          logTail =
+            logContent.length > maxLogChars
+              ? `[Log truncated to last ${maxLogChars} characters]\n${logContent.slice(-maxLogChars)}`
+              : logContent;
+        }
+      } catch {
+        logTail = "(No .log file was available.)";
+      }
+
+      const implicitArgs = ["-interaction=nonstopmode", "-file-line-error", "-synctex=1"];
+      const prompt = [
+        "Local LaTeX compilation failed. Please diagnose and fix this project.",
+        "",
+        `Captured at: ${new Date().toISOString()}`,
+        `Project directory: ${daemon.projectPath}`,
+        `Main file: ${mainFile}`,
+        `Compiler: ${compiler}`,
+        `Compiler path used by the app: ${compilerPath ?? "(resolved from PATH)"}`,
+        `Arguments: ${[...implicitArgs, ...args, mainFile].join(" ")}`,
+        `Exit code: ${exitCode ?? "unknown"}`,
+        `Reported error: ${error}`,
+        "",
+        "LaTeX log tail:",
+        "~~~log",
+        logTail || "(No log content was available.)",
+        "~~~",
+        "",
+        "If the error depends on current package documentation, class behavior, or a web-only error message, use websearch for discovery and webfetch for source URLs.",
+        "Please inspect the relevant .tex, .bib, .sty, and .cls files, make the minimal fix needed to compile, rerun the local compilation, and summarize what changed.",
+      ].join("\n");
+
+      setPendingOpenCodeMessage(prompt);
+      setShowRightPanel(true);
+
+      try {
+        const status = await invoke<OpenCodeStatus>("opencode_status");
+        if (!status.installed) {
+          setOpencodeDaemonStatus("unavailable");
+          toast(
+            "Compilation failed. OpenCode is not installed, so the Agent cannot be started.",
+            "error",
+          );
+          return;
+        }
+
+        if (
+          status.running &&
+          status.managed &&
+          opencodeStartedForPathRef.current === daemon.projectPath
+        ) {
+          setOpencodeDaemonStatus("running");
+          setOpencodePort(status.port);
+          toast("Compilation failed. Sent the log to Agent.", "error");
+          return;
+        }
+
+        setOpencodeDaemonStatus("starting");
+        setOpencodeError(null);
+        const startedStatus = await invoke<OpenCodeStatus>("opencode_start", {
+          directory: daemon.projectPath,
+          port: 4096,
+        });
+        setOpencodeDaemonStatus("running");
+        setOpencodePort(startedStatus.port);
+        opencodeStartedForPathRef.current = daemon.projectPath;
+        toast("Compilation failed. Sent the log to Agent.", "error");
+      } catch (agentError) {
+        const message = agentError instanceof Error ? agentError.message : String(agentError);
+        setOpencodeDaemonStatus("stopped");
+        setOpencodeError(message);
+        toast("Compilation failed. Could not start the Agent automatically.", "error");
+      }
+    },
+    [daemon, toast],
+  );
+
+  const runDirectCompile = useCallback(
+    async (mainFile: string) => {
+      if (!daemon.projectPath) return;
+
+      const status = latexCompiler.compilersStatus ?? (await latexCompiler.detectCompilers());
+      const hasDetectedCompiler =
+        status &&
+        (status.pdflatex.available ||
+          status.xelatex.available ||
+          status.lualatex.available ||
+          status.latexmk.available);
+
+      if (!status || !hasDetectedCompiler) {
+        toast("No LaTeX compiler found. Install TinyTeX or refresh compiler detection.", "error");
+        return;
+      }
+
+      let source = "";
+      try {
+        source = (await daemon.readFile(mainFile)) ?? "";
+      } catch {
+        // Compilation can still report a useful error if the file is missing.
+      }
+
+      const needsUnicodeCompiler =
+        /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/.test(source) ||
+        /\\documentclass(?:\[[^\]]*])?{ctex/.test(source) ||
+        /\\usepackage(?:\[[^\]]*])?{(?:ctex|xeCJK|fontspec)}/.test(source);
+
+      let compiler: LaTeXCompiler | null = null;
+      let args: string[] = [];
+      if (status.latexmk.available) {
+        compiler = "latexmk";
+        args = [needsUnicodeCompiler && status.xelatex.available ? "-xelatex" : "-pdf"];
+      } else if (needsUnicodeCompiler && status.xelatex.available) {
+        compiler = "xelatex";
+      } else if (status.pdflatex.available) {
+        compiler = "pdflatex";
+      } else if (status.xelatex.available) {
+        compiler = "xelatex";
+      } else if (status.lualatex.available) {
+        compiler = "lualatex";
+      }
+
+      if (!compiler) {
+        toast("No usable LaTeX compiler found.", "error");
+        return;
+      }
+
+      const compilerInfo = status[compiler];
+      toast(`Compiling ${mainFile} with ${compilerInfo.version ? compilerInfo.name : compiler}...`);
+
+      try {
+        const result = await invoke<CompilationResult>("latex_compile", {
+          directory: daemon.projectPath,
+          compiler,
+          mainFile,
+          args,
+          customPath: compilerInfo.path,
+        });
+
+        if (!result.success || !result.pdf_path) {
+          await queueCompileFailureForAgent({
+            mainFile,
+            compiler,
+            compilerPath: compilerInfo.path,
+            args,
+            error: result.error || "LaTeX compilation failed.",
+            exitCode: result.exit_code,
+          });
+          return;
+        }
+
+        const pdfFile = mainFile.replace(/\.tex$/i, ".pdf");
+        const pdfPath = result.pdf_path;
+
+        setEditorViewMode("file");
+        setGitDiffPreview(null);
+        setOpenTabs((prev) => (prev.includes(pdfFile) ? prev : [...prev, pdfFile]));
+        setSelectedFile(pdfFile);
+        setBinaryPreviewUrl(convertFileSrc(pdfPath));
+        setFileContent("");
+        setPdfRefreshKey((key) => key + 1);
+        void daemon.refreshFiles();
+        toast(`PDF rendered: ${pdfFile}`);
+      } catch (error) {
+        await queueCompileFailureForAgent({
+          mainFile,
+          compiler,
+          compilerPath: compilerInfo.path,
+          args,
+          error: String(error),
+          exitCode: null,
+        });
+      }
+    },
+    [daemon, latexCompiler, queueCompileFailureForAgent, toast],
+  );
+
   // Handle compile with main file detection
   const handleCompileWithDetection = useCallback(async () => {
     if (!daemon.projectPath) return;
@@ -547,8 +748,7 @@ The AI assistant will read and update this file during compilation.
 
     // If detection found a main file and doesn't need user input, proceed
     if (result.main_file && !result.needs_user_input) {
-      setShowRightPanel(true);
-      setPendingOpenCodeMessage(COMPILE_PROMPT.replace("{mainFile}", result.main_file));
+      await runDirectCompile(result.main_file);
       return;
     }
 
@@ -561,20 +761,18 @@ The AI assistant will read and update this file during compilation.
 
     // No tex files found
     toast("No .tex files found in the project", "error");
-  }, [daemon.projectPath, latexSettings, toast, ensureCompileNotesFile]);
+  }, [daemon.projectPath, latexSettings, toast, ensureCompileNotesFile, runDirectCompile]);
 
   // Handle main file selection from dialog
   const handleMainFileSelect = useCallback(
-    (mainFile: string) => {
+    async (mainFile: string) => {
       latexSettings.setMainFile(mainFile);
       setShowMainFileDialog(false);
       setMainFileDetectionResult(null);
 
-      // Proceed with compilation
-      setShowRightPanel(true);
-      setPendingOpenCodeMessage(COMPILE_PROMPT.replace("{mainFile}", mainFile));
+      await runDirectCompile(mainFile);
     },
-    [latexSettings],
+    [latexSettings, runDirectCompile],
   );
 
   const handleMainFileDialogCancel = useCallback(() => {
@@ -587,9 +785,11 @@ The AI assistant will read and update this file during compilation.
       const status = await invoke<OpenCodeStatus>("opencode_status");
       if (!status.installed) {
         setOpencodeDaemonStatus("unavailable");
-      } else if (status.running) {
+      } else if (status.running && status.managed) {
         setOpencodeDaemonStatus("running");
         setOpencodePort(status.port);
+      } else if (status.running) {
+        setOpencodeDaemonStatus("stopped");
       } else {
         setOpencodeDaemonStatus("stopped");
       }
@@ -642,11 +842,8 @@ The AI assistant will read and update this file during compilation.
         );
         return;
       }
-      // OpenCode is now installed, proceed to start it
-      if (!status.running) {
-        await startOpencode(daemon.projectPath);
-        toast("OpenCode started successfully!", "success");
-      }
+      await startOpencode(daemon.projectPath);
+      toast("OpenCode started successfully!", "success");
       return;
     }
 
@@ -668,6 +865,7 @@ The AI assistant will read and update this file during compilation.
       });
       setOpencodeDaemonStatus("running");
       setOpencodePort(status.port);
+      opencodeStartedForPathRef.current = daemon.projectPath;
       toast("OpenCode started successfully!", "success");
     } catch (err) {
       console.error("Failed to start OpenCode:", err);
@@ -707,21 +905,30 @@ The AI assistant will read and update this file during compilation.
     const willOpen = !showRightPanel;
     setShowRightPanel(willOpen);
 
-    if (willOpen && daemon.projectPath && opencodeDaemonStatus === "stopped") {
+    if (willOpen && daemon.projectPath) {
       const status = await checkOpencodeStatus();
-      if (status?.installed && !status.running) {
+      if (
+        status?.installed &&
+        (!status.running ||
+          !status.managed ||
+          opencodeStartedForPathRef.current !== daemon.projectPath)
+      ) {
         await startOpencode(daemon.projectPath);
-      } else if (status?.running) {
+      } else if (status?.running && status.managed) {
         opencodeStartedForPathRef.current = daemon.projectPath;
       }
     }
   }, [
     showRightPanel,
     daemon.projectPath,
-    opencodeDaemonStatus,
     checkOpencodeStatus,
     startOpencode,
   ]);
+
+  useEffect(() => {
+    if (!showRightPanel || !daemon.projectPath || opencodeDaemonStatus !== "stopped") return;
+    void startOpencode(daemon.projectPath);
+  }, [showRightPanel, daemon.projectPath, opencodeDaemonStatus, startOpencode]);
 
   useEffect(() => {
     localStorage.setItem("sidebarWidth", String(sidebarWidth));
@@ -845,13 +1052,36 @@ The AI assistant will read and update this file during compilation.
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const getFileType = useCallback((path: string): "text" | "image" | "pdf" => {
+  const getFileType = useCallback((path: string): "text" | "image" | "pdf" | "binary" => {
     const ext = path.split(".").pop()?.toLowerCase() || "";
+    const lowerPath = path.toLowerCase();
     if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "ico"].includes(ext)) {
       return "image";
     }
     if (ext === "pdf") {
       return "pdf";
+    }
+    if (
+      lowerPath.endsWith(".synctex.gz") ||
+      [
+        "zip",
+        "gz",
+        "tgz",
+        "tar",
+        "bz2",
+        "xz",
+        "7z",
+        "rar",
+        "dvi",
+        "ttf",
+        "otf",
+        "woff",
+        "woff2",
+        "eot",
+        "ds_store",
+      ].includes(ext)
+    ) {
+      return "binary";
     }
     return "text";
   }, []);
@@ -982,6 +1212,14 @@ The AI assistant will read and update this file during compilation.
               return newTabs;
             });
           } else {
+            if (errorStr.includes("BINARY_FILE")) {
+              const fullPath = daemon.projectPath
+                ? pathSync.join(daemon.projectPath, resolvedPath)
+                : resolvedPath;
+              setBinaryPreviewUrl(convertFileSrc(fullPath));
+              setFileContent("");
+              return;
+            }
             console.error("Failed to read file:", err);
             toast(`Failed to read file: ${err}`, "error");
             setFileContent("");
@@ -1207,7 +1445,7 @@ The AI assistant will read and update this file during compilation.
       const lastSave = lastSaveTimeRef.current;
       const isOurSave = lastSave && lastSave.path === path && Date.now() - lastSave.time < 2000;
 
-      if (path === selectedFile && !isOurSave) {
+      if (path === selectedFile && getFileType(path) === "text" && !isOurSave) {
         daemon
           .readFile(path)
           .then((content) => {
@@ -1224,6 +1462,7 @@ The AI assistant will read and update this file during compilation.
         splitPane &&
         path === splitPane.selectedFile &&
         !splitPane.binaryPreviewUrl &&
+        getFileType(path) === "text" &&
         !isOurSave
       ) {
         daemon
@@ -1245,7 +1484,7 @@ The AI assistant will read and update this file during compilation.
           });
       }
     }
-  }, [daemon.lastFileChange, selectedFile, handleFileSelect, daemon, splitPane]);
+  }, [daemon.lastFileChange, selectedFile, handleFileSelect, daemon, splitPane, getFileType]);
 
   const handleCloseTab = useCallback(
     (path: string, e?: React.MouseEvent) => {
@@ -1432,6 +1671,21 @@ The AI assistant will read and update this file during compilation.
           if (errorStr.includes("FILE_NOT_FOUND")) {
             toast(`File "${pathSync.basename(resolvedPath)}" no longer exists`, "error");
             setSplitPane(null);
+            return;
+          }
+          if (errorStr.includes("BINARY_FILE")) {
+            const fullPath = daemon.projectPath
+              ? pathSync.join(daemon.projectPath, resolvedPath)
+              : resolvedPath;
+            setSplitPane((prev) => {
+              if (!prev || prev.selectedFile !== resolvedPath) return prev;
+              return {
+                ...prev,
+                isLoading: false,
+                error: null,
+                binaryPreviewUrl: convertFileSrc(fullPath),
+              };
+            });
             return;
           }
           setSplitPane((prev) => {
@@ -1820,12 +2074,16 @@ The AI assistant will read and update this file during compilation.
                     refreshKey={splitPane.pdfRefreshKey}
                     onSynctexClick={handleSplitSynctexClick}
                   />
+                ) : splitFileType === "binary" ? (
+                  <div className="text-sm text-muted text-center">
+                    Binary file preview is not available.
+                  </div>
                 ) : (
                   <iframe
                     key={splitPane.pdfRefreshKey}
                     src={splitPane.binaryPreviewUrl}
                     className="w-full h-full border-0"
-                    title={`PDF: ${splitSelectedFile}`}
+                    title={`File: ${splitSelectedFile}`}
                   />
                 )}
               </div>
@@ -2491,6 +2749,12 @@ The AI assistant will read and update this file during compilation.
                 refreshKey={pdfRefreshKey}
                 onSynctexClick={handleSynctexClick}
               />
+            ) : getFileType(selectedFile) === "binary" ? (
+              <div className="flex-1 flex items-center justify-center overflow-auto p-4">
+                <div className="text-sm text-muted text-center">
+                  Binary file preview is not available.
+                </div>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center overflow-auto p-4">
                 <iframe

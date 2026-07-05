@@ -70,11 +70,32 @@ const STORAGE_KEY_MODEL = "opencode-selected-model";
 const PREFERRED_PROVIDER_ORDER = [
   "anthropic",
   "openai",
+  "deepseek",
   "openrouter",
   "azure",
   "aws-bedrock",
   "google", // Put Google last since it often lacks API key
 ];
+
+const PREFERRED_MODELS_BY_PROVIDER: Record<string, string[]> = {
+  deepseek: ["deepseek-v4-pro", "v4-pro", "deepseek-v4-flash", "v4-flash"],
+};
+
+function pickPreferredModel(provider: Provider): Model | undefined {
+  const providerKey = `${provider.id} ${provider.name}`.toLowerCase();
+  const preferredModels = Object.entries(PREFERRED_MODELS_BY_PROVIDER).find(([key]) =>
+    providerKey.includes(key),
+  )?.[1];
+
+  if (preferredModels) {
+    for (const preferredModel of preferredModels) {
+      const model = provider.models.find((m) => m.id.toLowerCase().includes(preferredModel));
+      if (model) return model;
+    }
+  }
+
+  return provider.models[0];
+}
 
 export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn {
   const { baseUrl = DEFAULT_BASE_URL, directory, autoConnect = false } = options;
@@ -411,7 +432,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           );
           if (provider && Array.isArray(provider.models) && provider.models.length > 0) {
             selectedProvider = provider;
-            selectedProviderModel = provider.models[0];
+            selectedProviderModel = pickPreferredModel(provider);
             break;
           }
         }
@@ -421,7 +442,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           selectedProvider = safeProviders.find(
             (p) => Array.isArray(p.models) && p.models.length > 0,
           );
-          selectedProviderModel = selectedProvider?.models?.[0];
+          selectedProviderModel = selectedProvider ? pickPreferredModel(selectedProvider) : undefined;
         }
 
         if (selectedProvider && selectedProviderModel) {

@@ -1,5 +1,7 @@
 "use client";
 
+import "@/lib/monaco/config";
+
 import { DiffEditor, type DiffOnMount, type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useTheme } from "next-themes";

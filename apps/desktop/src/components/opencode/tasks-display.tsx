@@ -27,6 +27,10 @@ export function parseTasks(data: unknown): TaskItem[] | null {
   return null;
 }
 
+function getTaskKey(task: TaskItem, index: number): string {
+  return task.id || `${task.status}-${task.priority ?? "normal"}-${index}-${task.content}`;
+}
+
 export function CollapsibleTasksBar({ tasks }: { tasks: TaskItem[] }) {
   const [expanded, setExpanded] = useState(false);
   const [tasksParent] = useAutoAnimate({ duration: 150 });
@@ -72,9 +76,9 @@ export function CollapsibleTasksBar({ tasks }: { tasks: TaskItem[] }) {
           ref={tasksParent}
           className="border-t border-border divide-y divide-border max-h-48 overflow-y-auto"
         >
-          {tasks.map((task) => (
+          {tasks.map((task, index) => (
             <div
-              key={task.id}
+              key={getTaskKey(task, index)}
               className="px-3 py-1.5 flex items-start gap-2 hover:bg-accent-hover transition-colors"
             >
               <div
@@ -123,9 +127,9 @@ export function TasksDisplay({ tasks }: { tasks: TaskItem[] }) {
         <span className="text-[10px] font-mono text-muted">{tasks.length}</span>
       </div>
       <div ref={tasksListParent} className="divide-y divide-border">
-        {tasks.map((task) => (
+        {tasks.map((task, index) => (
           <div
-            key={task.id}
+            key={getTaskKey(task, index)}
             className="px-3 py-2 flex items-start gap-2 hover:bg-accent-hover transition-colors"
           >
             <div

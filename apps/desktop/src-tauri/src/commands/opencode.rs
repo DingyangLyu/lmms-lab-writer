@@ -26,6 +26,7 @@ pub struct OpenCodeStatus {
     pub running: bool,
     pub port: u16,
     pub installed: bool,
+    pub managed: bool,
 }
 
 async fn find_opencode() -> Option<String> {
@@ -132,6 +133,7 @@ pub async fn opencode_status(
         running,
         port,
         installed,
+        managed: process_running,
     })
 }
 
@@ -218,6 +220,7 @@ pub async fn opencode_start(
     let mut child = command(&opencode_path)
         .args(["serve", "--port", &port.to_string()])
         .current_dir(&directory)
+        .env("OPENCODE_ENABLE_EXA", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true)
@@ -310,6 +313,7 @@ pub async fn opencode_start(
         running: true,
         port,
         installed: true,
+        managed: true,
     })
 }
 
@@ -456,16 +460,19 @@ mod tests {
             running: true,
             port: 4096,
             installed: true,
+            managed: true,
         };
 
         let json = serde_json::to_string(&status).unwrap();
         assert!(json.contains("\"running\":true"));
         assert!(json.contains("\"port\":4096"));
         assert!(json.contains("\"installed\":true"));
+        assert!(json.contains("\"managed\":true"));
 
         let deserialized: OpenCodeStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.running, status.running);
         assert_eq!(deserialized.port, status.port);
         assert_eq!(deserialized.installed, status.installed);
+        assert_eq!(deserialized.managed, status.managed);
     }
 }
