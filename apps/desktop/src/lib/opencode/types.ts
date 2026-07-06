@@ -275,6 +275,12 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
         title: "Fetching",
         subtitle: truncate(input.url as string),
       };
+    case "websearch":
+      return {
+        icon: "globe",
+        title: "Searching",
+        subtitle: truncate(input.query as string),
+      };
     case "task":
       return {
         icon: "bot",
@@ -352,6 +358,18 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
       };
     }
     default:
+      if (tool.toLowerCase().includes("perplexity_search")) {
+        const query =
+          (input.query as string | undefined) ??
+          (input.q as string | undefined) ??
+          (input.search as string | undefined);
+        return {
+          icon: "globe",
+          title: "Perplexity Search",
+          subtitle: truncate(query ?? "Search"),
+        };
+      }
+
       return {
         icon: "tool",
         title: tool,

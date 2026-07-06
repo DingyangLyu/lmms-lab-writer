@@ -12,6 +12,7 @@ import type {
   TextPart,
   ToolPart,
 } from "@/lib/opencode/types";
+import { stripSearchFallbackHint } from "@/lib/opencode/search-fallback";
 import { ChevronRightIcon } from "./icons";
 import { MarkdownText } from "./markdown-text";
 import { AskUserQuestionDisplay } from "./question-wizard";
@@ -64,7 +65,9 @@ export function MessageList({
     <div ref={turnsParent} className="space-y-6">
       {turns.map((turn, index) => {
         const userParts = getPartsForMessage(turn.user.id);
-        const userText = userParts.find((p): p is TextPart => p.type === "text")?.text || "";
+        const userText = stripSearchFallbackHint(
+          userParts.find((p): p is TextPart => p.type === "text")?.text || "",
+        );
         const userImages = userParts.filter(
           (p): p is FilePart =>
             p.type === "file" &&

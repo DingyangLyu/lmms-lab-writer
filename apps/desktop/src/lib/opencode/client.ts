@@ -1,4 +1,5 @@
 import type { Event, Message, Part, SessionInfo, SessionStatus } from "./types";
+import { appendSearchFallbackHint } from "./search-fallback";
 
 export function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === "AbortError") return true;
@@ -409,7 +410,7 @@ export class OpenCodeClient {
 
     // Add text part
     if (content.trim()) {
-      parts.push({ type: "text", text: content });
+      parts.push({ type: "text", text: appendSearchFallbackHint(content) });
     }
 
     const body: Record<string, unknown> = {
