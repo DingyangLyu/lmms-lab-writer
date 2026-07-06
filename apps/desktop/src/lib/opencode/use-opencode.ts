@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createOpenCodeClient, isAbortError, type OpenCodeClient } from "./client";
+import {
+  buildWebsearchFallbackPrompt,
+  getWebsearchFallbackFailure,
+  isPerplexitySearchPart,
+  type WebsearchFallbackFailure,
+} from "./search-fallback";
 import type { Event, Message, Part, QuestionAsked, SessionInfo, SessionStatus } from "./types";
 
 export type UseOpenCodeOptions = {
@@ -188,6 +194,8 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
     sessionId: string;
     retriedUnsupportedModel: boolean;
   } | null>(null);
+  const pendingWebsearchFallbacksRef = useRef<Map<string, WebsearchFallbackFailure[]>>(new Map());
+  const queuedWebsearchFallbackPartIdsRef = useRef<Set<string>>(new Set());
 
   // Sync messages and parts only (not status) - used after sending messages
   const syncMessagesAndPartsRef = useRef<() => void>(() => {});
@@ -240,6 +248,55 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
     syncFromStoreRef.current();
   }, []);
 
+  const flushWebsearchFallbackRef = useRef<(sessionId: string) => void>(() => {});
+  flushWebsearchFallbackRef.current = (sessionId: string) => {
+    const failures = pendingWebsearchFallbacksRef.current.get(sessionId);
+    if (!failures?.length) return;
+
+    pendingWebsearchFallbacksRef.current.delete(sessionId);
+
+    const client = clientRef.current;
+    if (!client || currentSessionIdRef.current !== sessionId) return;
+
+    const prompt = buildWebsearchFallbackPrompt(failures);
+    const selected = selectedModelRef.current;
+    const agent = selectedAgentRef.current ?? undefined;
+
+    lastSendRef.current = {
+      content: prompt,
+      agent,
+      sessionId,
+      retriedUnsupportedModel: false,
+    };
+    setError(null);
+    setStatus({ type: "running" });
+    client
+      .chat(sessionId, prompt, {
+        agent,
+        model: selected
+          ? {
+              providerID: selected.providerId,
+              modelID: selected.modelId,
+            }
+          : undefined,
+        variant: selected?.variant,
+      })
+      .then(() => {
+        setTimeout(() => {
+          syncMessagesAndPartsRef.current();
+        }, 500);
+      })
+      .catch((err) => {
+        if (isAbortError(err)) {
+          setStatus({ type: "idle" });
+          return;
+        }
+        console.error("[OpenCode] websearch fallback failed:", err);
+        setStatus({ type: "idle" });
+        setError(err instanceof Error ? err.message : "Failed to run websearch fallback");
+      });
+  };
+
   const handleEventRef = useRef<(event: Event) => void>(() => {});
   handleEventRef.current = (event: Event) => {
     if ("properties" in event) {
@@ -259,6 +316,30 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         const statusData = props.status as SessionStatus | undefined;
         if (statusData) {
           setStatus(statusData);
+        }
+        if (statusData?.type === "idle") {
+          flushWebsearchFallbackRef.current(eventSessionId as string);
+        }
+      }
+
+      if (event.type === "session.idle" && eventSessionId === currentSessionIdRef.current) {
+        setStatus({ type: "idle" });
+        flushWebsearchFallbackRef.current(eventSessionId as string);
+      }
+
+      if (event.type === "message.part.updated" && eventSessionId === currentSessionIdRef.current) {
+        const part = event.properties.part;
+        if (isPerplexitySearchPart(part)) {
+          pendingWebsearchFallbacksRef.current.delete(eventSessionId as string);
+        }
+
+        const failure = getWebsearchFallbackFailure(part);
+        if (failure && !queuedWebsearchFallbackPartIdsRef.current.has(failure.partId)) {
+          queuedWebsearchFallbackPartIdsRef.current.add(failure.partId);
+          const sessionFallbacks =
+            pendingWebsearchFallbacksRef.current.get(eventSessionId as string) ?? [];
+          sessionFallbacks.push(failure);
+          pendingWebsearchFallbacksRef.current.set(eventSessionId as string, sessionFallbacks);
         }
       }
 
@@ -588,7 +669,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           selectedProvider = safeProviders.find(
             (p) => Array.isArray(p.models) && p.models.length > 0,
           );
-          selectedProviderModel = selectedProvider ? pickPreferredModel(selectedProvider) : undefined;
+          selectedProviderModel = selectedProvider
+            ? pickPreferredModel(selectedProvider)
+            : undefined;
         }
 
         if (selectedProvider && selectedProviderModel) {
@@ -858,21 +941,18 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
     }
   }, []);
 
-  const handleSetSelectedModel = useCallback(
-    (model: SelectedModel | null) => {
-      setSelectedModel(model);
-      try {
-        if (model) {
-          localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(model));
-        } else {
-          localStorage.removeItem(STORAGE_KEY_MODEL);
-        }
-      } catch {
-        // Ignore localStorage errors
+  const handleSetSelectedModel = useCallback((model: SelectedModel | null) => {
+    setSelectedModel(model);
+    try {
+      if (model) {
+        localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(model));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_MODEL);
       }
-    },
-    [],
-  );
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
 
   const currentSession = currentSessionId
     ? sessions.find((s) => s.id === currentSessionId) || null
