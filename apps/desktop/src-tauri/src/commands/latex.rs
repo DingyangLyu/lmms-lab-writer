@@ -564,7 +564,7 @@ pub async fn latex_synctex_edit(
 
     if !output.status.success() {
         let stderr = decode_bytes(&output.stderr);
-        return Err(format!("synctex edit failed: {}", stderr));
+        return Err(synctex_edit_error_message(&stderr));
     }
 
     let stdout = decode_bytes(&output.stdout);
@@ -589,6 +589,19 @@ pub async fn latex_synctex_edit(
     }
 
     Ok(SynctexResult { file, line, column })
+}
+
+fn synctex_edit_error_message(stderr: &str) -> String {
+    if stderr.contains("No SyncTeX available") {
+        return "SYNCTEX_FILE_MISSING: No SyncTeX data is available for this PDF. Recompile with SyncTeX enabled (-synctex=1) to use PDF-to-source navigation.".to_string();
+    }
+
+    let trimmed = stderr.trim();
+    if trimmed.is_empty() {
+        "synctex edit failed without output".to_string()
+    } else {
+        format!("synctex edit failed: {}", trimmed)
+    }
 }
 
 /// Quick-install synctex via tlmgr (when a TeX distribution already exists).
@@ -1499,6 +1512,22 @@ mod tests {
                 path
             );
         }
+    }
+
+    #[test]
+    fn synctex_edit_error_message_detects_missing_synctex_data() {
+        let message =
+            synctex_edit_error_message("SyncTeX ERROR: No SyncTeX available for manuscript_CN.pdf");
+
+        assert!(message.starts_with("SYNCTEX_FILE_MISSING:"));
+        assert!(!message.contains("usage: synctex"));
+    }
+
+    #[test]
+    fn synctex_edit_error_message_has_final_fallback() {
+        let message = synctex_edit_error_message("");
+
+        assert_eq!(message, "synctex edit failed without output");
     }
 
     #[test]

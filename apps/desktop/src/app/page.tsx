@@ -77,6 +77,14 @@ function getReadableErrorMessage(error: unknown, fallback: string): string {
   return message.trim() || fallback;
 }
 
+function getSynctexLookupMessage(error: unknown): string {
+  const message = getReadableErrorMessage(error, "SyncTeX lookup failed.");
+  if (message.includes("SYNCTEX_FILE_MISSING") || message.includes("No SyncTeX available")) {
+    return "No SyncTeX data is available for this PDF. Recompile with SyncTeX enabled.";
+  }
+  return "SyncTeX lookup failed. Check that your PDF has a .synctex.gz file.";
+}
+
 type OpenCodeStatus = {
   running: boolean;
   port: number;
@@ -1288,8 +1296,9 @@ The AI assistant will read and update this file during compilation.
           pendingSynctexRetryRef.current = { page, x, y, context: "main" };
           setShowSynctexInstallDialog(true);
         } else {
-          console.error("SyncTeX lookup failed:", err);
-          toast("SyncTeX lookup failed. Check that your PDF has a .synctex.gz file.", "error");
+          const errorMessage = getSynctexLookupMessage(err);
+          console.warn(`SyncTeX lookup failed: ${getReadableErrorMessage(err, errorMessage)}`);
+          toast(errorMessage, "error");
         }
       }
     },
@@ -1333,8 +1342,9 @@ The AI assistant will read and update this file during compilation.
           pendingSynctexRetryRef.current = { page, x, y, context: "split" };
           setShowSynctexInstallDialog(true);
         } else {
-          console.error("SyncTeX lookup failed:", err);
-          toast("SyncTeX lookup failed. Check that your PDF has a .synctex.gz file.", "error");
+          const errorMessage = getSynctexLookupMessage(err);
+          console.warn(`SyncTeX lookup failed: ${getReadableErrorMessage(err, errorMessage)}`);
+          toast(errorMessage, "error");
         }
       }
     },
