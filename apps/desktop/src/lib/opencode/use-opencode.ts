@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createOpenCodeClient, isAbortError, type OpenCodeClient } from "./client";
+import {
+  createOpenCodeClient,
+  getOpenCodeErrorMessage,
+  isAbortError,
+  type OpenCodeClient,
+} from "./client";
 import {
   buildWebsearchFallbackPrompt,
   getWebsearchFallbackFailure,
@@ -291,7 +296,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           setStatus({ type: "idle" });
           return;
         }
-        console.error("[OpenCode] websearch fallback failed:", err);
+        console.error(
+          `[OpenCode] websearch fallback failed: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+        );
         setStatus({ type: "idle" });
         setError(err instanceof Error ? err.message : "Failed to run websearch fallback");
       });
@@ -428,7 +435,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
                       setStatus({ type: "idle" });
                       return;
                     }
-                    console.error("[OpenCode] Unsupported model fallback failed:", err);
+                    console.error(
+                      `[OpenCode] Unsupported model fallback failed: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+                    );
                     setStatus({ type: "idle" });
                     setError(
                       err instanceof Error
@@ -489,7 +498,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
                     }
                   })
                   .catch((err) => {
-                    console.error("[OpenCode] Auto-recovery failed:", err);
+                    console.error(
+                      `[OpenCode] Auto-recovery failed: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+                    );
                     setError("Session error. Please try again.");
                   });
               }
@@ -584,7 +595,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       }
     } catch (err) {
       if (isAbortError(err)) return;
-      console.error("Failed to load sessions:", err);
+      console.error(
+        `Failed to load OpenCode sessions: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+      );
       setSessions([]);
     }
   }, [connected]);
@@ -683,7 +696,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       }
     } catch (err) {
       if (isAbortError(err)) return;
-      console.error("Failed to load config:", err);
+      console.error(
+        `Failed to load OpenCode config: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+      );
       setAgents([]);
       setProviders([]);
     }
@@ -872,7 +887,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           setStatus({ type: "idle" });
           return;
         }
-        console.error("[OpenCode] sendMessage error:", err);
+        console.error(
+          `[OpenCode] sendMessage error: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+        );
         // On error, reset status to idle and show error
         setStatus({ type: "idle" });
         setError(err instanceof Error ? err.message : "Failed to send message");
@@ -905,7 +922,9 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         setCurrentQuestion(null);
       } catch (err) {
         if (isAbortError(err)) return;
-        console.error("[OpenCode] Failed to answer question:", err);
+        console.error(
+          `[OpenCode] Failed to answer question: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
+        );
         setError(err instanceof Error ? err.message : "Failed to answer question");
       }
     },

@@ -2,6 +2,7 @@
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getOpenCodeErrorMessage } from "@/lib/opencode/client";
 import type { ToolPart } from "@/lib/opencode/types";
 import { useOpenCode } from "@/lib/opencode/use-opencode";
 import { ChevronIcon, PlusIcon } from "./icons";
@@ -163,7 +164,9 @@ export const OpenCodePanel = memo(function OpenCodePanel({
           await opencode.sendMessage(pendingMessage);
           onPendingMessageSent?.();
         } catch (error) {
-          console.error("[OpenCode] Error sending pending message:", error);
+          console.error(
+            `[OpenCode] Error sending pending message: ${getOpenCodeErrorMessage(error, "Unknown error")}`,
+          );
         }
       }
     };

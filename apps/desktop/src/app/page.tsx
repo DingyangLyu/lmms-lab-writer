@@ -69,6 +69,14 @@ function throttle<T extends (...args: Parameters<T>) => void>(fn: T, limit: numb
   }) as T;
 }
 
+function getReadableErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/^(load failed|failed to fetch|networkerror)$/i.test(message.trim())) {
+    return fallback;
+  }
+  return message.trim() || fallback;
+}
+
 type OpenCodeStatus = {
   running: boolean;
   port: number;
@@ -820,7 +828,7 @@ The AI assistant will read and update this file during compilation.
         opencodeStartedForPathRef.current = directory;
         return status;
       } catch (err) {
-        console.error("Failed to start OpenCode:", err);
+        console.error(`Failed to start OpenCode: ${getReadableErrorMessage(err, "Unknown error")}`);
         setOpencodeDaemonStatus("unavailable");
         toast(
           "OpenCode is not installed or configured correctly. Please install it from https://opencode.ai/ or run: npm i -g opencode-ai@latest",
@@ -874,9 +882,9 @@ The AI assistant will read and update this file during compilation.
       opencodeStartedForPathRef.current = daemon.projectPath;
       toast("OpenCode started successfully!", "success");
     } catch (err) {
-      console.error("Failed to start OpenCode:", err);
+      const errorMessage = getReadableErrorMessage(err, "Failed to start OpenCode");
+      console.error(`Failed to start OpenCode: ${errorMessage}`);
       setOpencodeDaemonStatus("stopped");
-      const errorMessage = err instanceof Error ? err.message : String(err);
       setOpencodeError(errorMessage);
     }
   }, [daemon.projectPath, opencodeDaemonStatus, toast, checkOpencodeStatus, startOpencode]);
@@ -924,12 +932,7 @@ The AI assistant will read and update this file during compilation.
         opencodeStartedForPathRef.current = daemon.projectPath;
       }
     }
-  }, [
-    showRightPanel,
-    daemon.projectPath,
-    checkOpencodeStatus,
-    startOpencode,
-  ]);
+  }, [showRightPanel, daemon.projectPath, checkOpencodeStatus, startOpencode]);
 
   useEffect(() => {
     if (!showRightPanel || !daemon.projectPath || opencodeDaemonStatus !== "stopped") return;
@@ -2556,8 +2559,11 @@ The AI assistant will read and update this file during compilation.
       setCommitMessage(aiMessage);
       toast("AI commit draft generated.", "success");
     } catch (error) {
-      console.error("Failed to generate AI commit message:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getReadableErrorMessage(
+        error,
+        "Could not reach OpenCode. Start or restart the Agent and try again.",
+      );
+      console.error(`Failed to generate AI commit message: ${errorMessage}`);
       toast(`AI draft failed: ${errorMessage}`, "error");
     } finally {
       setIsGeneratingCommitMessageAI(false);

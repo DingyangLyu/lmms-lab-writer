@@ -7,6 +7,18 @@ export function isAbortError(error: unknown): boolean {
   return false;
 }
 
+export function getOpenCodeErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.trim() || fallback;
+}
+
+function isNetworkLoadFailure(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    /^(load failed|failed to fetch|networkerror|cancelled)$/i.test(error.message.trim())
+  );
+}
+
 export type OpenCodeClientOptions = {
   baseUrl: string;
   directory?: string;
@@ -68,7 +80,9 @@ export class OpenCodeClient {
     try {
       return await response.json();
     } catch (err) {
-      console.error(`[OpenCode] ${context}: Failed to parse JSON:`, err);
+      console.error(
+        `[OpenCode] ${context}: Failed to parse JSON: ${getOpenCodeErrorMessage(err, "Unknown parse error")}`,
+      );
       return null;
     }
   }
@@ -157,7 +171,10 @@ export class OpenCodeClient {
         this.handleEvent(data);
         this.options.onEvent?.(data);
       } catch (error) {
-        console.error("[OpenCode Client] Failed to parse event:", error, event.data);
+        console.error(
+          `[OpenCode Client] Failed to parse event: ${getOpenCodeErrorMessage(error, "Unknown parse error")}`,
+          event.data,
+        );
       }
     };
 
@@ -302,7 +319,11 @@ export class OpenCodeClient {
       return Array.isArray(data) ? data : [];
     } catch (error) {
       if (isAbortError(error)) return [];
-      console.error("Failed to list sessions:", error);
+      if (!isNetworkLoadFailure(error)) {
+        console.error(
+          `Failed to list OpenCode sessions: ${getOpenCodeErrorMessage(error, "Unknown error")}`,
+        );
+      }
       return [];
     }
   }
@@ -529,7 +550,11 @@ export class OpenCodeClient {
         .filter((a) => a.id && !(a as Record<string, unknown>).hidden);
     } catch (error) {
       if (isAbortError(error)) return [];
-      console.error("Failed to get agents:", error);
+      if (!isNetworkLoadFailure(error)) {
+        console.error(
+          `Failed to get OpenCode agents: ${getOpenCodeErrorMessage(error, "Unknown error")}`,
+        );
+      }
       return [];
     }
   }
@@ -595,7 +620,11 @@ export class OpenCodeClient {
       return result;
     } catch (error) {
       if (isAbortError(error)) return [];
-      console.error("Failed to get providers:", error);
+      if (!isNetworkLoadFailure(error)) {
+        console.error(
+          `Failed to get OpenCode providers: ${getOpenCodeErrorMessage(error, "Unknown error")}`,
+        );
+      }
       return [];
     }
   }
