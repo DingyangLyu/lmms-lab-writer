@@ -5,10 +5,11 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child as TokioChild;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration};
 
 const OPENCODE_ENABLE_EXA_ENV: &str = "OPENCODE_ENABLE_EXA";
 const OPENCODE_ENABLE_EXA_VALUE: &str = "1";
+const PERPLEXITY_API_KEY_ENV: &str = "PERPLEXITY_API_KEY";
 
 pub struct OpenCodeState {
     pub process: Mutex<Option<TokioChild>>,
@@ -186,6 +187,53 @@ async fn find_available_port(start_port: u16, max_attempts: u16) -> Option<u16> 
     None
 }
 
+async fn resolve_env_var(name: &str) -> Option<String> {
+    if let Ok(value) = std::env::var(name) {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            return Some(trimmed);
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut shells = Vec::new();
+        if let Ok(shell) = std::env::var("SHELL") {
+            shells.push(shell);
+        }
+        shells.push("/bin/zsh".to_string());
+        shells.push("/bin/bash".to_string());
+
+        let script = format!("printf %s \"${{{}}}\"", name);
+        for shell in shells {
+            if !std::path::Path::new(&shell).exists() {
+                continue;
+            }
+
+            let output = timeout(
+                Duration::from_secs(3),
+                command(&shell).args(["-ic", &script]).output(),
+            )
+            .await
+            .ok()
+            .and_then(Result::ok);
+
+            if let Some(output) = output {
+                if !output.status.success() {
+                    continue;
+                }
+
+                let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !value.is_empty() {
+                    return Some(value);
+                }
+            }
+        }
+    }
+
+    None
+}
+
 #[tauri::command]
 pub async fn opencode_start(
     app: AppHandle,
@@ -223,13 +271,22 @@ pub async fn opencode_start(
 
     *state.port.lock().map_err(|e| e.to_string())? = port;
 
-    let mut child = command(&opencode_path)
+    let perplexity_api_key = resolve_env_var(PERPLEXITY_API_KEY_ENV).await;
+
+    let mut opencode_command = command(&opencode_path);
+    opencode_command
         .args(["serve", "--port", &port.to_string()])
         .current_dir(&directory)
         .env(OPENCODE_ENABLE_EXA_ENV, OPENCODE_ENABLE_EXA_VALUE)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
+        .kill_on_drop(true);
+
+    if let Some(key) = &perplexity_api_key {
+        opencode_command.env(PERPLEXITY_API_KEY_ENV, key);
+    }
+
+    let mut child = opencode_command
         .spawn()
         .map_err(|e| format!("Failed to spawn OpenCode process: {}", e))?;
 
@@ -244,6 +301,17 @@ pub async fn opencode_start(
         }),
     )
     .ok();
+
+    if perplexity_api_key.is_some() {
+        app.emit(
+            "opencode-log",
+            serde_json::json!({
+                "type": "info",
+                "message": "Perplexity Search API key detected; perplexity_search MCP can use Perplexity as a search backend.",
+            }),
+        )
+        .ok();
+    }
 
     // Spawn tasks to stream stdout/stderr to frontend
     if let Some(stdout) = child.stdout.take() {

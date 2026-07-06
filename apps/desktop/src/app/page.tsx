@@ -589,7 +589,7 @@ The AI assistant will read and update this file during compilation.
         logTail || "(No log content was available.)",
         "~~~",
         "",
-        "If the error depends on current package documentation, class behavior, or a web-only error message, use websearch for discovery and webfetch for source URLs.",
+        "If the error depends on current package documentation, class behavior, or a web-only error message, use perplexity_search when available, websearch for discovery, and webfetch for source URLs. If websearch returns a 429 from Exa, fall back to perplexity_search or webfetch.",
         "Please inspect the relevant .tex, .bib, .sty, and .cls files, make the minimal fix needed to compile, rerun the local compilation, and summarize what changed.",
       ].join("\n");
 
