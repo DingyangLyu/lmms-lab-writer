@@ -57,7 +57,25 @@ async fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(git_command_error_message(&output.stdout, &output.stderr, args))
+    }
+}
+
+fn git_command_error_message(stdout: &[u8], stderr: &[u8], args: &[&str]) -> String {
+    let stderr_text = String::from_utf8_lossy(stderr).trim().to_string();
+    if !stderr_text.is_empty() {
+        return stderr_text;
+    }
+
+    let stdout_text = String::from_utf8_lossy(stdout).trim().to_string();
+    if !stdout_text.is_empty() {
+        return stdout_text;
+    }
+
+    if args.is_empty() {
+        "Git command failed without output".to_string()
+    } else {
+        format!("git {} failed without output", args.join(" "))
     }
 }
 
@@ -330,7 +348,17 @@ pub async fn git_add(dir: String, files: Vec<String>) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_commit(dir: String, message: String) -> Result<String, String> {
-    run_git(&dir, &["commit", "-m", &message]).await?;
+    let message = message.trim();
+    if message.is_empty() {
+        return Err("Commit message cannot be empty".to_string());
+    }
+
+    let staged_files = run_git(&dir, &["diff", "--cached", "--name-only"]).await?;
+    if staged_files.trim().is_empty() {
+        return Err("No staged changes to commit. Stage files before committing.".to_string());
+    }
+
+    run_git(&dir, &["commit", "-m", message]).await?;
     run_git(&dir, &["rev-parse", "--short", "HEAD"])
         .await
         .map(|s| s.trim().to_string())
@@ -671,7 +699,11 @@ pub async fn git_clone(url: String, directory: String) -> Result<String, String>
     if output.status.success() {
         Ok(directory)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(git_command_error_message(
+            &output.stdout,
+            &output.stderr,
+            &["clone", "--", &url, &directory],
+        ))
     }
 }
 
@@ -894,6 +926,48 @@ pub async fn gh_create_repo(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_command_error_message_prefers_stderr() {
+        let message =
+            git_command_error_message(b"stdout message", b"stderr message\n", &["status"]);
+
+        assert_eq!(message, "stderr message");
+    }
+
+    #[test]
+    fn git_command_error_message_falls_back_to_stdout() {
+        let message = git_command_error_message(
+            b"On branch main\nnothing to commit, working tree clean\n",
+            b"",
+            &["commit", "-m", "test"],
+        );
+
+        assert!(message.contains("nothing to commit"));
+    }
+
+    #[test]
+    fn git_command_error_message_has_final_fallback() {
+        let message = git_command_error_message(b"", b"", &["commit", "-m", "test"]);
+
+        assert_eq!(message, "git commit -m test failed without output");
+    }
+
+    #[tokio::test]
+    async fn git_commit_without_staged_changes_returns_clear_error() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let repo_dir = temp_dir.path().to_string_lossy().to_string();
+        run_git(&repo_dir, &["init"]).await.expect("git init");
+
+        let error = git_commit(repo_dir, "test commit".to_string())
+            .await
+            .expect_err("commit should fail");
+
+        assert_eq!(
+            error,
+            "No staged changes to commit. Stage files before committing."
+        );
+    }
 
     #[test]
     fn gh_auth_login_windows_launch_plan_uses_visible_cmd() {

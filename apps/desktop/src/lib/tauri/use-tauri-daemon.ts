@@ -51,6 +51,11 @@ const GH_AUTH_POLL_TIMEOUT_MS = 120_000;
 const DEFAULT_GIT_AUTO_FETCH_INTERVAL_MS = 120_000;
 const MIN_GIT_AUTO_FETCH_INTERVAL_MS = 15_000;
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.trim() || fallback;
+}
+
 type TauriDaemonOptions = {
   gitAutoFetchEnabled?: boolean;
   gitAutoFetchIntervalMs?: number;
@@ -531,8 +536,9 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
         await refreshGitStatus();
         return { success: true };
       } catch (error) {
-        console.error("Failed to git commit:", error);
-        return { success: false, error: String(error) };
+        const errorMessage = getErrorMessage(error, "Git commit failed without output");
+        console.error("Failed to git commit:", errorMessage);
+        return { success: false, error: errorMessage };
       }
     },
     [projectState.projectPath, refreshGitStatus],
