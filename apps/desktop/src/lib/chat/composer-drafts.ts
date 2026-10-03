@@ -5,6 +5,18 @@ import type { ChatImageFile } from "./images";
 /** Unsent composer text and attachments, per project conversation tab. Images stay in IndexedDB. */
 type Draft = { text: string; files: ChatImageFile[] };
 const SAVE_DELAY_MS = 300;
+const activeWriters = new Map<string, { project: string; flush: () => Promise<void> }>();
+/** Switching projects must await the draft transaction, not merely start an unmount save. */
+export async function flushComposerDrafts(project: string) {
+  const results = await Promise.allSettled(
+    [...activeWriters.values()]
+      .filter((entry) => entry.project === project)
+      .map((entry) => entry.flush()),
+  );
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed?.status === "rejected")
+    throw new Error(`聊天草稿尚未保存，切换已取消：${String(failed.reason)}`);
+}
 let database: Promise<IDBDatabase> | undefined;
 function db() {
   database ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -82,6 +94,15 @@ export function useComposerDraft(
     if (!key) return;
     let cancelled = false;
     loaded.current = null;
+    const writer = {
+      project: project ?? "",
+      flush: async () => {
+        if (loaded.current !== key) throw new Error("聊天草稿仍在载入，请稍后重试。");
+        const draft = latest.current;
+        await writeDraft(key, draft.text.trim() || draft.files.length ? draft : null);
+      },
+    };
+    activeWriters.set(key, writer);
     void readDraft(key)
       .then((draft) => {
         if (cancelled) return;
@@ -97,6 +118,7 @@ export function useComposerDraft(
       });
     return () => {
       cancelled = true;
+      if (activeWriters.get(key) === writer) activeWriters.delete(key);
       if (pending.current?.key === key) {
         clearTimeout(pending.current.timer);
         pending.current = null;

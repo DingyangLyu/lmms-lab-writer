@@ -3,6 +3,7 @@
 import type { FileNode, GitInfo, GitLogEntry, GitStatus } from "@lmms-lab/writer-shared";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { prepareProject } from "@/lib/editor/project-transition";
 import { pathSync } from "@/lib/path";
 
 function debounce<T extends (...args: Parameters<T>) => void>(
@@ -179,6 +180,8 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
     projectInfo: null,
     files: [],
   });
+  const projectPathRef = useRef(projectState.projectPath);
+  projectPathRef.current = projectState.projectPath;
 
   const [gitState, setGitState] = useState<GitState>({
     gitInfo: null,
@@ -211,6 +214,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
   const refreshGitStatusInternal = useCallback(async (dir: string) => {
     try {
       const gitStatus = await invoke<GitStatus>("git_status", { dir });
+      if (projectPathRef.current !== dir) return;
 
       if (gitStatus.isRepo) {
         const [log, gitGraph, gitLogEntries] = await Promise.all([
@@ -232,11 +236,13 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
           ahead: gitStatus.ahead,
           behind: gitStatus.behind,
         };
+        if (projectPathRef.current !== dir) return;
         setGitState((s) => ({ ...s, gitStatus, gitInfo, gitGraph, gitLogEntries }));
       } else {
         setGitState((s) => ({ ...s, gitStatus, gitInfo: null, gitGraph: [], gitLogEntries: [] }));
       }
     } catch (error) {
+      if (projectPathRef.current !== dir) return;
       console.error("Failed to get git status:", error);
       setGitState((s) => ({
         ...s,
@@ -265,22 +271,27 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       }));
 
       try {
-        await invoke("set_project_path", { path });
-
-        setProjectState((s) => ({ ...s, projectPath: path }));
-
-        const rawFiles = await invoke<unknown[]>("get_file_tree", {
-          dir: path,
-        });
-
-        const files = rawFiles.map((f) =>
-          convertFileNode(f as Parameters<typeof convertFileNode>[0]),
+        const files = await prepareProject(
+          path,
+          async (dir) => {
+            const rawFiles = await invoke<unknown[]>("get_file_tree", { dir });
+            return rawFiles.map((f) => convertFileNode(f as Parameters<typeof convertFileNode>[0]));
+          },
+          (path) => invoke("set_project_path", { path }),
         );
-
-        setProjectState((s) => ({
-          ...s,
+        projectPathRef.current = path;
+        setProjectState({
+          projectPath: path,
           files,
           projectInfo: { path },
+        });
+        setLastFileChange(null);
+        setGitState((s) => ({
+          ...s,
+          gitInfo: null,
+          gitStatus: null,
+          gitGraph: [],
+          gitLogEntries: [],
         }));
 
         refreshGitStatusInternal(path);
@@ -350,6 +361,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       const rawFiles = await invoke<unknown[]>("get_file_tree", {
         dir: projectState.projectPath,
       });
+      if (projectPathRef.current !== projectState.projectPath) return;
       const files = rawFiles.map((f) =>
         convertFileNode(f as Parameters<typeof convertFileNode>[0]),
       );
@@ -727,8 +739,6 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
   const [lastFileChange, setLastFileChange] = useState<FileChangeEvent | null>(null);
 
-  const projectPathRef = useRef(projectState.projectPath);
-  projectPathRef.current = projectState.projectPath;
   const isAutoFetchingRemoteRef = useRef(false);
 
   useEffect(() => {
@@ -743,7 +753,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       if (isCleanedUp) return;
       try {
         const rawFiles = await invoke<unknown[]>("get_file_tree", { dir });
-        if (isCleanedUp) return;
+        if (isCleanedUp || projectPathRef.current !== dir) return;
         const files = rawFiles.map((f) =>
           convertFileNode(f as Parameters<typeof convertFileNode>[0]),
         );
@@ -775,7 +785,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       if (isCleanedUp) return;
 
       unlistenFiles = await listen<FileNode[]>("files-changed", (event) => {
-        if (!isCleanedUp) {
+        if (!isCleanedUp && projectPathRef.current === projectState.projectPath) {
           setProjectState((s) => ({ ...s, files: event.payload }));
         }
       });
@@ -786,7 +796,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       }
 
       unlistenFileChanged = await listen<FileChangeEvent>("file-changed", (event) => {
-        if (isCleanedUp) return;
+        if (isCleanedUp || projectPathRef.current !== projectState.projectPath) return;
 
         const { kind } = event.payload;
 

@@ -38,10 +38,12 @@ import {
 } from "@/components/ui/tab-bar";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth";
+import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
 import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
 import { useEditorSettings } from "@/lib/editor";
 import { buildFileIndex, resolveFileReference } from "@/lib/editor/file-resolution";
+import { ProjectTransition } from "@/lib/editor/project-transition";
 import { projectRelativePath } from "@/lib/editor/save-manager";
 import {
   type EditorSelectionContext,
@@ -75,6 +77,7 @@ const PdfViewer = dynamic(
 );
 
 import {
+  FolderOpenIcon,
   GearIcon,
   PlayCircleIcon,
   RobotIcon,
@@ -374,6 +377,9 @@ export default function EditorPage() {
   const auth = useAuth();
   const { toast } = useToast();
   const recentProjects = useRecentProjects();
+  const [projectTransition] = useState(() => new ProjectTransition());
+  const [choosingProject, setChoosingProject] = useState(false);
+  const [switchingProject, setSwitchingProject] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<string>();
   const [fileContent, setFileContent] = useState<string>("");
@@ -2312,56 +2318,87 @@ The AI assistant will read and update this file during compilation.
     [daemon.projectPath, selectedFile, isLoadingFile, fileLoadError, saveManager],
   );
 
-  const handleOpenFolder = useCallback(async () => {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Select LaTeX Project",
-      });
-
-      if (selected && typeof selected === "string") {
-        if (selected !== daemon.projectPath && !(await confirmAgentsIdle("switch"))) return;
-        if (!(await flushBeforeLeave())) return;
-        primaryLoadRequestIdRef.current++;
-        splitLoadRequestIdRef.current++;
-        await daemon.setProject(selected);
-        setOpenTabs([]);
-        setSelectedFile(undefined);
-        setFileContent("");
-        setSplitPane(null);
-        await recentProjects.addProject(selected);
-        setShowSidebar(true);
-        setShowRightPanel(true);
-      }
-    } catch (err) {
-      console.error("Failed to open project:", err);
-    }
-  }, [daemon, recentProjects, flushBeforeLeave, confirmAgentsIdle]);
-
-  const handleOpenRecentProject = useCallback(
-    async (path: string) => {
+  const changeProject = useCallback(
+    async (choose: () => Promise<string | null>) => {
+      if (projectTransition.active) return;
+      setChoosingProject(true);
       try {
-        if (path !== daemon.projectPath && !(await confirmAgentsIdle("switch"))) return;
-        if (!(await flushBeforeLeave())) return;
-        primaryLoadRequestIdRef.current++;
-        splitLoadRequestIdRef.current++;
-        await daemon.setProject(path);
-        setOpenTabs([]);
-        setSelectedFile(undefined);
-        setFileContent("");
-        setSplitPane(null);
-        await recentProjects.addProject(path);
-        setShowSidebar(true);
-        setShowRightPanel(true);
+        const path = await projectTransition.run({
+          current: daemon.projectPath,
+          choose,
+          confirm: async () => {
+            if (compilingRef.current || latexSettings.saving)
+              throw new Error("编译或配置保存仍在进行，请完成后再切换文件夹。");
+            return confirmAgentsIdle("switch");
+          },
+          freeze: setSwitchingProject,
+          save: async () => {
+            // Commit the input method's current composition before reading editor buffers.
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            await saveManager.flushAll();
+            if (daemon.projectPath) await flushComposerDrafts(daemon.projectPath);
+          },
+          open: daemon.setProject,
+          reset: () => {
+            primaryLoadRequestIdRef.current++;
+            splitLoadRequestIdRef.current++;
+            gitDiffRequestIdRef.current++;
+            setOpenTabs([]);
+            setSelectedFile(undefined);
+            setFileContent("");
+            setSplitPane(null);
+            setEditorSelection(null);
+            setBinaryPreviewUrl(null);
+            setFileLoadError(null);
+            setIsLoadingFile(false);
+            setEditorViewMode("file");
+            setGitDiffPreview(null);
+            setPendingGoToLine(0);
+            setShowSidebar(true);
+            setShowRightPanel(true);
+          },
+        });
+        if (path)
+          await recentProjects
+            .addProject(path)
+            .catch((error) =>
+              toast(`文件夹已打开，但最近项目记录未保存：${String(error)}`, "error"),
+            );
       } catch (err) {
         console.error("Failed to open project:", err);
-        toast("Failed to open project", "error");
-        recentProjects.removeProject(path);
+        toast(`切换文件夹已取消，当前项目和草稿已保留：${String(err)}`, "error");
+      } finally {
+        setChoosingProject(false);
       }
     },
-    [daemon, recentProjects, toast, flushBeforeLeave, confirmAgentsIdle],
+    [
+      daemon,
+      recentProjects,
+      toast,
+      saveManager,
+      confirmAgentsIdle,
+      projectTransition,
+      latexSettings.saving,
+    ],
+  );
+  const handleOpenFolder = useCallback(
+    () =>
+      changeProject(async () => {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: "打开文件夹",
+          defaultPath: daemon.projectPath ? pathSync.dirname(daemon.projectPath) : undefined,
+        });
+        return typeof selected === "string" ? selected : null;
+      }),
+    [changeProject, daemon.projectPath],
+  );
+  const handleOpenRecentProject = useCallback(
+    (path: string) => changeProject(async () => path),
+    [changeProject],
   );
 
   const handleStageAll = useCallback(() => {
@@ -2749,6 +2786,10 @@ The AI assistant will read and update this file during compilation.
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
+      if (projectTransition.active) {
+        if (isMod && ["o", "s", "w", "b"].includes(key)) e.preventDefault();
+        return;
+      }
 
       if (isMod && key === "s") {
         e.preventDefault();
@@ -2790,6 +2831,7 @@ The AI assistant will read and update this file during compilation.
     handleCloseTab,
     handleCompileWithDetection,
     flushBeforeLeave,
+    projectTransition,
   ]);
 
   const isShowingGitDiff =
@@ -3014,7 +3056,18 @@ The AI assistant will read and update this file during compilation.
       onSource={handleAnnotationSource}
       onPdf={handleFileSelect}
     >
-      <div className="h-dvh flex flex-col">
+      {switchingProject && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-[250] flex items-center justify-center bg-background/70"
+        >
+          <p className="border border-border bg-background px-5 py-3 text-sm shadow-md">
+            正在保存当前内容并打开文件夹…
+          </p>
+        </div>
+      )}
+      <div className="h-dvh flex flex-col" inert={switchingProject}>
         <div className="flex-shrink-0 flex flex-col">
           <header className="h-12 border-b border-border flex items-center">
             <div className="w-full px-4 flex items-center justify-between gap-4">
@@ -3051,6 +3104,19 @@ The AI assistant will read and update this file during compilation.
                     {daemon.projectPath ? pathSync.basename(daemon.projectPath) : "LMMs-Lab Writer"}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenFolder()}
+                  disabled={choosingProject || daemon.isOpeningProject}
+                  aria-label="打开文件夹"
+                  title="打开文件夹（⌘/Ctrl+O），先保存当前修改"
+                  className="flex h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:bg-accent-hover disabled:opacity-50"
+                >
+                  <FolderOpenIcon className="size-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">
+                    {choosingProject ? "正在打开…" : "打开文件夹"}
+                  </span>
+                </button>
               </div>
 
               <div className="flex items-center gap-3 h-8">

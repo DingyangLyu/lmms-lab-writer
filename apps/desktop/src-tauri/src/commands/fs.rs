@@ -234,6 +234,11 @@ pub async fn get_file_tree(dir: String) -> Result<Vec<FileNode>, String> {
     if !path.exists() {
         return Err(format!("Directory not found: {}", dir));
     }
+    // Reject an unreadable root before a project switch. The recursive scanner
+    // tolerates unreadable children, but an inaccessible root is not an empty project.
+    let _directory = fs::read_dir(path)
+        .await
+        .map_err(|e| format!("Cannot open project directory: {e}"))?;
 
     let dir_clone = dir.clone();
     let result =
@@ -624,5 +629,27 @@ mod tests {
     async fn test_get_file_tree_returns_error_for_nonexistent_dir() {
         let result = get_file_tree("/nonexistent/directory".to_string()).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn project_root_must_be_readable_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("main.tex");
+        std::fs::write(&file, "paper").unwrap();
+        assert!(get_file_tree(file.to_string_lossy().into_owned())
+            .await
+            .is_err());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if unsafe { libc::geteuid() } != 0 {
+                let blocked = dir.path().join("blocked");
+                std::fs::create_dir(&blocked).unwrap();
+                std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o000)).unwrap();
+                let result = get_file_tree(blocked.to_string_lossy().into_owned()).await;
+                std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o700)).unwrap();
+                assert!(result.is_err());
+            }
+        }
     }
 }
