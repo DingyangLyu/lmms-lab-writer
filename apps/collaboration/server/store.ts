@@ -25,7 +25,17 @@ export class HttpError extends Error {
 export function fail(status: number, message: string): never {
   throw new HttpError(status, message);
 }
+/** Parser and validation errors from shared writing helpers are user input errors, not 500s. */
+export function checked<T>(action: () => T): T {
+  try {
+    return action();
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    fail(400, error instanceof Error ? error.message : "输入无效");
+  }
+}
 export const uid = () => randomUUID();
+export const AUTOMATIC_SNAPSHOTS = 50;
 export const digest = (input: string | Uint8Array) =>
   createHash("sha256").update(input).digest("hex");
 export function safePath(value: string) {
@@ -41,6 +51,7 @@ export function safePath(value: string) {
     fail(400, "无效文件路径");
   return value;
 }
+/** Shared by the server and the runner so both treat the same files as editable text. */
 export const textExtensions = new Set([
   "tex",
   "bib",
@@ -55,6 +66,8 @@ export const textExtensions = new Set([
   "yml",
   "yaml",
 ]);
+export const isTextPath = (path: string) =>
+  textExtensions.has(path.split(".").pop()?.toLowerCase() ?? "");
 export function textDoc(value: string) {
   const doc = new Y.Doc();
   doc.getText("content").insert(0, value);
@@ -87,6 +100,11 @@ export class Store {
       CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL,author TEXT NOT NULL,prompt TEXT NOT NULL,harness TEXT NOT NULL,status TEXT NOT NULL,runner TEXT,lease INTEGER,result TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,base TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS runners(id TEXT PRIMARY KEY,project TEXT NOT NULL,token TEXT NOT NULL UNIQUE,name TEXT NOT NULL,capabilities TEXT NOT NULL DEFAULT '[]');
     `);
+    // Older databases only had user-requested versions; keep them all as manual.
+    if (
+      !this.all<{ name: string }>("PRAGMA table_info(snapshots)").some((c) => c.name === "manual")
+    )
+      this.db.exec("ALTER TABLE snapshots ADD COLUMN manual INTEGER NOT NULL DEFAULT 1");
   }
   get<T>(sql: string, ...args: SQLInputValue[]): T | undefined {
     return this.db.prepare(sql).get(...args) as T | undefined;
@@ -124,6 +142,14 @@ export class Store {
     if (!allowed) fail(403, "当前角色不允许此操作");
     return role;
   }
+  /** A deleted file keeps its row for history, but must not reserve its path forever. */
+  releasePath(project: string, path: string) {
+    this.run(
+      "UPDATE files SET path='.deleted/'||id||'/'||path WHERE project=? AND path=? AND deleted=1",
+      project,
+      path,
+    );
+  }
   file(project: string, id: string) {
     return (
       this.get<FileRow>(
@@ -154,7 +180,8 @@ export class Store {
       Date.now(),
     );
   }
-  snapshot(project: string, user: string, label: string) {
+  /** Automatic safety versions are bounded; manual versions are never pruned. */
+  snapshot(project: string, user: string, label: string, manual = false) {
     const id = uid(),
       files = this.all<FileRow>("SELECT * FROM files WHERE project=?", project);
     const data = JSON.stringify({
@@ -167,14 +194,25 @@ export class Store {
     });
     if (Buffer.byteLength(data) > 150_000_000) fail(413, "项目快照过大");
     this.run(
-      "INSERT INTO snapshots VALUES(?,?,?,?,?,?)",
+      "INSERT INTO snapshots(id,project,label,author,created,data,manual) VALUES(?,?,?,?,?,?,?)",
       id,
       project,
       label,
       user,
       Date.now(),
       data,
+      manual ? 1 : 0,
     );
+    if (!manual)
+      this.run(
+        `DELETE FROM snapshots WHERE project=? AND manual=0
+          AND id NOT IN (SELECT base FROM jobs WHERE project=? AND status IN ('queued','running'))
+          AND id NOT IN (SELECT id FROM snapshots WHERE project=? AND manual=0 ORDER BY created DESC, rowid DESC LIMIT ?)`,
+        project,
+        project,
+        project,
+        AUTOMATIC_SNAPSHOTS,
+      );
     return id;
   }
   close() {

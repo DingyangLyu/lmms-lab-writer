@@ -26,16 +26,17 @@ import {
 import { Collaboration } from "./collaboration";
 import { projectJobs, runnerRequest } from "./jobs";
 import {
+  checked,
   decodeText,
   digest,
   type FileRow,
   fail,
   HttpError,
+  isTextPath,
   type Role,
   Store,
   safePath,
   textDoc,
-  textExtensions,
   type User,
   uid,
 } from "./store";
@@ -58,15 +59,18 @@ async function jsonBody(req: IncomingMessage): Promise<Body> {
     if (size > 16_000_000) fail(413, "请求超过 16 MB");
     chunks.push(b);
   }
+  let value: unknown;
   try {
-    const value: unknown = JSON.parse(Buffer.concat(chunks).toString());
-    if (!value || typeof value !== "object" || Array.isArray(value))
-      fail(400, "请求必须为 JSON 对象");
-    return value as Body;
+    value = JSON.parse(Buffer.concat(chunks).toString());
   } catch {
     fail(400, "无效 JSON");
   }
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    fail(400, "请求必须为 JSON 对象");
+  return value as Body;
 }
+const uniqueViolation = (error: unknown) =>
+  error instanceof Error && /UNIQUE constraint failed/.test(error.message);
 function json(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -110,6 +114,8 @@ export async function createWriterServer(options: Options) {
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
   const attempts = new Map<string, { at: number; count: number }>();
+  // Unknown usernames still pay the scrypt cost, so login timing does not reveal accounts.
+  const decoy = await passwordHash(randomBytes(16).toString("hex"));
   const server = createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -139,8 +145,8 @@ export async function createWriterServer(options: Options) {
           username = str(body, "username", 80),
           password = str(body, "password", 200);
         const user = store.get<User>("SELECT * FROM users WHERE username=?", username);
-        if (!user || !(await verifyPassword(password, user.password)))
-          fail(401, "用户名或密码错误");
+        const valid = await verifyPassword(password, user?.password ?? decoy);
+        if (!user || !valid) fail(401, "用户名或密码错误");
         session(store, user, res, origin.startsWith("https:"));
         return json(res, publicUser(user));
       }
@@ -200,10 +206,13 @@ export async function createWriterServer(options: Options) {
       }
       if (!path.startsWith("/api/")) {
         const root = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
-        const requested =
-          path === "/" || !extname(path)
-            ? "index.html"
-            : decodeURIComponent(path).replace(/^\//, "");
+        let requested = "index.html";
+        if (path !== "/" && extname(path))
+          try {
+            requested = decodeURIComponent(path).replace(/^\//, "");
+          } catch {
+            fail(400, "无效路径");
+          }
         const file = resolve(root, requested);
         if (!file.startsWith(`${root}/`)) fail(403, "无效路径");
         const content = await readFile(file).catch(() =>
@@ -330,7 +339,7 @@ export async function createWriterServer(options: Options) {
           edit();
           const body = await jsonBody(req),
             path = safePath(str(body, "path", 240));
-          const binary = !textExtensions.has(path.split(".").pop()?.toLowerCase() ?? "");
+          const binary = !isTextPath(path);
           const value = str(body, binary ? "base64" : "content", binary ? 14_000_000 : 2_000_000);
           let bytes: Uint8Array;
           if (binary) {
@@ -351,16 +360,20 @@ export async function createWriterServer(options: Options) {
             fail(413, "项目超过 2000 个文件或 100 MB");
           const id = uid();
           try {
-            store.run(
-              "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,?)",
-              id,
-              project,
-              path,
-              bytes,
-              binary ? 1 : 0,
-            );
-          } catch {
-            fail(409, "同名文件已存在，请在编辑器中更新");
+            store.transaction(() => {
+              store.releasePath(project, path);
+              store.run(
+                "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,?)",
+                id,
+                project,
+                path,
+                bytes,
+                binary ? 1 : 0,
+              );
+            });
+          } catch (error) {
+            if (uniqueViolation(error)) fail(409, "同名文件已存在，请在编辑器中更新");
+            throw error;
           }
           store.audit(project, user.id, "file.create", { id, path });
           collab.changed(project);
@@ -397,15 +410,32 @@ export async function createWriterServer(options: Options) {
           edit();
           const body = await jsonBody(req);
           const path = safePath(str(body, "path", 240));
-          store.run("UPDATE files SET path=? WHERE id=?", path, file.id);
-          store.audit(project, user.id, "file.rename", { file: file.id, path });
+          if (isTextPath(path) === !!file.binary)
+            fail(400, "重命名不能改变文本／二进制文件类型，请上传为新文件");
+          try {
+            store.transaction(() => {
+              store.releasePath(project, path);
+              store.run("UPDATE files SET path=? WHERE id=?", path, file.id);
+              store.audit(project, user.id, "file.rename", {
+                file: file.id,
+                from: file.path,
+                path,
+              });
+            });
+          } catch (error) {
+            if (uniqueViolation(error)) fail(409, "目标路径已有文件");
+            throw error;
+          }
           collab.changed(project);
           return json(res, { ok: true });
         }
         if (method === "DELETE") {
           edit();
           store.snapshot(project, user.id, "删除文件前");
-          store.run("UPDATE files SET deleted=1 WHERE id=?", file.id);
+          store.transaction(() => {
+            store.run("UPDATE files SET deleted=1 WHERE id=?", file.id);
+            store.audit(project, user.id, "file.delete", { file: file.id, path: file.path });
+          });
           for (const p of collab.peers) if (p.file === file.id) p.socket.close(1008, "文件已删除");
           collab.changed(project);
           return json(res, { ok: true });
@@ -415,7 +445,7 @@ export async function createWriterServer(options: Options) {
       if (rest === "doi" && method === "POST") {
         edit();
         const body = await jsonBody(req),
-          doi = normalizeDoi(str(body, "doi", 300));
+          doi = checked(() => normalizeDoi(str(body, "doi", 300)));
         const response = await fetch(
           `https://api.crossref.org/works/${encodeURIComponent(doi)}/transform/application/x-bibtex`,
           {
@@ -436,7 +466,9 @@ export async function createWriterServer(options: Options) {
         if (file.binary || !file.path.endsWith(".bib")) fail(400, "请选择 BibTeX 文件");
         const current = decodeText(file.state);
         if (current !== str(body, "expected", 2_000_000)) fail(409, "文献库已有新的修改");
-        const result = importBibliography(current, str(body, "bibtex", 2_000_000));
+        const result = checked(() => importBibliography(current, str(body, "bibtex", 2_000_000)));
+        if (!result.added)
+          return json(res, { added: 0, skipped: result.skipped, renamed: result.renamed });
         store.snapshot(project, user.id, "导入文献前");
         collab.replace(project, file.id, current, result.content, user.id);
         return json(res, { added: result.added, skipped: result.skipped, renamed: result.renamed });
@@ -447,16 +479,19 @@ export async function createWriterServer(options: Options) {
           from = str(body, "from", 150),
           to = str(body, "to", 150);
         const files = store.textFiles(project);
-        const plans = files
-          .map((f) => ({
-            ...f,
-            next: f.path.endsWith(".bib")
-              ? renameBibKey(f.content, from, to)
-              : f.path.endsWith(".tex")
-                ? renameCitationKey(f.content, from, to)
-                : f.content,
-          }))
-          .filter((f) => f.content !== f.next);
+        const plans = checked(() =>
+          files
+            .map((f) => ({
+              ...f,
+              next: f.path.endsWith(".bib")
+                ? renameBibKey(f.content, from, to)
+                : f.path.endsWith(".tex")
+                  ? renameCitationKey(f.content, from, to)
+                  : f.content,
+            }))
+            .filter((f) => f.content !== f.next),
+        );
+        if (!plans.length) return json(res, { files: 0 });
         store.snapshot(project, user.id, "重命名文献键前");
         collab.replaceMany(
           project,
@@ -512,7 +547,6 @@ export async function createWriterServer(options: Options) {
             body = str(b, "body").trim();
           if (!body) fail(400, "批注不能为空");
           store.transaction(() => {
-            store.snapshot(project, user.id, "批注创建前");
             store.run(
               "INSERT INTO comments VALUES(?,?,?,?,?,?,?,?,0,?,?)",
               id,
@@ -545,20 +579,22 @@ export async function createWriterServer(options: Options) {
         if (method === "POST" && commentRoute[2] === "reply") {
           const text = str(body, "body").trim();
           if (!text) fail(400, "回复不能为空");
-          store.run(
-            "INSERT INTO replies VALUES(?,?,?,?,?)",
-            uid(),
-            comment.id as string,
-            user.id,
-            text,
-            Date.now(),
-          );
+          store.transaction(() => {
+            store.run(
+              "INSERT INTO replies VALUES(?,?,?,?,?)",
+              uid(),
+              comment.id as string,
+              user.id,
+              text,
+              Date.now(),
+            );
+            store.audit(project, user.id, "comment.reply", { id: comment.id });
+          });
         } else if (method === "PATCH") {
           if (comment.author !== user.id && !["owner", "editor"].includes(role))
             fail(403, "只有作者或编辑者可以更改批注状态");
           const resolved = body.resolved === true ? 1 : 0;
           store.transaction(() => {
-            store.snapshot(project, user.id, "批注状态更新前");
             store.run(
               "UPDATE comments SET resolved=?,updated=? WHERE id=?",
               resolved,
@@ -578,14 +614,18 @@ export async function createWriterServer(options: Options) {
           return json(
             res,
             store.all(
-              "SELECT id,label,author,created FROM snapshots WHERE project=? ORDER BY created DESC LIMIT 100",
+              "SELECT id,label,author,created,manual FROM snapshots WHERE project=? ORDER BY created DESC LIMIT 100",
               project,
             ),
           );
         if (method === "POST") {
           edit();
           const body = await jsonBody(req);
-          const id = store.snapshot(project, user.id, str(body, "label", 200) || "手动版本");
+          const label =
+            typeof body.label === "string" && body.label.trim()
+              ? str(body, "label", 200).trim()
+              : "手动版本";
+          const id = store.snapshot(project, user.id, label, true);
           collab.changed(project);
           return json(res, { id }, 201);
         }
@@ -665,7 +705,7 @@ export async function createWriterServer(options: Options) {
           const base = str(body, "base", 2_000_000),
             proposed = str(body, "proposed", 2_000_000),
             id = uid();
-          const hunks = reviewHunks(base, proposed);
+          const hunks = checked(() => reviewHunks(base, proposed));
           store.run(
             "INSERT INTO proposals VALUES(?,?,?,?,?,?,?,1,?)",
             id,

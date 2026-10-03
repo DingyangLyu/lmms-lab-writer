@@ -7,6 +7,7 @@ import WebSocket from "ws";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { createWriterServer } from "./app";
+import { AUTOMATIC_SNAPSHOTS } from "./store";
 
 type Message = { type: string; state?: string; update?: string; id?: string; message?: string };
 const cleanups: Array<() => Promise<void>> = [];
@@ -358,6 +359,57 @@ describe("real collaboration service", () => {
       (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
     ).toBe("zyxone");
   });
+  it("reuses deleted paths, guards renames and reports input errors as client errors", async () => {
+    const f = await fixture(),
+      files = `/projects/${f.project}/files`;
+    const first = (await f.call(files, { path: "main.tex", content: "v1" }, f.owner)).data.id;
+    expect((await f.call(`${files}/${first}`, {}, f.owner, "DELETE")).status).toBe(200);
+    const second = await f.call(files, { path: "main.tex", content: "v2" }, f.owner);
+    expect(second.status).toBe(201);
+    expect((await f.call(files, { path: "main.tex", content: "v3" }, f.owner)).status).toBe(409);
+    const other = (await f.call(files, { path: "notes.tex", content: "n" }, f.owner)).data.id;
+    expect((await f.call(`${files}/${other}`, { path: "main.tex" }, f.owner, "PATCH")).status).toBe(
+      409,
+    );
+    expect(
+      (await f.call(`${files}/${other}`, { path: "figure.png" }, f.owner, "PATCH")).status,
+    ).toBe(400);
+    await f.call(`${files}/${second.data.id}`, {}, f.owner, "DELETE");
+    expect((await f.call(`${files}/${other}`, { path: "main.tex" }, f.owner, "PATCH")).status).toBe(
+      200,
+    );
+    const listed = (await f.call(files, undefined, f.owner)).data;
+    expect(listed.map((x: { path: string }) => x.path)).toEqual(["main.tex"]);
+    const bad = await f.call(
+      `/projects/${f.project}/bibliography/rename`,
+      { from: "a", to: "bad key" },
+      f.owner,
+    );
+    expect(bad.status).toBe(400);
+    expect(bad.data.error).toContain("引用键");
+    expect((await f.call(`/projects/${f.project}/doi`, { doi: "nope" }, f.owner)).status).toBe(400);
+    const audit = (await f.call(`/projects/${f.project}/audit`, undefined, f.owner)).data;
+    expect(audit.some((a: { action: string }) => a.action === "file.delete")).toBe(true);
+  });
+  it("bounds automatic versions without touching manual ones or queued task inputs", async () => {
+    const f = await fixture(),
+      me = (await f.call("/me", undefined, f.owner)).data.id as string;
+    const manual = await f.call(`/projects/${f.project}/snapshots`, {}, f.owner);
+    expect(manual.status).toBe(201);
+    const job = (
+      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "x" }, f.owner)
+    ).data.id;
+    for (let i = 0; i < AUTOMATIC_SNAPSHOTS + 5; i++)
+      f.app.store.snapshot(f.project, me, `auto ${i}`);
+    const rows = f.app.store.all<{ id: string; label: string; manual: number }>(
+      "SELECT id,label,manual FROM snapshots WHERE project=?",
+      f.project,
+    );
+    expect(rows.filter((r) => !r.manual)).toHaveLength(AUTOMATIC_SNAPSHOTS + 1);
+    expect(rows.find((r) => r.id === manual.data.id)?.label).toBe("手动版本");
+    const base = f.app.store.get<{ base: string }>("SELECT base FROM jobs WHERE id=?", job)?.base;
+    expect(rows.some((r) => r.id === base)).toBe(true);
+  });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),
       reviewer = await f.invite("commenter", "reviewer");
@@ -405,6 +457,8 @@ describe("real collaboration service", () => {
     const notes = (await f.call(`/projects/${f.project}/comments`, undefined, f.owner)).data;
     expect(notes[0].resolved).toBe(1);
     expect(notes[0].replies[0].body).toBe("已核对");
+    // Comments are additive; they no longer copy the whole project into a version each time.
+    expect((await f.call(`/projects/${f.project}/snapshots`, undefined, f.owner)).data).toEqual([]);
     const snapshot = (
       await f.call(`/projects/${f.project}/snapshots`, { label: "before" }, f.owner)
     ).data.id;
