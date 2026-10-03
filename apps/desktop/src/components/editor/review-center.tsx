@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
+import { sameProject } from "@/lib/project-root";
 
 type Summary = {
   id: string;
@@ -47,7 +48,7 @@ export function ReviewCenter({
       disposed = false;
     void reload().catch((e) => setError(String(e)));
     void listen<{ project: string; error?: string }>("writer://reviews-changed", ({ payload }) => {
-      if (payload.project === project) {
+      if (sameProject(payload.project, project)) {
         void reload().catch((e) => setError(String(e)));
         if (payload.error) setError(payload.error);
       }

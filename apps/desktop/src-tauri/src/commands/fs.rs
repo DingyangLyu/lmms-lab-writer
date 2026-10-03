@@ -104,10 +104,11 @@ async fn write_utf8_file(path: &str, content: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
+/// Returns the canonical root; backend events identify the project by this path.
 pub async fn set_project_path(
     state: tauri::State<'_, Mutex<ProjectState>>,
     path: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let canonical =
         std::fs::canonicalize(&path).map_err(|e| format!("Invalid project path: {}", e))?;
 
@@ -115,9 +116,10 @@ pub async fn set_project_path(
         return Err("Project path must be a directory".to_string());
     }
 
+    let canonical = canonical.to_string_lossy().to_string();
     let mut state_guard = state.lock().map_err(|e| e.to_string())?;
-    state_guard.project_path = Some(canonical.to_string_lossy().to_string());
-    Ok(())
+    state_guard.project_path = Some(canonical.clone());
+    Ok(canonical)
 }
 
 #[tauri::command]

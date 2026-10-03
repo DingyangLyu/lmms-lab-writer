@@ -68,6 +68,7 @@ import { makeBuildTarget } from "@/lib/latex/use-latex-settings";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
 import { annotationPrompt } from "@/lib/pdf/annotations";
+import { openedProjectPath } from "@/lib/project-root";
 import { useRecentProjects } from "@/lib/recent-projects";
 import { useTauriDaemon } from "@/lib/tauri";
 
@@ -501,12 +502,14 @@ export default function EditorPage() {
           "writer://prepare-delivery",
           async ({ payload }) => {
             let error: string | null = null;
+            // Buffers are keyed by the opened path; the bridge sends the canonical root.
+            const project = openedProjectPath(payload.project);
             try {
-              await saveManager.synchronize(payload.project, payload.files);
+              await saveManager.synchronize(project, payload.files);
               for (const doc of saveManager.documents.values()) {
                 if (
                   payload.checkpoint !== false &&
-                  doc.project === payload.project &&
+                  doc.project === project &&
                   (!payload.files || payload.files.includes(doc.path)) &&
                   /\.(tex|bib)$/i.test(doc.path)
                 )

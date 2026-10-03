@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { prepareProject } from "@/lib/editor/project-transition";
 import { pathSync } from "@/lib/path";
+import { rememberProjectRoot } from "@/lib/project-root";
 
 function debounce<T extends (...args: Parameters<T>) => void>(
   fn: T,
@@ -277,7 +278,8 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
             const rawFiles = await invoke<unknown[]>("get_file_tree", { dir });
             return rawFiles.map((f) => convertFileNode(f as Parameters<typeof convertFileNode>[0]));
           },
-          (path) => invoke("set_project_path", { path }),
+          async (path) =>
+            rememberProjectRoot(path, await invoke<string>("set_project_path", { path })),
         );
         projectPathRef.current = path;
         setProjectState({

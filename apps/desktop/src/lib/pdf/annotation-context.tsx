@@ -16,6 +16,7 @@ import {
   selectionMatchesDocument,
 } from "@/lib/editor/selection-context";
 import type { ConversationTab, ConversationTarget } from "@/lib/harness/types";
+import { sameProject } from "@/lib/project-root";
 import type { PdfAnnotation, PdfMark } from "./annotations";
 export type AnnotationDraft = {
   kind?: "pdf" | "text";
@@ -132,7 +133,7 @@ export function AnnotationProvider({
       });
     for (const event of ["writer://annotations-changed", "writer://bridge-changed"]) {
       void listen<{ project?: string }>(event, ({ payload }) => {
-        if (!payload?.project || payload.project === project) refresh();
+        if (!payload?.project || sameProject(payload.project, project)) refresh();
       })
         .then((stop) => {
           if (disposed) stop();

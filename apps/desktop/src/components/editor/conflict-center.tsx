@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DocumentConflict, SaveResult } from "@/lib/editor/merge";
 import type { SaveManager } from "@/lib/editor/save-manager";
+import { sameProject } from "@/lib/project-root";
 export function ConflictCenter({
   project,
   manager,
@@ -33,7 +34,7 @@ export function ConflictCenter({
     let disposed = false;
     let stop: (() => void) | undefined;
     void listen<{ project: string }>("writer://conflicts-changed", ({ payload }) => {
-      if (payload.project === project) void refresh();
+      if (sameProject(payload.project, project)) void refresh();
     }).then((s) => {
       if (disposed) s();
       else stop = s;
