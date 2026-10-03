@@ -4,7 +4,6 @@ import {
   type BuildTarget,
   DEFAULT_LATEX_SETTINGS,
   type LaTeXSettings,
-  type MainFileDetectionResult,
   type ProjectBuildConfig,
 } from "./types";
 export function makeBuildTarget(mainFile: string): BuildTarget {
@@ -105,23 +104,6 @@ export function useLatexSettings(projectPath: string | null) {
     },
     [saveConfig, setMainFile],
   );
-  const detectMainFile = useCallback(
-    async (directory: string): Promise<MainFileDetectionResult> => {
-      const next = await invoke<ProjectBuildConfig>("latex_project_load", {
-        directory,
-        legacyMainFile: null,
-      });
-      const active = next.targets.find((t) => t.id === next.activeTarget) ?? next.targets[0];
-      return {
-        main_file: active?.mainFile ?? null,
-        tex_files: next.targets.map((t) => t.mainFile),
-        detection_method: active ? "configured" : "none",
-        needs_user_input: !active,
-        message: active ? `编译目标：${active.name}` : "请添加编译目标",
-      };
-    },
-    [],
-  );
   return {
     settings,
     activeTarget,
@@ -133,6 +115,5 @@ export function useLatexSettings(projectPath: string | null) {
     error,
     saving,
     isDetecting: loading || loadedProject !== projectPath,
-    detectMainFile,
   };
 }

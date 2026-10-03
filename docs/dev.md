@@ -245,7 +245,6 @@ All file operations validate paths stay within the project directory (see `util.
 | `git_pull` | Pull from remote |
 | `git_fetch` | Fetch all remotes |
 | `git_init` | Init repo with LaTeX-specific `.gitignore` |
-| `git_clone` | Clone repository |
 | `git_add_remote` | Add remote |
 | `git_discard_all` | Discard all changes + remove untracked |
 | `git_discard_file` | Discard specific file changes |
@@ -258,10 +257,7 @@ All file operations validate paths stay within the project directory (see `util.
 | Command | Purpose |
 |---------|---------|
 | `latex_detect_compilers` | Detect available engines (pdflatex, xelatex, lualatex, latexmk) |
-| `latex_detect_main_file` | Auto-detect main `.tex` file using scoring heuristics |
-| `latex_compile` | Compile with specified engine and arguments |
 | `latex_stop_compilation` | Cancel running compilation |
-| `latex_clean_aux_files` | Remove .aux, .log, .out, .toc, .fls, etc. |
 | `latex_get_distributions` | List available LaTeX distributions for platform |
 | `latex_install` | One-click install LaTeX distribution |
 | `latex_open_download_page` | Open distribution download page in browser |
@@ -308,7 +304,6 @@ The OpenCode daemon runs as a separate process (`opencode serve`) with stdio pip
 |---------|---------|
 | `start_auth_callback_server` | Start local OAuth callback server |
 | `stop_auth_callback_server` | Stop callback server |
-| `get_auth_callback_port` | Get the port the server is listening on |
 
 Uses deep-link scheme `lmms-writer://` for desktop OAuth callback.
 
@@ -425,7 +420,6 @@ Current docs: `installation.mdx`, `quick-start.mdx`, `opencode.mdx`, `ai-agents.
 | `DownloadSection` | `components/download-sections.tsx` | OS-detected download buttons |
 | `DocsContent` | `components/docs-sections.tsx` | Docs navigation layout |
 | `Header` | `components/header.tsx` | Sticky nav with auth |
-| Motion utilities | `components/motion.tsx` | FadeIn, stagger, MotionCard, etc. |
 
 ## Turbo Build Pipeline
 

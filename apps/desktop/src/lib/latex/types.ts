@@ -122,10 +122,3 @@ export interface SynctexResult {
 }
 
 // Main file detection types
-export interface MainFileDetectionResult {
-  main_file: string | null;
-  tex_files: string[];
-  detection_method: "configured" | "single_file" | "auto_detected" | "ambiguous" | "none";
-  needs_user_input: boolean;
-  message: string;
-}

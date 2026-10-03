@@ -769,29 +769,6 @@ pub async fn git_init(dir: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn git_clone(url: String, directory: String) -> Result<String, String> {
-    if url.starts_with('-') {
-        return Err("Invalid URL: cannot start with '-'".to_string());
-    }
-
-    let output = command("git")
-        .args(["clone", "--", &url, &directory])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        Ok(directory)
-    } else {
-        Err(git_command_error_message(
-            &output.stdout,
-            &output.stderr,
-            &["clone", "--", &url, &directory],
-        ))
-    }
-}
-
-#[tauri::command]
 pub async fn git_add_remote(dir: String, name: String, url: String) -> Result<(), String> {
     run_git(&dir, &["remote", "add", &name, &url]).await?;
     Ok(())

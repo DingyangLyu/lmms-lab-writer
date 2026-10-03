@@ -50,13 +50,12 @@ lmms-lab-writer/
 | Main UI          | `apps/desktop/src/app/page.tsx`                       | Editor layout, panels, sidebar              |
 | State Management | `apps/desktop/src/lib/tauri/use-tauri-daemon.ts`      | Central Tauri IPC hook (all backend calls)  |
 | File Tree        | `apps/desktop/src/components/editor/file-tree.tsx`    | Project navigation, drag-and-drop           |
-| LaTeX Editor     | `apps/desktop/src/components/editor/latex-editor.tsx` | CodeMirror 6 with syntax highlighting       |
+| LaTeX Editor     | `apps/desktop/src/components/editor/latex-source-editor.tsx` | CodeMirror 6 with syntax highlighting |
 | Monaco Editor    | `apps/desktop/src/components/editor/monaco-editor.tsx`| File editor with language detection         |
 | Diff Editor      | `apps/desktop/src/components/editor/monaco-diff-editor.tsx` | Unified diff viewer                   |
 | Terminal         | `apps/desktop/src/components/editor/terminal.tsx`     | xterm.js + PTY                              |
 | Git Panel        | `apps/desktop/src/components/editor/sidebar-git-panel.tsx` | Git status, staging, commit            |
-| Changes Review   | `apps/desktop/src/components/editor/changes-review-panel.tsx` | Review changes before commit        |
-| Inline Diff      | `apps/desktop/src/components/editor/inline-diff-review.tsx` | Inline diff visualization            |
+| AI Change Review | `apps/desktop/src/components/editor/review-center.tsx` | Accept/reject agent edits per hunk  |
 | GitHub Publish   | `apps/desktop/src/components/editor/github-publish-dialog.tsx` | Create GitHub repo & push          |
 | OpenCode Panel   | `apps/desktop/src/components/opencode/opencode-panel.tsx` | AI chat interface                      |
 | LaTeX Settings   | `apps/desktop/src/components/latex/latex-settings-dialog.tsx` | Compiler configuration             |
@@ -69,11 +68,11 @@ lmms-lab-writer/
 | Module     | File                                                  | Key Commands                                     |
 | ---------- | ----------------------------------------------------- | ------------------------------------------------ |
 | `fs`       | `apps/desktop/src-tauri/src/commands/fs.rs`           | set_project_path, read_file, write_file, get_file_tree, watch_directory, create_file, rename_path, delete_path |
-| `git`      | `apps/desktop/src-tauri/src/commands/git.rs`          | git_status, git_log, git_diff, git_commit, git_push, git_pull, git_clone, git_add, git_fetch, gh_check, gh_create_repo |
-| `latex`    | `apps/desktop/src-tauri/src/commands/latex.rs`        | latex_compile, latex_detect_compilers, latex_detect_main_file, latex_clean_aux_files |
+| `git`      | `apps/desktop/src-tauri/src/commands/git.rs`          | git_status, git_log, git_diff, git_commit, git_push, git_pull, git_add, git_fetch, gh_check, gh_create_repo |
+| `latex`    | `apps/desktop/src-tauri/src/commands/latex.rs`        | latex_detect_compilers, latex_stop_compilation, latex_synctex_edit (builds: `latex_build.rs`) |
 | `terminal` | `apps/desktop/src-tauri/src/commands/terminal.rs`     | spawn_pty, write_pty, resize_pty, kill_pty       |
 | `opencode` | `apps/desktop/src-tauri/src/commands/opencode.rs`     | opencode_status, opencode_start, opencode_stop   |
-| `auth`     | `apps/desktop/src-tauri/src/commands/auth.rs`         | start_auth_callback_server, get_auth_callback_port |
+| `auth`     | `apps/desktop/src-tauri/src/commands/auth.rs`         | start_auth_callback_server, stop_auth_callback_server |
 | `util`     | `apps/desktop/src-tauri/src/commands/util.rs`         | Shared utilities for path validation             |
 
 ### Website

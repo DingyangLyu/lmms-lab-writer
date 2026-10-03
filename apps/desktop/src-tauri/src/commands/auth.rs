@@ -216,12 +216,3 @@ pub async fn stop_auth_callback_server(
 
     Ok(())
 }
-
-/// Get the current auth callback server port (if running)
-#[tauri::command]
-pub async fn get_auth_callback_port(
-    state: State<'_, AuthCallbackStateWrapper>,
-) -> Result<Option<u16>, String> {
-    let state_guard = state.lock().await;
-    Ok(state_guard.port)
-}

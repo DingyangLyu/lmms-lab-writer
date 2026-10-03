@@ -19,12 +19,7 @@ import { FileSidebarPanel } from "@/components/editor/sidebar-file-panel";
 import { GitSidebarPanel } from "@/components/editor/sidebar-git-panel";
 import { TerminalPanel } from "@/components/editor/terminal-panel";
 import { HarnessButtons, HarnessWorkspace } from "@/components/harness/workspace";
-import {
-  LaTeXInstallPrompt,
-  LaTeXSettingsDialog,
-  MainFileSelectionDialog,
-  SynctexInstallDialog,
-} from "@/components/latex";
+import { LaTeXInstallPrompt, LaTeXSettingsDialog, SynctexInstallDialog } from "@/components/latex";
 import { BuildTargetsEditor, readCompilerOverrides } from "@/components/latex/build-targets-editor";
 import { TemplateImportDialog } from "@/components/latex/template-import-dialog";
 import { RecentProjects } from "@/components/recent-projects";
@@ -60,11 +55,9 @@ import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
 import type {
   BuildTarget,
   LaTeXCompiler,
-  MainFileDetectionResult,
   SynctexResult,
   TargetBuildResult,
 } from "@/lib/latex/types";
-import { makeBuildTarget } from "@/lib/latex/use-latex-settings";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
 import { annotationPrompt } from "@/lib/pdf/annotations";
@@ -563,9 +556,6 @@ export default function EditorPage() {
   const [pendingOpenCodeMessage, setPendingOpenCodeMessage] = useState<string | null>(null);
   const [opencodeError, setOpencodeError] = useState<string | null>(null);
 
-  const [showMainFileDialog, setShowMainFileDialog] = useState(false);
-  const [mainFileDetectionResult, setMainFileDetectionResult] =
-    useState<MainFileDetectionResult | null>(null);
   const [showGitHubPublishDialog, setShowGitHubPublishDialog] = useState(false);
   const [ghPublishError, setGhPublishError] = useState<string | null>(null);
   const [showSynctexInstallDialog, setShowSynctexInstallDialog] = useState(false);
@@ -825,22 +815,6 @@ The AI assistant will read and update this file during compilation.
     runDirectCompile,
     toast,
   ]);
-  const handleMainFileSelect = useCallback(
-    async (mainFile: string) => {
-      const target =
-        latexSettings.settings.config.targets.find((t) => t.mainFile === mainFile) ||
-        makeBuildTarget(mainFile);
-      await latexSettings.setMainFile(mainFile);
-      setShowMainFileDialog(false);
-      setMainFileDetectionResult(null);
-      await runDirectCompile(target);
-    },
-    [latexSettings, runDirectCompile],
-  );
-  const handleMainFileDialogCancel = useCallback(() => {
-    setShowMainFileDialog(false);
-    setMainFileDetectionResult(null);
-  }, []);
 
   const checkOpencodeStatus = useCallback(async () => {
     try {
@@ -3633,15 +3607,6 @@ The AI assistant will read and update this file during compilation.
           }}
           onSignOut={auth.signOut}
         />
-
-        {mainFileDetectionResult && (
-          <MainFileSelectionDialog
-            open={showMainFileDialog}
-            detectionResult={mainFileDetectionResult}
-            onSelect={handleMainFileSelect}
-            onCancel={handleMainFileDialogCancel}
-          />
-        )}
 
         <SynctexInstallDialog
           open={showSynctexInstallDialog}
