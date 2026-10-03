@@ -363,6 +363,8 @@ async fn call_tool(app: &AppHandle, backend: &str, params: &Value) -> Result<Val
             .await
         }
         "writer_resolve_pdf_annotation" | "writer_resolve_annotation" => {
+            // A read-only/plan turn cannot have addressed the note, so it may not close it.
+            ensure_document_write(&sender)?;
             let id = arg(args, "id")?;
             let notes = super::annotations::load(&sender.project).await?;
             let note = notes.iter().find(|n| n.id == id).ok_or("批注不存在")?;
@@ -564,6 +566,13 @@ async fn dispatch_ready(app: &AppHandle) {
                     task.callback = "queued".into();
                 }
                 task.updated_at = now();
+            }
+            // A sender closed while its task ran can never receive the reply.
+            let sender_open = data.sessions.contains_key(&delivery.task.from);
+            if let Some(task) = data.tasks.iter_mut().find(|t| t.id == delivery.task.id) {
+                if task.callback == "queued" && !sender_open {
+                    task.callback = "interrupted".into();
+                }
             }
             drop(data);
             let _ = persist(&app).await;
