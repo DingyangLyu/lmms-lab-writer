@@ -218,7 +218,9 @@ function Workspace({
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const [members, setMembers] = useState<{ id: string; username: string; role: string }[]>([]),
-    [snapshots, setSnapshots] = useState<{ id: string; label: string; created: number }[]>([]),
+    [snapshots, setSnapshots] = useState<
+      { id: string; label: string; created: number; manual?: number }[]
+    >([]),
     [proposals, setProposals] = useState<Proposal[]>([]);
   const [jobs, setJobs] = useState<SharedJob[]>([]);
   const editor = useRef<EditorHandle | null>(null),
@@ -272,10 +274,30 @@ function Workspace({
     );
   }, [prefix]);
   useEffect(() => {
-    void reload().catch((e) => setError(String(e)));
     let socket: WebSocket | null = null,
       stopped = false,
       retry: ReturnType<typeof setTimeout> | null = null;
+    // Bursts of project-changed events collapse into one reload at a time, so an older
+    // response can never overwrite a newer one.
+    let loading = false,
+      again = false;
+    const refresh = () => {
+      if (loading) {
+        again = true;
+        return;
+      }
+      loading = true;
+      void reload()
+        .catch((e) => setError(String(e)))
+        .finally(() => {
+          loading = false;
+          if (again && !stopped) {
+            again = false;
+            refresh();
+          }
+        });
+    };
+    refresh();
     const connect = () => {
       if (stopped) return;
       socket = new WebSocket(
@@ -283,7 +305,7 @@ function Workspace({
       );
       socket.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.type === "project-changed") void reload().catch((e) => setError(String(e)));
+        if (m.type === "project-changed") refresh();
         if (m.type === "ready") setRole(m.role);
       };
       socket.onclose = (e) => {
@@ -738,12 +760,22 @@ function Workspace({
                   onClick={() =>
                     void run(async () => {
                       const current = await api<{ content: string }>(`${prefix}/files/${bibFile}`);
-                      const result = await api<{ added: number; skipped: string[] }>(
-                        `${prefix}/bibliography/import`,
-                        { file: bibFile, expected: current.content, bibtex: bib },
-                      );
+                      const result = await api<{
+                        added: number;
+                        skipped: string[];
+                        renamed: Record<string, string>;
+                      }>(`${prefix}/bibliography/import`, {
+                        file: bibFile,
+                        expected: current.content,
+                        bibtex: bib,
+                      });
+                      const renamed = Object.entries(result.renamed ?? {})
+                        .map(([from, to]) => `${from}→${to}`)
+                        .join("，");
                       setNotice(
-                        `导入 ${result.added} 条，跳过 ${result.skipped.length} 条重复文献`,
+                        `导入 ${result.added} 条，跳过 ${result.skipped.length} 条重复文献${
+                          renamed ? `；引用键冲突已改名：${renamed}` : ""
+                        }`,
                       );
                       setBib("");
                       await sourcesChanged();
@@ -916,7 +948,10 @@ function Workspace({
                 </p>
                 {snapshots.map((s) => (
                   <article className="snapshot" key={s.id}>
-                    <strong>{s.label}</strong>
+                    <strong>
+                      {s.label}
+                      {s.manual === 0 && <span className="muted"> · 自动</span>}
+                    </strong>
                     <p>{new Date(s.created).toLocaleString()}</p>
                     <button
                       type="button"

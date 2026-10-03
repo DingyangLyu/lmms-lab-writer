@@ -6,10 +6,10 @@ import {
   syntaxHighlighting,
 } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { useEffect, useRef } from "react";
-import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
+import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 import { base64, unbase64 } from "./api";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
@@ -26,6 +26,17 @@ export type Comment = {
   replies: { id: string; authorName: string; body: string }[];
 };
 export type Selection = { quote: string; start: string; end: string };
+const LIMIT = 2_000_000;
+/** Comment highlights follow edits by position mapping between (throttled) re-anchors. */
+const setMarks = StateEffect.define<DecorationSet>();
+const commentMarks = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(marks, transaction) {
+    for (const effect of transaction.effects) if (effect.is(setMarks)) return effect.value;
+    return marks.map(transaction.changes);
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 export type EditorHandle = {
   text: () => string;
   selection: () => Selection | null;
@@ -56,8 +67,7 @@ export function Editor({
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
-  const editability = useRef(new Compartment()),
-    marks = useRef(new Compartment());
+  const editability = useRef(new Compartment());
   const callbacks = useRef({ onRole, onStatus, onError, onReady });
   callbacks.current = { onRole, onStatus, onError, onReady };
   const readOnly = useRef(role);
@@ -81,9 +91,13 @@ export function Editor({
         doc: text.toString(),
         extensions: [
           EditorState.transactionFilter.of((transaction) => {
+            // Never drop remote changes: the editor would silently diverge from the shared doc.
+            if (!transaction.docChanged || transaction.annotation(ySyncAnnotation) !== undefined)
+              return transaction;
+            // A UTF-16 unit is at most 3 UTF-8 bytes; only encode when near the limit.
             if (
-              transaction.docChanged &&
-              new TextEncoder().encode(transaction.newDoc.toString()).length > 2_000_000
+              transaction.newDoc.length * 3 > LIMIT &&
+              new TextEncoder().encode(transaction.newDoc.toString()).length > LIMIT
             ) {
               queueMicrotask(() =>
                 callbacks.current.onError("文稿超过 2 MB，请拆分文件；本次输入未覆盖原文。"),
@@ -102,7 +116,7 @@ export function Editor({
           editability.current.of(
             EditorState.readOnly.of(!["owner", "editor"].includes(readOnly.current)),
           ),
-          marks.current.of([]),
+          commentMarks,
           EditorView.contentAttributes.of({
             "aria-label": "多人 LaTeX 编辑器",
             spellcheck: "false",
@@ -209,16 +223,22 @@ export function Editor({
           /* Orphaned notes stay in the list. */
         }
       }
-      const set: DecorationSet = Decoration.set(ranges, true);
-      v.dispatch({ effects: marks.current.reconfigure(EditorView.decorations.of(set)) });
+      v.dispatch({ effects: setMarks.of(Decoration.set(ranges, true)) });
     };
     decorate();
-    const update = () =>
-      queueMicrotask(() => {
+    // Re-anchor from Yjs positions at most a few times per second, not on every keystroke.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const update = () => {
+      timer ??= setTimeout(() => {
+        timer = null;
         if (view.current === v) decorate();
-      });
+      }, 200);
+    };
     p.doc.on("update", update);
-    return () => p.doc.off("update", update);
+    return () => {
+      if (timer) clearTimeout(timer);
+      p.doc.off("update", update);
+    };
   }, [comments, file]);
   return <div ref={host} className="editor-host" />;
 }

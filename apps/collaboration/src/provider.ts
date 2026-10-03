@@ -4,6 +4,8 @@ import * as Y from "yjs";
 import { base64, unbase64 } from "./api";
 export type SyncStatus = "connecting" | "saved" | "saving" | "offline" | "denied";
 export type Person = { id: string; name: string };
+/** Keystrokes inside this window travel as one merged update (fewer server writes). */
+const BATCH_MS = 80;
 export class WriterProvider {
   doc = new Y.Doc();
   awareness = new Awareness(this.doc);
@@ -12,6 +14,8 @@ export class WriterProvider {
   stopped = false;
   retry: ReturnType<typeof setTimeout> | null = null;
   pending = new Set<string>();
+  outgoing: Uint8Array[] = [];
+  batch: ReturnType<typeof setTimeout> | null = null;
   ready = false;
   editable = false;
   unsynced = false;
@@ -52,9 +56,29 @@ export class WriterProvider {
   onUpdate = (update: Uint8Array, origin: unknown) => {
     if (origin === this || origin === this.cache) return;
     this.unsynced = true;
-    if (this.ready && this.editable) this.sendUpdate(update);
-    else this.status("offline");
+    if (!this.ready || !this.editable) {
+      this.status("offline");
+      return;
+    }
+    this.outgoing.push(update);
+    this.status("saving");
+    if (this.outgoing.length >= 64) this.flush();
+    else this.batch ??= setTimeout(() => this.flush(), BATCH_MS);
   };
+  flush() {
+    if (this.batch) clearTimeout(this.batch);
+    this.batch = null;
+    const updates = this.outgoing,
+      [first] = updates;
+    this.outgoing = [];
+    if (first) this.sendUpdate(updates.length === 1 ? first : Y.mergeUpdates(updates));
+  }
+  /** Unsent local changes are recomputed from the server state vector after reconnecting. */
+  dropBatch() {
+    if (this.batch) clearTimeout(this.batch);
+    this.batch = null;
+    this.outgoing = [];
+  }
   sendUpdate(update: Uint8Array) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const id = crypto.randomUUID();
@@ -88,11 +112,10 @@ export class WriterProvider {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === "ready") {
-          const serverDoc = new Y.Doc();
-          Y.applyUpdate(serverDoc, unbase64(msg.state));
-          const vector = Y.encodeStateVector(serverDoc);
-          serverDoc.destroy();
-          Y.applyUpdate(this.doc, unbase64(msg.state), this);
+          const state = unbase64(msg.state),
+            vector = Y.encodeStateVectorFromUpdate(state);
+          this.dropBatch();
+          Y.applyUpdate(this.doc, state, this);
           this.editable = ["owner", "editor"].includes(msg.role);
           this.role(msg.role);
           this.ready = true;
@@ -128,6 +151,7 @@ export class WriterProvider {
     };
     socket.onclose = (event) => {
       this.ready = false;
+      this.dropBatch();
       if (this.stopped) return;
       if (event.code === 1008) {
         this.status("denied");
@@ -147,6 +171,7 @@ export class WriterProvider {
     this.stopped = true;
     window.removeEventListener("beforeunload", this.beforeUnload);
     if (this.retry) clearTimeout(this.retry);
+    this.flush();
     this.awareness.setLocalState(null);
     this.socket?.close();
     this.doc.off("update", this.onUpdate);
