@@ -1,5 +1,7 @@
 > **DingyangLyu fork:** See [LICENSE](LICENSE) and [NOTICE](NOTICE) for commercial-use restrictions and preserved MIT rights. Website, Homebrew, and download links naming the upstream project still refer to upstream products, not a commercially licensed release of this fork.
 
+This fork includes desktop bibliography management and per-task change review, plus an initial self-hosted multiplayer editor with shared source comments and reviewable AI tasks. See the [local setup, Docker deployment, backup instructions, and current limitations](docs/research-tools-and-collaboration.md).
+
 <div align="center">
 
 <a href="https://writer.lmms-lab.com">

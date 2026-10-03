@@ -236,6 +236,8 @@ async fn snapshot_with_index(
         ".writer/latex.json",
         ".writer/revisions",
         ".writer/conflicts",
+        ".writer/reviews",
+        ".writer/review-index",
     ] {
         if Path::new(project).join(metadata).exists() {
             git(project, &["add", "-f", "--", metadata], Some(index)).await?;

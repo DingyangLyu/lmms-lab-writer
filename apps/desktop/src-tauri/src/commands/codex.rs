@@ -656,10 +656,15 @@ pub async fn codex_start_turn(
     permission_mode
         .unwrap_or_default()
         .apply_to_turn(&mut params);
-    ensure_client(&state, app)
+    super::writer_bridge::prepare_review(&app, "codex", &thread_id).await?;
+    let result = ensure_client(&state, app.clone())
         .await?
         .request("turn/start", params)
-        .await
+        .await;
+    if result.is_err() {
+        let _ = super::reviews::finish(&app, &format!("codex:{thread_id}")).await;
+    }
+    result
 }
 
 #[tauri::command]

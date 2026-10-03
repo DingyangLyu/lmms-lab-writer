@@ -7,8 +7,11 @@ import type { DocumentConflict } from "@/lib/editor/merge";
 import type { DocumentSave, SaveManager } from "@/lib/editor/save-manager";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import { AnnotationManager } from "./annotation-manager";
+import { BibliographyPanel } from "./bibliography-panel";
+import { CollaborationButton } from "./collaboration-button";
 import { ConflictCenter } from "./conflict-center";
 import { GitVersions } from "./git-versions";
+import { ReviewCenter } from "./review-center";
 
 export function SaveStatus({
   agentBusy = false,
@@ -19,6 +22,7 @@ export function SaveStatus({
   path,
   onReload,
   onOpenDraft,
+  onOpenFile,
   highlightAmbiguousUnicode,
   onToggleUnicodeHighlight,
   closeError,
@@ -32,6 +36,7 @@ export function SaveStatus({
   path?: string;
   onReload: (path: string, content: string) => void;
   onOpenDraft: (path: string, content: string) => void;
+  onOpenFile: (path: string) => void;
   highlightAmbiguousUnicode: boolean;
   onToggleUnicodeHighlight: () => void;
   closeError: string | null;
@@ -115,6 +120,24 @@ export function SaveStatus({
           字符方框：{highlightAmbiguousUnicode ? "开" : "关"}
         </button>
         {project && <AnnotationManager />}
+        {project && <CollaborationButton project={project} manager={manager} />}
+        {project && (
+          <BibliographyPanel
+            key={`bib:${project}`}
+            project={project}
+            manager={manager}
+            onOpen={onOpenFile}
+          />
+        )}
+        {project && (
+          <ReviewCenter
+            key={`review:${project}`}
+            project={project}
+            manager={manager}
+            agentBusy={agentBusy}
+            onOpen={onOpenFile}
+          />
+        )}
         {project && (
           <ConflictCenter
             key={`conflicts:${project}`}

@@ -1,0 +1,31 @@
+services:
+  writer:
+    build:
+      context: .
+      dockerfile: apps/collaboration/Dockerfile
+    ports:
+      - "127.0.0.1:${WRITER_PORT:-8787}:8787"
+    environment:
+      WRITER_ORIGIN: "${WRITER_ORIGIN:-http://127.0.0.1:8787}"
+      WRITER_ADMIN_USER: "${WRITER_ADMIN_USER:-writer}"
+      WRITER_ADMIN_PASSWORD: "${WRITER_ADMIN_PASSWORD:?Set an initial admin password of at least 12 characters}"
+    volumes:
+      - writer-data:/data
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=64m
+  tex-image:
+    profiles: [tools]
+    image: writer-tex:local
+    build:
+      context: .
+      dockerfile: apps/collaboration/Dockerfile.tex
+volumes:
+  writer-data:

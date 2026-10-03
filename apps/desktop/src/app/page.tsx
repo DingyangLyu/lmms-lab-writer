@@ -3240,6 +3240,7 @@ The AI assistant will read and update this file during compilation.
 
         {daemon.projectPath && (
           <SaveStatus
+            onOpenFile={handleChatFileClick}
             onConflictResolved={(conflict) => {
               if (!conflict.owner.startsWith("agent:")) return;
               const native = conflict.owner.slice(6),

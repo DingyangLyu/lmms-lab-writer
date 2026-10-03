@@ -573,6 +573,7 @@ pub async fn claude_start_turn(
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Claude Code 启动失败：{e}"))?;
+    super::reviews::begin(&cwd, &format!("claude:{session_id}")).await?;
     let stdout = child.stdout.take().ok_or("Claude stdout 不可用")?;
     let stderr = child.stderr.take().ok_or("Claude stderr 不可用")?;
     let run = Arc::new(Run {

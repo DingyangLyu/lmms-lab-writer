@@ -1,0 +1,5 @@
+FROM debian:bookworm-slim
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends latexmk texlive-latex-recommended texlive-latex-extra texlive-xetex texlive-luatex texlive-lang-chinese fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
+ENV openin_any=p openout_any=p shell_escape=0
+WORKDIR /work
+CMD ["latexmk","--version"]

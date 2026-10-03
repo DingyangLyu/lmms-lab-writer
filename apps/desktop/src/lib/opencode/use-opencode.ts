@@ -853,6 +853,10 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           sessionId,
           retriedUnsupportedModel: false,
         };
+        if (directory && !steer) {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("review_begin", { project: directory, actor: `opencode:${sessionId}` });
+        }
         await client.chat(sessionId, content, {
           agent: agentToUse,
           model: selectedModel
@@ -884,7 +888,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         return false;
       }
     },
-    [connected, syncMessagesAndParts, selectedAgent, selectedModel, agents, providers],
+    [connected, syncMessagesAndParts, selectedAgent, selectedModel, agents, providers, directory],
   );
 
   const abort = useCallback(async () => {

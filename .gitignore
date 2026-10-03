@@ -86,3 +86,9 @@ lint_output.txt
 test-screenshots/
 
 .opencode/
+
+# Local collaboration databases and runtime workspaces
+**/.data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

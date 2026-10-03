@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/.next
+**/dist
+**/out
+**/target
+**/target-*
+**/.data
+**/.writer
+**/.lmms_lab_writer
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+whalent-install.sh

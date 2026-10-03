@@ -1,0 +1,224 @@
+import { defaultKeymap } from "@codemirror/commands";
+import {
+  defaultHighlightStyle,
+  foldGutter,
+  StreamLanguage,
+  syntaxHighlighting,
+} from "@codemirror/language";
+import { stex } from "@codemirror/legacy-modes/mode/stex";
+import { Compartment, EditorState } from "@codemirror/state";
+import { Decoration, type DecorationSet, EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { useEffect, useRef } from "react";
+import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
+import * as Y from "yjs";
+import { base64, unbase64 } from "./api";
+import { type Person, type SyncStatus, WriterProvider } from "./provider";
+export type Comment = {
+  id: string;
+  file: string;
+  authorName: string;
+  quote: string;
+  start: string;
+  end: string;
+  body: string;
+  resolved: number;
+  created: number;
+  replies: { id: string; authorName: string; body: string }[];
+};
+export type Selection = { quote: string; start: string; end: string };
+export type EditorHandle = {
+  text: () => string;
+  selection: () => Selection | null;
+  insert: (text: string) => void;
+  focusComment: (comment: Comment) => void;
+};
+export function Editor({
+  project,
+  file,
+  user,
+  role,
+  comments,
+  onRole,
+  onStatus,
+  onError,
+  onReady,
+}: {
+  project: string;
+  file: string;
+  user: Person;
+  role: string;
+  comments: Comment[];
+  onRole: (role: string) => void;
+  onStatus: (s: SyncStatus) => void;
+  onError: (e: string) => void;
+  onReady: (handle: EditorHandle | null) => void;
+}) {
+  const host = useRef<HTMLDivElement>(null),
+    view = useRef<EditorView | null>(null),
+    provider = useRef<WriterProvider | null>(null);
+  const editability = useRef(new Compartment()),
+    marks = useRef(new Compartment());
+  const callbacks = useRef({ onRole, onStatus, onError, onReady });
+  callbacks.current = { onRole, onStatus, onError, onReady };
+  const readOnly = useRef(role);
+  readOnly.current = role;
+  useEffect(() => {
+    if (!host.current) return;
+    const p = new WriterProvider(
+      project,
+      file,
+      user,
+      (s) => callbacks.current.onStatus(s),
+      (r) => callbacks.current.onRole(r),
+      (e) => callbacks.current.onError(e),
+    );
+    provider.current = p;
+    const text = p.doc.getText("content"),
+      undo = new Y.UndoManager(text);
+    const v = new EditorView({
+      parent: host.current,
+      state: EditorState.create({
+        doc: text.toString(),
+        extensions: [
+          EditorState.transactionFilter.of((transaction) => {
+            if (
+              transaction.docChanged &&
+              new TextEncoder().encode(transaction.newDoc.toString()).length > 2_000_000
+            ) {
+              queueMicrotask(() =>
+                callbacks.current.onError("文稿超过 2 MB，请拆分文件；本次输入未覆盖原文。"),
+              );
+              return [];
+            }
+            return transaction;
+          }),
+          lineNumbers(),
+          foldGutter(),
+          StreamLanguage.define(stex),
+          syntaxHighlighting(defaultHighlightStyle),
+          EditorView.lineWrapping,
+          keymap.of([...yUndoManagerKeymap, ...defaultKeymap]),
+          yCollab(text, p.awareness, { undoManager: undo }),
+          editability.current.of(
+            EditorState.readOnly.of(!["owner", "editor"].includes(readOnly.current)),
+          ),
+          marks.current.of([]),
+          EditorView.contentAttributes.of({
+            "aria-label": "多人 LaTeX 编辑器",
+            spellcheck: "false",
+          }),
+          EditorView.theme({
+            "&": { height: "100%", fontSize: "15px" },
+            ".cm-scroller": {
+              overflow: "auto",
+              fontFamily: '"SF Mono",Menlo,"PingFang SC",monospace',
+            },
+            ".cm-content": { padding: "16px 0" },
+            ".cm-line": { padding: "0 12px" },
+            ".cm-gutters": {
+              background: "#f8fafb",
+              borderRight: "1px solid #e2e6ea",
+              color: "#7a858e",
+            },
+            ".writer-comment": { background: "#ffefb6", borderBottom: "2px solid #dba323" },
+            ".writer-comment-resolved": { borderBottom: "2px solid #39a471" },
+          }),
+        ],
+      }),
+    });
+    view.current = v;
+    callbacks.current.onReady({
+      text: () => v.state.doc.toString(),
+      selection: () => {
+        const s = v.state.selection.main;
+        if (s.empty) return null;
+        return {
+          quote: v.state.sliceDoc(s.from, s.to),
+          start: base64(
+            Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, s.from)),
+          ),
+          end: base64(
+            Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, s.to, -1)),
+          ),
+        };
+      },
+      insert: (insert) => {
+        if (!p.editable) return;
+        v.dispatch(v.state.replaceSelection(insert));
+        v.focus();
+      },
+      focusComment: (c) => {
+        try {
+          const a = Y.createAbsolutePositionFromRelativePosition(
+              Y.decodeRelativePosition(unbase64(c.start)),
+              p.doc,
+            ),
+            z = Y.createAbsolutePositionFromRelativePosition(
+              Y.decodeRelativePosition(unbase64(c.end)),
+              p.doc,
+            );
+          if (!a || !z || a.index >= z.index) throw new Error("批注原文已删除，需要重新定位");
+          v.dispatch({ selection: { anchor: a.index, head: z.index }, scrollIntoView: true });
+          v.focus();
+        } catch (e) {
+          callbacks.current.onError(String(e));
+        }
+      },
+    });
+    return () => {
+      callbacks.current.onReady(null);
+      v.destroy();
+      undo.destroy();
+      p.destroy();
+      view.current = null;
+      provider.current = null;
+    };
+  }, [project, file, user]);
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: editability.current.reconfigure([
+        EditorState.readOnly.of(!["owner", "editor"].includes(role)),
+        EditorView.editable.of(["owner", "editor"].includes(role)),
+      ]),
+    });
+  }, [role]);
+  useEffect(() => {
+    const v = view.current,
+      p = provider.current;
+    if (!v || !p) return;
+    const decorate = () => {
+      const ranges = [];
+      for (const c of comments.filter((c) => c.file === file)) {
+        try {
+          const a = Y.createAbsolutePositionFromRelativePosition(
+              Y.decodeRelativePosition(unbase64(c.start)),
+              p.doc,
+            ),
+            z = Y.createAbsolutePositionFromRelativePosition(
+              Y.decodeRelativePosition(unbase64(c.end)),
+              p.doc,
+            );
+          if (a && z && a.index < z.index && z.index <= v.state.doc.length)
+            ranges.push(
+              Decoration.mark({
+                class: c.resolved ? "writer-comment-resolved" : "writer-comment",
+                attributes: { title: `${c.authorName}: ${c.body}` },
+              }).range(a.index, z.index),
+            );
+        } catch {
+          /* Orphaned notes stay in the list. */
+        }
+      }
+      const set: DecorationSet = Decoration.set(ranges, true);
+      v.dispatch({ effects: marks.current.reconfigure(EditorView.decorations.of(set)) });
+    };
+    decorate();
+    const update = () =>
+      queueMicrotask(() => {
+        if (view.current === v) decorate();
+      });
+    p.doc.on("update", update);
+    return () => p.doc.off("update", update);
+  }, [comments, file]);
+  return <div ref={host} className="editor-host" />;
+}
