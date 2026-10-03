@@ -858,60 +858,76 @@ pub async fn prepare_review(app: &AppHandle, backend: &str, id: &str) {
         super::reviews::begin_or_report(app, &project, &actor).await;
     }
 }
-/// One event subscription, no status polling by either model.
-pub fn monitor_opencode(app: AppHandle, port: u16, project: String) {
+/// Event streams are scoped by `?directory=`, so each open project needs its own watcher.
+/// Keyed by server process too, so a restarted server on the same port is watched again.
+static OPENCODE_MONITORS: std::sync::Mutex<std::collections::BTreeSet<(u32, u16, String)>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+/// One event subscription per server and project, no status polling by either model.
+pub fn monitor_opencode(app: AppHandle, server: u32, port: u16, project: String) {
+    let key = (server, port, project.clone());
+    let fresh = OPENCODE_MONITORS
+        .lock()
+        .map(|mut watched| watched.insert(key.clone()))
+        .unwrap_or(false);
+    if !fresh {
+        return;
+    }
     tokio::spawn(async move {
-        let client = match reqwest::Client::builder().no_proxy().build() {
-            Ok(client) => client,
-            Err(_) => return,
-        };
-        let url = format!(
-            "http://127.0.0.1:{port}/event?directory={}",
-            urlencoding::encode(&project)
-        );
-        let mut response = match client.get(url).send().await {
-            Ok(response) => response,
-            Err(_) => return,
-        };
-        let mut pending = String::new();
-        while let Ok(Some(chunk)) = response.chunk().await {
-            pending.push_str(&String::from_utf8_lossy(&chunk));
-            while let Some(index) = pending.find('\n') {
-                let line = pending[..index].trim_end_matches('\r').to_string();
-                pending.drain(..=index);
-                let Some(raw) = line.strip_prefix("data:") else {
-                    continue;
-                };
-                let Ok(event) = serde_json::from_str::<Value>(raw.trim()) else {
-                    continue;
-                };
-                if let Some(id) = event
-                    .pointer("/properties/sessionID")
-                    .and_then(Value::as_str)
-                {
-                    match event["type"].as_str() {
-                        Some("session.status") => {
-                            set_busy(
-                                &app,
-                                "opencode",
-                                id,
-                                event
-                                    .pointer("/properties/status/type")
-                                    .and_then(Value::as_str)
-                                    != Some("idle"),
-                            )
-                            .await
-                        }
-                        Some("session.idle") => set_busy(&app, "opencode", id, false).await,
-                        _ => {}
-                    }
-                }
-            }
-            if pending.len() > 4_000_000 {
-                pending.clear();
-            }
+        watch_opencode(&app, port, &project).await;
+        if let Ok(mut watched) = OPENCODE_MONITORS.lock() {
+            watched.remove(&key);
         }
     });
+}
+async fn watch_opencode(app: &AppHandle, port: u16, project: &str) {
+    let Ok(client) = reqwest::Client::builder().no_proxy().build() else {
+        return;
+    };
+    let url = format!(
+        "http://127.0.0.1:{port}/event?directory={}",
+        urlencoding::encode(project)
+    );
+    let Ok(mut response) = client.get(url).send().await else {
+        return;
+    };
+    let mut pending = String::new();
+    while let Ok(Some(chunk)) = response.chunk().await {
+        pending.push_str(&String::from_utf8_lossy(&chunk));
+        while let Some(index) = pending.find('\n') {
+            let line = pending[..index].trim_end_matches('\r').to_string();
+            pending.drain(..=index);
+            let Some(raw) = line.strip_prefix("data:") else {
+                continue;
+            };
+            let Ok(event) = serde_json::from_str::<Value>(raw.trim()) else {
+                continue;
+            };
+            if let Some(id) = event
+                .pointer("/properties/sessionID")
+                .and_then(Value::as_str)
+            {
+                match event["type"].as_str() {
+                    Some("session.status") => {
+                        set_busy(
+                            app,
+                            "opencode",
+                            id,
+                            event
+                                .pointer("/properties/status/type")
+                                .and_then(Value::as_str)
+                                != Some("idle"),
+                        )
+                        .await
+                    }
+                    Some("session.idle") => set_busy(app, "opencode", id, false).await,
+                    _ => {}
+                }
+            }
+        }
+        if pending.len() > 4_000_000 {
+            pending.clear();
+        }
+    }
 }
 
 async fn prepare_delivery(app: &AppHandle, project: &str) -> Result<(), String> {

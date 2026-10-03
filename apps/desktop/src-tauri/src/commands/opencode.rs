@@ -355,9 +355,24 @@ pub async fn opencode_start(
     // Every Writer request carries `?directory=`, so one server serves all opened projects.
     // Restarting it for another project would abort sessions still running in the previous one.
     if state.process_running()? {
+        let port = *state.port.lock().map_err(|e| e.to_string())?;
+        let server = state
+            .process
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_ref()
+            .and_then(|child| child.id())
+            .unwrap_or(0);
+        // The shared server is already up; this project still needs its own status watcher.
+        super::writer_bridge::monitor_opencode(
+            app.clone(),
+            server,
+            port,
+            directory.to_string_lossy().into_owned(),
+        );
         return Ok(OpenCodeStatus {
             running: true,
-            port: *state.port.lock().map_err(|e| e.to_string())?,
+            port,
             installed: true,
             managed: true,
             web_search_enabled: true,
@@ -516,10 +531,12 @@ pub async fn opencode_start(
         ));
     }
 
+    let server = child.id().unwrap_or(0);
     *state.process.lock().map_err(|e| e.to_string())? = Some(child);
 
     super::writer_bridge::monitor_opencode(
         app.clone(),
+        server,
         port,
         directory.to_string_lossy().into_owned(),
     );
