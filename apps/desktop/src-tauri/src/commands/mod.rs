@@ -30,5 +30,5 @@ pub mod source_annotations;
 pub mod local_files;
 
 pub mod chat_files;
-pub mod writing;
 pub mod reviews;
+pub mod writing;

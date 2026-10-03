@@ -302,6 +302,10 @@ pub struct SaveResult {
     pub merged: bool,
     pub conflict: Option<Conflict>,
     pub version_error: Option<String>,
+    /// Disk text replaced by a successful save; lets callers move a person's own edit out of
+    /// running agent reviews.
+    #[serde(skip)]
+    pub previous: Option<String>,
 }
 async fn store_conflict(project: &str, value: &Conflict) -> Result<(), String> {
     let file = metadata_dir(project, "conflicts")
@@ -375,6 +379,7 @@ async fn save_inner(
                             merged: false,
                             conflict: None,
                             version_error: None,
+                            previous: None,
                         });
                     }
                 }
@@ -417,6 +422,7 @@ async fn save_inner(
                 content,
                 conflict: None,
                 version_error,
+                previous: Some(disk),
             });
         }
         let revision = format!(
@@ -444,6 +450,7 @@ async fn save_inner(
             merged: false,
             conflict: Some(conflict),
             version_error: None,
+            previous: None,
         });
     }
     Err("文件仍在连续变化，本次修改已保留，请稍后重试合并。".into())
@@ -457,6 +464,22 @@ pub async fn merge_save_document(
     expected: String,
 ) -> Result<SaveResult, String> {
     let result = save(&project, &path, &expected, &content, "editor", None).await;
+    if let Ok(SaveResult {
+        previous: Some(previous),
+        content,
+        ..
+    }) = &result
+    {
+        if previous != content {
+            if let Err(error) =
+                super::reviews::rebase_human_edit(&project, &path, Some(previous), content).await
+            {
+                eprintln!(
+                    "[reviews] could not exclude an editor save from running reviews: {error}"
+                );
+            }
+        }
+    }
     let _ = app.emit(
         "writer://conflicts-changed",
         serde_json::json!({"project":project}),

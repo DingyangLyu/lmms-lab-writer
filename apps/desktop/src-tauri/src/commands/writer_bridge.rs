@@ -600,7 +600,7 @@ async fn opencode_turn(
         .no_proxy()
         .build()
         .map_err(|e| e.to_string())?;
-    super::reviews::begin(&session.project, &session.id).await?;
+    super::reviews::begin_or_report(app, &session.project, &session.id).await;
     let response = client
         .post(format!(
             "http://127.0.0.1:{port}/session/{}/message?directory={}",
@@ -822,12 +822,7 @@ pub async fn set_busy(app: &AppHandle, backend: &str, id: &str, busy: bool) {
     if busy {
         super::reviews::mark_running(&key(backend, id)).await;
     } else {
-        if let Err(error) = super::reviews::finish_if_started(app, &key(backend, id)).await {
-            let _ = app.emit(
-                "writer://review-error",
-                json!({"actor":key(backend,id),"error":error}),
-            );
-        }
+        super::reviews::finish_if_started(app, &key(backend, id)).await;
     }
 }
 pub async fn conversation_is_busy(app: &AppHandle, actor: &str) -> bool {
@@ -839,7 +834,8 @@ pub async fn conversation_is_busy(app: &AppHandle, actor: &str) -> bool {
         .get(actor)
         .is_some_and(|s| s.busy || s.active_job.is_some())
 }
-pub async fn prepare_review(app: &AppHandle, backend: &str, id: &str) -> Result<(), String> {
+/// Best effort: a conversation that is not registered (or cannot be captured) still runs.
+pub async fn prepare_review(app: &AppHandle, backend: &str, id: &str) {
     let actor = key(backend, id);
     let project = app
         .state::<BridgeState>()
@@ -850,9 +846,8 @@ pub async fn prepare_review(app: &AppHandle, backend: &str, id: &str) -> Result<
         .get(&actor)
         .map(|s| s.project.clone());
     if let Some(project) = project {
-        super::reviews::begin(&project, &actor).await?;
+        super::reviews::begin_or_report(app, &project, &actor).await;
     }
-    Ok(())
 }
 /// One event subscription, no status polling by either model.
 pub fn monitor_opencode(app: AppHandle, port: u16, project: String) {

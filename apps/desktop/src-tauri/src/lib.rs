@@ -99,7 +99,6 @@ pub fn run() {
             commands::writing::bibliography_lookup_doi,
             commands::writing::bibliography_zotero_local,
             commands::reviews::review_begin,
-            commands::reviews::review_end,
             commands::reviews::review_list,
             commands::reviews::review_read,
             commands::reviews::review_decide,

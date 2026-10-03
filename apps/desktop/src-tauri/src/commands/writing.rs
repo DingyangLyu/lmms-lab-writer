@@ -47,6 +47,8 @@ pub async fn metadata(project: &str, name: &str) -> Result<PathBuf, String> {
     }
     Ok(dir)
 }
+/// Editable project text. Oversized, non-UTF-8 or unreadable files are skipped rather than
+/// failing the whole project: one large data file must not block reviews or bibliography.
 pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
     let root = annotations::root(project).await?;
     let paths = tokio::task::spawn_blocking(move || {
@@ -70,7 +72,7 @@ pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
                     .contains(&e.file_name().to_string_lossy().as_ref())
             })
         {
-            let e = entry.map_err(|e| e.to_string())?;
+            let Ok(e) = entry else { continue };
             if !e.file_type().is_file() {
                 continue;
             }
@@ -78,8 +80,8 @@ pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
             if !["tex", "bib", "md", "txt", "sty", "cls", "bst", "py"].contains(&ext) {
                 continue;
             }
-            if e.metadata().map_err(|e| e.to_string())?.len() > 2_000_000 {
-                return Err(format!("文件过大：{}", e.path().display()));
+            if e.metadata().map_or(true, |m| m.len() > 2_000_000) {
+                continue;
             }
             paths.push(
                 e.path()
@@ -101,9 +103,18 @@ pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
     let mut files = vec![];
     for path in paths {
         let (_, target) = saving::target_path(project, &path).await?;
-        let content = fs::read_to_string(target)
-            .await
-            .map_err(|e| format!("{path}: {e}"))?;
+        let content = match fs::read_to_string(target).await {
+            Ok(content) => content,
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::InvalidData | std::io::ErrorKind::NotFound
+                ) =>
+            {
+                continue
+            }
+            Err(e) => return Err(format!("{path}: {e}")),
+        };
         total += content.len();
         if total > 32_000_000 {
             return Err("项目文本超过 32 MB，请拆分项目".into());
@@ -223,7 +234,21 @@ pub async fn writing_apply_changes(
     changes: Vec<FileEdit>,
     label: String,
 ) -> Result<(), String> {
+    let edits: Vec<_> = changes
+        .iter()
+        .map(|c| (c.path.clone(), c.expected.clone(), c.content.clone()))
+        .collect();
     let result = apply(&project, changes, &label).await;
+    if result.is_ok() {
+        // Bibliography and citation edits are the user's, not the running agent's.
+        for (path, before, after) in &edits {
+            if let Err(error) =
+                super::reviews::rebase_human_edit(&project, path, before.as_deref(), after).await
+            {
+                eprintln!("[reviews] could not exclude {path} from running reviews: {error}");
+            }
+        }
+    }
     let _ = app.emit(
         "writer://writing-changed",
         serde_json::json!({"project":project}),

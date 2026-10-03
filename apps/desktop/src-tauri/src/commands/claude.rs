@@ -570,10 +570,13 @@ pub async fn claude_start_turn(
     if let Some(effort) = options.effort {
         cmd.arg("--effort").arg(effort);
     }
+    // Capture the baseline before the process exists, so no edit can precede it.
+    let actor = format!("claude:{session_id}");
+    super::reviews::begin_or_report(&app, &cwd, &actor).await;
+    let review = super::reviews::TurnGuard::new(&app, &actor);
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Claude Code 启动失败：{e}"))?;
-    super::reviews::begin(&cwd, &format!("claude:{session_id}")).await?;
     let stdout = child.stdout.take().ok_or("Claude stdout 不可用")?;
     let stderr = child.stderr.take().ok_or("Claude stderr 不可用")?;
     let run = Arc::new(Run {
@@ -626,6 +629,7 @@ pub async fn claude_start_turn(
         let _ = child.kill().await;
         return Err(error);
     }
+    review.disarm();
     super::writer_bridge::set_busy(&app, "claude", &session_id, true).await;
     tokio::spawn(async move {
         emit(&app, &session, &json!({"type":"writer_started"}));

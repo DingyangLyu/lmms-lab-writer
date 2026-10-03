@@ -91,12 +91,14 @@ export function ReviewCenter({
       <button
         type="button"
         className="border border-border px-2 py-1 text-xs"
+        title={error || undefined}
         onClick={() => {
           setOpen(true);
           void run(reload);
         }}
       >
         修改审阅 {summaries.reduce((n, s) => n + s.pending, 0)}
+        {error && <span className="ml-1 text-red-600">!</span>}
       </button>
       {open && (
         <div className="fixed inset-0 z-[175] flex items-center justify-center bg-black/30 p-5">
@@ -121,8 +123,9 @@ export function ReviewCenter({
             </header>
             <p className="border-b border-border p-3 text-xs text-muted">
               原生 Agent
-              的修改已写入工作区；接受表示保留，拒绝会安全撤回该项，撤销决定可重新核对。记录的是任务期间的文本变化，可能包含同时发生的人工或其他
-              Agent 修改；图片、PDF 等请在 Git 版本中核对。运行中暂不接受或撤回。
+              的修改已写入工作区；接受表示保留，拒绝会安全撤回该项，撤销决定可重新核对。任务期间在编辑器和文献库中的人工保存会自动排除；同时运行的其他
+              Agent 或外部程序的修改仍可能计入。图片、PDF 及超过 2 MB 的文本请在 Git
+              版本中核对。运行中暂不接受或撤回。
             </p>
             {error && (
               <p role="alert" className="whitespace-pre-wrap p-3 text-sm text-red-600">

@@ -656,7 +656,7 @@ pub async fn codex_start_turn(
     permission_mode
         .unwrap_or_default()
         .apply_to_turn(&mut params);
-    super::writer_bridge::prepare_review(&app, "codex", &thread_id).await?;
+    super::writer_bridge::prepare_review(&app, "codex", &thread_id).await;
     let result = ensure_client(&state, app.clone())
         .await?
         .request("turn/start", params)
@@ -884,7 +884,15 @@ pub async fn bridge_turn(
     )
     .map_err(|e| e.to_string())?;
     mode.apply_to_turn(&mut params);
-    let started = client.request("turn/start", params).await?;
+    // Delegated turns edit the paper too; record them like turns started from the panel.
+    super::reviews::begin_or_report(&app, &session.project, &session.id).await;
+    let started = match client.request("turn/start", params).await {
+        Ok(started) => started,
+        Err(error) => {
+            let _ = super::reviews::finish(&app, &session.id).await;
+            return Err(error);
+        }
+    };
     let turn_id = started
         .pointer("/turn/id")
         .and_then(Value::as_str)
