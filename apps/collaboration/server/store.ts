@@ -133,6 +133,10 @@ export class Store {
       ) ?? fail(404, "文档不存在")
     );
   }
+  /** Cheap per-message check; `file()` would load the whole document state. */
+  fileExists(project: string, id: string) {
+    return !!this.get("SELECT 1 FROM files WHERE project=? AND id=? AND deleted=0", project, id);
+  }
   textFiles(project: string) {
     return this.all<FileRow>(
       "SELECT * FROM files WHERE project=? AND deleted=0 AND binary=0 ORDER BY path",

@@ -1,8 +1,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as encoding from "lib0/encoding";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
+import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { createWriterServer } from "./app";
 
@@ -280,6 +282,81 @@ describe("real collaboration service", () => {
       body: '{"name":"bad"}',
     });
     expect(forged.status).toBe(403);
+  });
+  it("survives malformed cursor updates and keeps per-user cursor identity", async () => {
+    const f = await fixture(),
+      viewer = await f.invite("viewer", "reader");
+    const file = (
+      await f.call(`/projects/${f.project}/files`, { path: "main.tex", content: "text" }, f.owner)
+    ).data.id;
+    const owner = await f.peer(f.owner, file),
+      bad = await f.peer(viewer, file);
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, 2);
+    encoding.writeVarUint(encoder, 4242);
+    encoding.writeVarUint(encoder, 1);
+    encoding.writeVarString(encoder, JSON.stringify({ cursor: null }));
+    encoding.writeVarUint(encoder, 4343);
+    const closed = new Promise<number>((resolve) => bad.ws.once("close", resolve));
+    bad.ws.send(
+      JSON.stringify({
+        type: "awareness",
+        update: Buffer.from(encoding.toUint8Array(encoder)).toString("base64"),
+      }),
+    );
+    expect(await closed).toBe(1008);
+    expect((await f.call("/health")).status).toBe(200);
+    const awareness = new Awareness(owner.doc);
+    awareness.setLocalStateField("user", { name: "spoofed", color: "#000" });
+    owner.ws.send(
+      JSON.stringify({
+        type: "awareness",
+        update: Buffer.from(encodeAwarenessUpdate(awareness, [owner.doc.clientID])).toString(
+          "base64",
+        ),
+      }),
+    );
+    const watcher = await f.peer(f.owner, file),
+      seen = new Awareness(watcher.doc);
+    applyAwarenessUpdate(
+      seen,
+      Buffer.from((await watcher.next("awareness")).update || "", "base64"),
+      null,
+    );
+    const user = seen.getStates().get(owner.doc.clientID)?.user as { name: string; color: string };
+    expect(user.name).toBe("owner");
+    expect(user.color).toMatch(/^hsl\(/);
+    awareness.destroy();
+    seen.destroy();
+  });
+  it("releases rooms after rejected replacements and keeps the audit trail readable", async () => {
+    const f = await fixture();
+    const file = (
+      await f.call(`/projects/${f.project}/files`, { path: "a.tex", content: "one" }, f.owner)
+    ).data.id;
+    const stale = await f.call(
+      `/projects/${f.project}/files/${file}`,
+      { expected: "stale", content: "two" },
+      f.owner,
+      "PUT",
+    );
+    expect(stale.status).toBe(409);
+    expect(f.app.collab.rooms.size).toBe(0);
+    const p = await f.peer(f.owner, file);
+    for (const [i, text] of ["x", "y", "z"].entries()) {
+      p.send(
+        `e${i}`,
+        p.capture(() => p.doc.getText("content").insert(0, text)),
+      );
+      await p.next("ack");
+    }
+    const edits = (await f.call(`/projects/${f.project}/audit`, undefined, f.owner)).data.filter(
+      (a: { action: string }) => a.action === "document.edit",
+    );
+    expect(edits).toHaveLength(1);
+    expect(
+      (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
+    ).toBe("zyxone");
   });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),
