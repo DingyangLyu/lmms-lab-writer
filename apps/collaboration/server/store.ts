@@ -4,6 +4,12 @@ import { join } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import * as Y from "yjs";
 export type Role = "owner" | "editor" | "commenter" | "viewer";
+type Access = "read" | "comment" | "edit" | "owner";
+const allows = (role: Role, minimum: Access) =>
+  minimum === "read" ||
+  (minimum === "comment" && role !== "viewer") ||
+  (minimum === "edit" && (role === "owner" || role === "editor")) ||
+  (minimum === "owner" && role === "owner");
 export type User = { id: string; username: string; password: string; admin: number };
 export type FileRow = {
   id: string;
@@ -132,15 +138,19 @@ export class Store {
         ?.role ?? fail(403, "无权访问此项目")
     );
   }
-  require(project: string, user: string, minimum: "read" | "comment" | "edit" | "owner" = "read") {
+  require(project: string, user: string, minimum: Access = "read") {
     const role = this.role(project, user);
-    const allowed =
-      minimum === "read" ||
-      (minimum === "comment" && role !== "viewer") ||
-      (minimum === "edit" && ["owner", "editor"].includes(role)) ||
-      (minimum === "owner" && role === "owner");
-    if (!allowed) fail(403, "当前角色不允许此操作");
+    if (!allows(role, minimum)) fail(403, "当前角色不允许此操作");
     return role;
+  }
+  /** Non-throwing permission check for background work such as queued AI tasks. */
+  can(project: string, user: string, minimum: Access) {
+    const role = this.get<{ role: Role }>(
+      "SELECT role FROM members WHERE project=? AND user=?",
+      project,
+      user,
+    )?.role;
+    return !!role && allows(role, minimum);
   }
   /** A deleted file keeps its row for history, but must not reserve its path forever. */
   releasePath(project: string, path: string) {

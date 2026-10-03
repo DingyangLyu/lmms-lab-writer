@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { safePath } from "./store";
+import { isTextPath, safePath } from "./store";
 
 type Job = {
   id: string;
@@ -34,8 +34,13 @@ async function request<T>(path: string, body: unknown): Promise<T> {
 export async function executeJob(job: Job, work: string, heartbeat: () => Promise<unknown>) {
   const kind = job.harness.startsWith("compile:") ? "compile" : job.harness;
   if (!allowed.includes(kind)) throw new Error(`本机未启用 ${kind} 执行器`);
+  // Project-level agent config is never handed to the local CLI, and never reported deleted.
+  const withheld = new Set<string>();
   for (const file of job.files) {
-    if (["opencode.json", "opencode.jsonc"].includes(basename(file.path).toLowerCase())) continue;
+    if (["opencode.json", "opencode.jsonc"].includes(basename(file.path).toLowerCase())) {
+      withheld.add(file.path);
+      continue;
+    }
     const path = join(work, safePath(file.path));
     await mkdir(dirname(path), { recursive: true });
     await writeFile(
@@ -207,7 +212,7 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
         )
           continue;
         const path = relative ? `${relative}/${item.name}` : item.name;
-        if (item.isSymbolicLink()) continue;
+        if (item.isSymbolicLink() || withheld.has(path)) continue;
         if (item.isDirectory()) {
           await visit(join(dir, item.name), path);
           continue;
@@ -216,7 +221,7 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
         const old = job.files.find((f) => f.path === path);
         const bytes = await readFile(join(work, path));
         if (bytes.length > 2_000_000) continue;
-        if (/\.(tex|bib|md|txt|sty|cls|bst|csv|json|py)$/i.test(path)) {
+        if (isTextPath(path)) {
           const content = bytes.toString("utf8");
           if (content !== old?.content) outputs.push({ path, content });
         } else if (/\.(png|jpe?g|svg|pdf)$/i.test(path) && bytes.toString("base64") !== old?.base64)
@@ -225,7 +230,7 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
       }
     };
     await visit(work);
-    for (const old of job.files.filter((f) => !f.binary))
+    for (const old of job.files.filter((f) => !f.binary && !withheld.has(f.path)))
       try {
         await readFile(join(work, old.path));
       } catch (e) {

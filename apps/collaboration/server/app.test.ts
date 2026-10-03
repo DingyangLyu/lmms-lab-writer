@@ -184,6 +184,51 @@ describe("real collaboration service", () => {
     await f.call(`/projects/${f.project}/jobs/${second}`, {}, f.owner, "DELETE");
     expect((await runner("heartbeat", { id: second })).status).toBe(409);
   });
+  it("skips tasks that can no longer run and follows renamed files", async () => {
+    const f = await fixture(),
+      editor = await f.invite("editor", "temporary");
+    const files = `/projects/${f.project}/files`;
+    const file = (await f.call(files, { path: "main.tex", content: "Old.\n" }, f.owner)).data.id;
+    const token = (
+      await f.call(
+        `/projects/${f.project}/runners`,
+        { name: "worker", capabilities: ["codex"] },
+        f.owner,
+      )
+    ).data.token;
+    const runner = async (path: string, body: unknown) => {
+      const response = await fetch(`${f.app.origin}/api/runner/${path}`, {
+        method: "POST",
+        headers: { Origin: f.app.origin, Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      return { status: response.status, data: await response.json() };
+    };
+    const orphan = (
+      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "a" }, editor)
+    ).data.id;
+    const kept = (
+      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "b" }, f.owner)
+    ).data.id;
+    const me = (await f.call("/me", undefined, editor)).data.id;
+    await f.call(`/projects/${f.project}/members/${me}`, {}, f.owner, "DELETE");
+    const leased = await runner("lease", {});
+    expect(leased.status).toBe(200);
+    expect(leased.data.job.id).toBe(kept);
+    const jobs = (await f.call(`/projects/${f.project}/jobs`, undefined, f.owner)).data;
+    expect(jobs.find((j: { id: string }) => j.id === orphan).status).toBe("failed");
+    await f.call(`${files}/${file}`, { path: "chapter.tex" }, f.owner, "PATCH");
+    const done = await runner("result", {
+      id: kept,
+      result: "ok",
+      files: [{ path: "main.tex", content: "New.\n" }],
+    });
+    expect(done.status).toBe(200);
+    const listed = (await f.call(files, undefined, f.owner)).data;
+    expect(listed.map((x: { path: string }) => x.path)).toEqual(["chapter.tex"]);
+    const proposals = (await f.call(`/projects/${f.project}/proposals`, undefined, f.owner)).data;
+    expect(proposals[0].file).toBe(file);
+  });
   it("merges concurrent Chinese edits, acknowledges durable writes and survives restart", async () => {
     const f = await fixture(),
       editor = await f.invite("editor", "coauthor");

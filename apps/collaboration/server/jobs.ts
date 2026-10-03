@@ -4,6 +4,7 @@ import { reviewHunks } from "@lmms-lab/writing";
 import * as Y from "yjs";
 import type { Collaboration } from "./collaboration";
 import {
+  checked,
   decodeText,
   digest,
   fail,
@@ -33,6 +34,8 @@ type Runner = { id: string; project: string; token: string; name: string; capabi
 type Snapshot = {
   files: { id: string; path: string; state: string; binary: number; deleted: number }[];
 };
+const PROJECT_FILES = 2000,
+  PROJECT_BYTES = 100_000_000;
 const text = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
@@ -55,41 +58,53 @@ export function runnerRequest(
       runner.project,
       Date.now(),
     );
-    return store.transaction(() => {
+    let changed = false;
+    const leased = store.transaction(() => {
       const jobs = store.all<Job>(
         "SELECT * FROM jobs WHERE project=? AND status='queued' ORDER BY created LIMIT 50",
         runner.project,
       );
-      const job = jobs.find((j) =>
-        caps.includes(j.harness.startsWith("compile:") ? "compile" : j.harness),
-      );
-      if (!job) return { job: null };
-      store.require(job.project, job.author, "edit");
-      store.run(
-        "UPDATE jobs SET status='running',runner=?,lease=? WHERE id=? AND status='queued'",
-        runner.id,
-        Date.now() + 60000,
-        job.id,
-      );
-      const snapshot =
-        store.get<{ data: string }>(
+      for (const job of jobs) {
+        if (!caps.includes(job.harness.startsWith("compile:") ? "compile" : job.harness)) continue;
+        // A task that can never run must not block every task queued behind it.
+        const snapshot = store.get<{ data: string }>(
           "SELECT data FROM snapshots WHERE id=? AND project=?",
           job.base,
           job.project,
-        ) ?? fail(404, "任务快照不存在");
-      const files = (JSON.parse(snapshot.data) as Snapshot).files
-        .filter((f) => !f.deleted)
-        .map((f) => ({
-          id: f.id,
-          path: f.path,
-          binary: !!f.binary,
-          ...(f.binary
-            ? { base64: f.state }
-            : { content: decodeText(Buffer.from(f.state, "base64")) }),
-        }));
-      collab.changed(runner.project);
-      return { job: { ...job, files } };
+        );
+        const blocked = !store.can(job.project, job.author, "edit")
+          ? "提交者已无编辑权限，任务未执行"
+          : !snapshot
+            ? "任务输入版本已不存在，请重新提交"
+            : null;
+        if (blocked || !snapshot) {
+          store.run("UPDATE jobs SET status='failed',result=? WHERE id=?", blocked, job.id);
+          changed = true;
+          continue;
+        }
+        store.run(
+          "UPDATE jobs SET status='running',runner=?,lease=? WHERE id=? AND status='queued'",
+          runner.id,
+          Date.now() + 60000,
+          job.id,
+        );
+        const files = (JSON.parse(snapshot.data) as Snapshot).files
+          .filter((f) => !f.deleted)
+          .map((f) => ({
+            id: f.id,
+            path: f.path,
+            binary: !!f.binary,
+            ...(f.binary
+              ? { base64: f.state }
+              : { content: decodeText(Buffer.from(f.state, "base64")) }),
+          }));
+        changed = true;
+        return { job: { ...job, files } };
+      }
+      return { job: null };
     });
+    if (changed) collab.changed(runner.project);
+    return leased;
   }
   const id = text(body, "id", 80),
     job =
@@ -100,7 +115,14 @@ export function runnerRequest(
         runner.id,
       ) ?? fail(404, "任务不存在");
   if (job.status !== "running") fail(409, "任务已结束或取消");
-  store.require(job.project, job.author, "edit");
+  if (!store.can(job.project, job.author, "edit")) {
+    store.run(
+      "UPDATE jobs SET status='failed',result='提交者已无编辑权限，结果未提交' WHERE id=?",
+      id,
+    );
+    collab.changed(job.project);
+    fail(409, "提交者已无编辑权限");
+  }
   if (path === "/api/runner/heartbeat") {
     store.run("UPDATE jobs SET lease=? WHERE id=?", Date.now() + 60000, id);
     return { ok: true };
@@ -138,6 +160,16 @@ export function runnerRequest(
     if (seen.has(f.path)) fail(400, "输出路径重复");
     seen.add(f.path);
   }
+  const usage = store.get<{ count: number; bytes: number }>(
+    "SELECT count(*) as count,coalesce(sum(length(state)),0) as bytes FROM files WHERE project=?",
+    job.project,
+  ) ?? { count: 0, bytes: 0 };
+  const added = files.filter((f) => f.binary);
+  if (
+    usage.count + added.length > PROJECT_FILES ||
+    usage.bytes + added.reduce((n, f) => n + (f.binary?.length ?? 0), 0) > PROJECT_BYTES
+  )
+    fail(413, `项目超过 ${PROJECT_FILES} 个文件或 100 MB，产物未保存`);
   const ids: string[] = [];
   store.transaction(() => {
     for (const f of files) {
@@ -146,6 +178,7 @@ export function runnerRequest(
         const path = `artifacts/${job.id}/${f.path}`;
         if (path.length > 240) fail(400, "产物路径过长");
         const id = uid();
+        store.releasePath(job.project, path);
         store.run(
           "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,1)",
           id,
@@ -159,14 +192,25 @@ export function runnerRequest(
       if (old?.binary) fail(400, "不能用文本覆盖二进制文件");
       const base = old ? decodeText(Buffer.from(old.state, "base64")) : "";
       if (base === f.content) continue;
-      let file = store.get<{ id: string }>(
-        "SELECT id FROM files WHERE project=? AND path=? AND deleted=0",
-        job.project,
-        f.path,
-      );
+      // Follow the snapshot's file ID so a collaborator's rename during the task keeps the
+      // proposal on the same document instead of creating an empty copy at the old path.
+      let file =
+        (old &&
+          store.get<{ id: string; binary: number }>(
+            "SELECT id,binary FROM files WHERE project=? AND id=? AND deleted=0",
+            job.project,
+            old.id,
+          )) ||
+        store.get<{ id: string; binary: number }>(
+          "SELECT id,binary FROM files WHERE project=? AND path=? AND deleted=0",
+          job.project,
+          f.path,
+        );
+      if (file?.binary) fail(400, "不能用文本覆盖二进制文件");
       if (!file) {
         const id = uid(),
           doc = textDoc("");
+        store.releasePath(job.project, f.path);
         store.run(
           "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,0)",
           id,
@@ -175,10 +219,10 @@ export function runnerRequest(
           Y.encodeStateAsUpdate(doc),
         );
         doc.destroy();
-        file = { id };
+        file = { id, binary: 0 };
       }
       const id = uid(),
-        hunks = reviewHunks(base, f.content || "");
+        hunks = checked(() => reviewHunks(base, f.content || ""));
       store.run(
         "INSERT INTO proposals VALUES(?,?,?,?,?,?,?,1,?)",
         id,
