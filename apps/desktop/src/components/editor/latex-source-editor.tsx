@@ -52,12 +52,12 @@ import {
   rectangularSelection,
   ViewPlugin,
 } from "@codemirror/view";
+import { documentEdits } from "@lmms-lab/writing";
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { trackEditorDrag } from "@/lib/codemirror/drag-selection";
 import { latexFolding, latexFoldRanges } from "@/lib/codemirror/latex-folding";
 import { latexHighlighting, latexLanguage } from "@/lib/codemirror/latex-language";
 import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
-import { documentEdits } from "@/lib/editor/merge";
 import type { EditorTextRange } from "@/lib/editor/selection-context";
 import type { SourceMark } from "@/lib/editor/source-annotations";
 import type { EditorSettings, EditorTheme } from "@/lib/editor/types";

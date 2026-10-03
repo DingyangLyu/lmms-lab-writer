@@ -163,19 +163,6 @@ fn bounded(text: &str) -> Result<(), String> {
         Ok(())
     }
 }
-#[tauri::command]
-pub async fn merge_document_text(
-    base: String,
-    ours: String,
-    theirs: String,
-) -> Result<MergeResult, String> {
-    for text in [&base, &ours, &theirs] {
-        bounded(text)?;
-    }
-    tokio::task::spawn_blocking(move || merge(&base, &ours, &theirs))
-        .await
-        .map_err(|e| e.to_string())
-}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Revision {
@@ -184,21 +171,7 @@ pub struct Revision {
     pub content: String,
 }
 async fn metadata_dir(project: &str, kind: &str) -> Result<std::path::PathBuf, String> {
-    let root = super::annotations::root(project).await?;
-    let dir = root.join(".writer").join(kind);
-    let mut existing = dir.as_path();
-    while !existing.exists() {
-        existing = existing.parent().ok_or("无效元数据路径")?;
-    }
-    if !fs::canonicalize(existing)
-        .await
-        .map_err(|e| e.to_string())?
-        .starts_with(&root)
-    {
-        return Err("元数据目录超出当前项目".into());
-    }
-    fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
-    Ok(dir)
+    super::writing::metadata(project, kind).await
 }
 fn identifier(value: &str) -> Result<(), String> {
     if value.len() != 64 || !value.bytes().all(|c| c.is_ascii_hexdigit()) {

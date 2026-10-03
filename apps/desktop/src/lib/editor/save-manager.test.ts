@@ -1,5 +1,5 @@
+import { mergeText } from "@lmms-lab/writing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mergeText } from "./merge";
 import { type Draft, projectRelativePath, SaveManager } from "./save-manager";
 
 class MemoryStorage {

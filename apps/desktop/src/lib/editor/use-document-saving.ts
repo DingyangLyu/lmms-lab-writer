@@ -1,9 +1,9 @@
 "use client";
 
+import type { SaveResult } from "@lmms-lab/writing";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import type { SaveResult } from "./merge";
 import { SaveManager } from "./save-manager";
 
 /** `beforeClose` may veto quitting (e.g. agents still running); editor drafts are flushed after. */

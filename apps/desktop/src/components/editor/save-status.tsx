@@ -1,9 +1,9 @@
 "use client";
 
+import type { DocumentConflict } from "@lmms-lab/writing";
 import { invoke } from "@tauri-apps/api/core";
 import { ask, save } from "@tauri-apps/plugin-dialog";
 import { type ReactNode, useState } from "react";
-import type { DocumentConflict } from "@/lib/editor/merge";
 import type { DocumentSave, SaveManager } from "@/lib/editor/save-manager";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import { AnnotationManager } from "./annotation-manager";

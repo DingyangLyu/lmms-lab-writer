@@ -1,4 +1,4 @@
-import { type DocumentConflict, mergeText, type SaveResult } from "./merge";
+import { type DocumentConflict, mergeText, type SaveResult } from "@lmms-lab/writing";
 export type Draft = {
   project: string;
   path: string;

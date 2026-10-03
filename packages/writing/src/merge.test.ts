@@ -11,7 +11,7 @@ describe("incremental merges", () => {
     const changes = documentEdits(base, "new\nunchanged\nend");
     expect(changes).toHaveLength(2);
     let text = base;
-    for (const e of changes.toReversed())
+    for (const e of [...changes].reverse())
       text = text.slice(0, e.from) + e.insert + text.slice(e.to);
     expect(text).toBe("new\nunchanged\nend");
   });

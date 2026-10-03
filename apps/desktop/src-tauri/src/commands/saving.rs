@@ -221,51 +221,6 @@ pub async fn checkpoint_document(
 }
 
 #[tauri::command]
-pub async fn save_document(
-    project: String,
-    path: String,
-    content: String,
-    expected: String,
-) -> Result<(), String> {
-    let _guard = SAVE_LOCK.lock().await;
-    let (root, target) = target_path(&project, &path).await?;
-    let disk = fs::read_to_string(&target)
-        .await
-        .map_err(|e| format!("无法读取原文件；为防止覆盖，已停止保存：{}", e))?;
-    if disk == content {
-        return Ok(());
-    }
-    if disk != expected {
-        return Err("文件已被 AI 或其他程序修改，已停止覆盖。你的修改仍保留在恢复草稿中，请另存副本后比较。".into());
-    }
-    if fs::metadata(&target)
-        .await
-        .map_err(|e| e.to_string())?
-        .permissions()
-        .readonly()
-    {
-        return Err("文件为只读，无法保存。请另存副本或恢复写入权限。".into());
-    }
-    let dir = create_backup(&root, &target, &disk).await?;
-    // Catch external edits made while the backup was being written.
-    if fs::read_to_string(&target)
-        .await
-        .map_err(|e| e.to_string())?
-        != disk
-    {
-        return Err("备份期间文件被外部修改，已停止覆盖。请另存副本后比较。".into());
-    }
-    atomic_write(&target, content.as_bytes()).await?;
-    // Cleanup failure must not turn a successful document save into a failure.
-    if let Ok(items) = backups(&dir).await {
-        for old in items.iter().skip(HISTORY_LIMIT) {
-            let _ = fs::remove_file(dir.join(&old.id)).await;
-        }
-    }
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn list_document_backups(project: String, path: String) -> Result<Vec<Backup>, String> {
     let (root, target) = target_path(&project, &path).await?;
     backups(&history_dir(&root, &target).await?).await
@@ -315,6 +270,23 @@ pub async fn read_document(project: String, path: String) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Editor saves go through the merging save; these checks cover its file safety.
+    async fn save_document(
+        project: String,
+        path: String,
+        content: String,
+        expected: String,
+    ) -> Result<(), String> {
+        let result = super::super::document_merge::save(
+            &project, &path, &expected, &content, "editor", None,
+        )
+        .await?;
+        if result.status == "saved" {
+            Ok(())
+        } else {
+            Err(format!("已停止覆盖：{}", result.status))
+        }
+    }
     async fn project() -> (tempfile::TempDir, String, PathBuf) {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().to_string_lossy().to_string();
@@ -373,13 +345,16 @@ mod tests {
         let history = list_document_backups(root.clone(), "main.tex".into())
             .await
             .unwrap();
-        assert_eq!(history.len(), 1);
-        assert_eq!(
-            read_document_backup(root, "main.tex".into(), history[0].id.clone())
-                .await
-                .unwrap(),
-            "原稿"
-        );
+        let mut saved = vec![];
+        for item in &history {
+            saved.push(
+                read_document_backup(root.clone(), "main.tex".into(), item.id.clone())
+                    .await
+                    .unwrap(),
+            );
+        }
+        assert!(saved.contains(&"原稿".to_string()));
+        assert!(saved.contains(&"新版中文 ✨".to_string()));
     }
     #[tokio::test]
     async fn external_edit_is_not_overwritten() {
