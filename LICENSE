@@ -1,21 +1,99 @@
-MIT License
+DingyangLyu Writer Noncommercial License
+Version 1.0 — 2026-10-03
 
-Copyright (c) 2026 LMMs-Lab
+Copyright (c) 2026 DingyangLyu, for contributions in which DingyangLyu
+holds the relevant rights. Other copyrights remain with their holders.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Scope and existing rights
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This license applies only to original additions and modifications in this
+fork that DingyangLyu owns or is expressly authorized to license and
+distributes under these terms (the "Covered Contributions"). In a mixed
+file it covers only those contributions, not the entire file merely
+because it was modified.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Upstream LMMs-Lab material retains its MIT license and copyright notice,
+preserved without changes in LICENSES/MIT-LMMs-Lab.txt. Dependencies and
+other third-party material retain their own terms. This license does not
+limit rights independently granted under MIT or another license, statutory
+exceptions, or rights in material not protected by applicable law.
+
+This fork snapshot is reissued under these terms on 2026-10-03. Earlier
+fork distributions carried MIT notices. Reissuing the snapshot or replacing
+public Git history does not itself revoke independently granted rights.
+See NOTICE for the provenance and history reconstruction.
+
+2. Free noncommercial permission
+
+Subject to these terms, DingyangLyu grants worldwide, non-exclusive,
+royalty-free permission to use, reproduce, study, modify, and distribute
+Covered Contributions in source or executable form solely for personal
+noncommercial use, noncommercial teaching and learning, and noncommercial
+scientific or academic research, including publication of its findings.
+
+Ordinary tuition at a nonprofit educational institution, an academic
+salary, a public-interest research grant, or publication through a
+commercial publisher does not by itself make these uses commercial.
+The actual purpose of the use controls.
+
+3. Commercial use requires prior written authorization
+
+No commercial-use permission for Covered Contributions is granted here.
+Before commercial use, obtain a separate written license from DingyangLyu
+or an expressly authorized licensing representative.
+
+Commercial use includes use for business operations or commercial product
+development; paid consulting or contract deliverables for a business;
+selling or commercially licensing Covered Contributions or a product
+containing them; and providing them through a paid, advertising-supported,
+or other commercially operated hosted service, including SaaS. A service
+can be commercial even if its end users pay nothing. Work on behalf of a
+business is not personal use merely because an individual operates it.
+
+Authorization must identify the permitted scope and come from the relevant
+rights holder. Public availability, a fork, or an unanswered request is
+not authorization. Requests may be initiated through the repository at
+https://github.com/DingyangLyu/lmms-lab-writer or a contact method published
+by https://github.com/DingyangLyu. Existing rights in section 1 remain intact.
+
+4. Redistribution
+
+Distributions relying on this license must retain this license, NOTICE,
+applicable copyright notices, and upstream and third-party license notices.
+Identify your changes and do not misrepresent their origin. Recipients
+must receive the same noncommercial permissions for Covered Contributions
+and be informed that commercial use requires separate written permission.
+You may license your own new contributions separately but cannot grant
+rights to another person's contributions beyond those you hold.
+
+5. User documents, names, and contributions
+
+User manuscripts, PDFs, figures, research data, and other input or output
+do not become subject to this license solely because this software
+processes them. Content incorporated from others retains its own terms.
+The purpose of using the software still determines whether section 3 applies.
+
+No trademark rights or endorsement by LMMs-Lab or other parties are granted.
+Submitting a contribution does not assign copyright or automatically give
+DingyangLyu commercial relicensing rights. Such rights require a separate
+express grant from the relevant rights holder.
+
+6. Termination
+
+Permission under this license terminates upon a violation of its conditions.
+It is reinstated if you cure the violation within 30 days of first becoming
+aware of it, unless this is a repeated violation after a prior reinstatement.
+This affects only rights granted here, not independently granted rights.
+
+7. Warranty and liability
+
+To the maximum extent permitted by law, Covered Contributions are provided
+as is without warranties, including merchantability, fitness for a particular
+purpose, or noninfringement. No rights holder or contributor is liable for
+damages or other liability arising from their use, distribution, or inability
+to use them, whether in contract, tort, or otherwise. Mandatory legal rights
+are unaffected.
+
+This is a source-available license with commercial-use restrictions, not
+an OSI-approved open-source license. The English text is authoritative;
+summaries and translations are provided for convenience.

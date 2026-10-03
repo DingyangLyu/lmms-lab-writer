@@ -227,7 +227,7 @@ const MESSAGES: Record<Locale, WebMessages> = {
     },
     home: {
       heroDescription:
-        "The AI-native LaTeX editor. One-click setup, every language, Git built-in, fully open source.",
+        "The AI-native LaTeX editor. One-click setup, every language, Git built-in, source available for noncommercial use.",
       heroImageAlt: "LMMs-Lab Writer - AI-native LaTeX editor",
       downloadCta: "Download",
       documentationCta: "Documentation",
@@ -256,9 +256,9 @@ const MESSAGES: Record<Locale, WebMessages> = {
             "Stage, commit, diff, push, pull - all from the sidebar. AI-generated commit messages. One-click GitHub publishing.",
         },
         {
-          title: "Fully Open Source",
+          title: "Source Available",
           description:
-            "MIT licensed. Your files never leave your machine. No telemetry, no vendor lock-in. Fork it, modify it - it's yours.",
+            "This fork is free for personal, educational, and research purposes that are noncommercial. Commercial use of covered contributions requires written authorization; upstream and prior MIT grants remain intact. See the repository LICENSE and NOTICE.",
         },
         {
           title: "Cross-Platform",
@@ -313,11 +313,11 @@ const MESSAGES: Record<Locale, WebMessages> = {
           writer: "Local, instant",
         },
         {
-          feature: "Open source",
+          feature: "Source licensing",
           overleaf: "No",
-          writer: "MIT license",
+          writer: "Noncommercial; commercial authorization required",
         },
-        { feature: "Price", overleaf: "$21-42/month", writer: "Free" },
+        { feature: "Price", overleaf: "$21-42/month", writer: "Free for noncommercial use" },
       ],
     },
     footer: {
@@ -393,9 +393,9 @@ const MESSAGES: Record<Locale, WebMessages> = {
       installNoticeSudoTitle: "Why sudo appears",
       installNoticeSudoBody:
         "sudo is used to place the app in protected system locations (for example /Applications) with correct ownership and permissions.",
-      installNoticeOpenSourceTitle: "Open source, fully auditable",
+      installNoticeOpenSourceTitle: "Source available, auditable",
       installNoticeOpenSourceBody:
-        "All app and installer logic is open source, so anyone can inspect exactly what runs before granting privileges.",
+        "App and installer source can be inspected before granting privileges. See LICENSE and NOTICE for this fork's noncommercial terms and preserved upstream rights.",
       installNoticeIndependenceTitle: "Independent distribution",
       installNoticeIndependenceBody:
         "We intentionally ship outside Apple-controlled distribution channels to keep installation policy transparent and under user control.",
@@ -530,7 +530,8 @@ const MESSAGES: Record<Locale, WebMessages> = {
       language: "语言",
     },
     home: {
-      heroDescription: "AI 原生 LaTeX 编辑器。一键环境配置，全语言支持，内置 Git，完全开源。",
+      heroDescription:
+        "AI 原生 LaTeX 编辑器。一键环境配置，全语言支持，内置 Git，源码可见，非商业免费。",
       heroImageAlt: "LMMs-Lab Writer - AI 原生 LaTeX 编辑器",
       downloadCta: "下载客户端",
       documentationCta: "查看文档",
@@ -558,8 +559,9 @@ const MESSAGES: Record<Locale, WebMessages> = {
             "侧栏内置暂存、提交、Diff 查看、推送与拉取功能。支持 AI 自动生成提交信息，一键发布至 GitHub。",
         },
         {
-          title: "完全开源",
-          description: "MIT 协议。数据完全本地化，无遥测、无厂商锁定。你可以自由 Fork 与修改。",
+          title: "源码可见",
+          description:
+            "本分支个人非商业使用、非商业教学与科研免费；适用新许可的贡献商用需书面授权。上游和已发布 MIT 版本的权利不变，详见仓库 LICENSE 与 NOTICE。",
         },
         {
           title: "跨平台",
@@ -614,11 +616,11 @@ const MESSAGES: Record<Locale, WebMessages> = {
           writer: "本地即时编译",
         },
         {
-          feature: "开源协议",
+          feature: "源码许可",
           overleaf: "否",
-          writer: "MIT 协议",
+          writer: "非商业免费；商业需授权",
         },
-        { feature: "价格", overleaf: "$21-42/月", writer: "免费" },
+        { feature: "价格", overleaf: "$21-42/月", writer: "非商业免费" },
       ],
     },
     footer: {
@@ -694,8 +696,9 @@ const MESSAGES: Record<Locale, WebMessages> = {
       installNoticeSudoTitle: "关于 sudo 权限",
       installNoticeSudoBody:
         "sudo 用于将应用写入受保护目录（如 /Applications），并设置正确的文件所有权与权限。",
-      installNoticeOpenSourceTitle: "开源透明",
-      installNoticeOpenSourceBody: "应用及安装脚本完全开源，您可以在授权前审查所有执行逻辑。",
+      installNoticeOpenSourceTitle: "源码透明",
+      installNoticeOpenSourceBody:
+        "应用及安装脚本源码可供审查。本分支适用新许可的贡献限非商业使用，商业需书面授权；上游许可不变。",
       installNoticeIndependenceTitle: "独立分发",
       installNoticeIndependenceBody:
         "我们选择不依赖 Apple 的封闭分发渠道，旨在保持安装策略的透明性，并将控制权交还给用户。",
@@ -830,7 +833,7 @@ const MESSAGES: Record<Locale, WebMessages> = {
     },
     home: {
       heroDescription:
-        "AI ネイティブな LaTeX エディタ。ワンクリック設定、全言語対応、Git 内蔵、完全オープンソース。",
+        "AI ネイティブな LaTeX エディタ。ワンクリック設定、全言語対応、Git 内蔵、ソース公開、非商用利用は無料。",
       heroImageAlt: "LMMs-Lab Writer - AI ネイティブ LaTeX エディタ",
       downloadCta: "ダウンロード",
       documentationCta: "ドキュメント",
@@ -860,9 +863,9 @@ const MESSAGES: Record<Locale, WebMessages> = {
             "ステージ、コミット、差分確認、プッシュ/プルをサイドバーで完結。AI によるコミットメッセージ生成や、GitHub へのワンクリック公開にも対応。",
         },
         {
-          title: "完全オープンソース",
+          title: "ソース公開",
           description:
-            "MIT ライセンス。ファイルは常にローカルに保存され、テレメトリやベンダーロックインはありません。自由に Fork や改変が可能です。",
+            "個人・教育・研究の非商用利用は無料です。対象となる独自変更の商用利用には書面許諾が必要です。上流および公開済み MIT 版の権利は維持されます。LICENSE と NOTICE を参照してください。",
         },
         {
           title: "クロスプラットフォーム",
@@ -917,11 +920,11 @@ const MESSAGES: Record<Locale, WebMessages> = {
           writer: "ローカル即時実行",
         },
         {
-          feature: "オープンソース",
+          feature: "ソースのライセンス",
           overleaf: "いいえ",
-          writer: "MIT ライセンス",
+          writer: "非商用は無料・商用は許諾が必要",
         },
-        { feature: "価格", overleaf: "$21-42/月", writer: "無料" },
+        { feature: "価格", overleaf: "$21-42/月", writer: "非商用は無料" },
       ],
     },
     footer: {
@@ -997,7 +1000,7 @@ const MESSAGES: Record<Locale, WebMessages> = {
       installNoticeSudoTitle: "sudo が必要な理由",
       installNoticeSudoBody:
         "sudo は /Applications などの保護されたディレクトリへの配置と、適切な権限設定のために使用されます。",
-      installNoticeOpenSourceTitle: "オープンソースで監査可能",
+      installNoticeOpenSourceTitle: "ソース公開で監査可能",
       installNoticeOpenSourceBody:
         "アプリ本体とインストーラのロジックは全て公開されており、権限を付与する前に処理内容を確認できます。",
       installNoticeIndependenceTitle: "独立した配布方針",

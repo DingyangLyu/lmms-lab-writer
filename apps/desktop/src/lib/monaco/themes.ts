@@ -6,8 +6,51 @@ import githubDarkTheme from "./github-dark.json";
 // Source: monaco-themes/themes/ (v0.4.8)
 import githubLightTheme from "./github-light.json";
 
+// Overleaf's default TextMate theme keeps prose uncolored and uses blue for
+// commands, teal for reference keys/environment names, green for comments/math,
+// and violet for literals/operators. Keep these rules
+// scoped to LaTeX so other languages retain the imported GitHub themes.
+// https://github.com/overleaf/overleaf/blob/main/services/web/frontend/js/features/source-editor/themes/cm6/textmate.json
+const latexLightRules = [
+  { token: "keyword.control.latex", foreground: "0000A2" },
+  { token: "keyword.latex", foreground: "0000A2" },
+  { token: "markup.heading.latex", foreground: "1C50AF" },
+  { token: "comment.latex", foreground: "4C886B" },
+  { token: "string.math.latex", foreground: "036A07" },
+  { token: "operator.math.latex", foreground: "833FBA" },
+  { token: "reference.key.latex", foreground: "318495" },
+  { token: "entity.name.environment.latex", foreground: "318495" },
+  { token: "delimiter.table.latex", foreground: "0000A2" },
+  { token: "variable.parameter.latex", foreground: "24292E" },
+  { token: "delimiter.bracket.latex", foreground: "687687" },
+  { token: "constant.latex", foreground: "833FBA" },
+  { token: "number.latex", foreground: "833FBA" },
+];
+
+// TextMate itself is a light theme. This dark counterpart uses the same
+// semantic hierarchy, with lower-contrast colors on GitHub Dark's background.
+const latexDarkRules = [
+  { token: "keyword.control.latex", foreground: "9CC3F5" },
+  { token: "keyword.latex", foreground: "9CC3F5" },
+  { token: "markup.heading.latex", foreground: "B4C9FF" },
+  { token: "comment.latex", foreground: "8BAE96" },
+  { token: "string.math.latex", foreground: "A9C788" },
+  { token: "operator.math.latex", foreground: "C7A5DB" },
+  { token: "reference.key.latex", foreground: "77BDC5" },
+  { token: "entity.name.environment.latex", foreground: "77BDC5" },
+  { token: "delimiter.table.latex", foreground: "9CC3F5" },
+  { token: "variable.parameter.latex", foreground: "C9D1D9" },
+  { token: "delimiter.bracket.latex", foreground: "9BA8B4" },
+  { token: "constant.latex", foreground: "C7A5DB" },
+  { token: "number.latex", foreground: "C7A5DB" },
+];
+
 // Supplementary editor chrome colors not included in the base GitHub Light theme
 const githubLightEditorColors: Record<string, string> = {
+  "editor.foreground": "#24292e",
+  "editor.selectionBackground": "#b5d5ff",
+  "editor.lineHighlightBackground": "#f5f5f5",
+  "editorLineNumber.foreground": "#666666",
   "editorLineNumber.activeForeground": "#24292e",
   "editorCursor.background": "#ffffff",
   "editor.selectionHighlightBackground": "#c8c8fa88",
@@ -111,6 +154,7 @@ export const defineEditorThemes = (monaco: Monaco) => {
   const lightTheme = githubLightTheme as MonacoTheme;
   monaco.editor.defineTheme("one-light", {
     ...lightTheme,
+    rules: [...lightTheme.rules, ...latexLightRules],
     colors: {
       ...lightTheme.colors,
       ...githubLightEditorColors,
@@ -121,6 +165,7 @@ export const defineEditorThemes = (monaco: Monaco) => {
   const darkTheme = githubDarkTheme as MonacoTheme;
   monaco.editor.defineTheme("one-dark", {
     ...darkTheme,
+    rules: [...darkTheme.rules, ...latexDarkRules],
     colors: {
       ...darkTheme.colors,
       ...githubDarkEditorColors,

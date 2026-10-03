@@ -1218,13 +1218,14 @@ function FileTreeInner({
         <FileTreeContext.Provider value={ctxValue}>
           {containerSize.width > 0 && containerSize.height > 0 && (
             <Tree<ArboristFileNode>
+              key={projectPath}
               ref={treeRef}
               data={arboristData}
               width={containerSize.width}
               height={containerSize.height}
               rowHeight={28}
               indent={12}
-              openByDefault={true}
+              openByDefault={false}
               disableDrag={true}
               disableDrop={true}
               disableEdit={true}

@@ -38,6 +38,7 @@ export type UserMessage = {
   model: {
     providerID: string;
     modelID: string;
+    variant?: string;
   };
 };
 
@@ -113,6 +114,7 @@ export type ToolStateRunning = {
 };
 
 export type ToolStateCompleted = {
+  attachments?: FilePart[];
   status: "completed";
   input: Record<string, unknown>;
   output: string;
@@ -214,6 +216,16 @@ export type Event =
   | { type: "message.removed"; properties: { sessionID: string; messageID: string } }
   | { type: "message.part.updated"; properties: { part: Part; delta?: string } }
   | {
+      type: "message.part.delta";
+      properties: {
+        sessionID: string;
+        messageID: string;
+        partID: string;
+        field: string;
+        delta: string;
+      };
+    }
+  | {
       type: "message.part.removed";
       properties: { sessionID: string; messageID: string; partID: string };
     }
@@ -273,6 +285,12 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
         icon: "globe",
         title: "Fetching",
         subtitle: truncate(input.url as string),
+      };
+    case "websearch":
+      return {
+        icon: "globe",
+        title: "Searching",
+        subtitle: truncate(input.query as string),
       };
     case "task":
       return {
@@ -351,6 +369,18 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
       };
     }
     default:
+      if (tool.toLowerCase().includes("perplexity_search")) {
+        const query =
+          (input.query as string | undefined) ??
+          (input.q as string | undefined) ??
+          (input.search as string | undefined);
+        return {
+          icon: "globe",
+          title: "Perplexity Search",
+          subtitle: truncate(query ?? "Search"),
+        };
+      }
+
       return {
         icon: "tool",
         title: tool,

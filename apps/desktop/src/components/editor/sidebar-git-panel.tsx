@@ -352,7 +352,7 @@ export function GitSidebarPanel({
       {showDiscardAllConfirm && (
         <ConfirmDialog
           title="Discard all changes"
-          message={`This will discard all ${unstagedChanges.length} unstaged change${unstagedChanges.length > 1 ? "s" : ""}. This action cannot be undone.`}
+          message={`This will discard all ${unstagedChanges.length} unstaged change${unstagedChanges.length > 1 ? "s" : ""}. A Writer version is saved first (see Git 历史); Writer annotations, attachments and backups are never discarded.`}
           confirmLabel="Discard All"
           cancelLabel="Cancel"
           onConfirm={() => {

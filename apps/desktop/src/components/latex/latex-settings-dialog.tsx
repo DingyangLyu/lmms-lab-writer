@@ -30,6 +30,7 @@ interface LaTeXSettingsDialogProps {
   editorSettings: EditorSettings;
   onUpdateEditorSettings: (updates: Partial<EditorSettings>) => void;
   texFiles: string[];
+  buildSettings?: React.ReactNode;
   authLoading: boolean;
   authConfigured: boolean;
   authProfile: UserProfile | null;
@@ -155,6 +156,7 @@ export function LaTeXSettingsDialog({
   editorSettings,
   onUpdateEditorSettings,
   texFiles,
+  buildSettings,
   authLoading,
   authConfigured,
   authProfile,
@@ -439,6 +441,15 @@ export function LaTeXSettingsDialog({
                   { value: "trailing", label: "Trailing" },
                   { value: "all", label: "All" },
                 ]}
+              />
+
+              <CheckboxItem
+                checked={editorSettings.highlightAmbiguousUnicode}
+                onChange={(enabled) =>
+                  onUpdateEditorSettings({ highlightAmbiguousUnicode: enabled })
+                }
+                label="中文标点方框"
+                description="标记容易与英文符号混淆的全角标点；关闭只改变显示，不改动文稿。"
               />
 
               <div className="space-y-3 pt-1">
@@ -901,40 +912,43 @@ export function LaTeXSettingsDialog({
 
             {/* ===== BUILD TAB ===== */}
             <Tabs.Content value="build" className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
-              <SectionHeader>Main File</SectionHeader>
+              {buildSettings ?? (
+                <>
+                  <SectionHeader>Main File</SectionHeader>
 
-              <div className="py-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-foreground-secondary">
-                    Main .tex File
-                  </span>
-                </div>
-                {texFiles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">
-                    No .tex files found in project
-                  </p>
-                ) : (
-                  <Select
-                    value={settings.mainFile || ""}
-                    onValueChange={(v) => onUpdateSettings({ mainFile: v || null })}
-                  >
-                    <SelectTrigger className="w-full" aria-label="Main .tex file">
-                      <SelectValue placeholder="Select main .tex file..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {texFiles.map((file) => (
-                        <SelectItem key={file} value={file}>
-                          {file}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  The entry point for LaTeX compilation
-                </p>
-              </div>
-
+                  <div className="py-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground-secondary">
+                        Main .tex File
+                      </span>
+                    </div>
+                    {texFiles.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">
+                        No .tex files found in project
+                      </p>
+                    ) : (
+                      <Select
+                        value={settings.mainFile || ""}
+                        onValueChange={(v) => onUpdateSettings({ mainFile: v || null })}
+                      >
+                        <SelectTrigger className="w-full" aria-label="Main .tex file">
+                          <SelectValue placeholder="Select main .tex file..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {texFiles.map((file) => (
+                            <SelectItem key={file} value={file}>
+                              {file}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      The entry point for LaTeX compilation
+                    </p>
+                  </div>
+                </>
+              )}
               <SectionHeader>Git</SectionHeader>
 
               <div className="flex items-center justify-between py-2">

@@ -1,8 +1,12 @@
 "use client";
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
-import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { ChatImage } from "@/components/chat/chat-image";
+import { UserFileMessage } from "@/components/chat/user-file-message";
+import { stripWriterContext } from "@/lib/bridge/context";
+import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
+import { stripSearchFallbackHint } from "@/lib/opencode/search-fallback";
 import type {
   AssistantMessage,
   FilePart,
@@ -17,7 +21,7 @@ import { MarkdownText } from "./markdown-text";
 import { AskUserQuestionDisplay } from "./question-wizard";
 import { ToolDisplay } from "./tool-display";
 
-export function MessageList({
+export const MessageList = memo(function MessageList({
   messages,
   getPartsForMessage,
   onFileClick,
@@ -64,7 +68,9 @@ export function MessageList({
     <div ref={turnsParent} className="space-y-6">
       {turns.map((turn, index) => {
         const userParts = getPartsForMessage(turn.user.id);
-        const userText = userParts.find((p): p is TextPart => p.type === "text")?.text || "";
+        const userText = stripSearchFallbackHint(
+          userParts.find((p): p is TextPart => p.type === "text")?.text || "",
+        );
         const userImages = userParts.filter(
           (p): p is FilePart =>
             p.type === "file" &&
@@ -95,7 +101,7 @@ export function MessageList({
       })}
     </div>
   );
-}
+});
 
 function MessageTurn({
   userText,
@@ -115,6 +121,11 @@ function MessageTurn({
   onAnswer?: (questionID: string, answers: string[][]) => void;
 }) {
   const [stepsParent] = useAutoAnimate({ duration: 150 });
+  const selectionMessage = useMemo(
+    () => splitEditorSelectionMessage(stripWriterContext(userText)),
+    [userText],
+  );
+  const displayText = selectionMessage?.instruction ?? stripWriterContext(userText);
   const [now, setNow] = useState(() => Date.now());
 
   // Deduplicate parts
@@ -172,29 +183,24 @@ function MessageTurn({
         {userImages && userImages.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
             {userImages.map((img) => (
-              <a
-                key={img.id}
-                href={img.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <Image
-                  unoptimized
-                  src={img.url}
-                  alt="Attached"
-                  width={200}
-                  height={128}
-                  className="max-h-32 max-w-[200px] object-contain rounded border border-border hover:border-border-dark transition-colors cursor-zoom-in"
-                />
-              </a>
+              <ChatImage key={img.id} url={img.url} name={img.filename || "图片附件"} />
             ))}
           </div>
         )}
-        {userText && (
+        {displayText && (
           <p className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-words text-foreground">
-            {userText}
+            <UserFileMessage text={displayText} onFileClick={onFileClick} />
           </p>
+        )}
+        {selectionMessage && (
+          <details className="mt-2 text-xs text-muted">
+            <summary className="cursor-pointer break-words">
+              已引用 {selectionMessage.path}（展开原文）
+            </summary>
+            <div className="mt-2 max-h-64 overflow-auto">
+              <MarkdownText text={selectionMessage.reference} />
+            </div>
+          </details>
         )}
       </div>
 
@@ -229,6 +235,9 @@ function MessageTurn({
               }
               return <ToolDisplay key={p.id} part={toolPart} onFileClick={onFileClick} />;
             }
+
+            if (p.type === "file" && "mime" in p && p.mime?.startsWith("image/"))
+              return <ChatImage key={p.id} url={p.url} name={p.filename || "图片"} />;
 
             // Text Part — rendered as markdown
             if (p.type === "text") {

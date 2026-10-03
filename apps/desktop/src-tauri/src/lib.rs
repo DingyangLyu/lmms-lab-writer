@@ -1,13 +1,15 @@
 mod commands;
 
 use commands::auth::AuthCallbackStateWrapper;
+use commands::codex::CodexState;
 use commands::fs::{ProjectState, WatcherState};
 use commands::latex::LaTeXCompilationState;
 use commands::opencode::OpenCodeState;
 use commands::terminal::PtyState;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tauri::webview::WebviewWindowBuilder;
-use tauri::WebviewUrl;
+use tauri::{Emitter, Manager, WebviewUrl};
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::Mutex as TokioMutex;
 
@@ -34,6 +36,15 @@ fn is_external_url(url: &url::Url, dev_port: u16) -> bool {
     true
 }
 
+fn is_writer_page(url: &url::Url) -> bool {
+    let local = url.scheme() == "tauri" && url.host_str() == Some("localhost")
+        || matches!(url.scheme(), "http" | "https") && url.host_str() == Some("tauri.localhost")
+        || cfg!(debug_assertions)
+            && matches!(url.host_str(), Some("localhost" | "127.0.0.1"))
+            && url.port() == Some(3000);
+    local && matches!(url.path(), "" | "/" | "/index.html") || url.as_str() == "about:blank"
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -47,6 +58,10 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .manage(PtyState::default())
         .manage(OpenCodeState::default())
+        .manage(CodexState::default())
+        .manage(commands::claude::ClaudeState::default())
+        .manage(commands::writer_bridge::BridgeState::default())
+        .manage(commands::saving::SaveGuard::default())
         .manage(LaTeXCompilationState::default())
         .manage(Mutex::new(WatcherState::default()))
         .manage(Mutex::new(ProjectState::default()))
@@ -55,12 +70,46 @@ pub fn run() {
                 as AuthCallbackStateWrapper,
         )
         .invoke_handler(tauri::generate_handler![
+            commands::annotations::pdf_list_annotations,
+            commands::annotations::pdf_add_annotation,
+            commands::annotations::pdf_update_annotation,
+            commands::annotations::pdf_ensure_annotation_versions,
+            commands::annotations::pdf_prepare_annotations,
+            commands::source_annotations::writer_annotation_locations,
+            commands::source_annotations::add_text_annotation,
+            commands::source_annotations::annotation_marks_for_document,
+            commands::document_merge::merge_document_text,
+            commands::document_merge::merge_save_document,
+            commands::document_merge::read_document_revision,
+            commands::document_merge::list_document_conflicts,
+            commands::document_merge::resolve_document_conflict,
+            commands::pdf_text::pdf_prepare_preview,
+            commands::annotations::pdf_repair_annotation_quotes,
+            commands::writer_bridge::writer_register_conversation,
+            commands::writer_bridge::writer_unregister_conversation,
+            commands::writer_bridge::writer_delivery_prepared,
+            commands::writer_bridge::writer_bridge_snapshot,
+            commands::writer_bridge::writer_cancel_queued_task,
+            commands::chat_images::read_chat_image,
+            commands::chat_files::import_chat_file,
+            commands::chat_files::import_chat_file_data,
+            commands::chat_files::validate_chat_files,
             commands::auth::start_auth_callback_server,
             commands::auth::stop_auth_callback_server,
             commands::auth::get_auth_callback_port,
             commands::fs::set_project_path,
+            commands::local_files::resolve_local_file,
+            commands::local_files::reveal_local_file,
             commands::fs::read_file,
             commands::fs::write_file,
+            commands::saving::save_document,
+            commands::saving::checkpoint_document,
+            commands::saving::read_document,
+            commands::saving::list_document_backups,
+            commands::saving::read_document_backup,
+            commands::saving::export_document_copy,
+            commands::saving::register_save_guard,
+            commands::saving::finish_close,
             commands::fs::get_file_tree,
             commands::fs::watch_directory,
             commands::fs::stop_watch,
@@ -69,6 +118,11 @@ pub fn run() {
             commands::fs::rename_path,
             commands::fs::delete_path,
             commands::git::git_status,
+            commands::git_snapshots::git_snapshot_status,
+            commands::git_snapshots::git_create_snapshot,
+            commands::git_snapshots::git_snapshot_history,
+            commands::git_snapshots::git_snapshot_diff,
+            commands::git_snapshots::git_snapshot_file,
             commands::git::git_log,
             commands::git::git_graph,
             commands::git::git_diff,
@@ -95,9 +149,35 @@ pub fn run() {
             commands::opencode::opencode_stop,
             commands::opencode::opencode_restart,
             commands::opencode::kill_port_process,
+            commands::claude::claude_initialize,
+            commands::claude::claude_list_sessions,
+            commands::claude::claude_create_session,
+            commands::claude::claude_read_session,
+            commands::claude::claude_rename_session,
+            commands::claude::claude_start_turn,
+            commands::claude::claude_steer_turn,
+            commands::claude::claude_respond_permission,
+            commands::claude::claude_stop,
+            commands::codex::codex_initialize,
+            commands::codex::codex_list_models,
+            commands::codex::codex_start_thread,
+            commands::codex::codex_resume_thread,
+            commands::codex::codex_list_threads,
+            commands::codex::codex_read_thread,
+            commands::codex::codex_rename_thread,
+            commands::codex::codex_start_turn,
+            commands::codex::codex_steer_turn,
+            commands::codex::codex_interrupt_turn,
+            commands::codex::codex_respond_to_request,
+            commands::codex::codex_pending_requests,
             commands::latex::latex_detect_compilers,
             commands::latex::latex_detect_main_file,
             commands::latex::latex_compile,
+            commands::latex_project::latex_project_load,
+            commands::latex_project::latex_project_save,
+            commands::latex_project::latex_scan_targets,
+            commands::latex_build::latex_build_target,
+            commands::templates::latex_import_template,
             commands::latex::latex_stop_compilation,
             commands::latex::latex_clean_aux_files,
             commands::latex::latex_synctex_edit,
@@ -108,6 +188,27 @@ pub fn run() {
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // The macOS predefined Quit item calls NSApplication.terminate directly,
+            // bypassing ExitRequested. Route Cmd+Q through Tauri's guarded exit instead.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItem, MenuItemKind};
+                let menu = Menu::default(app.handle())?;
+                if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.first() {
+                    if let Some(quit) = app_menu.items()?.last() {
+                        app_menu.remove(quit)?;
+                    }
+                    app_menu.append(&MenuItem::with_id(
+                        app.handle(),
+                        "writer-safe-quit",
+                        "Quit LMMs-Lab Writer",
+                        true,
+                        Some("CmdOrCtrl+Q"),
+                    )?)?;
+                }
+                app.set_menu(menu)?;
+            }
 
             let webview_url = if cfg!(debug_assertions) {
                 WebviewUrl::External("http://localhost:3000".parse().unwrap())
@@ -132,7 +233,15 @@ pub fn run() {
                     });
                     return false;
                 }
-                true
+                if is_writer_page(url) {
+                    return true;
+                }
+                // A document link must never replace the application document.
+                let _ = opener_handle.emit(
+                    "writer://open-link",
+                    serde_json::json!({"href":url.as_str()}),
+                );
+                false
             });
 
             let _window = builder.build()?;
@@ -142,8 +251,37 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "writer-safe-quit" {
+                app.exit(0);
+            }
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let guard = window.state::<commands::saving::SaveGuard>();
+                if guard.ready.load(Ordering::SeqCst) && !guard.approved.load(Ordering::SeqCst) {
+                    api.prevent_close();
+                    let _ = window.emit("writer-close-requested", ());
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Application exit can bypass Drop for managed Tauri state. Release
+            // the OpenCode process group explicitly after the save guard passes.
+            if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<OpenCodeState>().shutdown_now();
+                app.state::<commands::claude::ClaudeState>().shutdown_now();
+            }
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let guard = app.state::<commands::saving::SaveGuard>();
+                if guard.ready.load(Ordering::SeqCst) && !guard.approved.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                    let _ = app.emit("writer-close-requested", ());
+                }
+            }
+        });
 }
 
 #[cfg(test)]
@@ -152,6 +290,22 @@ mod tests {
 
     fn parse_url(s: &str) -> url::Url {
         url::Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn document_links_cannot_replace_the_writer_page() {
+        assert!(is_writer_page(&parse_url("tauri://localhost/")));
+        assert!(is_writer_page(&parse_url(
+            "http://tauri.localhost/index.html"
+        )));
+        for url in [
+            "tauri://localhost/main.pdf",
+            "tauri://localhost/en/main.tex#L4",
+            "file:///tmp/main.pdf",
+            "https://example.com/main.pdf",
+        ] {
+            assert!(!is_writer_page(&parse_url(url)), "{url}");
+        }
     }
 
     #[test]

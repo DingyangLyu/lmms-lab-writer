@@ -22,15 +22,6 @@ const TERMINAL_HEIGHT_STORAGE_KEY = "terminalHeight";
 const RESIZE_STEP = 16;
 const LARGE_RESIZE_STEP = 64;
 
-const PANEL_SPRING = {
-  type: "spring" as const,
-  stiffness: 520,
-  damping: 42,
-  mass: 0.8,
-};
-
-const INSTANT_TRANSITION = { duration: 0 } as const;
-
 const EditorTerminal = dynamic(
   () => import("@/components/editor/terminal").then((mod) => mod.Terminal),
   {
@@ -98,7 +89,6 @@ export function TerminalPanel({
   fontFamily,
   fontSize,
   lineHeight,
-  prefersReducedMotion,
   onClose,
 }: TerminalPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -239,21 +229,14 @@ export function TerminalPanel({
   return (
     <AnimatePresence>
       {open && projectPath && (
-        <motion.div
+        <div
           ref={panelRef}
           key="terminal-container"
-          initial={prefersReducedMotion ? { opacity: 1, height: 0 } : { opacity: 0, height: 0 }}
-          animate={{
-            opacity: 1,
-            height: isResizing ? "var(--terminal-panel-height)" : height,
-          }}
-          exit={prefersReducedMotion ? { opacity: 0, height: 0 } : { opacity: 0, height: 0 }}
-          transition={prefersReducedMotion ? INSTANT_TRANSITION : PANEL_SPRING}
           className="flex-shrink-0 border-t border-border bg-background flex flex-col overflow-hidden"
           style={
             {
               "--terminal-panel-height": `${height}px`,
-              willChange: prefersReducedMotion ? undefined : "height, opacity",
+              height: isResizing ? "var(--terminal-panel-height)" : height,
             } as CSSProperties
           }
         >
@@ -322,7 +305,7 @@ export function TerminalPanel({
             lineHeight={lineHeight}
             className="flex-1 min-h-0"
           />
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

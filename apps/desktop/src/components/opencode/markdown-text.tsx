@@ -3,6 +3,9 @@ import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { ChatImage } from "@/components/chat/chat-image";
+import { ChatLink } from "@/components/chat/chat-link";
+import { chatUrlTransform } from "@/lib/chat/links";
 import "katex/dist/katex.min.css";
 import { useMemo } from "react";
 
@@ -18,9 +21,11 @@ export function MarkdownText({
 }) {
   const components = useMemo<Components>(() => {
     const filePattern =
-      /\.(tex|bib|cls|sty|txt|md|json|yaml|yml|py|js|ts|tsx|css|html|pdf|png|jpg)$/i;
+      /\.(tex|bib|cls|sty|txt|md|json|yaml|yml|py|js|ts|tsx|css|html|pdf|png|jpg|jpeg|svg|pptx?|docx?|xlsx?)$/i;
 
     return {
+      img: ({ src, alt }) =>
+        typeof src === "string" ? <ChatImage url={src} name={alt || "图片"} /> : null,
       pre({ children }) {
         return (
           <pre className="bg-accent-hover border border-border p-3 overflow-x-auto text-[11px] my-3 font-mono leading-relaxed">
@@ -65,18 +70,11 @@ export function MarkdownText({
       li({ children }) {
         return <li className="text-[13px]">{children}</li>;
       },
-      a({ href, children }) {
-        return (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline"
-          >
-            {children}
-          </a>
-        );
-      },
+      a: ({ href, children }) => (
+        <ChatLink href={href} onFileClick={onFileClick}>
+          {children}
+        </ChatLink>
+      ),
       strong({ children }) {
         return <strong className="font-semibold">{children}</strong>;
       },
@@ -121,6 +119,7 @@ export function MarkdownText({
 
   return (
     <ReactMarkdown
+      urlTransform={chatUrlTransform}
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePlugins}
       components={components}

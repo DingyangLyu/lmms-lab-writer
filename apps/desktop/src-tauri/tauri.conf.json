@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' asset: http://asset.localhost data: blob: https://*.supabase.co https://*.githubusercontent.com; media-src 'self' asset: http://asset.localhost data: blob:; frame-src 'self' asset: http://asset.localhost blob:; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co",
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' asset: http://asset.localhost data: blob: https:; media-src 'self' asset: http://asset.localhost data: blob:; frame-src 'self' asset: http://asset.localhost blob:; connect-src 'self' asset: http://asset.localhost https://asset.localhost http://localhost:* ws://localhost:* wss://localhost:* ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]
@@ -23,6 +23,11 @@
   },
   "bundle": {
     "active": true,
+    "resources": {
+      "../../../LICENSE": "legal/LICENSE",
+      "../../../NOTICE": "legal/NOTICE",
+      "../../../LICENSES/MIT-LMMs-Lab.txt": "legal/MIT-LMMs-Lab.txt"
+    },
     "targets": "all",
     "icon": [
       "icons/32x32.png",

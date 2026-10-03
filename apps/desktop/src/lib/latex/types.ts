@@ -1,4 +1,4 @@
-export type LaTeXCompiler = "pdflatex" | "xelatex" | "lualatex" | "latexmk";
+export type LaTeXCompiler = "pdflatex" | "xelatex" | "lualatex" | "latexmk" | "tectonic";
 
 export interface CompilerInfo {
   name: string;
@@ -12,10 +12,34 @@ export interface LaTeXCompilersStatus {
   xelatex: CompilerInfo;
   lualatex: CompilerInfo;
   latexmk: CompilerInfo;
+  tectonic: CompilerInfo;
 }
 
+export interface BuildTarget {
+  id: string;
+  name: string;
+  mainFile: string;
+  engine: LaTeXCompiler | "auto";
+  workDir: string;
+  outputDir: string;
+}
+export interface ProjectBuildConfig {
+  version: 1;
+  activeTarget: string | null;
+  targets: BuildTarget[];
+}
 export interface LaTeXSettings {
   mainFile: string | null;
+  config: ProjectBuildConfig;
+}
+export interface TargetBuildResult {
+  success: boolean;
+  pdfPath: string | null;
+  pdfRelative: string | null;
+  engine: string;
+  compilerPath: string;
+  output: string;
+  error: string | null;
 }
 
 export type CompilationStatus = "idle" | "compiling" | "success" | "error";
@@ -35,6 +59,7 @@ export interface CompileOutputEvent {
 
 export const DEFAULT_LATEX_SETTINGS: LaTeXSettings = {
   mainFile: null,
+  config: { version: 1, activeTarget: null, targets: [] },
 };
 
 export const COMPILE_PROMPT = `Please compile the LaTeX document.
@@ -57,6 +82,7 @@ export const COMPILER_DISPLAY_NAMES: Record<LaTeXCompiler, string> = {
   xelatex: "XeLaTeX",
   lualatex: "LuaLaTeX",
   latexmk: "Latexmk",
+  tectonic: "Tectonic",
 };
 
 export const COMPILER_DESCRIPTIONS: Record<LaTeXCompiler, string> = {
@@ -64,6 +90,7 @@ export const COMPILER_DESCRIPTIONS: Record<LaTeXCompiler, string> = {
   xelatex: "Recommended for CJK - native Unicode and system fonts support",
   lualatex: "Modern Lua-based compiler with Unicode support, slower than XeLaTeX",
   latexmk: "Automated build tool that runs LaTeX the right number of times",
+  tectonic: "Portable Unicode engine with automatic package downloads",
 };
 
 // LaTeX Installation Types

@@ -85,3 +85,4 @@ lint_output.txt
 # Test screenshots (generated)
 test-screenshots/
 
+.opencode/

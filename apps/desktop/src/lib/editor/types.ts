@@ -22,6 +22,7 @@ export interface EditorSettings {
   lineHeight: number;
   wordWrap: "off" | "on" | "wordWrapColumn" | "bounded";
   wordWrapColumn: number;
+  highlightAmbiguousUnicode: boolean;
 
   // Editing
   tabSize: number;
@@ -69,8 +70,9 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   fontFamily: "",
   fontSize: 14,
   lineHeight: 1.6,
-  wordWrap: "off",
+  wordWrap: "on",
   wordWrapColumn: 80,
+  highlightAmbiguousUnicode: false,
 
   // Editing
   tabSize: 2,

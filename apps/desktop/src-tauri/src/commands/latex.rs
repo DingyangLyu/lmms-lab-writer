@@ -44,6 +44,7 @@ pub struct LaTeXCompilersStatus {
     pub xelatex: CompilerInfo,
     pub lualatex: CompilerInfo,
     pub latexmk: CompilerInfo,
+    pub tectonic: CompilerInfo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,6 +63,7 @@ pub struct CompileOutputEvent {
 }
 
 pub struct LaTeXCompilationState {
+    pub build_lock: Mutex<()>,
     pub current_process: Arc<Mutex<Option<Child>>>,
 }
 
@@ -69,11 +71,12 @@ impl Default for LaTeXCompilationState {
     fn default() -> Self {
         Self {
             current_process: Arc::new(Mutex::new(None)),
+            build_lock: Mutex::new(()),
         }
     }
 }
 
-async fn find_compiler(name: &str) -> CompilerInfo {
+pub(super) async fn find_compiler(name: &str) -> CompilerInfo {
     let which_cmd = if cfg!(target_os = "windows") {
         "where"
     } else {
@@ -94,27 +97,32 @@ async fn find_compiler(name: &str) -> CompilerInfo {
 
             if !path.is_empty() {
                 let version = get_compiler_version(name, &path).await;
-                return CompilerInfo {
-                    name: name.to_string(),
-                    path: Some(path),
-                    available: true,
-                    version,
-                };
+                if version.is_some() {
+                    return CompilerInfo {
+                        name: name.into(),
+                        path: Some(path),
+                        available: true,
+                        version,
+                    };
+                }
             }
         }
     }
 
     // Check common installation paths
-    let common_paths = get_common_paths(name);
+    let mut common_paths = dynamic_compiler_paths(name).await;
+    common_paths.extend(get_common_paths(name));
     for path in common_paths {
         if std::path::Path::new(&path).exists() {
             let version = get_compiler_version(name, &path).await;
-            return CompilerInfo {
-                name: name.to_string(),
-                path: Some(path),
-                available: true,
-                version,
-            };
+            if version.is_some() {
+                return CompilerInfo {
+                    name: name.into(),
+                    path: Some(path),
+                    available: true,
+                    version,
+                };
+            }
         }
     }
 
@@ -126,8 +134,79 @@ async fn find_compiler(name: &str) -> CompilerInfo {
     }
 }
 
+async fn dynamic_compiler_paths(name: &str) -> Vec<String> {
+    let mut roots = vec![
+        std::path::PathBuf::from("/usr/local/texlive"),
+        std::path::PathBuf::from("/opt/texlive"),
+        std::path::PathBuf::from("C:/texlive"),
+    ];
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = std::path::PathBuf::from(home);
+        roots.extend([
+            home.join("Library/TinyTeX"),
+            home.join(".TinyTeX"),
+            home.join("texlive"),
+        ]);
+    }
+    for env in ["APPDATA", "LOCALAPPDATA"] {
+        if let Some(root) = std::env::var_os(env) {
+            roots.push(std::path::PathBuf::from(root).join("TinyTeX"));
+        }
+    }
+    let filename = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.into()
+    };
+    let mut result = vec![];
+    for root in roots {
+        let mut installs = vec![root.clone()];
+        if let Ok(mut dirs) = tokio::fs::read_dir(&root).await {
+            while let Ok(Some(entry)) = dirs.next_entry().await {
+                if entry
+                    .file_name()
+                    .to_string_lossy()
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+                {
+                    installs.push(entry.path());
+                }
+            }
+        }
+        installs.sort();
+        installs.reverse();
+        for install in installs {
+            if let Ok(mut bins) = tokio::fs::read_dir(install.join("bin")).await {
+                while let Ok(Some(bin)) = bins.next_entry().await {
+                    let path = bin.path().join(&filename);
+                    if path.is_file() {
+                        result.push(path.to_string_lossy().into());
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
 fn get_common_paths(name: &str) -> Vec<String> {
     let mut paths = Vec::new();
+    let executable = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
+    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+        let home = std::path::PathBuf::from(home);
+        for folder in [".local/bin", ".cargo/bin", "bin"] {
+            paths.push(
+                home.join(folder)
+                    .join(&executable)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
 
     #[cfg(target_os = "windows")]
     {
@@ -210,7 +289,17 @@ fn get_common_paths(name: &str) -> Vec<String> {
 }
 
 async fn get_compiler_version(name: &str, path: &str) -> Option<String> {
-    let output = command(path).arg("--version").output().await.ok()?;
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        command(path)
+            .arg("--version")
+            .stdin(Stdio::null())
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await
+    .ok()?
+    .ok()?;
 
     if output.status.success() {
         let version_output = String::from_utf8_lossy(&output.stdout);
@@ -231,11 +320,12 @@ async fn get_compiler_version(name: &str, path: &str) -> Option<String> {
 
 #[tauri::command]
 pub async fn latex_detect_compilers() -> Result<LaTeXCompilersStatus, String> {
-    let (pdflatex, xelatex, lualatex, latexmk) = tokio::join!(
+    let (pdflatex, xelatex, lualatex, latexmk, tectonic) = tokio::join!(
         find_compiler("pdflatex"),
         find_compiler("xelatex"),
         find_compiler("lualatex"),
         find_compiler("latexmk"),
+        find_compiler("tectonic"),
     );
 
     Ok(LaTeXCompilersStatus {
@@ -243,6 +333,7 @@ pub async fn latex_detect_compilers() -> Result<LaTeXCompilersStatus, String> {
         xelatex,
         lualatex,
         latexmk,
+        tectonic,
     })
 }
 
@@ -251,6 +342,7 @@ fn has_any_compiler(status: &LaTeXCompilersStatus) -> bool {
         || status.xelatex.available
         || status.lualatex.available
         || status.latexmk.available
+        || status.tectonic.available
 }
 
 async fn is_compiler_detectable_after_install() -> bool {
@@ -309,13 +401,27 @@ pub async fn latex_compile(
     let env_path = std::env::var("PATH").unwrap_or_default();
     #[cfg(target_os = "macos")]
     let env_path = {
-        if !env_path.contains("/Library/TeX/texbin") {
-            format!(
-                "/Library/TeX/texbin:/opt/homebrew/bin:/usr/local/bin:{}",
-                env_path
-            )
-        } else {
+        let mut prefixes = vec![
+            "/Library/TeX/texbin".to_string(),
+            "/opt/homebrew/bin".to_string(),
+            "/usr/local/bin".to_string(),
+        ];
+
+        if let Ok(home) = std::env::var("HOME") {
+            prefixes.insert(0, format!("{}/Library/TinyTeX/bin/universal-darwin", home));
+            prefixes.insert(1, format!("{}/Library/TinyTeX/bin/arm64-darwin", home));
+            prefixes.insert(2, format!("{}/Library/TinyTeX/bin/x86_64-darwin", home));
+        }
+
+        let missing_prefixes: Vec<String> = prefixes
+            .into_iter()
+            .filter(|path| !env_path.contains(path))
+            .collect();
+
+        if missing_prefixes.is_empty() {
             env_path
+        } else {
+            format!("{}:{}", missing_prefixes.join(":"), env_path)
         }
     };
     cmd.env("PATH", env_path);
@@ -443,6 +549,13 @@ pub async fn latex_compile(
 pub async fn latex_stop_compilation(state: State<'_, LaTeXCompilationState>) -> Result<(), String> {
     let mut process_guard = state.current_process.lock().await;
     if let Some(mut child) = process_guard.take() {
+        #[cfg(unix)]
+        if let Some(id) = child.id() {
+            unsafe {
+                libc::kill(-(id as i32), libc::SIGTERM);
+            }
+        }
+
         child
             .kill()
             .await
@@ -547,7 +660,7 @@ pub async fn latex_synctex_edit(
 
     if !output.status.success() {
         let stderr = decode_bytes(&output.stderr);
-        return Err(format!("synctex edit failed: {}", stderr));
+        return Err(synctex_edit_error_message(&stderr));
     }
 
     let stdout = decode_bytes(&output.stdout);
@@ -572,6 +685,19 @@ pub async fn latex_synctex_edit(
     }
 
     Ok(SynctexResult { file, line, column })
+}
+
+fn synctex_edit_error_message(stderr: &str) -> String {
+    if stderr.contains("No SyncTeX available") {
+        return "SYNCTEX_FILE_MISSING: No SyncTeX data is available for this PDF. Recompile with SyncTeX enabled (-synctex=1) to use PDF-to-source navigation.".to_string();
+    }
+
+    let trimmed = stderr.trim();
+    if trimmed.is_empty() {
+        "synctex edit failed without output".to_string()
+    } else {
+        format!("synctex edit failed: {}", trimmed)
+    }
 }
 
 /// Quick-install synctex via tlmgr (when a TeX distribution already exists).
@@ -1485,8 +1611,30 @@ mod tests {
     }
 
     #[test]
+    fn synctex_edit_error_message_detects_missing_synctex_data() {
+        let message =
+            synctex_edit_error_message("SyncTeX ERROR: No SyncTeX available for manuscript_CN.pdf");
+
+        assert!(message.starts_with("SYNCTEX_FILE_MISSING:"));
+        assert!(!message.contains("usage: synctex"));
+    }
+
+    #[test]
+    fn synctex_edit_error_message_has_final_fallback() {
+        let message = synctex_edit_error_message("");
+
+        assert_eq!(message, "synctex edit failed without output");
+    }
+
+    #[test]
     fn has_any_compiler_all_unavailable() {
         let status = LaTeXCompilersStatus {
+            tectonic: CompilerInfo {
+                name: "tectonic".into(),
+                path: None,
+                available: false,
+                version: None,
+            },
             pdflatex: CompilerInfo {
                 name: "pdflatex".into(),
                 path: None,
@@ -1518,6 +1666,12 @@ mod tests {
     #[test]
     fn has_any_compiler_one_available() {
         let status = LaTeXCompilersStatus {
+            tectonic: CompilerInfo {
+                name: "tectonic".into(),
+                path: None,
+                available: false,
+                version: None,
+            },
             pdflatex: CompilerInfo {
                 name: "pdflatex".into(),
                 path: Some("/usr/bin/pdflatex".into()),

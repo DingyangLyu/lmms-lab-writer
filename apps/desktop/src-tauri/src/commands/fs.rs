@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileNode {
@@ -73,6 +72,9 @@ fn validate_path_within_project(path: &str, project_path: &str) -> Result<(), St
 
 const IGNORED_DIRS: &[&str] = &[
     "node_modules",
+    ".lmms_lab_writer",
+    // Writer metadata, attachment copies, versions and build staging: managed by the app.
+    ".writer",
     ".git",
     ".next",
     "dist",
@@ -98,19 +100,7 @@ fn ensure_utf8_encoding(encoding: Option<&str>) -> Result<(), String> {
 }
 
 async fn write_utf8_file(path: &str, content: &str) -> Result<(), String> {
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // String in Rust is guaranteed UTF-8; write bytes directly as UTF-8 (no BOM).
-    file.write_all(content.as_bytes())
-        .await
-        .map_err(|e| e.to_string())?;
-    file.flush().await.map_err(|e| e.to_string())
+    super::saving::atomic_write(Path::new(path), content.as_bytes()).await
 }
 
 #[tauri::command]
@@ -265,7 +255,7 @@ fn build_file_tree(dir: &Path, base_path: &str) -> Vec<FileNode> {
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
 
-        if IGNORED_DIRS.contains(&name.as_str()) {
+        if IGNORED_DIRS.contains(&name.as_str()) || name.starts_with(".lmms-save-") {
             continue;
         }
 
@@ -316,7 +306,7 @@ fn build_file_tree(dir: &Path, base_path: &str) -> Vec<FileNode> {
 fn should_ignore_path(path: &Path) -> bool {
     for component in path.components() {
         let name = component.as_os_str().to_string_lossy();
-        if IGNORED_DIRS.contains(&name.as_ref()) {
+        if IGNORED_DIRS.contains(&name.as_ref()) || name.starts_with(".lmms-save-") {
             return true;
         }
     }

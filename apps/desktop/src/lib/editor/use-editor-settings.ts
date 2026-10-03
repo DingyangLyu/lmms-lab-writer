@@ -57,6 +57,10 @@ function migrateSettings(parsed: Record<string, unknown>): EditorSettings {
     Math.round(
       clampNumber(settings.lineHeight, DEFAULT_EDITOR_SETTINGS.lineHeight, 1.0, 3.0) * 10,
     ) / 10;
+  settings.highlightAmbiguousUnicode =
+    typeof parsed.highlightAmbiguousUnicode === "boolean"
+      ? parsed.highlightAmbiguousUnicode
+      : DEFAULT_EDITOR_SETTINGS.highlightAmbiguousUnicode;
 
   if (settings.terminalShellMode !== "auto" && settings.terminalShellMode !== "custom") {
     settings.terminalShellMode = DEFAULT_EDITOR_SETTINGS.terminalShellMode;

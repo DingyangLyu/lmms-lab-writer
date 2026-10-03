@@ -1,6 +1,10 @@
+import type { EditorSelectionContext } from "@/lib/editor/selection-context";
+
 export type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
 
-export type Props = {
+export type Props = import("@/lib/harness/types").HarnessLifecycle & {
+  active?: boolean;
+  onWorkingChange?: (busy: boolean) => void;
   className?: string;
   baseUrl?: string;
   directory?: string;
@@ -11,6 +15,10 @@ export type Props = {
   onFileClick?: (path: string) => void;
   pendingMessage?: string | null;
   onPendingMessageSent?: () => void;
+  editorSelection?: EditorSelectionContext | null;
+  onClearSelection?: () => void;
+  onSelectionSent?: (selection: EditorSelectionContext) => void;
+  onBeforeSend?: (selection: EditorSelectionContext | null) => Promise<void>;
 };
 
 export type TaskItem = {
@@ -32,4 +40,4 @@ export type AskUserQuestion = {
   multiSelect?: boolean;
 };
 
-export type AttachedFile = { url: string; mime: string; filename: string };
+export type AttachedFile = import("@/lib/chat/images").ChatImageFile;

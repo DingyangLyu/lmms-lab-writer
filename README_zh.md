@@ -1,3 +1,5 @@
+> **DingyangLyu 分支：** 商用限制及保留的 MIT 权利见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。仍指向上游官网、Homebrew 和下载页的链接提供的是上游产品，不代表本分支的商业授权版本。
+
 <div align="center">
 
 <a href="https://writer.lmms-lab.com">
@@ -16,7 +18,7 @@
 
 [![macOS](https://img.shields.io/badge/-macOS-111111?style=flat-square&logo=apple&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
 [![Windows](https://img.shields.io/badge/-Windows-0078D4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-f0c000?style=flat-square)](LICENSE)
+[![License: Source Available](https://img.shields.io/badge/License-Source_Available-f0c000?style=flat-square)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&color=e8a317)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)
 
 [English](README.md) | 中文 | [日本語](README_ja.md)
@@ -88,14 +90,14 @@ Git 绝非事后补充的功能——它被**原生构建在侧边栏**中：
 <img src="imgs/git-support.png" alt="Git 集成——从侧边栏暂存、提交、差异对比、推送" width="720">
 </div>
 
-## 完全开源
+## 源码可见，非商业免费
 
-采用 MIT 许可证。每一行代码都在 GitHub 上公开。没有供应商锁定，没有数据遥测，没有隐藏费用。
+本分支源码公开。个人非商业使用、非商业教学和科研免费；适用新许可的原创新增及修改部分，商业用途须事先取得书面授权。上游和已经按 MIT 发布的版本保留原有权利。
 
 - 你的文件**永远不会离开你的设备**
 - AI 工具使用**你自己的 API 密钥**
 - 所有功能**完全离线可用**（编辑、编译、Git 操作）
-- 自由 Fork、修改、自托管——它是完全属于你的工具
+- 可按 [LICENSE](LICENSE) 在允许的非商业范围内 Fork、修改和自托管
 
 ## 跨平台原生体验
 
@@ -134,8 +136,8 @@ brew tap EvolvingLMMs-Lab/tap && brew install --cask lmms-lab-writer
 | **Git 集成** | 需付费 | 免费，原生内置 |
 | **离线使用** | 不支持 | 完整支持 |
 | **编译速度** | 云端排队 | 本地极速编译 |
-| **开源** | 否 | MIT 协议开源 |
-| **价格** | $21-42/月 | 免费 |
+| **源码许可** | 专有 | 源码可见；适用新许可的贡献限非商业使用 |
+| **价格** | $21-42/月 | 非商业免费；商业用途需授权 |
 
 ## 快速开始
 
@@ -179,7 +181,7 @@ claude "写一段摘要，总结我们的三个核心贡献"
 ## 参与开发
 
 ```bash
-git clone https://github.com/EvolvingLMMs-Lab/lmms-lab-writer.git
+git clone https://github.com/DingyangLyu/lmms-lab-writer.git
 cd lmms-lab-writer
 pnpm install
 pnpm tauri:dev
@@ -189,7 +191,9 @@ pnpm tauri:dev
 
 ## 许可证
 
-MIT
+本分支中有权按新条款授权的原创新增及修改，采用 [DingyangLyu Writer Noncommercial License v1.0](LICENSE)：个人非商业使用、非商业教学和科研免费，商业用途需事先书面授权。这是源码可见许可，不是 OSI 定义的开源许可。
+
+[上游 MIT 许可](LICENSES/MIT-LMMs-Lab.txt)和版权声明完整保留。本分支于 2026-10-03 整理公开历史并重新发布快照，这不追溯撤销独立取得的既有权利。范围见 [NOTICE](NOTICE) 和[许可说明](docs/licensing.md)。商业授权请联系 [DingyangLyu](https://github.com/DingyangLyu)。
 
 ---
 

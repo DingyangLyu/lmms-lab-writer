@@ -1,3 +1,5 @@
+> **DingyangLyu fork:** See [LICENSE](LICENSE) and [NOTICE](NOTICE) for commercial-use restrictions and preserved MIT rights. Website, Homebrew, and download links naming the upstream project still refer to upstream products, not a commercially licensed release of this fork.
+
 <div align="center">
 
 <a href="https://writer.lmms-lab.com">
@@ -15,7 +17,7 @@
 [![Download](https://img.shields.io/badge/-Download-2ea44f?style=flat-square&logo=github&logoColor=white)](https://writer.lmms-lab.com/download)
 
 [![Release](https://img.shields.io/github/v/release/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&label=Release&color=6c47ff)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-f0c000?style=flat-square)](LICENSE)
+[![License: Source Available](https://img.shields.io/badge/License-Source_Available-f0c000?style=flat-square)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&color=e8a317)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)
 
 [![macOS](https://img.shields.io/badge/-macOS-111111?style=flat-square&logo=apple&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
@@ -56,9 +58,9 @@ Write effortlessly in **English, Chinese, Japanese, Korean, Arabic, or any other
 <img src="imgs/compile-cn.png" alt="Full CJK and Unicode support with XeLaTeX">
 </div>
 
-## AI-Powered Workflows with OpenCode
+## AI-Powered Workflows with OpenCode and Codex
 
-The built-in **OpenCode** panel brings AI directly into your editing experience:
+The built-in agent panel lets you switch between **OpenCode** and the local **Codex app-server**. Both can edit your project directly:
 
 ```
 You: "Add a related work section comparing our method to LoRA and QLoRA"
@@ -70,6 +72,7 @@ You: *hit compile* Done.
 - AI analyzes your entire project for deep context awareness
 - Edits are reflected in the editor in real-time
 - Compatible with **any model**—Claude, GPT, Gemini, DeepSeek, or local LLMs
+- Codex reuses your local Codex login and supports live web search for literature discovery, with links you can verify before adding citations
 
 It also pairs perfectly with **Claude Code**, **Cursor**, **Codex CLI**, **Aider**, and other tools. The editor monitors your project directory, syncing external changes instantly.
 
@@ -93,14 +96,14 @@ Stop paying premium prices for basic Git sync. Here, version control is free, po
 <img src="imgs/git-support.png" alt="Git integration — stage, commit, diff, push from the sidebar" width="720">
 </div>
 
-## Fully Open Source
+## Source Available, Free for Noncommercial Use
 
-MIT licensed. Every line of code is open on GitHub. No vendor lock-in, no telemetry, no hidden costs.
+This fork is source available. Personal, educational, and research uses that are noncommercial are free; commercial use of covered fork contributions requires prior written authorization. Upstream MIT rights and previously published MIT versions remain unchanged. See [License](#license).
 
 - Your files **never leave your local machine**
 - AI tools utilize **your own API keys**
 - Fully functional **offline** (editing, compilation, Git)
-- Fork it, modify it, self-host it—it's yours to control
+- Fork, modify, and self-host for permitted noncommercial purposes under [LICENSE](LICENSE)
 
 ## Cross-Platform
 
@@ -139,8 +142,8 @@ Or [download for macOS / Windows](https://writer.lmms-lab.com/download) from the
 | **Git** | Paid plans only | Free, built into sidebar |
 | **Offline** | No | Full support |
 | **Compilation** | Cloud queue | Local, instant |
-| **Open source** | No | MIT license |
-| **Price** | $21-42/month | Free |
+| **Source licensing** | Proprietary | Source available; covered contributions restricted to noncommercial use |
+| **Price** | $21-42/month | Noncommercial use free; commercial authorization required |
 
 ## Quick Start
 
@@ -184,7 +187,7 @@ Yes. Editing, compilation, and Git operations are fully functional without an in
 ## Development
 
 ```bash
-git clone https://github.com/EvolvingLMMs-Lab/lmms-lab-writer.git
+git clone https://github.com/DingyangLyu/lmms-lab-writer.git
 cd lmms-lab-writer
 pnpm install
 pnpm tauri:dev
@@ -194,7 +197,9 @@ See the **[Developer Guide](docs/dev.md)** for full architecture, tech stack, Ru
 
 ## License
 
-MIT
+Covered original fork contributions use the [DingyangLyu Writer Noncommercial License v1.0](LICENSE): personal, noncommercial teaching and research use is free; commercial use requires prior written authorization. This is not an OSI-approved open-source license.
+
+The [upstream MIT license](LICENSES/MIT-LMMs-Lab.txt) and attribution are preserved. This fork snapshot was reissued on 2026-10-03 with reconstructed public history; this does not revoke independently granted rights. See [NOTICE](NOTICE) and the [licensing guide](docs/licensing.md). Contact [DingyangLyu](https://github.com/DingyangLyu) for commercial authorization.
 
 ---
 

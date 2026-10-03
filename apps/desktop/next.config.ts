@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
       },
     });
 
-    if (isProd && !isServer) {
+    if (isProd && !isServer && process.env.LMMS_SKIP_OBFUSCATION !== "1") {
       config.optimization = {
         ...config.optimization,
         minimize: true,

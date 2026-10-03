@@ -30,6 +30,15 @@ const APPLE_GOOGLE_MONO_FONTS = [
   '"Courier New"',
 ];
 
+// Match the familiar Overleaf code-editor stack before falling back to a CJK face.
+const OVERLEAF_EDITOR_FONTS = [
+  '"Monaco"',
+  '"Menlo"',
+  '"Consolas"',
+  '"Lucida Console"',
+  '"Source Code Pro"',
+];
+
 const TERMINAL_NERD_MONO_FONTS = [
   '"FiraCode Nerd Font Mono"',
   '"FiraCode Nerd Font"',
@@ -44,9 +53,9 @@ const TERMINAL_NERD_MONO_FONTS = [
 ];
 
 export const EDITOR_MONO_FONT_FAMILY = [
-  ...APPLE_GOOGLE_MONO_FONTS,
-  ...CJK_MONO_FONTS,
+  ...OVERLEAF_EDITOR_FONTS,
   ...CJK_SANS_FALLBACK_FONTS,
+  ...CJK_MONO_FONTS,
   "monospace",
 ].join(", ");
 

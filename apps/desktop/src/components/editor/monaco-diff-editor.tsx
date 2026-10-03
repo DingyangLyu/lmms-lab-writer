@@ -1,5 +1,7 @@
 "use client";
 
+import "@/lib/monaco/config";
+
 import { DiffEditor, type DiffOnMount, type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useTheme } from "next-themes";
@@ -219,6 +221,11 @@ export const MonacoDiffEditor = memo(function MonacoDiffEditor({
           scrollBeyondLastLine: false,
           wordWrap: "on",
           diffWordWrap: "on",
+          unicodeHighlight: {
+            nonBasicASCII: false,
+            ambiguousCharacters: editorSettings?.highlightAmbiguousUnicode ?? false,
+            invisibleCharacters: true,
+          },
           fontSize: editorSettings?.fontSize ?? 13,
           fontFamily: resolveMonoFontFamily(editorSettings?.fontFamily),
           lineNumbers: "on",

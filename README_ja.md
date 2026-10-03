@@ -1,3 +1,5 @@
+> **DingyangLyu フォーク：** 商用制限と維持される MIT の権利は [LICENSE](LICENSE) と [NOTICE](NOTICE) を参照してください。上流のサイト・Homebrew・ダウンロード先は引き続き上流製品を指します。
+
 <div align="center">
 
 <a href="https://writer.lmms-lab.com">
@@ -16,7 +18,7 @@
 
 [![macOS](https://img.shields.io/badge/-macOS-111111?style=flat-square&logo=apple&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
 [![Windows](https://img.shields.io/badge/-Windows-0078D4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-f0c000?style=flat-square)](LICENSE)
+[![License: Source Available](https://img.shields.io/badge/License-Source_Available-f0c000?style=flat-square)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&color=e8a317)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)
 
 [English](README.md) | [中文](README_zh.md) | 日本語
@@ -88,14 +90,14 @@ Overleaf の Git 同期機能に月額 $21 を支払う必要はもうありま�
 <img src="imgs/git-support.png" alt="Git 統合——サイドバーからステージ、コミット、差分表示、プッシュ" width="720">
 </div>
 
-## 完全オープンソース
+## ソース公開・非商用利用は無料
 
-MIT ライセンスで提供。すべてのコードは GitHub 上で公開されています。ベンダーロックイン、テレメトリ、隠れたコストは一切ありません。
+本フォークはソース公開です。個人・教育・研究の非商用利用は無料で、対象となる独自変更の商用利用には事前の書面許諾が必要です。上流および既存の MIT 版の権利は維持されます。
 
 - ファイルは**あなたのデバイスから流出しません**
 - AI ツールは**あなた自身の API キー**を使用
 - すべての機能が**オフラインで動作**（編集、コンパイル、Git 操作）
-- フォーク、改変、セルフホスト——すべて自由です
+- [LICENSE](LICENSE) の許諾範囲内で非商用のフォーク・改変・セルフホストが可能です
 
 ## クロスプラットフォーム対応
 
@@ -134,8 +136,8 @@ brew tap EvolvingLMMs-Lab/tap && brew install --cask lmms-lab-writer
 | **Git 連携** | 有料プランのみ | 無料、標準搭載 |
 | **オフライン** | 不可 | 完全対応 |
 | **コンパイル** | クラウド上のキュー待ち | ローカルで即時実行 |
-| **オープンソース** | いいえ | MIT ライセンス |
-| **価格** | $21-42/月 | 無料 |
+| **ソースのライセンス** | プロプライエタリ | ソース公開・対象の独自変更は非商用に限定 |
+| **価格** | $21-42/月 | 非商用は無料・商用は許諾が必要 |
 
 ## クイックスタート
 
@@ -179,7 +181,7 @@ claude "この論文の3つの主要な貢献を要約したアブストラク�
 ## 開発に参加する
 
 ```bash
-git clone https://github.com/EvolvingLMMs-Lab/lmms-lab-writer.git
+git clone https://github.com/DingyangLyu/lmms-lab-writer.git
 cd lmms-lab-writer
 pnpm install
 pnpm tauri:dev
@@ -189,7 +191,9 @@ pnpm tauri:dev
 
 ## ライセンス
 
-MIT
+許諾権限のある独自の追加・変更には [DingyangLyu Writer Noncommercial License v1.0](LICENSE) が適用されます。個人・教育・研究の非商用利用は無料で、商用利用には事前の書面許諾が必要です。OSI 承認のオープンソースライセンスではありません。
+
+[上流の MIT ライセンス](LICENSES/MIT-LMMs-Lab.txt) と著作権表示は維持されます。本フォークは 2026-10-03 に公開履歴を再構成してスナップショットを再公開しました。既に独立して付与された権利は取り消されません。[NOTICE](NOTICE) を参照してください。商用許諾は [DingyangLyu](https://github.com/DingyangLyu) にお問い合わせください。
 
 ---
 

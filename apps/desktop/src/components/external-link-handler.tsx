@@ -1,5 +1,6 @@
 "use client";
 
+import { isTauri } from "@tauri-apps/api/core";
 import { useEffect } from "react";
 
 /**
@@ -8,11 +9,11 @@ import { useEffect } from "react";
  */
 export function ExternalLinkHandler() {
   useEffect(() => {
+    if (!isTauri()) return;
     const handleClick = async (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest("a");
+      const anchor = e.target instanceof Element ? e.target.closest("a") : null;
 
-      if (!anchor) return;
+      if (!anchor || anchor.hasAttribute("data-writer-link")) return;
 
       const href = anchor.getAttribute("href");
       if (!href) return;
@@ -34,7 +35,7 @@ export function ExternalLinkHandler() {
           await open(href);
         } catch (err) {
           console.error("Failed to open external link:", err);
-          window.open(href, "_blank");
+          originalWindowOpen.call(window, href, "_blank", "noopener,noreferrer");
         }
       }
     };

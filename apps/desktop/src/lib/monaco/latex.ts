@@ -2,9 +2,25 @@
 
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages } from "monaco-editor";
+import { getLaTeXFoldingRanges } from "./latex-folding";
+
+const registered = new WeakSet<Monaco>();
 
 // Register LaTeX language support
 export const registerLaTeXLanguage = (monaco: Monaco) => {
+  if (registered.has(monaco)) return;
+  registered.add(monaco);
+  monaco.languages.registerFoldingRangeProvider("latex", {
+    provideFoldingRanges: (model: editor.ITextModel) =>
+      getLaTeXFoldingRanges(model.getValue()).map((range) => ({
+        start: range.start,
+        end: range.end,
+        kind:
+          range.kind === "comment"
+            ? monaco.languages.FoldingRangeKind.Comment
+            : monaco.languages.FoldingRangeKind.Region,
+      })),
+  });
   // Register the LaTeX language
   monaco.languages.register({
     id: "latex",
@@ -181,7 +197,17 @@ export const registerLaTeXLanguage = (monaco: Monaco) => {
 
         // Commands with arguments
         [/\\(begin|end)\s*\{/, { token: "keyword.control", next: "@environment" }],
-        [/\\(documentclass|usepackage)\s*(\[)?/, { token: "keyword.control", next: "@options" }],
+        // The optional argument and required argument are separate states. If
+        // there is no [...], entering an options state would color the rest of
+        // the document as a package parameter after the closing }.
+        [
+          /\\(documentclass|usepackage)\s*\[/,
+          { token: "keyword.control", next: "@packageOptions" },
+        ],
+        [
+          /\\(documentclass|usepackage)\s*\{/,
+          { token: "keyword.control", next: "@packageArgument" },
+        ],
 
         // Section commands
         [
@@ -189,8 +215,12 @@ export const registerLaTeXLanguage = (monaco: Monaco) => {
           { token: "markup.heading", next: "@braceArg" },
         ],
 
-        // Reference commands
-        [/\\(ref|cite|label|pageref|eqref)\s*\{/, { token: "keyword", next: "@braceArg" }],
+        // Citation, cross-reference, and label keys are identifiers, not prose.
+        // Keep the command and its optional notes separate from the key list.
+        [
+          /\\(?:[Cc]ite[a-zA-Z]*|nocite|autocite|parencite|textcite|footcite|supercite|smartcite|fullcite|ref|pageref|eqref|label)\*?(?=\s*(?:\[|\{))/,
+          { token: "keyword", next: "@referenceStart" },
+        ],
 
         // Text formatting
         [/\\(textbf|textit|texttt|emph|underline)\s*\{/, { token: "keyword", next: "@braceArg" }],
@@ -198,8 +228,13 @@ export const registerLaTeXLanguage = (monaco: Monaco) => {
         // Other commands
         [/\\[a-zA-Z@]+\*?/, "keyword"],
 
+        // Alignment cells and explicit LaTeX line breaks are structure, not text.
+        [/&/, "delimiter.table"],
+        [/\\\\/, "delimiter.table"],
+
         // Special characters
         [/\\[{}$&#%_^~\\]/, "constant"],
+        [/#[1-9]/, "constant"],
 
         // Curly braces groups
         [/\{/, { token: "delimiter.bracket", next: "@braceGroup" }],
@@ -217,7 +252,8 @@ export const registerLaTeXLanguage = (monaco: Monaco) => {
         [/\$/, { token: "string.math", next: "@pop" }],
         [/\\\)/, { token: "string.math", next: "@pop" }],
         [/\\[a-zA-Z]+/, "keyword"],
-        [/[^$\\]+/, "string.math"],
+        [/[=+\-*/^_<>]/, "operator.math"],
+        [/[^$\\=+\-*/^_<>]+/, "string.math"],
         [/./, "string.math"],
       ],
 
@@ -225,19 +261,60 @@ export const registerLaTeXLanguage = (monaco: Monaco) => {
         [/\$\$/, { token: "string.math", next: "@pop" }],
         [/\\\]/, { token: "string.math", next: "@pop" }],
         [/\\[a-zA-Z]+/, "keyword"],
-        [/[^$\\]+/, "string.math"],
+        [/[=+\-*/^_<>]/, "operator.math"],
+        [/[^$\\=+\-*/^_<>]+/, "string.math"],
         [/./, "string.math"],
       ],
 
       environment: [
-        [/[a-zA-Z*]+/, "variable.parameter"],
+        [/[a-zA-Z][a-zA-Z0-9*@-]*/, "entity.name.environment"],
         [/\}/, { token: "keyword.control", next: "@pop" }],
       ],
 
-      options: [
+      referenceStart: [
+        [/\s+/, ""],
+        [/\[/, { token: "delimiter.bracket", next: "@referenceOption" }],
+        [/\{/, { token: "delimiter.bracket", switchTo: "@referenceKeys" }],
+        [/./, { token: "", goBack: 1, next: "@pop" }],
+      ],
+
+      referenceOption: [
+        [/%.*$/, "comment"],
         [/\]/, { token: "delimiter.bracket", next: "@pop" }],
-        [/\{/, { token: "delimiter.bracket", next: "@braceArg" }],
-        [/[^\]{}]+/, "variable.parameter"],
+        [/\\[a-zA-Z@]+/, "keyword"],
+        [/[^\]%\\]+/, "variable.parameter"],
+        [/./, "variable.parameter"],
+      ],
+
+      referenceKeys: [
+        [/%.*$/, "comment"],
+        [/\}/, { token: "delimiter.bracket", next: "@pop" }],
+        [/,/, "delimiter.bracket"],
+        [/\s+/, ""],
+        [/[^\s,{}%\\]+/, "reference.key"],
+        [/\\./, "constant"],
+        [/./, "reference.key"],
+      ],
+
+      packageOptions: [
+        [/\]/, { token: "delimiter.bracket", switchTo: "@packageArgumentStart" }],
+        [/%.*$/, "comment"],
+        [/[^\]%]+/, "variable.parameter"],
+        [/./, "variable.parameter"],
+      ],
+
+      packageArgumentStart: [
+        [/\s+/, ""],
+        [/\{/, { token: "delimiter.bracket", switchTo: "@packageArgument" }],
+        // A malformed or unfinished optional argument should not trap later
+        // prose in the package state.
+        [/./, { token: "", goBack: 1, next: "@pop" }],
+      ],
+
+      packageArgument: [
+        [/%.*$/, "comment"],
+        [/\}/, { token: "delimiter.bracket", next: "@pop" }],
+        [/[^}%]+/, "variable.parameter"],
       ],
 
       braceArg: [

@@ -2,6 +2,7 @@
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useMemo, useState } from "react";
+import { RenameChat } from "@/components/chat/rename-chat";
 import type { SessionInfo } from "@/lib/opencode/types";
 import { TrashIcon } from "./icons";
 import { formatRelativeTime } from "./utils";
@@ -12,12 +13,14 @@ export function SessionList({
   onSelect,
   onNewSession,
   onDelete,
+  onRename,
 }: {
   sessions: SessionInfo[];
   currentSessionId: string | null;
   onSelect: (id: string) => void;
   onNewSession: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => Promise<void>;
 }) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [listParent] = useAutoAnimate({ duration: 200 });
@@ -48,12 +51,12 @@ export function SessionList({
         return (
           <div
             key={session.id}
-            className={`w-full flex items-center border-b border-border hover:bg-accent-hover transition-colors ${isActive ? "bg-surface-secondary" : ""}`}
+            className={`group w-full flex items-center border-b border-border hover:bg-accent-hover transition-colors ${isActive ? "bg-surface-secondary" : ""}`}
           >
             <button
               type="button"
               onClick={() => onSelect(session.id)}
-              className="flex-1 text-left px-3 py-2"
+              className="min-w-0 flex-1 text-left px-3 py-2 group-has-[input]:hidden"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -68,6 +71,10 @@ export function SessionList({
                 <span className="text-xs text-muted flex-shrink-0">{timeStr}</span>
               </div>
             </button>
+            <RenameChat
+              name={session.title || "未命名对话"}
+              onRename={(title) => onRename(session.id, title)}
+            />
             <button
               type="button"
               onClick={(e) => {

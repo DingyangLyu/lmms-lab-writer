@@ -1,0 +1,29 @@
+LMMs-Lab Writer — DingyangLyu fork
+
+Upstream project: https://github.com/EvolvingLMMs-Lab/lmms-lab-writer
+Upstream copyright: Copyright (c) 2026 LMMs-Lab
+Unmodified upstream license: LICENSES/MIT-LMMs-Lab.txt
+Fork: https://github.com/DingyangLyu/lmms-lab-writer
+
+Snapshot reissue and public history reconstruction: 2026-10-03
+This snapshot combines the fork's changes with the DingyangLyu Writer
+Noncommercial License v1.0. It applies only to Covered Contributions as
+defined in LICENSE. The date of this publication is not backdated.
+
+The upstream history through commit
+21f6bc6cdb98359e2aaf5b1fb16e3e93c728abed is retained unchanged. Subsequent
+fork work, recorded under the Git identities yuanbai and DingyangLyu, is
+consolidated into this new snapshot. The original fork history is backed
+up locally. Earlier fork distributions carried MIT notices; reconstructing
+the public branch does not revoke independently granted rights or guarantee
+that prior objects, copies, or caches are no longer accessible.
+
+Git attribution does not by itself establish ownership of every
+contribution. Do not remove upstream
+notices, label unmodified upstream files as exclusively noncommercial, or
+treat this notice as an assignment of another contributor's rights.
+
+Dependencies, fonts, assets, and external tools retain their own licenses.
+This notice does not replace their notices. Source and binary distributions
+must include LICENSE, NOTICE, LICENSES/MIT-LMMs-Lab.txt and any applicable
+third-party notices.

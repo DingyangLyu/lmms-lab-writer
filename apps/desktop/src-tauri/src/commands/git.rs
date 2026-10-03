@@ -57,7 +57,76 @@ async fn run_git(cwd: &str, args: &[&str]) -> Result<String, String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(git_command_error_message(
+            &output.stdout,
+            &output.stderr,
+            args,
+        ))
+    }
+}
+
+/// Writer's annotations, attachments, revisions and save backups live inside the project.
+const PRIVATE_DIRS: [&str; 2] = [".writer", ".lmms_lab_writer"];
+
+fn is_private_path(path: &str) -> bool {
+    let path = path.trim_matches('"').trim_end_matches('/');
+    PRIVATE_DIRS
+        .iter()
+        .any(|dir| path == *dir || path.starts_with(&format!("{dir}/")))
+}
+
+/// Keep Writer data out of ordinary Git (status, stage all, clean) via the local,
+/// uncommitted `info/exclude`. Tracked files remain tracked.
+pub async fn protect_private_dirs(dir: &str) -> Result<(), String> {
+    let exclude = run_git(dir, &["rev-parse", "--git-path", "info/exclude"]).await?;
+    let exclude = std::path::Path::new(dir).join(exclude.trim());
+    let current = match tokio::fs::read_to_string(&exclude).await {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e.to_string()),
+    };
+    let missing: Vec<String> = PRIVATE_DIRS
+        .iter()
+        .map(|dir| format!("{dir}/"))
+        .filter(|line| !current.lines().any(|existing| existing.trim() == line))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    if let Some(parent) = exclude.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let mut next = current;
+    if !next.is_empty() && !next.ends_with('\n') {
+        next.push('\n');
+    }
+    next.push_str("# LMMs-Lab Writer private data (local only)\n");
+    for line in missing {
+        next.push_str(&line);
+        next.push('\n');
+    }
+    tokio::fs::write(&exclude, next)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+fn git_command_error_message(stdout: &[u8], stderr: &[u8], args: &[&str]) -> String {
+    let stderr_text = String::from_utf8_lossy(stderr).trim().to_string();
+    if !stderr_text.is_empty() {
+        return stderr_text;
+    }
+
+    let stdout_text = String::from_utf8_lossy(stdout).trim().to_string();
+    if !stdout_text.is_empty() {
+        return stdout_text;
+    }
+
+    if args.is_empty() {
+        "Git command failed without output".to_string()
+    } else {
+        format!("git {} failed without output", args.join(" "))
     }
 }
 
@@ -78,6 +147,8 @@ pub async fn git_status(dir: String) -> Result<GitStatus, String> {
     }
 
     let dir_ref = &dir;
+    // Best effort: an unwritable exclude file must not hide the Git panel.
+    let _ = protect_private_dirs(dir_ref).await;
 
     // Check if repo has any commits
     let has_commits = run_git(dir_ref, &["rev-parse", "HEAD"]).await.is_ok();
@@ -150,6 +221,9 @@ pub async fn git_status(dir: String) -> Result<GitStatus, String> {
         .to_string();
 
         let path = line[3..].trim().to_string();
+        if status == "untracked" && is_private_path(&path) {
+            continue;
+        }
         changes.push(GitFileChange {
             path,
             status,
@@ -283,15 +357,42 @@ pub async fn git_diff(
 
 #[tauri::command]
 pub async fn git_discard_all(dir: String) -> Result<(), String> {
-    // Restore all tracked modified/deleted files
-    run_git(&dir, &["checkout", "--", "."]).await?;
-    // Remove all untracked files and directories
-    run_git(&dir, &["clean", "-fd"]).await?;
+    let _ = protect_private_dirs(&dir).await;
+    snapshot_before_discard(&dir).await?;
+    // Restore tracked files and remove untracked ones, never Writer's private data.
+    run_git(
+        &dir,
+        &[
+            "checkout",
+            "--",
+            ".",
+            ":(exclude).writer",
+            ":(exclude).lmms_lab_writer",
+        ],
+    )
+    .await?;
+    run_git(
+        &dir,
+        &["clean", "-fd", "-e", ".writer", "-e", ".lmms_lab_writer"],
+    )
+    .await?;
     Ok(())
+}
+
+/// Discarding is otherwise irreversible; keep a private Writer version first.
+async fn snapshot_before_discard(dir: &str) -> Result<(), String> {
+    super::git_snapshots::create_snapshot(dir, Some("Writer · 丢弃 Git 更改前自动保存"), &[])
+        .await
+        .map(|_| ())
+        .map_err(|e| format!("丢弃前无法保存 Writer 版本，已取消操作：{e}"))
 }
 
 #[tauri::command]
 pub async fn git_discard_file(dir: String, file: String) -> Result<(), String> {
+    if is_private_path(&file) {
+        return Err("Writer 的批注、附件和备份不能通过 Git 丢弃。".into());
+    }
+    snapshot_before_discard(&dir).await?;
     // Check if it's an untracked file by looking at git status
     let status = run_git(&dir, &["status", "--porcelain", "--", &file]).await?;
     if status.starts_with("??") {
@@ -330,7 +431,17 @@ pub async fn git_add(dir: String, files: Vec<String>) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_commit(dir: String, message: String) -> Result<String, String> {
-    run_git(&dir, &["commit", "-m", &message]).await?;
+    let message = message.trim();
+    if message.is_empty() {
+        return Err("Commit message cannot be empty".to_string());
+    }
+
+    let staged_files = run_git(&dir, &["diff", "--cached", "--name-only"]).await?;
+    if staged_files.trim().is_empty() {
+        return Err("No staged changes to commit. Stage files before committing.".to_string());
+    }
+
+    run_git(&dir, &["commit", "-m", message]).await?;
     run_git(&dir, &["rev-parse", "--short", "HEAD"])
         .await
         .map(|s| s.trim().to_string())
@@ -640,6 +751,7 @@ async fn fetch_gitignore() -> Option<String> {
 #[tauri::command]
 pub async fn git_init(dir: String) -> Result<(), String> {
     run_git(&dir, &["init"]).await?;
+    let _ = protect_private_dirs(&dir).await;
 
     // Create a .gitignore file for LaTeX projects
     let gitignore_path = std::path::Path::new(&dir).join(".gitignore");
@@ -671,7 +783,11 @@ pub async fn git_clone(url: String, directory: String) -> Result<String, String>
     if output.status.success() {
         Ok(directory)
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(git_command_error_message(
+            &output.stdout,
+            &output.stderr,
+            &["clone", "--", &url, &directory],
+        ))
     }
 }
 
@@ -894,6 +1010,48 @@ pub async fn gh_create_repo(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_command_error_message_prefers_stderr() {
+        let message =
+            git_command_error_message(b"stdout message", b"stderr message\n", &["status"]);
+
+        assert_eq!(message, "stderr message");
+    }
+
+    #[test]
+    fn git_command_error_message_falls_back_to_stdout() {
+        let message = git_command_error_message(
+            b"On branch main\nnothing to commit, working tree clean\n",
+            b"",
+            &["commit", "-m", "test"],
+        );
+
+        assert!(message.contains("nothing to commit"));
+    }
+
+    #[test]
+    fn git_command_error_message_has_final_fallback() {
+        let message = git_command_error_message(b"", b"", &["commit", "-m", "test"]);
+
+        assert_eq!(message, "git commit -m test failed without output");
+    }
+
+    #[tokio::test]
+    async fn git_commit_without_staged_changes_returns_clear_error() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let repo_dir = temp_dir.path().to_string_lossy().to_string();
+        run_git(&repo_dir, &["init"]).await.expect("git init");
+
+        let error = git_commit(repo_dir, "test commit".to_string())
+            .await
+            .expect_err("commit should fail");
+
+        assert_eq!(
+            error,
+            "No staged changes to commit. Stage files before committing."
+        );
+    }
 
     #[test]
     fn gh_auth_login_windows_launch_plan_uses_visible_cmd() {

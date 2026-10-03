@@ -1,3 +1,5 @@
+> Historical upstream marketing copy. References below to MIT, unrestricted free use, or open source describe the upstream product, not the current licensing policy of this fork. See [LICENSE](../LICENSE) and [NOTICE](../NOTICE).
+
 # LMMs-Lab Writer - Dan Koe Style Copy
 
 ## The Philosophical Hook (Newsletter/Long-form)

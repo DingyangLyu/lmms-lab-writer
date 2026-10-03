@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChatImage } from "@/components/chat/chat-image";
 import { Spinner } from "@/components/ui/spinner";
 import type { ToolPart } from "@/lib/opencode/types";
 import { getToolInfo } from "@/lib/opencode/types";
@@ -27,6 +28,10 @@ export function ToolDisplay({
     /\.(tex|bib|cls|sty|txt|md|json|yaml|yml|py|js|ts|tsx|css|html|pdf|log|aux|gz|xdv|fdb_latexmk|synctex)$/i.test(
       clickablePath,
     );
+  const images =
+    part.state.status === "completed"
+      ? (part.state.attachments ?? []).filter((file) => file.mime.startsWith("image/"))
+      : [];
   const output = (part.state as { output?: string }).output;
   // Always expand if it's a task tool to show the UI
   const isTaskTool = ["todowrite", "todocreate", "todolist", "todoread", "todoupdate"].includes(
@@ -49,7 +54,8 @@ export function ToolDisplay({
   const tasksToDisplay = tasksFromOutput || tasksFromInput;
 
   // If we have tasks to display, force "hasDetails" to true to allow expansion (or auto-expand)
-  const hasDetails = Object.keys(part.state.input).length > 0 || output || tasksToDisplay;
+  const hasDetails =
+    Object.keys(part.state.input).length > 0 || output || tasksToDisplay || images.length > 0;
 
   const diffStats = useMemo(() => {
     if (output && (part.tool === "write" || part.tool === "edit")) {
@@ -124,6 +130,17 @@ export function ToolDisplay({
 
       {expanded && (
         <div className="border-t border-border bg-background">
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-3">
+              {images.map((image) => (
+                <ChatImage
+                  key={image.id || image.url}
+                  url={image.url}
+                  name={image.filename || "工具图片"}
+                />
+              ))}
+            </div>
+          )}
           {/* Special Task Display */}
           {tasksToDisplay && (
             <div className="px-3 py-2">

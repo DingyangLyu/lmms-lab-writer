@@ -1,10 +1,20 @@
 "use client";
 
-import { CaretLeftIcon, CaretRightIcon, XIcon } from "@phosphor-icons/react";
-import Image from "next/image";
+import {
+  ArrowUpIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  PaperclipIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronIcon, ImageIcon, SendIcon, StopIcon } from "./icons";
+import { AttachmentStrip } from "@/components/chat/attachment-strip";
+import { GrowingTextarea } from "@/components/chat/growing-textarea";
+import { useChatAttachments } from "@/lib/chat/use-chat-attachments";
+import { type EditorSelectionContext, selectionRangeLabel } from "@/lib/editor/selection-context";
+import { findSelectedModel } from "@/lib/opencode/model-selection";
+import { ChevronIcon, StopIcon } from "./icons";
 import type { AttachedFile } from "./types";
 
 interface SelectOption {
@@ -15,6 +25,73 @@ interface SelectOption {
 interface SelectOptionGroup {
   label: string;
   options: SelectOption[];
+}
+
+type VariantMap = Record<string, { disabled?: boolean; [key: string]: unknown }>;
+
+type InputModel = {
+  id: string;
+  name: string;
+  options?: { max?: boolean; reasoning?: boolean };
+  variants?: VariantMap;
+};
+
+type InputProvider = {
+  id: string;
+  name: string;
+  models: InputModel[];
+};
+
+type SelectedModelChoice = {
+  providerId: string;
+  modelId: string;
+  variant?: string;
+};
+
+const VARIANT_LABELS: Record<string, string> = {
+  none: "None",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "XHigh",
+  fast: "Fast",
+};
+
+const VARIANT_ORDER = ["none", "low", "medium", "high", "xhigh", "fast"];
+
+function isVariantEnabled(variants: VariantMap | undefined, variant: string | undefined): boolean {
+  if (!variants || !variant) return false;
+  return variants[variant]?.disabled !== true;
+}
+
+function formatVariantLabel(variant: string): string {
+  return VARIANT_LABELS[variant] ?? variant;
+}
+
+function getVariantOptions(variants: VariantMap | undefined): SelectOption[] {
+  if (!variants) return [];
+
+  const available = Object.entries(variants)
+    .filter(([, config]) => config?.disabled !== true)
+    .map(([variant]) => variant)
+    .sort((a, b) => {
+      const aIndex = VARIANT_ORDER.indexOf(a);
+      const bIndex = VARIANT_ORDER.indexOf(b);
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+  if (available.length === 0) return [];
+
+  return [
+    { value: "", label: "Effort: Auto" },
+    ...available.map((variant) => ({
+      value: variant,
+      label: `Effort: ${formatVariantLabel(variant)}`,
+    })),
+  ];
 }
 
 function useDropdownPosition(
@@ -274,6 +351,9 @@ function GroupedSelect({
 }
 
 export function InputArea({
+  directory,
+  onAttachmentLoading,
+  active = true,
   input,
   setInput,
   attachedFiles,
@@ -281,153 +361,86 @@ export function InputArea({
   onSend,
   onAbort,
   isWorking,
+  isSending = false,
+  deliveryMode = "steer",
+  deliveryControls,
   agents,
   providers,
   selectedAgent,
   selectedModel,
   onSelectAgent,
   onSelectModel,
+  editorSelection,
+  onClearSelection,
 }: {
+  active?: boolean;
+  directory?: string;
+  onAttachmentLoading?: (loading: boolean) => void;
   input: string;
   setInput: (v: string) => void;
   attachedFiles: AttachedFile[];
-  setAttachedFiles: (files: AttachedFile[]) => void;
+  setAttachedFiles: React.Dispatch<React.SetStateAction<AttachedFile[]>>;
   onSend: () => void;
   onAbort: () => void;
   isWorking: boolean;
+  isSending?: boolean;
+  deliveryMode?: "steer" | "queue";
+  deliveryControls?: React.ReactNode;
   agents: { id: string; name: string; description?: string }[];
-  providers: {
-    id: string;
-    name: string;
-    models: {
-      id: string;
-      name: string;
-      options?: { max?: boolean; reasoning?: boolean };
-    }[];
-  }[];
+  providers: InputProvider[];
   selectedAgent: string | null;
-  selectedModel: { providerId: string; modelId: string } | null;
+  selectedModel: SelectedModelChoice | null;
   onSelectAgent: (agentId: string | null) => void;
-  onSelectModel: (m: { providerId: string; modelId: string } | null) => void;
+  onSelectModel: (m: SelectedModelChoice | null) => void;
+  editorSelection?: EditorSelectionContext | null;
+  onClearSelection?: () => void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-
-  const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-
-      const newFiles: AttachedFile[] = [];
-      for (const file of Array.from(files)) {
-        // Only accept images
-        if (!file.type.startsWith("image/")) continue;
-
-        // Convert to base64 data URL
-        const reader = new FileReader();
-        const dataUrl = await new Promise<string>((resolve) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-
-        newFiles.push({
-          url: dataUrl,
-          mime: file.type,
-          filename: file.name,
-        });
-      }
-
-      setAttachedFiles([...attachedFiles, ...newFiles]);
-      // Reset input so same file can be selected again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    },
-    [attachedFiles, setAttachedFiles],
+  const attachments = useChatAttachments(
+    attachedFiles,
+    setAttachedFiles,
+    active,
+    isSending,
+    directory,
   );
-
-  const handleRemoveFile = useCallback(
-    (index: number) => {
-      setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
-    },
-    [attachedFiles, setAttachedFiles],
+  useEffect(
+    () => onAttachmentLoading?.(attachments.loading),
+    [onAttachmentLoading, attachments.loading],
   );
-
-  const handlePaste = useCallback(
-    async (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      const imageFiles: File[] = [];
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) imageFiles.push(file);
-        }
-      }
-
-      if (imageFiles.length === 0) return;
-
-      // Prevent default paste behavior for images
-      e.preventDefault();
-
-      const newFiles: AttachedFile[] = [];
-      for (const file of imageFiles) {
-        const reader = new FileReader();
-        const dataUrl = await new Promise<string>((resolve) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-
-        newFiles.push({
-          url: dataUrl,
-          mime: file.type,
-          filename: file.name || `pasted-image-${Date.now()}.${file.type.split("/")[1] || "png"}`,
-        });
-      }
-
-      setAttachedFiles([...attachedFiles, ...newFiles]);
-    },
-    [attachedFiles, setAttachedFiles],
-  );
-
+  const isComposingRef = useRef(false);
+  const compositionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const nativeEvent = e.nativeEvent;
+    if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (!attachments.loading) onSend();
     }
   };
 
-  // Handle keyboard navigation for image preview modal
-  useEffect(() => {
-    if (previewIndex === null) return;
+  const handleCompositionStart = () => {
+    if (compositionEndTimerRef.current) {
+      clearTimeout(compositionEndTimerRef.current);
+      compositionEndTimerRef.current = null;
+    }
+    isComposingRef.current = true;
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setPreviewIndex(null);
-      } else if (e.key === "ArrowLeft" && attachedFiles.length > 1) {
-        setPreviewIndex((prev) => {
-          const current = prev ?? 0;
-          return (current - 1 + attachedFiles.length) % attachedFiles.length;
-        });
-      } else if (e.key === "ArrowRight" && attachedFiles.length > 1) {
-        setPreviewIndex((prev) => {
-          const current = prev ?? 0;
-          return (current + 1) % attachedFiles.length;
-        });
+  const handleCompositionEnd = () => {
+    compositionEndTimerRef.current = setTimeout(() => {
+      isComposingRef.current = false;
+      compositionEndTimerRef.current = null;
+    }, 0);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (compositionEndTimerRef.current) {
+        clearTimeout(compositionEndTimerRef.current);
       }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [previewIndex, attachedFiles.length]);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
   }, []);
 
   const _selectedAgentName = useMemo(() => {
@@ -435,67 +448,90 @@ export function InputArea({
   }, [selectedAgent, agents]);
 
   let selectedModelInfo = { name: "Model", provider: "", isMax: false };
-  if (selectedModel) {
-    for (const provider of providers) {
-      const model = provider.models?.find((m) => m.id === selectedModel.modelId);
-      if (model) {
-        selectedModelInfo = {
-          name: model.name,
-          provider: provider.name,
-          isMax: model.options?.max ?? false,
-        };
-        break;
-      }
-    }
+  let selectedModelRecord: InputModel | undefined;
+  const selected = findSelectedModel(providers, selectedModel);
+  if (selected) {
+    selectedModelRecord = selected.model;
+    selectedModelInfo = {
+      name: selected.model.name,
+      provider: selected.provider.name,
+      isMax: selected.model.options?.max ?? false,
+    };
   }
+  const variantOptions = getVariantOptions(selectedModelRecord?.variants);
 
   return (
-    <div className="border border-border rounded-xl bg-accent-hover focus-within:border-border-dark focus-within:bg-background transition-all">
-      {/* Attached images preview - above textarea */}
-      {attachedFiles.length > 0 && (
-        <div className="flex gap-2 px-3 pt-3 pb-1 overflow-x-auto">
-          {attachedFiles.map((file, index) => (
-            <div key={file.url} className="relative flex-shrink-0 group">
-              <button
-                type="button"
-                onClick={() => setPreviewIndex(index)}
-                className="block focus:outline-none focus:ring-2 focus:ring-accent rounded"
-                title="Click to preview"
-              >
-                <Image
-                  unoptimized
-                  src={file.url}
-                  alt={file.filename}
-                  width={64}
-                  height={64}
-                  className="h-16 w-16 object-cover rounded border border-border cursor-zoom-in hover:border-border-dark transition-colors"
-                />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRemoveFile(index)}
-                className="absolute -top-1.5 -right-1.5 size-5 bg-foreground text-background rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+    <fieldset
+      aria-label="聊天输入与附件"
+      ref={attachments.areaRef}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={attachments.onDrop}
+      className="writer-composer-card"
+    >
+      {deliveryControls}
+      {editorSelection && (
+        <section className="border-b border-border px-3 py-2 text-xs" aria-label="已引用编辑器选区">
+          <div className="flex items-start gap-2">
+            <span className="min-w-0 flex-1 break-words">
+              自动引用：{editorSelection.path} ·{" "}
+              {editorSelection.ranges.map(selectionRangeLabel).join("、")}
+            </span>
+            <button
+              type="button"
+              onClick={onClearSelection}
+              className="shrink-0 px-1 hover:text-accent"
+              aria-label="取消选区引用"
+              title="取消选区引用"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </div>
+          <details className="mt-1">
+            <summary className="cursor-pointer text-muted">
+              查看选中原文（
+              {editorSelection.ranges.reduce(
+                (count, range) => count + Array.from(range.text).length,
+                0,
+              )}{" "}
+              字符）
+            </summary>
+            <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs">
+              {editorSelection.ranges.map((range) => range.text).join("\n\n")}
+            </pre>
+          </details>
+        </section>
+      )}
+      <AttachmentStrip
+        files={attachedFiles}
+        disabled={isSending}
+        onRemove={(index) => setAttachedFiles((current) => current.filter((_, i) => i !== index))}
+      />
+      {attachments.error && (
+        <p role="alert" className="px-3 py-2 text-xs text-red-600">
+          {attachments.error}
+        </p>
+      )}
+      {attachments.loading && (
+        <p role="status" className="px-3 text-xs text-muted">
+          正在添加附件…
+        </p>
       )}
 
-      <textarea
-        ref={textareaRef}
+      <GrowingTextarea
+        aria-label="发送给 OpenCode 的消息"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder='Ask anything... "Add unit tests for the user service"'
-        disabled={isWorking}
-        className={`w-full min-h-[44px] max-h-[200px] px-4 py-3 resize-none focus:outline-none text-sm bg-transparent placeholder:text-muted-foreground ${attachedFiles.length > 0 ? "pt-2" : ""}`}
-        rows={1}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
+        onPaste={attachments.onPaste}
+        placeholder={
+          editorSelection ? "说明如何修改选中的内容…" : "让 OpenCode 查找文献或修改选中内容…"
+        }
+        className="writer-composer-input"
+        rows={3}
       />
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="writer-composer-toolbar">
         <CustomSelect
           value={selectedAgent || ""}
           options={agents.filter((a) => a?.id).map((a) => ({ value: a.id, label: a.name }))}
@@ -524,7 +560,12 @@ export function InputArea({
             onChange={(v) => {
               const [providerId, modelId] = v.split(":");
               if (providerId && modelId) {
-                onSelectModel({ providerId, modelId });
+                const provider = providers.find((p) => p.id === providerId);
+                const model = provider?.models.find((m) => m.id === modelId);
+                const variant = isVariantEnabled(model?.variants, selectedModel?.variant)
+                  ? selectedModel?.variant
+                  : undefined;
+                onSelectModel({ providerId, modelId, variant });
               } else {
                 onSelectModel(null);
               }
@@ -534,111 +575,77 @@ export function InputArea({
           {selectedModelInfo.isMax && (
             <span className="text-xs text-muted font-medium flex-shrink-0">Max</span>
           )}
+          {selectedModel && variantOptions.length > 0 && (
+            <CustomSelect
+              value={selectedModel.variant ?? ""}
+              options={variantOptions}
+              onChange={(variant) =>
+                onSelectModel({
+                  ...selectedModel,
+                  variant: variant || undefined,
+                })
+              }
+              className="max-w-[110px]"
+            />
+          )}
         </div>
 
         <input
-          ref={fileInputRef}
+          ref={attachments.pickerRef}
           type="file"
-          accept="image/*"
+          accept={undefined}
           multiple
-          onChange={handleFileSelect}
+          onChange={(event) => {
+            void attachments.addFiles(Array.from(event.target.files ?? []));
+            event.target.value = "";
+          }}
           className="hidden"
         />
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isWorking}
-          className={`p-1.5 transition-colors flex-shrink-0 ${
+          onClick={() => void attachments.choose()}
+          disabled={isSending}
+          className={`flex size-8 items-center justify-center border border-border transition-colors flex-shrink-0 ${
             attachedFiles.length > 0 ? "text-accent" : "text-muted-foreground hover:text-muted"
-          } ${isWorking ? "opacity-50 cursor-not-allowed" : ""}`}
-          title="Attach image"
+          } ${isSending ? "opacity-50 cursor-not-allowed" : ""}`}
+          title="添加文件或图片，也可粘贴或拖入"
+          aria-label="添加附件"
         >
-          <ImageIcon className="size-4" />
+          <PaperclipIcon className="size-4" />
           {attachedFiles.length > 0 && (
             <span className="sr-only">{attachedFiles.length} attached</span>
           )}
         </button>
 
-        {isWorking ? (
+        {isWorking && (
           <button
             type="button"
             onClick={onAbort}
-            className="p-1.5 text-muted hover:text-foreground transition-colors"
+            className="flex size-8 shrink-0 items-center justify-center border border-border text-muted hover:text-foreground transition-colors"
             title="Stop"
           >
             <StopIcon className="size-5" />
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!input.trim() && attachedFiles.length === 0}
-            className="p-1.5 bg-surface-tertiary hover:bg-border rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-surface-tertiary"
-            title="Send"
-          >
-            <SendIcon className="size-4 text-muted" />
-          </button>
         )}
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={
+            isSending || attachments.loading || (!input.trim() && attachedFiles.length === 0)
+          }
+          className="flex size-8 shrink-0 items-center justify-center bg-foreground text-background disabled:opacity-40"
+          title={isWorking ? (deliveryMode === "queue" ? "加入队列" : "立即指导") : "发送"}
+          aria-label={
+            isWorking
+              ? deliveryMode === "queue"
+                ? "加入 OpenCode 队列"
+                : "立即指导 OpenCode"
+              : "发送给 OpenCode"
+          }
+        >
+          <ArrowUpIcon className="size-4" />
+        </button>
       </div>
-
-      {/* Image preview modal */}
-      {previewIndex !== null && attachedFiles[previewIndex] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/80">
-          <button
-            type="button"
-            aria-label="Close image preview"
-            className="absolute inset-0 cursor-zoom-out"
-            onClick={() => setPreviewIndex(null)}
-          />
-          <div className="relative max-w-[90vw] max-h-[90vh]">
-            <Image
-              unoptimized
-              src={attachedFiles[previewIndex].url}
-              alt="Preview"
-              width={1600}
-              height={1200}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
-            <button
-              type="button"
-              onClick={() => setPreviewIndex(null)}
-              className="absolute top-2 right-2 size-8 bg-foreground/50 hover:bg-foreground/70 text-background rounded-full flex items-center justify-center transition-colors"
-              title="Close"
-            >
-              <XIcon className="size-5" />
-            </button>
-            {/* Navigation arrows */}
-            {attachedFiles.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPreviewIndex(
-                      (previewIndex - 1 + attachedFiles.length) % attachedFiles.length,
-                    );
-                  }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 size-10 bg-foreground/50 hover:bg-foreground/70 text-background rounded-full flex items-center justify-center transition-colors"
-                  title="Previous"
-                >
-                  <CaretLeftIcon className="size-6" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPreviewIndex((previewIndex + 1) % attachedFiles.length);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 size-10 bg-foreground/50 hover:bg-foreground/70 text-background rounded-full flex items-center justify-center transition-colors"
-                  title="Next"
-                >
-                  <CaretRightIcon className="size-6" />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    </fieldset>
   );
 }

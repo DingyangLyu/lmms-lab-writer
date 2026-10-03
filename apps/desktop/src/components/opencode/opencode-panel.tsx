@@ -1,10 +1,23 @@
 "use client";
 
-import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ConversationBridge } from "@/components/bridge/conversation-bridge";
+import { DeliveryControls, type DeliveryMode } from "@/components/chat/delivery-controls";
+import { ResizableComposer } from "@/components/ui/panel-height";
+import { useConversationBridge } from "@/lib/bridge/use-conversation-bridge";
+import { useComposerDraft } from "@/lib/chat/composer-drafts";
+import { prepareChatFiles } from "@/lib/chat/files";
+import type { ChatImageFile } from "@/lib/chat/images";
+import type { ChatDraft, ChatOutbox } from "@/lib/chat/outbox";
+import { useChatOutbox } from "@/lib/chat/use-chat-outbox";
+import { useIdleTranscript } from "@/lib/chat/use-idle-transcript";
+import { withEditorSelection } from "@/lib/editor/selection-context";
+import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
+import { getOpenCodeErrorMessage } from "@/lib/opencode/client";
 import type { ToolPart } from "@/lib/opencode/types";
 import { useOpenCode } from "@/lib/opencode/use-opencode";
-import { ChevronIcon, PlusIcon } from "./icons";
+import { PlusIcon } from "./icons";
 import { InputArea } from "./input-area";
 import { MessageList } from "./message-list";
 import { OnboardingState } from "./onboarding";
@@ -13,6 +26,8 @@ import { CollapsibleTasksBar, parseTasks } from "./tasks-display";
 import type { Props } from "./types";
 
 export const OpenCodePanel = memo(function OpenCodePanel({
+  active = true,
+  onWorkingChange,
   className = "",
   baseUrl,
   directory,
@@ -23,16 +38,55 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   onFileClick,
   pendingMessage,
   onPendingMessageSent,
+  editorSelection = null,
+  onClearSelection,
+  onSelectionSent,
+  onBeforeSend,
+  ...lifecycle
 }: Props) {
-  const opencode = useOpenCode({ baseUrl, directory, autoConnect });
+  const opencode = useOpenCode({
+    baseUrl,
+    directory,
+    autoConnect,
+    initialSessionId: lifecycle.initialSessionId,
+  });
+  const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [input, setInput] = useState("");
-  const [attachedFiles, setAttachedFiles] = useState<
-    { url: string; mime: string; filename: string }[]
-  >([]);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("steer");
+  const outboxRef = useRef<ChatOutbox | null>(null);
+  const registerRef = useRef<((id: string) => Promise<void>) | null>(null);
+  const sessionRef = useRef(opencode.currentSessionId);
+  sessionRef.current = opencode.currentSessionId;
+  useEffect(() => {
+    if (opencode.error && outboxRef.current?.state.items.length)
+      void outboxRef.current.pause(opencode.error);
+  }, [opencode.error]);
+  const [preparing, setPreparing] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendingRef = useRef(false);
+  const cancelSendRef = useRef(false);
+  const [attachedFiles, setAttachedFiles] = useState<ChatImageFile[]>([]);
+  useComposerDraft(
+    directory,
+    lifecycle.instanceId,
+    input,
+    setInput,
+    attachedFiles,
+    setAttachedFiles,
+  );
   const [showSessionList, setShowSessionList] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const lastSessionIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pendingMessageSentRef = useRef(false);
-  const [panelParent] = useAutoAnimate({ duration: 200 });
+
+  useEffect(() => {
+    if (pendingMessage) {
+      pendingMessageSentRef.current = false;
+    }
+  }, [pendingMessage]);
 
   // Extract latest tasks from message history
   const latestTasks = useMemo(() => {
@@ -75,17 +129,66 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       }
     }
     return null;
-  }, [opencode]);
+  }, [opencode.messages, opencode.getPartsForMessage]);
 
-  // Auto-scroll to bottom when messages/parts update
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      if (active) messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+    },
+    [active],
+  );
+
+  const updateShouldAutoScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 120;
   }, []);
+
+  // Keep the stream pinned to the bottom unless the user intentionally scrolls up.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: New streamed parts trigger scrolling; composer text must not.
+  useEffect(() => {
+    if (lastSessionIdRef.current !== opencode.currentSessionId) {
+      lastSessionIdRef.current = opencode.currentSessionId;
+      shouldAutoScrollRef.current = true;
+      scrollToBottom("auto");
+      return;
+    }
+
+    if (!shouldAutoScrollRef.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      scrollToBottom("smooth");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [opencode.currentSessionId, opencode.messages, opencode.getPartsForMessage, scrollToBottom]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || showSessionList || !opencode.currentSessionId) return;
+
+    const observer = new ResizeObserver(() => {
+      if (shouldAutoScrollRef.current) {
+        scrollToBottom("smooth");
+      }
+    });
+    observer.observe(container);
+    if (scrollContentRef.current) observer.observe(scrollContentRef.current);
+
+    return () => observer.disconnect();
+  }, [scrollToBottom, showSessionList, opencode.currentSessionId]);
 
   // Handle pending message from external source
   useEffect(() => {
     const handlePendingMessage = async () => {
-      if (!pendingMessage || pendingMessageSentRef.current || !opencode.connected) {
+      if (
+        !pendingMessage ||
+        pendingMessageSentRef.current ||
+        !opencode.connected ||
+        ["running", "busy", "retry"].includes(opencode.status.type)
+      ) {
         return;
       }
 
@@ -113,7 +216,9 @@ export const OpenCodePanel = memo(function OpenCodePanel({
           await opencode.sendMessage(pendingMessage);
           onPendingMessageSent?.();
         } catch (error) {
-          console.error("[OpenCode] Error sending pending message:", error);
+          console.error(
+            `[OpenCode] Error sending pending message: ${getOpenCodeErrorMessage(error, "Unknown error")}`,
+          );
         }
       }
     };
@@ -132,12 +237,16 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   }, [opencode]);
 
   const handleNewSession = useCallback(async () => {
+    if (lifecycle.onNewConversation) {
+      lifecycle.onNewConversation();
+      return;
+    }
     const session = await opencode.createSession();
     if (session) {
       await opencode.selectSession(session.id);
       setShowSessionList(false);
     }
-  }, [opencode]);
+  }, [opencode, lifecycle.onNewConversation]);
 
   const _handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -147,14 +256,40 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     [opencode],
   );
 
-  const handleSend = useCallback(async () => {
-    const content = input.trim();
-    if (!content && attachedFiles.length === 0) return;
-    const filesToSend = [...attachedFiles];
-    setInput("");
-    setAttachedFiles([]);
-    await opencode.sendMessage(content, filesToSend.length > 0 ? filesToSend : undefined);
-  }, [input, attachedFiles, opencode]);
+  const transmit = useCallback(
+    async (draft: ChatDraft, steer = false) => {
+      if (!opencode.ready) throw new Error("正在载入连接或历史，请稍后发送。");
+      if (sendingRef.current) throw new Error("上一条消息仍在发送。");
+      const expectedSession = opencode.currentSessionId;
+      sendingRef.current = true;
+      cancelSendRef.current = false;
+      setPreparing(true);
+      setSendError(null);
+      try {
+        await onBeforeSend?.(draft.selection);
+        const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files);
+        if (cancelSendRef.current || expectedSession !== sessionRef.current)
+          throw new Error("发送已取消或对话已切换。");
+        if (!expectedSession) {
+          const created = await opencode.createSession();
+          if (!created) throw new Error("无法建立对话，输入内容已保留。");
+          await registerRef.current?.(created.id);
+        }
+        shouldAutoScrollRef.current = true;
+        const sent = await opencode.sendMessage(
+          withEditorSelection(payload.text, draft.selection),
+          payload.images,
+          steer,
+        );
+        if (!sent) throw new Error("OpenCode 未确认消息，请核对连接状态。");
+        scrollToBottom("auto");
+      } finally {
+        sendingRef.current = false;
+        setPreparing(false);
+      }
+    },
+    [opencode, onBeforeSend, scrollToBottom, directory],
+  );
 
   const handleAnswer = useCallback(
     async (_questionID: string, answers: string[][]) => {
@@ -166,10 +301,13 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       }
       await opencode.answerQuestion(actualQuestionID, answers);
     },
-    [opencode],
+    [opencode.currentQuestion?.id, opencode.answerQuestion],
   );
 
   const handleAbort = useCallback(async () => {
+    cancelSendRef.current = true;
+    if (outboxRef.current?.state.items.length)
+      await outboxRef.current.pause("已停止任务，队列已暂停。").catch(() => {});
     await opencode.abort();
   }, [opencode]);
 
@@ -177,6 +315,126 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     opencode.status.type === "running" ||
     opencode.status.type === "busy" ||
     opencode.status.type === "retry";
+
+  const bridge = useConversationBridge(
+    "opencode",
+    opencode.currentSessionId,
+    directory,
+    opencode.currentSession?.title || "OpenCode",
+    isWorking || preparing,
+    {
+      model: opencode.selectedModel
+        ? { providerID: opencode.selectedModel.providerId, modelID: opencode.selectedModel.modelId }
+        : null,
+      variant: opencode.selectedModel?.variant,
+      agent: opencode.selectedAgent,
+    },
+  );
+  registerRef.current = bridge.register;
+  const bridgeWorking = bridge.snapshot.conversations.some(
+    (session) => session.id === bridge.fullId && Boolean(session.activeJob),
+  );
+  const outbox = useChatOutbox({
+    scope:
+      directory && opencode.currentSessionId
+        ? JSON.stringify(["opencode", directory, opencode.currentSessionId])
+        : null,
+    ready: opencode.ready,
+    busy: isWorking || bridgeWorking || preparing,
+    completion: opencode.completion,
+    deliver: (message) => transmit(message),
+  });
+  outboxRef.current = outbox;
+  const historySnapshot = useMemo(
+    () => ({ messages: opencode.messages, parts: opencode.parts }),
+    [opencode.messages, opencode.parts],
+  );
+  const idleHistory = useIdleTranscript({
+    scope: `opencode:${directory}:${lifecycle.instanceId}:${opencode.currentSessionId}`,
+    active,
+    protectedWork:
+      !opencode.ready ||
+      isWorking ||
+      preparing ||
+      bridgeWorking ||
+      Boolean(opencode.currentQuestion) ||
+      Boolean(input.trim()) ||
+      attachedFiles.length > 0 ||
+      outbox.state.items.length > 0 ||
+      Boolean(lifecycle.incoming),
+    value: historySnapshot,
+    release: opencode.releaseHistory,
+    restore: opencode.restoreHistory,
+  });
+
+  const handleSend = useCallback(async () => {
+    if (sendingRef.current || (!input.trim() && !attachedFiles.length)) return;
+    const draft: ChatDraft = { raw: input, files: [...attachedFiles], selection: editorSelection };
+    try {
+      if ((isWorking || bridgeWorking) && deliveryMode === "queue") await outbox.enqueue(draft);
+      else await transmit(draft, isWorking || bridgeWorking);
+      setInput((current) => (current === draft.raw ? "" : current));
+      setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
+      if (draft.selection) onSelectionSent?.(draft.selection);
+    } catch (cause) {
+      setSendError(getOpenCodeErrorMessage(cause, "发送失败，消息已保留。"));
+    }
+  }, [
+    input,
+    attachedFiles,
+    editorSelection,
+    isWorking,
+    bridgeWorking,
+    deliveryMode,
+    outbox,
+    transmit,
+    onSelectionSent,
+  ]);
+  useEffect(() => {
+    onWorkingChange?.(isWorking || preparing || bridgeWorking);
+  }, [isWorking, preparing, bridgeWorking, onWorkingChange]);
+  useEffect(() => {
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    void listen<{ id: string }>("writer://conversation-updated", ({ payload }) => {
+      if (payload.id === bridge.fullId && opencode.currentSessionId)
+        void opencode.selectSession(opencode.currentSessionId);
+    }).then((unlisten) => {
+      if (cancelled) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [bridge.fullId, opencode.currentSessionId, opencode.selectSession]);
+
+  usePanelLifecycle(
+    lifecycle,
+    {
+      sessionId: opencode.currentSessionId,
+      title: opencode.currentSession?.title || "新 OpenCode 对话",
+      status: opencode.currentQuestion
+        ? "waiting"
+        : isWorking || bridgeWorking || preparing
+          ? "running"
+          : opencode.error || sendError
+            ? "error"
+            : opencode.ready
+              ? "idle"
+              : "connecting",
+      hasDraft: Boolean(input.trim() || attachedFiles.length || attachmentLoading),
+      queued: outbox.state.items.length,
+    },
+    {
+      ready: opencode.ready && Boolean(opencode.selectedModel),
+      busy: isWorking || bridgeWorking,
+      preparing,
+      transmit,
+      enqueue: (draft) => outbox.enqueue(draft),
+      onError: setSendError,
+    },
+  );
 
   // Not connected - show onboarding
   if (!opencode.connected) {
@@ -194,7 +452,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     );
   }
 
-  if (!opencode.currentSessionId || showSessionList) {
+  if (showSessionList) {
     return (
       <div className={`flex h-full flex-col ${className}`}>
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
@@ -219,18 +477,29 @@ export const OpenCodePanel = memo(function OpenCodePanel({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
+          {sendError && (
+            <p role="alert" className="p-2 text-xs text-accent">
+              {sendError}
+            </p>
+          )}
           <SessionList
             sessions={opencode.sessions}
             currentSessionId={opencode.currentSessionId}
             onSelect={(id) => {
-              opencode.selectSession(id);
+              if (lifecycle.onOpenConversation)
+                lifecycle.onOpenConversation(id, opencode.sessions.find((s) => s.id === id)?.title);
+              else void opencode.selectSession(id);
               setShowSessionList(false);
             }}
-            onDelete={opencode.deleteSession}
-            onNewSession={async () => {
-              const s = await opencode.createSession();
-              if (s) setShowSessionList(false);
+            onDelete={async (id) => {
+              if (lifecycle.openSessionIds?.includes(id)) {
+                setSendError("该对话已在标签中打开，请先结束任务并关闭标签，再删除历史。");
+                return;
+              }
+              await opencode.deleteSession(id);
             }}
+            onRename={opencode.renameSession}
+            onNewSession={handleNewSession}
           />
         </div>
       </div>
@@ -240,16 +509,25 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   const currentSession = opencode.sessions.find((s) => s.id === opencode.currentSessionId);
 
   return (
-    <div ref={panelParent} className={`flex h-full flex-col bg-accent-hover/50 ${className}`}>
+    <div
+      data-chat-panel="opencode"
+      className={`flex h-full min-h-0 flex-col overflow-hidden bg-accent-hover/50 ${className}`}
+    >
+      <ConversationBridge bridge={bridge} />
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-background px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2 overflow-hidden">
           <button
             type="button"
-            onClick={() => setShowSessionList(true)}
-            className="flex-shrink-0 text-muted hover:text-foreground transition-colors"
+            onClick={() => {
+              if (lifecycle.onShowHistory) lifecycle.onShowHistory();
+              else setShowSessionList(true);
+            }}
+            className="flex-shrink-0 border border-border px-2 py-1 text-muted hover:text-foreground transition-colors"
+            title="打开历史对话"
+            aria-label="OpenCode 历史对话"
           >
-            <ChevronIcon className="size-4 rotate-90" />
+            <span className="text-xs">历史</span>
           </button>
           <div className="flex flex-col min-w-0">
             <h2 className="text-xs font-medium truncate">{currentSession?.title || "New Chat"}</h2>
@@ -293,41 +571,73 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       {latestTasks && <CollapsibleTasksBar tasks={latestTasks} />}
 
       {/* Content Area */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        <div className="absolute inset-0 flex flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {opencode.messages.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <MessageList
-                messages={opencode.messages}
-                getPartsForMessage={opencode.getPartsForMessage}
-                onFileClick={onFileClick}
-                onAnswer={handleAnswer}
-              />
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="border-t border-border bg-background p-3">
-            <InputArea
-              input={input}
-              setInput={setInput}
-              attachedFiles={attachedFiles}
-              setAttachedFiles={setAttachedFiles}
-              onSend={handleSend}
-              onAbort={handleAbort}
-              isWorking={isWorking}
-              agents={opencode.agents}
-              providers={opencode.providers}
-              selectedAgent={opencode.selectedAgent}
-              selectedModel={opencode.selectedModel}
-              onSelectAgent={opencode.setSelectedAgent}
-              onSelectModel={opencode.setSelectedModel}
+      <div
+        ref={scrollContainerRef}
+        onScroll={updateShouldAutoScroll}
+        data-chat-history="opencode"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+      >
+        <div ref={scrollContentRef}>
+          {idleHistory.sleeping ? (
+            <p role="status">
+              {idleHistory.error || "正在恢复对话历史…"}
+              {idleHistory.error && (
+                <button type="button" onClick={idleHistory.retry}>
+                  重试
+                </button>
+              )}
+            </p>
+          ) : opencode.messages.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <MessageList
+              messages={opencode.messages}
+              getPartsForMessage={opencode.getPartsForMessage}
+              onFileClick={onFileClick}
+              onAnswer={handleAnswer}
             />
-          </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
+
+      <ResizableComposer backend="opencode">
+        {sendError && (
+          <p role="alert" className="mb-2 text-xs text-accent break-words">
+            {sendError}
+          </p>
+        )}
+        <InputArea
+          directory={directory}
+          onAttachmentLoading={setAttachmentLoading}
+          active={active}
+          input={input}
+          setInput={setInput}
+          attachedFiles={attachedFiles}
+          setAttachedFiles={setAttachedFiles}
+          onSend={handleSend}
+          onAbort={handleAbort}
+          isWorking={isWorking || bridgeWorking}
+          isSending={preparing || !opencode.ready}
+          deliveryMode={deliveryMode}
+          deliveryControls={
+            <DeliveryControls
+              mode={deliveryMode}
+              onModeChange={setDeliveryMode}
+              busy={isWorking || bridgeWorking}
+              outbox={outbox}
+            />
+          }
+          editorSelection={editorSelection}
+          onClearSelection={onClearSelection}
+          agents={opencode.agents}
+          providers={opencode.providers}
+          selectedAgent={opencode.selectedAgent}
+          selectedModel={opencode.selectedModel}
+          onSelectAgent={opencode.setSelectedAgent}
+          onSelectModel={opencode.setSelectedModel}
+        />
+      </ResizableComposer>
     </div>
   );
 });

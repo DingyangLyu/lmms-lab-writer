@@ -1,111 +1,138 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
-import { DEFAULT_LATEX_SETTINGS, type LaTeXSettings, type MainFileDetectionResult } from "./types";
-
-const STORAGE_KEY = "latex-settings";
-
-export function useLatexSettings() {
-  const [settings, setSettings] = useState<LaTeXSettings>(() => {
-    if (typeof window === "undefined") {
-      return DEFAULT_LATEX_SETTINGS;
-    }
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type BuildTarget,
+  DEFAULT_LATEX_SETTINGS,
+  type LaTeXSettings,
+  type MainFileDetectionResult,
+  type ProjectBuildConfig,
+} from "./types";
+export function makeBuildTarget(mainFile: string): BuildTarget {
+  const slash = mainFile.lastIndexOf("/");
+  const dir = slash >= 0 ? mainFile.slice(0, slash) : ".";
+  return {
+    id: `target-${crypto.randomUUID()}`,
+    name: mainFile.replace(/\.tex$/i, ""),
+    mainFile,
+    engine: "auto",
+    workDir: dir,
+    outputDir: dir,
+  };
+}
+export function useLatexSettings(projectPath: string | null) {
+  const [config, setConfig] = useState<ProjectBuildConfig>(DEFAULT_LATEX_SETTINGS.config);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedProject, setLoadedProject] = useState<string | null>(null);
+  const projectRef = useRef(projectPath);
+  projectRef.current = projectPath;
+  const serial = useRef(Promise.resolve());
+  const reload = useCallback(async () => {
+    if (!projectPath) return;
+    setLoading(true);
+    setError(null);
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...DEFAULT_LATEX_SETTINGS, ...parsed };
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return DEFAULT_LATEX_SETTINGS;
-  });
-
-  const [detectionResult, setDetectionResult] = useState<MainFileDetectionResult | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-
-  // Persist settings to localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [settings]);
-
-  const updateSettings = useCallback((updates: Partial<LaTeXSettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates }));
-  }, []);
-
-  const setMainFile = useCallback(
-    (mainFile: string | null) => {
-      updateSettings({ mainFile });
-    },
-    [updateSettings],
-  );
-
-  const resetSettings = useCallback(() => {
-    setSettings(DEFAULT_LATEX_SETTINGS);
-  }, []);
-
-  // Detect main file in the project directory
-  const detectMainFile = useCallback(
-    async (projectPath: string): Promise<MainFileDetectionResult | null> => {
-      if (!projectPath) return null;
-
-      setIsDetecting(true);
+      let legacy: string | null = null;
       try {
-        const result = await invoke<MainFileDetectionResult>("latex_detect_main_file", {
-          directory: projectPath,
-          configuredMainFile: settings.mainFile,
-        });
-
-        setDetectionResult(result);
-
-        // Auto-set main file if detection succeeded without user input
-        if (result.main_file && !result.needs_user_input) {
-          setMainFile(result.main_file);
+        legacy = JSON.parse(localStorage.getItem("latex-settings") || "null")?.mainFile ?? null;
+      } catch {
+        /* Ignore an invalid legacy preference. */
+      }
+      const next = await invoke<ProjectBuildConfig>("latex_project_load", {
+        directory: projectPath,
+        legacyMainFile: legacy,
+      });
+      if (projectRef.current === projectPath) {
+        setConfig(next);
+        setLoadedProject(projectPath);
+      }
+    } catch (cause) {
+      if (projectRef.current === projectPath) setError(String(cause));
+    } finally {
+      if (projectRef.current === projectPath) setLoading(false);
+    }
+  }, [projectPath]);
+  useEffect(() => {
+    setConfig(DEFAULT_LATEX_SETTINGS.config);
+    setLoadedProject(null);
+    if (projectPath) void reload();
+  }, [projectPath, reload]);
+  const saveConfig = useCallback(
+    async (next: ProjectBuildConfig) => {
+      if (!projectPath) throw new Error("请先打开项目");
+      setSaving(true);
+      setError(null);
+      const save = serial.current
+        .catch(() => {})
+        .then(() => invoke<void>("latex_project_save", { directory: projectPath, config: next }));
+      serial.current = save;
+      try {
+        await save;
+        if (projectRef.current === projectPath) {
+          setConfig(next);
+          setLoadedProject(projectPath);
         }
-
-        return result;
-      } catch (error) {
-        console.error("Failed to detect main file:", error);
-        return null;
+      } catch (cause) {
+        if (projectRef.current === projectPath) setError(String(cause));
+        throw cause;
       } finally {
-        setIsDetecting(false);
+        if (projectRef.current === projectPath) setSaving(false);
       }
     },
-    [settings.mainFile, setMainFile],
+    [projectPath],
   );
-
-  // Get the effective main file for compilation
-  const getEffectiveMainFile = useCallback(
-    async (projectPath: string): Promise<string | null> => {
-      // If we already have a valid main file configured, check if it exists
-      if (settings.mainFile) {
-        const result = await detectMainFile(projectPath);
-        if (result?.main_file) {
-          return result.main_file;
-        }
-      }
-
-      // Otherwise, try to detect
-      const result = await detectMainFile(projectPath);
-      return result?.main_file || null;
+  const current = loadedProject === projectPath ? config : DEFAULT_LATEX_SETTINGS.config;
+  const activeTarget =
+    current.targets.find((t) => t.id === current.activeTarget) ?? current.targets[0] ?? null;
+  const settings: LaTeXSettings = { mainFile: activeTarget?.mainFile ?? null, config: current };
+  const setMainFile = useCallback(
+    async (mainFile: string | null) => {
+      const existing = config.targets.find((t) => t.mainFile === mainFile);
+      const target = existing || (mainFile ? makeBuildTarget(mainFile) : null);
+      await saveConfig({
+        ...config,
+        activeTarget: target?.id ?? null,
+        targets: target && !existing ? [...config.targets, target] : config.targets,
+      });
     },
-    [settings.mainFile, detectMainFile],
+    [config, saveConfig],
   );
-
+  const updateSettings = useCallback(
+    (updates: Partial<LaTeXSettings>) => {
+      if (updates.config) void saveConfig(updates.config).catch(() => {});
+      else if (updates.mainFile !== undefined) void setMainFile(updates.mainFile).catch(() => {});
+    },
+    [saveConfig, setMainFile],
+  );
+  const detectMainFile = useCallback(
+    async (directory: string): Promise<MainFileDetectionResult> => {
+      const next = await invoke<ProjectBuildConfig>("latex_project_load", {
+        directory,
+        legacyMainFile: null,
+      });
+      const active = next.targets.find((t) => t.id === next.activeTarget) ?? next.targets[0];
+      return {
+        main_file: active?.mainFile ?? null,
+        tex_files: next.targets.map((t) => t.mainFile),
+        detection_method: active ? "configured" : "none",
+        needs_user_input: !active,
+        message: active ? `编译目标：${active.name}` : "请添加编译目标",
+      };
+    },
+    [],
+  );
   return {
     settings,
-    updateSettings,
+    activeTarget,
+    saveConfig,
+    selectTarget: (id: string) => saveConfig({ ...config, activeTarget: id }),
     setMainFile,
-    resetSettings,
-    // Main file detection
+    updateSettings,
+    reload,
+    error,
+    saving,
+    isDetecting: loading || loadedProject !== projectPath,
     detectMainFile,
-    getEffectiveMainFile,
-    detectionResult,
-    isDetecting,
   };
 }

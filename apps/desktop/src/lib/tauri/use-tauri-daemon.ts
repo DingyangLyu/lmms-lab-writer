@@ -51,6 +51,11 @@ const GH_AUTH_POLL_TIMEOUT_MS = 120_000;
 const DEFAULT_GIT_AUTO_FETCH_INTERVAL_MS = 120_000;
 const MIN_GIT_AUTO_FETCH_INTERVAL_MS = 15_000;
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.trim() || fallback;
+}
+
 type TauriDaemonOptions = {
   gitAutoFetchEnabled?: boolean;
   gitAutoFetchIntervalMs?: number;
@@ -253,9 +258,6 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
   const setProject = useCallback(
     async (path: string) => {
-      let isMounted = true;
-
-      setProjectState((s) => ({ ...s, projectPath: path }));
       setOperationState((s) => ({
         ...s,
         isOpeningProject: true,
@@ -264,12 +266,12 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
       try {
         await invoke("set_project_path", { path });
-        if (!isMounted) return;
+
+        setProjectState((s) => ({ ...s, projectPath: path }));
 
         const rawFiles = await invoke<unknown[]>("get_file_tree", {
           dir: path,
         });
-        if (!isMounted) return;
 
         const files = rawFiles.map((f) =>
           convertFileNode(f as Parameters<typeof convertFileNode>[0]),
@@ -283,18 +285,12 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
         refreshGitStatusInternal(path);
       } catch (error) {
-        if (!isMounted) return;
         console.error("Failed to set project:", error);
         setError(String(error), "open project");
+        throw error;
       } finally {
-        if (isMounted) {
-          setOperationState((s) => ({ ...s, isOpeningProject: false }));
-        }
+        setOperationState((s) => ({ ...s, isOpeningProject: false }));
       }
-
-      return () => {
-        isMounted = false;
-      };
     },
     [setError, refreshGitStatusInternal],
   );
@@ -313,6 +309,13 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
           console.warn(`File not found: ${relativePath}`);
           throw new Error(`FILE_NOT_FOUND:${relativePath}`);
         }
+        if (
+          errorStr.includes("stream did not contain valid UTF-8") ||
+          errorStr.includes("invalid utf-8") ||
+          errorStr.includes("invalid UTF-8")
+        ) {
+          throw new Error(`BINARY_FILE:${relativePath}`);
+        }
         console.error("Failed to read file:", error);
         throw error;
       }
@@ -322,7 +325,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
   const writeFile = useCallback(
     async (relativePath: string, content: string) => {
-      if (!projectState.projectPath) return;
+      if (!projectState.projectPath) throw new Error("No project open");
 
       try {
         const fullPath = resolvePathWithinProject(projectState.projectPath, relativePath);
@@ -334,6 +337,7 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       } catch (error) {
         console.error("Failed to write file:", error);
         setError(String(error), "save file");
+        throw error;
       }
     },
     [projectState.projectPath, setError],
@@ -524,8 +528,9 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
         await refreshGitStatus();
         return { success: true };
       } catch (error) {
-        console.error("Failed to git commit:", error);
-        return { success: false, error: String(error) };
+        const errorMessage = getErrorMessage(error, "Git commit failed without output");
+        console.error("Failed to git commit:", errorMessage);
+        return { success: false, error: errorMessage };
       }
     },
     [projectState.projectPath, refreshGitStatus],
