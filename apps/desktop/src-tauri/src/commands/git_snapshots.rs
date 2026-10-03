@@ -163,8 +163,12 @@ pub struct SnapshotResult {
 }
 
 #[tauri::command]
-pub async fn git_create_snapshot(project: String) -> Result<SnapshotResult, String> {
-    create_snapshot(&project, None, &[]).await
+pub async fn git_create_snapshot(
+    project: String,
+    message: Option<String>,
+) -> Result<SnapshotResult, String> {
+    let label = message.filter(|m| !m.trim().is_empty() && m.len() <= 200);
+    create_snapshot(&project, label.as_deref(), &[]).await
 }
 /// Explicit annotation versions share the same private ref and leave HEAD/index intact.
 pub async fn create_snapshot(
@@ -450,7 +454,7 @@ mod tests {
         tokio::fs::write(format!("{project}/.lmms_lab_writer/backup"), "noise")
             .await
             .unwrap();
-        let saved = git_create_snapshot(project.clone()).await.unwrap();
+        let saved = git_create_snapshot(project.clone(), None).await.unwrap();
         assert!(saved.created);
         assert_eq!(ref_hash(&project, "HEAD").await, head);
         assert_eq!(
@@ -471,11 +475,21 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(files.trim(), "main.tex");
-        assert!(!git_create_snapshot(project.clone()).await.unwrap().created);
+        assert!(
+            !git_create_snapshot(project.clone(), None)
+                .await
+                .unwrap()
+                .created
+        );
         tokio::fs::remove_file(format!("{project}/main.tex"))
             .await
             .unwrap();
-        assert!(git_create_snapshot(project.clone()).await.unwrap().created);
+        assert!(
+            git_create_snapshot(project.clone(), None)
+                .await
+                .unwrap()
+                .created
+        );
         assert_eq!(
             git_snapshot_history(project.clone()).await.unwrap().len(),
             2
@@ -494,7 +508,7 @@ mod tests {
             .await
             .unwrap();
         assert!(!git_snapshot_status(project.clone()).await.unwrap().is_repo);
-        let first = git_create_snapshot(project.clone()).await.unwrap();
+        let first = git_create_snapshot(project.clone(), None).await.unwrap();
         assert!(first.created);
         assert!(ref_hash(&project, "HEAD").await.is_none());
         assert_eq!(
@@ -515,7 +529,7 @@ mod tests {
             .await
             .unwrap();
         assert!(!git_snapshot_status(project.clone()).await.unwrap().is_repo);
-        let saved = git_create_snapshot(project.clone()).await.unwrap();
+        let saved = git_create_snapshot(project.clone(), None).await.unwrap();
         assert!(saved.created);
         assert_eq!(
             git_snapshot_file(project.clone(), saved.hash, "main.tex".into())

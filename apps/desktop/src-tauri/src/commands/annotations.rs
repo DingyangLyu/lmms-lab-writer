@@ -809,7 +809,7 @@ mod version_tests {
         assert!(serde_json::from_str::<Vec<Annotation>>(&saved).unwrap()[0].resolved);
         // Periodic snapshots must retain notes even with .writer/ ignored by ordinary Git.
         assert!(
-            !super::super::git_snapshots::git_create_snapshot(project.clone())
+            !super::super::git_snapshots::git_create_snapshot(project.clone(), None)
                 .await
                 .unwrap()
                 .created
