@@ -98,7 +98,9 @@ function asOptionalString(value) {
 
 function asStringArray(value) {
   if (!Array.isArray(value)) return undefined;
-  const items = value.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim());
+  const items = value
+    .filter((item) => typeof item === "string" && item.trim())
+    .map((item) => item.trim());
   return items.length > 0 ? items : undefined;
 }
 
@@ -139,7 +141,8 @@ async function callPerplexitySearch(args) {
   const body = {
     query,
     max_results: asPositiveInt(args.maxResults ?? args.max_results, 8, 1, 20),
-    search_context_size: asOptionalString(args.searchContextSize ?? args.search_context_size) ?? "medium",
+    search_context_size:
+      asOptionalString(args.searchContextSize ?? args.search_context_size) ?? "medium",
     country: asOptionalString(args.country),
     search_domain_filter: asStringArray(args.searchDomainFilter ?? args.search_domain_filter),
     search_language_filter: asStringArray(args.searchLanguageFilter ?? args.search_language_filter),

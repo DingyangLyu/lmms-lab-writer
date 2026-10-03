@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { canClose, focusConversation, newTab, restoreWorkspace, updateConversation } from "./workspace";
+import {
+  canClose,
+  focusConversation,
+  newTab,
+  restoreWorkspace,
+  updateConversation,
+} from "./workspace";
 
 describe("concurrent conversation identity", () => {
   it("focuses the last conversation for a backend without creating a replacement", () => {
     const codex = newTab("codex", "codex-1", "Codex research");
     const openCode = newTab("opencode", "open-1", "OpenCode research");
-    const state = { tabs: [codex, openCode], activeId: openCode.id, lastActive: { codex: codex.id, opencode: openCode.id } };
+    const state = {
+      tabs: [codex, openCode],
+      activeId: openCode.id,
+      lastActive: { codex: codex.id, opencode: openCode.id },
+    };
     const next = focusConversation(state, "codex");
     expect(next?.activeId).toBe(codex.id);
     expect(next?.tabs).toHaveLength(2);
