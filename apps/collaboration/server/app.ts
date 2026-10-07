@@ -24,22 +24,22 @@ import {
   verifyPassword,
 } from "./auth";
 import { Collaboration } from "./collaboration";
+import { sql, uniqueViolation } from "./db";
 import { projectJobs, runnerRequest } from "./jobs";
+import { Store, type User } from "./store";
 import {
   checked,
   decodeText,
   digest,
-  type FileRow,
   fail,
   HttpError,
   isTextPath,
   type Role,
-  Store,
+  roles,
   safePath,
   textDoc,
-  type User,
   uid,
-} from "./store";
+} from "./util";
 
 type Body = Record<string, unknown>;
 const str = (body: Body, key: string, max = 10000) =>
@@ -69,8 +69,6 @@ async function jsonBody(req: IncomingMessage): Promise<Body> {
     fail(400, "请求必须为 JSON 对象");
   return value as Body;
 }
-const uniqueViolation = (error: unknown) =>
-  error instanceof Error && /UNIQUE constraint failed/.test(error.message);
 function json(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -79,7 +77,7 @@ function json(res: ServerResponse, data: unknown, status = 200) {
   res.end(JSON.stringify(data));
 }
 function roleInput(value: string): Role {
-  if (!["owner", "editor", "commenter", "viewer"].includes(value)) fail(400, "无效角色");
+  if (!roles.includes(value as Role)) fail(400, "无效角色");
   return value as Role;
 }
 const publicUser = (u: User) => ({ id: u.id, name: u.username, admin: !!u.admin });
@@ -95,12 +93,30 @@ type Proposal = {
   created: number;
 };
 type SnapshotData = {
-  files: Array<Omit<FileRow, "state"> & { state: string }>;
-  comments: Body[];
-  replies: Body[];
+  files: Array<{
+    id: string;
+    path: string;
+    state: string;
+    binary: boolean | number;
+    deleted: boolean | number;
+  }>;
+};
+type Comment = {
+  id: string;
+  file: string;
+  author: string;
+  authorName: string;
+  quote: string;
+  start: string;
+  end: string;
+  body: string;
+  resolved: boolean;
+  created: number;
+  updated: number;
 };
 export type Options = {
-  directory: string;
+  /** `postgres://…` for production, `pglite:<dir>` or `pglite:memory` for tests and trials. */
+  databaseUrl: string;
   adminUser?: string;
   adminPassword?: string;
   host?: string;
@@ -109,13 +125,19 @@ export type Options = {
   staticDirectory?: string;
 };
 export async function createWriterServer(options: Options) {
-  const store = new Store(options.directory);
-  await bootstrap(store, options.adminUser ?? "", options.adminPassword ?? "");
+  const store = await Store.open(options.databaseUrl);
+  try {
+    await bootstrap(store, options.adminUser ?? "", options.adminPassword ?? "");
+  } catch (error) {
+    await store.close();
+    throw error;
+  }
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
   const attempts = new Map<string, { at: number; count: number }>();
   // Unknown usernames still pay the scrypt cost, so login timing does not reveal accounts.
   const decoy = await passwordHash(randomBytes(16).toString("hex"));
+  const db = store.db;
   const server = createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -130,7 +152,10 @@ export async function createWriterServer(options: Options) {
       const path = url.pathname;
       if (!["GET", "HEAD"].includes(method) && !allowedOrigin(req.headers.origin, origin))
         fail(403, "请求来源不匹配");
-      if (path === "/api/health") return json(res, { ok: true });
+      if (path === "/api/health") {
+        await db.row(sql`SELECT 1`);
+        return json(res, { ok: true });
+      }
       if (["/api/login", "/api/join"].includes(path) && method === "POST") {
         const ip = req.socket.remoteAddress ?? "unknown",
           old = attempts.get(ip),
@@ -144,10 +169,12 @@ export async function createWriterServer(options: Options) {
         const body = await jsonBody(req),
           username = str(body, "username", 80),
           password = str(body, "password", 200);
-        const user = store.get<User>("SELECT * FROM users WHERE username=?", username);
+        const user = await db.row<User>(
+          sql`SELECT id, username, password, admin FROM users WHERE username=${username}`,
+        );
         const valid = await verifyPassword(password, user?.password ?? decoy);
         if (!user || !valid) fail(401, "用户名或密码错误");
-        session(store, user, res, origin.startsWith("https:"));
+        await session(store, user, res, origin.startsWith("https:"));
         return json(res, publicUser(user));
       }
       if (path === "/api/join" && method === "POST") {
@@ -156,52 +183,47 @@ export async function createWriterServer(options: Options) {
           username = str(body, "username", 80),
           password = str(body, "password", 200);
         if (!/^[\p{L}\p{N}_ .-]{2,80}$/u.test(username)) fail(400, "用户名格式无效");
-        const invitation = store.get<{
+        const invitation = await db.row<{
           project: string;
           role: Role;
           expires: number;
-          used: number;
-        }>("SELECT * FROM invites WHERE token=?", digest(token));
+          used: boolean;
+        }>(sql`SELECT project, role, expires, used FROM invites WHERE token=${digest(token)}`);
         if (!invitation || invitation.used || invitation.expires < Date.now())
           fail(410, "邀请已失效");
-        let user = store.get<User>("SELECT * FROM users WHERE username=?", username);
-        if (user && !(await verifyPassword(password, user.password)))
+        const existing = await db.row<User>(
+          sql`SELECT id, username, password, admin FROM users WHERE username=${username}`,
+        );
+        if (existing && !(await verifyPassword(password, existing.password)))
           fail(401, "该用户名已存在，请使用原密码");
-        const created = user
-          ? null
-          : { id: uid(), username, password: await passwordHash(password), admin: 0 };
-        store.transaction(() => {
-          const claimed = store.run(
-            "UPDATE invites SET used=1 WHERE token=? AND used=0 AND expires>?",
-            digest(token),
-            Date.now(),
-          );
-          if (!claimed.changes) fail(410, "邀请已使用");
-          if (created)
-            store.run(
-              "INSERT INTO users VALUES(?,?,?,0)",
-              created.id,
-              created.username,
-              created.password,
+        const user: User = existing ?? {
+          id: uid(),
+          username,
+          password: await passwordHash(password),
+          admin: false,
+        };
+        try {
+          await db.transaction(async (tx) => {
+            const claimed = await tx.run(
+              sql`UPDATE invites SET used=true WHERE token=${digest(token)} AND NOT used AND expires>${Date.now()}`,
             );
-          user ??= created as User;
-          if (
-            !store.get(
-              "SELECT role FROM members WHERE project=? AND user=?",
-              invitation.project,
-              user.id,
-            )
-          )
-            store.run(
-              "INSERT INTO members VALUES(?,?,?)",
-              invitation.project,
-              user.id,
-              invitation.role,
+            if (!claimed) fail(410, "邀请已使用");
+            if (!existing)
+              await tx.run(
+                sql`INSERT INTO users(id, username, password, admin, created)
+                    VALUES(${user.id}, ${username}, ${user.password}, false, ${Date.now()})`,
+              );
+            await tx.run(
+              sql`INSERT INTO members(project, user_id, role) VALUES(${invitation.project}, ${user.id}, ${invitation.role})
+                  ON CONFLICT (project, user_id) DO NOTHING`,
             );
-          store.audit(invitation.project, user.id, "member.join", {});
-        });
-        if (!user) fail(500, "无法创建账号");
-        session(store, user, res, origin.startsWith("https:"));
+            await store.audit(invitation.project, user.id, "member.join", {}, tx);
+          });
+        } catch (error) {
+          if (uniqueViolation(error)) fail(409, "该用户名刚被注册，请换一个");
+          throw error;
+        }
+        await session(store, user, res, origin.startsWith("https:"));
         return json(res, publicUser(user));
       }
       if (!path.startsWith("/api/")) {
@@ -232,25 +254,25 @@ export async function createWriterServer(options: Options) {
         return;
       }
       if (path.startsWith("/api/runner/") && method === "POST")
-        return json(res, runnerRequest(store, collab, req, path, await jsonBody(req)));
-      const user = userFor(store, req);
+        return json(res, await runnerRequest(store, collab, req, path, await jsonBody(req)));
+      const user = await userFor(store, req);
       if (path === "/api/me") return json(res, publicUser(user));
       if (path === "/api/logout" && method === "POST") {
-        store.run("DELETE FROM sessions WHERE token=?", digest(cookie(req)));
+        await db.run(sql`DELETE FROM sessions WHERE token=${digest(cookie(req))}`);
         res.setHeader(
           "Set-Cookie",
           "writer_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
         );
-        for (const p of collab.peers) if (p.user.id === user.id) p.socket.close(1008);
+        collab.disconnectUser(user.id, "已退出登录");
         return json(res, { ok: true });
       }
       if (path === "/api/projects") {
         if (method === "GET")
           return json(
             res,
-            store.all(
-              "SELECT p.*,m.role FROM projects p JOIN members m ON p.id=m.project WHERE m.user=? ORDER BY p.created DESC",
-              user.id,
+            await db.rows(
+              sql`SELECT p.id, p.name, p.created, m.role FROM projects p JOIN members m ON p.id=m.project
+                  WHERE m.user_id=${user.id} ORDER BY p.created DESC`,
             ),
           );
         if (method === "POST") {
@@ -258,9 +280,13 @@ export async function createWriterServer(options: Options) {
             name = str(body, "name", 120).trim();
           if (!name) fail(400, "请填写项目名");
           const id = uid();
-          store.transaction(() => {
-            store.run("INSERT INTO projects VALUES(?,?,?)", id, name, Date.now());
-            store.run("INSERT INTO members VALUES(?,?,?)", id, user.id, "owner");
+          await db.transaction(async (tx) => {
+            await tx.run(
+              sql`INSERT INTO projects(id, name, created) VALUES(${id}, ${name}, ${Date.now()})`,
+            );
+            await tx.run(
+              sql`INSERT INTO members(project, user_id, role) VALUES(${id}, ${user.id}, 'owner')`,
+            );
           });
           return json(res, { id, name, role: "owner" }, 201);
         }
@@ -269,18 +295,18 @@ export async function createWriterServer(options: Options) {
       if (!route?.[1]) fail(404, "接口不存在");
       const project = route[1],
         rest = route[2] ?? "",
-        role = store.require(project, user.id);
+        role = await store.require(project, user.id);
       const edit = () => store.require(project, user.id, "edit"),
         owner = () => store.require(project, user.id, "owner");
       if (!rest && method === "GET")
         return json(res, {
-          ...store.get<Body>("SELECT * FROM projects WHERE id=?", project),
+          ...(await db.row<Body>(sql`SELECT id, name, created FROM projects WHERE id=${project}`)),
           role,
         });
       if (/^(jobs|runners)(\/|$)/.test(rest))
         return json(
           res,
-          projectJobs(
+          await projectJobs(
             store,
             collab,
             project,
@@ -291,38 +317,35 @@ export async function createWriterServer(options: Options) {
             method === "GET" ? {} : await jsonBody(req),
           ),
         );
-      if (rest === "members") {
-        if (method === "GET")
-          return json(
-            res,
-            store.all(
-              "SELECT u.id,u.username,m.role FROM members m JOIN users u ON u.id=m.user WHERE m.project=?",
-              project,
-            ),
-          );
-      }
+      if (rest === "members" && method === "GET")
+        return json(
+          res,
+          await db.rows(
+            sql`SELECT u.id, u.username, m.role FROM members m JOIN users u ON u.id=m.user_id
+                WHERE m.project=${project} ORDER BY u.username`,
+          ),
+        );
       if (rest.startsWith("members/") && method === "DELETE") {
-        owner();
+        await owner();
         const target = rest.slice(8);
         if (target === user.id) fail(400, "不能撤销自己的所有者权限");
-        store.run("DELETE FROM members WHERE project=? AND user=?", project, target);
+        await db.transaction(async (tx) => {
+          await tx.run(sql`DELETE FROM members WHERE project=${project} AND user_id=${target}`);
+          await store.audit(project, user.id, "member.revoke", { user: target }, tx);
+        });
         collab.revoke(project, target);
-        store.audit(project, user.id, "member.revoke", { user: target });
         collab.changed(project);
         return json(res, { ok: true });
       }
       if (rest === "invite" && method === "POST") {
-        owner();
+        await owner();
         const body = await jsonBody(req),
-          role = roleInput(str(body, "role"));
-        if (role === "owner") fail(400, "邀请不能授予所有者角色");
+          invited = roleInput(str(body, "role"));
+        if (invited === "owner") fail(400, "邀请不能授予所有者角色");
         const token = randomBytes(32).toString("hex");
-        store.run(
-          "INSERT INTO invites VALUES(?,?,?,?,0)",
-          digest(token),
-          project,
-          role,
-          Date.now() + 7 * 86400000,
+        await db.run(
+          sql`INSERT INTO invites(token, project, role, expires)
+              VALUES(${digest(token)}, ${project}, ${invited}, ${Date.now() + 7 * 86400000})`,
         );
         return json(res, { token, url: `${origin}/?invite=${token}`, expiresInDays: 7 });
       }
@@ -330,13 +353,13 @@ export async function createWriterServer(options: Options) {
         if (method === "GET")
           return json(
             res,
-            store.all(
-              "SELECT id,path,binary,revision FROM files WHERE project=? AND deleted=0 ORDER BY path",
-              project,
+            await db.rows(
+              sql`SELECT id, path, is_binary AS "binary", revision FROM files
+                  WHERE project=${project} AND NOT deleted ORDER BY path`,
             ),
           );
         if (method === "POST") {
-          edit();
+          await edit();
           const body = await jsonBody(req),
             path = safePath(str(body, "path", 240));
           const binary = !isTextPath(path);
@@ -352,52 +375,48 @@ export async function createWriterServer(options: Options) {
             d.destroy();
           }
           if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
-          const limits = store.get<{ count: number; bytes: number }>(
-            "SELECT count(*) as count,coalesce(sum(length(state)),0) as bytes FROM files WHERE project=?",
-            project,
+          const limits = await db.row<{ count: number; bytes: number }>(
+            sql`SELECT count(*) AS count, coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project}`,
           );
           if ((limits?.count ?? 0) >= 2000 || (limits?.bytes ?? 0) + bytes.length > 100_000_000)
             fail(413, "项目超过 2000 个文件或 100 MB");
           const id = uid();
           try {
-            store.transaction(() => {
-              store.releasePath(project, path);
-              store.run(
-                "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,?)",
-                id,
-                project,
-                path,
-                bytes,
-                binary ? 1 : 0,
+            await db.transaction(async (tx) => {
+              await store.releasePath(project, path, tx);
+              await tx.run(
+                sql`INSERT INTO files(id, project, path, state, is_binary) VALUES(${id}, ${project}, ${path}, ${bytes}, ${binary})`,
               );
+              await store.audit(project, user.id, "file.create", { id, path }, tx);
             });
           } catch (error) {
             if (uniqueViolation(error)) fail(409, "同名文件已存在，请在编辑器中更新");
             throw error;
           }
-          store.audit(project, user.id, "file.create", { id, path });
           collab.changed(project);
           return json(res, { id, path, binary, revision: 1 }, 201);
         }
       }
-      const fileRoute = /^files\/([^/]+)(?:\/(.*))?$/.exec(rest);
+      const fileRoute = /^files\/([^/]+)$/.exec(rest);
       if (fileRoute?.[1]) {
-        const file = store.file(project, fileRoute[1]);
-        if (method === "GET" && !fileRoute[2])
+        const file = await store.fileMeta(project, fileRoute[1]);
+        if (method === "GET") {
+          const state = await store.fileState(file.id);
           return json(res, {
             id: file.id,
             path: file.path,
-            binary: !!file.binary,
+            binary: file.binary,
             revision: file.revision,
             ...(file.binary
-              ? { base64: Buffer.from(file.state).toString("base64") }
-              : { content: decodeText(file.state) }),
+              ? { base64: Buffer.from(state).toString("base64") }
+              : { content: decodeText(state) }),
           });
+        }
         if (method === "PUT") {
-          edit();
+          await edit();
           if (file.binary) fail(400, "二进制文件请上传为新版本文件名");
           const body = await jsonBody(req);
-          collab.replace(
+          await collab.replace(
             project,
             file.id,
             str(body, "expected", 2_000_000),
@@ -407,20 +426,22 @@ export async function createWriterServer(options: Options) {
           return json(res, { ok: true });
         }
         if (method === "PATCH") {
-          edit();
+          await edit();
           const body = await jsonBody(req);
           const path = safePath(str(body, "path", 240));
-          if (isTextPath(path) === !!file.binary)
+          if (isTextPath(path) === file.binary)
             fail(400, "重命名不能改变文本／二进制文件类型，请上传为新文件");
           try {
-            store.transaction(() => {
-              store.releasePath(project, path);
-              store.run("UPDATE files SET path=? WHERE id=?", path, file.id);
-              store.audit(project, user.id, "file.rename", {
-                file: file.id,
-                from: file.path,
-                path,
-              });
+            await db.transaction(async (tx) => {
+              await store.releasePath(project, path, tx);
+              await tx.run(sql`UPDATE files SET path=${path} WHERE id=${file.id}`);
+              await store.audit(
+                project,
+                user.id,
+                "file.rename",
+                { file: file.id, from: file.path, path },
+                tx,
+              );
             });
           } catch (error) {
             if (uniqueViolation(error)) fail(409, "目标路径已有文件");
@@ -430,20 +451,26 @@ export async function createWriterServer(options: Options) {
           return json(res, { ok: true });
         }
         if (method === "DELETE") {
-          edit();
-          store.snapshot(project, user.id, "删除文件前");
-          store.transaction(() => {
-            store.run("UPDATE files SET deleted=1 WHERE id=?", file.id);
-            store.audit(project, user.id, "file.delete", { file: file.id, path: file.path });
+          await edit();
+          await db.transaction(async (tx) => {
+            await store.snapshot(project, user.id, "删除文件前", false, tx);
+            await tx.run(sql`UPDATE files SET deleted=true WHERE id=${file.id}`);
+            await store.audit(
+              project,
+              user.id,
+              "file.delete",
+              { file: file.id, path: file.path },
+              tx,
+            );
           });
-          for (const p of collab.peers) if (p.file === file.id) p.socket.close(1008, "文件已删除");
+          collab.closeFile(file.id, "文件已删除");
           collab.changed(project);
           return json(res, { ok: true });
         }
       }
-      if (rest === "sources" && method === "GET") return json(res, store.textFiles(project));
+      if (rest === "sources" && method === "GET") return json(res, await store.textFiles(project));
       if (rest === "doi" && method === "POST") {
-        edit();
+        await edit();
         const body = await jsonBody(req),
           doi = checked(() => normalizeDoi(str(body, "doi", 300)));
         const response = await fetch(
@@ -460,25 +487,25 @@ export async function createWriterServer(options: Options) {
         return json(res, { bibtex: data });
       }
       if (rest === "bibliography/import" && method === "POST") {
-        edit();
+        await edit();
         const body = await jsonBody(req),
-          file = store.file(project, str(body, "file"));
+          file = await store.fileMeta(project, str(body, "file"));
         if (file.binary || !file.path.endsWith(".bib")) fail(400, "请选择 BibTeX 文件");
-        const current = decodeText(file.state);
+        const current = await collab.text(project, file.id);
         if (current !== str(body, "expected", 2_000_000)) fail(409, "文献库已有新的修改");
         const result = checked(() => importBibliography(current, str(body, "bibtex", 2_000_000)));
         if (!result.added)
           return json(res, { added: 0, skipped: result.skipped, renamed: result.renamed });
-        store.snapshot(project, user.id, "导入文献前");
-        collab.replace(project, file.id, current, result.content, user.id);
+        await store.snapshot(project, user.id, "导入文献前");
+        await collab.replace(project, file.id, current, result.content, user.id);
         return json(res, { added: result.added, skipped: result.skipped, renamed: result.renamed });
       }
       if (rest === "bibliography/rename" && method === "POST") {
-        edit();
+        await edit();
         const body = await jsonBody(req),
           from = str(body, "from", 150),
           to = str(body, "to", 150);
-        const files = store.textFiles(project);
+        const files = await store.textFiles(project);
         const plans = checked(() =>
           files
             .map((f) => ({
@@ -492,8 +519,8 @@ export async function createWriterServer(options: Options) {
             .filter((f) => f.content !== f.next),
         );
         if (!plans.length) return json(res, { files: 0 });
-        store.snapshot(project, user.id, "重命名文献键前");
-        collab.replaceMany(
+        await store.snapshot(project, user.id, "重命名文献键前");
+        await collab.replaceMany(
           project,
           plans.map((p) => ({ file: p.id, expected: p.content, content: p.next })),
           user.id,
@@ -501,28 +528,30 @@ export async function createWriterServer(options: Options) {
         return json(res, { files: plans.length });
       }
       if (rest === "comments") {
-        if (method === "GET")
+        if (method === "GET") {
+          const comments = await db.rows<Comment>(
+            sql`SELECT c.id, c.file, c.author, u.username AS "authorName", c.quote, c.start_pos AS start,
+                       c.end_pos AS "end", c.body, c.resolved, c.created, c.updated
+                FROM comments c JOIN users u ON c.author=u.id
+                WHERE c.project=${project} ORDER BY c.created DESC`,
+          );
+          const replies = await db.rows<{ comment: string }>(
+            sql`SELECT r.id, r.comment, r.author, u.username AS "authorName", r.body, r.created
+                FROM replies r JOIN comments c ON r.comment=c.id JOIN users u ON r.author=u.id
+                WHERE c.project=${project} ORDER BY r.created`,
+          );
           return json(
             res,
-            store
-              .all<Body>(
-                "SELECT c.*,u.username AS authorName FROM comments c JOIN users u ON c.author=u.id WHERE c.project=? ORDER BY c.created DESC",
-                project,
-              )
-              .map((c) => ({
-                ...c,
-                replies: store.all(
-                  "SELECT r.*,u.username AS authorName FROM replies r JOIN users u ON r.author=u.id WHERE r.comment=? ORDER BY r.created",
-                  c.id as string,
-                ),
-              })),
+            comments.map((c) => ({ ...c, replies: replies.filter((r) => r.comment === c.id) })),
           );
+        }
         if (method === "POST") {
-          store.require(project, user.id, "comment");
+          await store.require(project, user.id, "comment");
           const b = await jsonBody(req),
-            file = store.file(project, str(b, "file")),
+            file = await store.file(project, str(b, "file")),
             start = str(b, "start", 10000),
-            end = str(b, "end", 10000);
+            end = str(b, "end", 10000),
+            quote = str(b, "quote", 20000);
           if (file.binary) fail(400, "请选择源码段落批注");
           const d = new Y.Doc();
           Y.applyUpdate(d, file.state);
@@ -538,29 +567,20 @@ export async function createWriterServer(options: Options) {
               );
             if (!a || !z || a.type !== selectedText || z.type !== a.type || a.index >= z.index)
               fail(409, "选区已失效，请重新选择");
-            if (selectedText.toString().slice(a.index, z.index) !== str(b, "quote", 20000))
+            if (selectedText.toString().slice(a.index, z.index) !== quote)
               fail(409, "选文已被修改，请核对后重新批注");
           } finally {
             d.destroy();
           }
           const id = uid(),
-            body = str(b, "body").trim();
-          if (!body) fail(400, "批注不能为空");
-          store.transaction(() => {
-            store.run(
-              "INSERT INTO comments VALUES(?,?,?,?,?,?,?,?,0,?,?)",
-              id,
-              project,
-              file.id,
-              user.id,
-              str(b, "quote", 20000),
-              start,
-              end,
-              body,
-              Date.now(),
-              Date.now(),
+            text = str(b, "body").trim();
+          if (!text) fail(400, "批注不能为空");
+          await db.transaction(async (tx) => {
+            await tx.run(
+              sql`INSERT INTO comments(id, project, file, author, quote, start_pos, end_pos, body, resolved, created, updated)
+                  VALUES(${id}, ${project}, ${file.id}, ${user.id}, ${quote}, ${start}, ${end}, ${text}, false, ${Date.now()}, ${Date.now()})`,
             );
-            store.audit(project, user.id, "comment.create", { id, file: file.id });
+            await store.audit(project, user.id, "comment.create", { id, file: file.id }, tx);
           });
           collab.changed(project);
           return json(res, { id }, 201);
@@ -568,42 +588,37 @@ export async function createWriterServer(options: Options) {
       }
       const commentRoute = /^comments\/([^/]+)(?:\/(reply))?$/.exec(rest);
       if (commentRoute?.[1]) {
-        store.require(project, user.id, "comment");
+        await store.require(project, user.id, "comment");
         const comment =
-          store.get<Body>(
-            "SELECT * FROM comments WHERE project=? AND id=?",
-            project,
-            commentRoute[1],
-          ) ?? fail(404, "批注不存在");
+          (await db.row<{ id: string; author: string }>(
+            sql`SELECT id, author FROM comments WHERE project=${project} AND id=${commentRoute[1]}`,
+          )) ?? fail(404, "批注不存在");
         const body = await jsonBody(req);
         if (method === "POST" && commentRoute[2] === "reply") {
           const text = str(body, "body").trim();
           if (!text) fail(400, "回复不能为空");
-          store.transaction(() => {
-            store.run(
-              "INSERT INTO replies VALUES(?,?,?,?,?)",
-              uid(),
-              comment.id as string,
-              user.id,
-              text,
-              Date.now(),
+          await db.transaction(async (tx) => {
+            await tx.run(
+              sql`INSERT INTO replies(id, comment, author, body, created)
+                  VALUES(${uid()}, ${comment.id}, ${user.id}, ${text}, ${Date.now()})`,
             );
-            store.audit(project, user.id, "comment.reply", { id: comment.id });
+            await store.audit(project, user.id, "comment.reply", { id: comment.id }, tx);
           });
-        } else if (method === "PATCH") {
+        } else if (method === "PATCH" && !commentRoute[2]) {
           if (comment.author !== user.id && !["owner", "editor"].includes(role))
             fail(403, "只有作者或编辑者可以更改批注状态");
-          const resolved = body.resolved === true ? 1 : 0;
-          store.transaction(() => {
-            store.run(
-              "UPDATE comments SET resolved=?,updated=? WHERE id=?",
-              resolved,
-              Date.now(),
-              comment.id as string,
+          const resolved = body.resolved === true;
+          await db.transaction(async (tx) => {
+            await tx.run(
+              sql`UPDATE comments SET resolved=${resolved}, updated=${Date.now()} WHERE id=${comment.id}`,
             );
-            store.audit(project, user.id, resolved ? "comment.resolve" : "comment.reopen", {
-              id: comment.id,
-            });
+            await store.audit(
+              project,
+              user.id,
+              resolved ? "comment.resolve" : "comment.reopen",
+              { id: comment.id },
+              tx,
+            );
           });
         } else fail(405, "不支持的操作");
         collab.changed(project);
@@ -613,43 +628,41 @@ export async function createWriterServer(options: Options) {
         if (method === "GET")
           return json(
             res,
-            store.all(
-              "SELECT id,label,author,created,manual FROM snapshots WHERE project=? ORDER BY created DESC LIMIT 100",
-              project,
+            await db.rows(
+              sql`SELECT id, label, author, created, manual FROM snapshots
+                  WHERE project=${project} ORDER BY created DESC LIMIT 100`,
             ),
           );
         if (method === "POST") {
-          edit();
+          await edit();
           const body = await jsonBody(req);
           const label =
             typeof body.label === "string" && body.label.trim()
               ? str(body, "label", 200).trim()
               : "手动版本";
-          const id = store.snapshot(project, user.id, label, true);
+          const id = await store.snapshot(project, user.id, label, true);
           collab.changed(project);
           return json(res, { id }, 201);
         }
       }
       const restore = /^snapshots\/([^/]+)\/restore$/.exec(rest);
       if (restore?.[1] && method === "POST") {
-        owner();
+        await owner();
         const body = await jsonBody(req),
           fileId = str(body, "file"),
           expected = str(body, "expected", 2_000_000);
         const saved =
-          store.get<{ data: string }>(
-            "SELECT data FROM snapshots WHERE id=? AND project=?",
-            restore[1],
-            project,
-          ) ?? fail(404, "版本不存在");
+          (await db.row<{ data: string }>(
+            sql`SELECT data FROM snapshots WHERE id=${restore[1]} AND project=${project}`,
+          )) ?? fail(404, "版本不存在");
         const snap = JSON.parse(saved.data) as SnapshotData;
         const old =
           snap.files.find((f) => f.id === fileId && !f.binary && !f.deleted) ??
           fail(404, "该版本不含此文档");
-        const current = store.file(project, fileId);
+        const current = await store.fileMeta(project, fileId);
         if (current.binary) fail(400, "只支持恢复文本");
-        store.snapshot(project, user.id, "恢复文档前");
-        collab.replace(
+        await store.snapshot(project, user.id, "恢复文档前");
+        await collab.replace(
           project,
           fileId,
           expected,
@@ -659,20 +672,19 @@ export async function createWriterServer(options: Options) {
         return json(res, { ok: true });
       }
       if (rest === "export" && method === "GET") {
-        const files = store.all<FileRow>(
-          "SELECT * FROM files WHERE project=? AND deleted=0",
-          project,
-        );
         const entries: Record<string, Uint8Array> = {};
-        for (const f of files)
-          entries[safePath(f.path)] = f.binary
-            ? new Uint8Array(f.state)
-            : Buffer.from(decodeText(f.state));
+        for (const f of await store.projectFiles(project))
+          entries[safePath(f.path)] = f.binary ? f.state : Buffer.from(decodeText(f.state));
         entries["writer-collaboration-notes.json"] = Buffer.from(
           JSON.stringify(
             {
-              comments: store.all("SELECT * FROM comments WHERE project=?", project),
-              audit: store.all("SELECT * FROM audit WHERE project=? ORDER BY created", project),
+              comments: await db.rows(
+                sql`SELECT id, file, author, quote, body, resolved, created, updated
+                    FROM comments WHERE project=${project}`,
+              ),
+              audit: await db.rows(
+                sql`SELECT actor, action, detail, created FROM audit WHERE project=${project} ORDER BY created`,
+              ),
             },
             null,
             2,
@@ -690,49 +702,42 @@ export async function createWriterServer(options: Options) {
         if (method === "GET")
           return json(
             res,
-            store
-              .all<Proposal>(
-                "SELECT * FROM proposals WHERE project=? ORDER BY created DESC LIMIT 100",
-                project,
+            (
+              await db.rows<Proposal>(
+                sql`SELECT * FROM proposals WHERE project=${project} ORDER BY created DESC LIMIT 100`,
               )
-              .map((p) => ({ ...p, hunks: JSON.parse(p.hunks) })),
+            ).map((p) => ({ ...p, hunks: JSON.parse(p.hunks) })),
           );
         if (method === "POST") {
-          edit();
+          await edit();
           const body = await jsonBody(req),
-            file = store.file(project, str(body, "file"));
+            file = await store.fileMeta(project, str(body, "file"));
           if (file.binary) fail(400, "暂不支持二进制补丁");
           const base = str(body, "base", 2_000_000),
             proposed = str(body, "proposed", 2_000_000),
             id = uid();
           const hunks = checked(() => reviewHunks(base, proposed));
-          store.run(
-            "INSERT INTO proposals VALUES(?,?,?,?,?,?,?,1,?)",
-            id,
-            project,
-            file.id,
-            user.id,
-            base,
-            proposed,
-            JSON.stringify(hunks),
-            Date.now(),
-          );
-          store.audit(project, user.id, "proposal.create", { id, file: file.id });
+          await db.transaction(async (tx) => {
+            await tx.run(
+              sql`INSERT INTO proposals(id, project, file, author, base, proposed, hunks, revision, created)
+                  VALUES(${id}, ${project}, ${file.id}, ${user.id}, ${base}, ${proposed}, ${JSON.stringify(hunks)}, 1, ${Date.now()})`,
+            );
+            await store.audit(project, user.id, "proposal.create", { id, file: file.id }, tx);
+          });
           collab.changed(project);
           return json(res, { id }, 201);
         }
       }
       const decision = /^proposals\/([^/]+)\/decide$/.exec(rest);
       if (decision?.[1] && method === "POST") {
-        edit();
+        await edit();
         const body = await jsonBody(req),
           p =
-            store.get<Proposal>(
-              "SELECT * FROM proposals WHERE project=? AND id=?",
-              project,
-              decision[1],
-            ) ?? fail(404, "建议不存在");
-        if (p.revision !== number(body, "revision")) fail(409, "建议已被其他人更新");
+            (await db.row<Proposal>(
+              sql`SELECT * FROM proposals WHERE project=${project} AND id=${decision[1]}`,
+            )) ?? fail(404, "建议不存在");
+        const revision = number(body, "revision");
+        if (p.revision !== revision) fail(409, "建议已被其他人更新");
         const hunks = JSON.parse(p.hunks) as ReviewHunk[],
           part = hunks[number(body, "part")];
         if (!part) fail(400, "修改项不存在");
@@ -746,60 +751,73 @@ export async function createWriterServer(options: Options) {
         const before = rendered();
         part.status = status as ReviewHunk["status"];
         const after = rendered(),
-          file = store.file(project, p.file),
-          current = decodeText(file.state),
+          current = await collab.text(project, p.file),
           merged = mergeText(before, current, after);
         if (merged.content === null)
           fail(409, "这处内容已有重叠修改；建议保留，请核对最新正文后重新提交");
-        store.snapshot(project, user.id, "审阅决定前");
-        collab.replaceMany(
+        await store.snapshot(project, user.id, "审阅决定前");
+        await collab.replaceMany(
           project,
           [{ file: p.file, expected: current, content: merged.content }],
           user.id,
-          () => {
-            store.run(
-              "UPDATE proposals SET hunks=?,revision=revision+1 WHERE id=?",
-              JSON.stringify(hunks),
-              p.id,
+          async (tx) => {
+            // Optimistic check inside the same transaction as the text change.
+            const updated = await tx.run(
+              sql`UPDATE proposals SET hunks=${JSON.stringify(hunks)}, revision=revision+1
+                  WHERE id=${p.id} AND revision=${revision}`,
             );
-            store.audit(project, user.id, "proposal.decide", { id: p.id, part: body.part, status });
+            if (!updated) fail(409, "建议已被其他人更新");
+            await store.audit(
+              project,
+              user.id,
+              "proposal.decide",
+              { id: p.id, part: body.part, status },
+              tx,
+            );
           },
         );
-        collab.changed(project);
         return json(res, { ok: true });
       }
       if (rest === "audit" && method === "GET")
         return json(
           res,
-          store.all(
-            "SELECT a.*,u.username AS name FROM audit a LEFT JOIN users u ON a.actor=u.id WHERE a.project=? ORDER BY a.created DESC LIMIT 200",
-            project,
+          await db.rows(
+            sql`SELECT a.id, a.actor, a.action, a.detail, a.created, u.username AS name
+                FROM audit a LEFT JOIN users u ON a.actor=u.id
+                WHERE a.project=${project} ORDER BY a.created DESC LIMIT 200`,
           ),
         );
       fail(404, "接口不存在");
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
-      json(
-        res,
-        {
-          error:
-            status === 500
-              ? "服务操作失败，数据仍保留；请检查服务日志"
-              : error instanceof Error
-                ? error.message
-                : "操作失败",
-        },
-        status,
-      );
+      if (!res.headersSent)
+        json(
+          res,
+          {
+            error:
+              status === 500
+                ? "服务操作失败，数据仍保留；请检查服务日志"
+                : error instanceof Error
+                  ? error.message
+                  : "操作失败",
+          },
+          status,
+        );
       if (status === 500)
         console.error("Writer request failed:", error instanceof Error ? error.message : "unknown");
     }
   });
   server.on("upgrade", (req, socket, head) => collab.upgrade(req, socket, head));
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 8787, options.host ?? "127.0.0.1", resolve);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(options.port ?? 8787, options.host ?? "127.0.0.1", resolve);
+    });
+  } catch (error) {
+    collab.close();
+    await store.close();
+    throw error;
+  }
   const address = server.address();
   if (!options.origin && address && typeof address !== "string")
     origin = `http://127.0.0.1:${address.port}`;
@@ -813,7 +831,7 @@ export async function createWriterServer(options: Options) {
       await new Promise<void>((resolve, reject) =>
         server.close((e) => (e ? reject(e) : resolve())),
       );
-      store.close();
+      await store.close();
     },
   };
 }

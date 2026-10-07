@@ -1,231 +1,183 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import * as Y from "yjs";
-export type Role = "owner" | "editor" | "commenter" | "viewer";
-type Access = "read" | "comment" | "edit" | "owner";
-const allows = (role: Role, minimum: Access) =>
-  minimum === "read" ||
-  (minimum === "comment" && role !== "viewer") ||
-  (minimum === "edit" && (role === "owner" || role === "editor")) ||
-  (minimum === "owner" && role === "owner");
-export type User = { id: string; username: string; password: string; admin: number };
-export type FileRow = {
+import { connect, type Database, type Sql, sql } from "./db";
+import { type Access, allows, decodeText, fail, type Role, uid } from "./util";
+
+export type User = { id: string; username: string; password: string; admin: boolean };
+export type FileMeta = {
   id: string;
   project: string;
   path: string;
-  state: Uint8Array;
-  binary: number;
-  deleted: number;
+  binary: boolean;
+  deleted: boolean;
   revision: number;
 };
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-export function fail(status: number, message: string): never {
-  throw new HttpError(status, message);
-}
-/** Parser and validation errors from shared writing helpers are user input errors, not 500s. */
-export function checked<T>(action: () => T): T {
-  try {
-    return action();
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    fail(400, error instanceof Error ? error.message : "输入无效");
-  }
-}
-export const uid = () => randomUUID();
+/** `state` is the compacted base merged with every update appended after it. */
+export type FileRow = FileMeta & { state: Uint8Array };
 export const AUTOMATIC_SNAPSHOTS = 50;
-export const digest = (input: string | Uint8Array) =>
-  createHash("sha256").update(input).digest("hex");
-export function safePath(value: string) {
-  if (
-    !value ||
-    value.length > 240 ||
-    value.includes("\\") ||
-    value.startsWith("/") ||
-    value.split("/").some((p) => !p || p.startsWith(".")) ||
-    value.includes(":") ||
-    [...value].some((c) => c.charCodeAt(0) < 32)
-  )
-    fail(400, "无效文件路径");
-  return value;
-}
-/** Shared by the server and the runner so both treat the same files as editable text. */
-export const textExtensions = new Set([
-  "tex",
-  "bib",
-  "md",
-  "txt",
-  "sty",
-  "cls",
-  "bst",
-  "csv",
-  "json",
-  "py",
-  "yml",
-  "yaml",
-]);
-export const isTextPath = (path: string) =>
-  textExtensions.has(path.split(".").pop()?.toLowerCase() ?? "");
-export function textDoc(value: string) {
-  const doc = new Y.Doc();
-  doc.getText("content").insert(0, value);
-  return doc;
-}
-export function decodeText(state: Uint8Array) {
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, state);
-  const text = doc.getText("content").toString();
-  doc.destroy();
-  return text;
-}
+const meta = `id, project, path, is_binary AS "binary", deleted, revision`;
+const bytes = (value: Uint8Array) => (value instanceof Uint8Array ? value : new Uint8Array(value));
+const merged = (state: Uint8Array, updates: Uint8Array[]) =>
+  updates.length ? Y.mergeUpdates([state, ...updates]) : state;
+
 export class Store {
-  db: DatabaseSync;
-  constructor(public directory: string) {
-    mkdirSync(directory, { recursive: true });
-    this.db = new DatabaseSync(join(directory, "writer.sqlite"));
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;
-      CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,password TEXT NOT NULL,admin INTEGER NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user TEXT NOT NULL REFERENCES users(id),expires INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,name TEXT NOT NULL,created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS members(project TEXT NOT NULL REFERENCES projects(id),user TEXT NOT NULL REFERENCES users(id),role TEXT NOT NULL,PRIMARY KEY(project,user));
-      CREATE TABLE IF NOT EXISTS invites(token TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects(id),role TEXT NOT NULL,expires INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects(id),path TEXT NOT NULL,state BLOB NOT NULL,binary INTEGER NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 1,UNIQUE(project,path));
-      CREATE TABLE IF NOT EXISTS comments(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects(id),file TEXT NOT NULL REFERENCES files(id),author TEXT NOT NULL REFERENCES users(id),quote TEXT NOT NULL,start TEXT NOT NULL,end TEXT NOT NULL,body TEXT NOT NULL,resolved INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,updated INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS replies(id TEXT PRIMARY KEY,comment TEXT NOT NULL REFERENCES comments(id),author TEXT NOT NULL REFERENCES users(id),body TEXT NOT NULL,created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects(id),label TEXT NOT NULL,author TEXT NOT NULL REFERENCES users(id),created INTEGER NOT NULL,data TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY,project TEXT NOT NULL,actor TEXT NOT NULL,action TEXT NOT NULL,detail TEXT NOT NULL,created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY,project TEXT NOT NULL,file TEXT NOT NULL,author TEXT NOT NULL,base TEXT NOT NULL,proposed TEXT NOT NULL,hunks TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,created INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL,author TEXT NOT NULL,prompt TEXT NOT NULL,harness TEXT NOT NULL,status TEXT NOT NULL,runner TEXT,lease INTEGER,result TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,base TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS runners(id TEXT PRIMARY KEY,project TEXT NOT NULL,token TEXT NOT NULL UNIQUE,name TEXT NOT NULL,capabilities TEXT NOT NULL DEFAULT '[]');
-    `);
-    // Older databases only had user-requested versions; keep them all as manual.
-    if (
-      !this.all<{ name: string }>("PRAGMA table_info(snapshots)").some((c) => c.name === "manual")
-    )
-      this.db.exec("ALTER TABLE snapshots ADD COLUMN manual INTEGER NOT NULL DEFAULT 1");
+  constructor(public db: Database) {}
+  static async open(url: string) {
+    return new Store(await connect(url));
   }
-  get<T>(sql: string, ...args: SQLInputValue[]): T | undefined {
-    return this.db.prepare(sql).get(...args) as T | undefined;
-  }
-  all<T>(sql: string, ...args: SQLInputValue[]): T[] {
-    return this.db.prepare(sql).all(...args) as T[];
-  }
-  run(sql: string, ...args: SQLInputValue[]) {
-    return this.db.prepare(sql).run(...args);
-  }
-  transaction<T>(action: () => T): T {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = action();
-      this.db.exec("COMMIT");
-      return result;
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
-  }
-  role(project: string, user: string): Role {
+  async role(project: string, user: string, q: Sql = this.db): Promise<Role> {
     return (
-      this.get<{ role: Role }>("SELECT role FROM members WHERE project=? AND user=?", project, user)
-        ?.role ?? fail(403, "无权访问此项目")
+      (
+        await q.row<{ role: Role }>(
+          sql`SELECT role FROM members WHERE project=${project} AND user_id=${user}`,
+        )
+      )?.role ?? fail(403, "无权访问此项目")
     );
   }
-  require(project: string, user: string, minimum: Access = "read") {
-    const role = this.role(project, user);
+  async require(project: string, user: string, minimum: Access = "read", q: Sql = this.db) {
+    const role = await this.role(project, user, q);
     if (!allows(role, minimum)) fail(403, "当前角色不允许此操作");
     return role;
   }
   /** Non-throwing permission check for background work such as queued AI tasks. */
-  can(project: string, user: string, minimum: Access) {
-    const role = this.get<{ role: Role }>(
-      "SELECT role FROM members WHERE project=? AND user=?",
-      project,
-      user,
-    )?.role;
-    return !!role && allows(role, minimum);
+  async can(project: string, user: string, minimum: Access, q: Sql = this.db) {
+    const row = await q.row<{ role: Role }>(
+      sql`SELECT role FROM members WHERE project=${project} AND user_id=${user}`,
+    );
+    return !!row && allows(row.role, minimum);
   }
   /** A deleted file keeps its row for history, but must not reserve its path forever. */
-  releasePath(project: string, path: string) {
-    this.run(
-      "UPDATE files SET path='.deleted/'||id||'/'||path WHERE project=? AND path=? AND deleted=1",
-      project,
-      path,
+  async releasePath(project: string, path: string, q: Sql = this.db) {
+    await q.run(
+      sql`UPDATE files SET path='.deleted/'||id||'/'||path WHERE project=${project} AND path=${path} AND deleted`,
     );
   }
-  file(project: string, id: string) {
+  async fileMeta(project: string, id: string, q: Sql = this.db): Promise<FileMeta> {
     return (
-      this.get<FileRow>(
-        "SELECT * FROM files WHERE project=? AND id=? AND deleted=0",
-        project,
-        id,
-      ) ?? fail(404, "文档不存在")
+      (await q.row<FileMeta>({
+        text: `SELECT ${meta} FROM files WHERE project=$1 AND id=$2 AND NOT deleted`,
+        values: [project, id],
+      })) ?? fail(404, "文档不存在")
     );
   }
-  /** Cheap per-message check; `file()` would load the whole document state. */
-  fileExists(project: string, id: string) {
-    return !!this.get("SELECT 1 FROM files WHERE project=? AND id=? AND deleted=0", project, id);
+  async fileExists(project: string, id: string, q: Sql = this.db) {
+    return !!(await q.row(
+      sql`SELECT 1 FROM files WHERE project=${project} AND id=${id} AND NOT deleted`,
+    ));
   }
-  textFiles(project: string) {
-    return this.all<FileRow>(
-      "SELECT * FROM files WHERE project=? AND deleted=0 AND binary=0 ORDER BY path",
-      project,
-    ).map((f) => ({ id: f.id, path: f.path, content: decodeText(f.state), revision: f.revision }));
+  async fileState(id: string, q: Sql = this.db) {
+    const base = await q.row<{ state: Uint8Array }>(sql`SELECT state FROM files WHERE id=${id}`);
+    if (!base) fail(404, "文档不存在");
+    const updates = await q.rows<{ data: Uint8Array }>(
+      sql`SELECT data FROM file_updates WHERE file=${id} ORDER BY id`,
+    );
+    return merged(
+      bytes(base.state),
+      updates.map((u) => bytes(u.data)),
+    );
   }
-  audit(project: string, actor: string, action: string, detail: unknown) {
-    this.run(
-      "INSERT INTO audit VALUES(?,?,?,?,?,?)",
-      uid(),
-      project,
-      actor,
-      action,
-      JSON.stringify(detail),
-      Date.now(),
+  async file(project: string, id: string, q: Sql = this.db): Promise<FileRow> {
+    const row = await this.fileMeta(project, id, q);
+    return { ...row, state: await this.fileState(id, q) };
+  }
+  /** Every acknowledged edit is one small row; compaction folds them into `files.state`. */
+  async appendUpdate(file: string, update: Uint8Array, q: Sql = this.db) {
+    await q.run(
+      sql`INSERT INTO file_updates(file, data, created) VALUES(${file}, ${update}, ${Date.now()})`,
+    );
+  }
+  async pending(file: string, q: Sql = this.db) {
+    return (
+      (await q.row<{ count: number; bytes: number }>(
+        sql`SELECT count(*) AS count, coalesce(sum(length(data)),0) AS bytes FROM file_updates WHERE file=${file}`,
+      )) ?? { count: 0, bytes: 0 }
+    );
+  }
+  /** Callers serialise appends to `file` (the collaboration room lock) while compacting. */
+  async compact(file: string) {
+    await this.db.transaction(async (tx) => {
+      const base = await tx.row<{ state: Uint8Array }>(
+        sql`SELECT state FROM files WHERE id=${file} FOR UPDATE`,
+      );
+      const updates = await tx.rows<{ id: number; data: Uint8Array }>(
+        sql`SELECT id, data FROM file_updates WHERE file=${file} ORDER BY id`,
+      );
+      const last = updates.at(-1);
+      if (!base || !last) return;
+      const doc = new Y.Doc();
+      try {
+        Y.applyUpdate(doc, bytes(base.state));
+        for (const u of updates) Y.applyUpdate(doc, bytes(u.data));
+        await tx.run(
+          sql`UPDATE files SET state=${Y.encodeStateAsUpdate(doc)}, revision=revision+1 WHERE id=${file}`,
+        );
+      } finally {
+        doc.destroy();
+      }
+      await tx.run(sql`DELETE FROM file_updates WHERE file=${file} AND id<=${last.id}`);
+    });
+  }
+  /** All files of a project with their merged states, in two queries. */
+  async projectFiles(project: string, q: Sql = this.db, includeDeleted = false) {
+    const rows = await q.rows<FileRow>({
+      text: `SELECT ${meta}, state FROM files WHERE project=$1 ${includeDeleted ? "" : "AND NOT deleted"} ORDER BY path`,
+      values: [project],
+    });
+    const updates = await q.rows<{ file: string; data: Uint8Array }>(
+      sql`SELECT u.file, u.data FROM file_updates u JOIN files f ON f.id=u.file WHERE f.project=${project} ORDER BY u.id`,
+    );
+    const pending = new Map<string, Uint8Array[]>();
+    for (const u of updates) pending.set(u.file, [...(pending.get(u.file) ?? []), bytes(u.data)]);
+    return rows.map((f) => ({ ...f, state: merged(bytes(f.state), pending.get(f.id) ?? []) }));
+  }
+  async textFiles(project: string, q: Sql = this.db) {
+    return (await this.projectFiles(project, q))
+      .filter((f) => !f.binary)
+      .map((f) => ({ id: f.id, path: f.path, content: decodeText(f.state), revision: f.revision }));
+  }
+  async audit(project: string, actor: string, action: string, detail: unknown, q: Sql = this.db) {
+    await q.run(
+      sql`INSERT INTO audit(id, project, actor, action, detail, created)
+          VALUES(${uid()}, ${project}, ${actor}, ${action}, ${JSON.stringify(detail)}, ${Date.now()})`,
     );
   }
   /** Automatic safety versions are bounded; manual versions are never pruned. */
-  snapshot(project: string, user: string, label: string, manual = false) {
-    const id = uid(),
-      files = this.all<FileRow>("SELECT * FROM files WHERE project=?", project);
+  async snapshot(project: string, user: string, label: string, manual = false, q: Sql = this.db) {
+    const id = uid();
+    const files = await this.projectFiles(project, q, true);
+    const comments = await q.rows(
+      sql`SELECT id, project, file, author, quote, start_pos AS start, end_pos AS "end", body, resolved, created, updated
+          FROM comments WHERE project=${project}`,
+    );
+    const replies = await q.rows(
+      sql`SELECT r.* FROM replies r JOIN comments c ON r.comment=c.id WHERE c.project=${project}`,
+    );
     const data = JSON.stringify({
-      files: files.map((f) => ({ ...f, state: Buffer.from(f.state).toString("base64") })),
-      comments: this.all("SELECT * FROM comments WHERE project=?", project),
-      replies: this.all(
-        "SELECT r.* FROM replies r JOIN comments c ON r.comment=c.id WHERE c.project=?",
-        project,
-      ),
+      files: files.map((f) => ({
+        id: f.id,
+        path: f.path,
+        binary: f.binary,
+        deleted: f.deleted,
+        revision: f.revision,
+        state: Buffer.from(f.state).toString("base64"),
+      })),
+      comments,
+      replies,
     });
     if (Buffer.byteLength(data) > 150_000_000) fail(413, "项目快照过大");
-    this.run(
-      "INSERT INTO snapshots(id,project,label,author,created,data,manual) VALUES(?,?,?,?,?,?,?)",
-      id,
-      project,
-      label,
-      user,
-      Date.now(),
-      data,
-      manual ? 1 : 0,
+    await q.run(
+      sql`INSERT INTO snapshots(id, project, label, author, created, manual, data)
+          VALUES(${id}, ${project}, ${label}, ${user}, ${Date.now()}, ${manual}, ${data})`,
     );
     if (!manual)
-      this.run(
-        `DELETE FROM snapshots WHERE project=? AND manual=0
-          AND id NOT IN (SELECT base FROM jobs WHERE project=? AND status IN ('queued','running'))
-          AND id NOT IN (SELECT id FROM snapshots WHERE project=? AND manual=0 ORDER BY created DESC, rowid DESC LIMIT ?)`,
-        project,
-        project,
-        project,
-        AUTOMATIC_SNAPSHOTS,
+      await q.run(
+        sql`DELETE FROM snapshots WHERE project=${project} AND NOT manual
+              AND id NOT IN (SELECT base FROM jobs WHERE project=${project} AND status IN ('queued','running'))
+              AND id NOT IN (SELECT id FROM snapshots WHERE project=${project} AND NOT manual
+                             ORDER BY created DESC, id DESC LIMIT ${AUTOMATIC_SNAPSHOTS})`,
       );
     return id;
   }
   close() {
-    this.db.close();
+    return this.db.close();
   }
 }

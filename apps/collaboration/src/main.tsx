@@ -219,7 +219,7 @@ function Workspace({
     [busy, setBusy] = useState(false);
   const [members, setMembers] = useState<{ id: string; username: string; role: string }[]>([]),
     [snapshots, setSnapshots] = useState<
-      { id: string; label: string; created: number; manual?: number }[]
+      { id: string; label: string; created: number; manual?: boolean }[]
     >([]),
     [proposals, setProposals] = useState<Proposal[]>([]);
   const [jobs, setJobs] = useState<SharedJob[]>([]);
@@ -950,7 +950,7 @@ function Workspace({
                   <article className="snapshot" key={s.id}>
                     <strong>
                       {s.label}
-                      {s.manual === 0 && <span className="muted"> · 自动</span>}
+                      {s.manual === false && <span className="muted"> · 自动</span>}
                     </strong>
                     <p>{new Date(s.created).toLocaleString()}</p>
                     <button

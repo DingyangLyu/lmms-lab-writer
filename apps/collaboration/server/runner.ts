@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { isTextPath, safePath } from "./store";
+import { isTextPath, safePath } from "./util";
 
 type Job = {
   id: string;

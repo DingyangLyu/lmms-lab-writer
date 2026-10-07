@@ -3,18 +3,9 @@ import type { IncomingMessage } from "node:http";
 import { reviewHunks } from "@lmms-lab/writing";
 import * as Y from "yjs";
 import type { Collaboration } from "./collaboration";
-import {
-  checked,
-  decodeText,
-  digest,
-  fail,
-  type Role,
-  type Store,
-  safePath,
-  textDoc,
-  type User,
-  uid,
-} from "./store";
+import { sql } from "./db";
+import type { Store, User } from "./store";
+import { checked, decodeText, digest, fail, type Role, safePath, textDoc, uid } from "./util";
 
 type Body = Record<string, unknown>;
 type Job = {
@@ -32,7 +23,13 @@ type Job = {
 };
 type Runner = { id: string; project: string; token: string; name: string; capabilities: string };
 type Snapshot = {
-  files: { id: string; path: string; state: string; binary: number; deleted: number }[];
+  files: {
+    id: string;
+    path: string;
+    state: string;
+    binary: boolean | number;
+    deleted: boolean | number;
+  }[];
 };
 const PROJECT_FILES = 2000,
   PROJECT_BYTES = 100_000_000;
@@ -40,7 +37,7 @@ const text = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
     : fail(400, `无效字段 ${key}`);
-export function runnerRequest(
+export async function runnerRequest(
   store: Store,
   collab: Collaboration,
   req: IncomingMessage,
@@ -49,45 +46,43 @@ export function runnerRequest(
 ) {
   const token = req.headers.authorization?.replace(/^Bearer /, "") || "";
   const runner =
-    store.get<Runner>("SELECT * FROM runners WHERE token=?", digest(token)) ??
+    (await store.db.row<Runner>(sql`SELECT * FROM runners WHERE token=${digest(token)}`)) ??
     fail(401, "Runner 凭据无效");
   if (path === "/api/runner/lease") {
     const caps = JSON.parse(runner.capabilities) as string[];
-    store.run(
-      "UPDATE jobs SET status='failed',result='执行器失联，可重新提交任务' WHERE project=? AND status='running' AND lease<?",
-      runner.project,
-      Date.now(),
+    await store.db.run(
+      sql`UPDATE jobs SET status='failed', result='执行器失联，可重新提交任务'
+          WHERE project=${runner.project} AND status='running' AND lease<${Date.now()}`,
     );
     let changed = false;
-    const leased = store.transaction(() => {
-      const jobs = store.all<Job>(
-        "SELECT * FROM jobs WHERE project=? AND status='queued' ORDER BY created LIMIT 50",
-        runner.project,
+    const leased = await store.db.transaction(async (tx) => {
+      const jobs = await tx.rows<Job>(
+        sql`SELECT * FROM jobs WHERE project=${runner.project} AND status='queued' ORDER BY created LIMIT 50`,
       );
       for (const job of jobs) {
         if (!caps.includes(job.harness.startsWith("compile:") ? "compile" : job.harness)) continue;
         // A task that can never run must not block every task queued behind it.
-        const snapshot = store.get<{ data: string }>(
-          "SELECT data FROM snapshots WHERE id=? AND project=?",
-          job.base,
-          job.project,
+        const snapshot = await tx.row<{ data: string }>(
+          sql`SELECT data FROM snapshots WHERE id=${job.base} AND project=${job.project}`,
         );
-        const blocked = !store.can(job.project, job.author, "edit")
+        const blocked = !(await store.can(job.project, job.author, "edit", tx))
           ? "提交者已无编辑权限，任务未执行"
           : !snapshot
             ? "任务输入版本已不存在，请重新提交"
             : null;
         if (blocked || !snapshot) {
-          store.run("UPDATE jobs SET status='failed',result=? WHERE id=?", blocked, job.id);
+          await tx.run(
+            sql`UPDATE jobs SET status='failed', result=${blocked} WHERE id=${job.id} AND status='queued'`,
+          );
           changed = true;
           continue;
         }
-        store.run(
-          "UPDATE jobs SET status='running',runner=?,lease=? WHERE id=? AND status='queued'",
-          runner.id,
-          Date.now() + 60000,
-          job.id,
+        // Another runner may have claimed it since the SELECT; only one update can win.
+        const claimed = await tx.run(
+          sql`UPDATE jobs SET status='running', runner=${runner.id}, lease=${Date.now() + 60000}
+              WHERE id=${job.id} AND status='queued'`,
         );
+        if (!claimed) continue;
         const files = (JSON.parse(snapshot.data) as Snapshot).files
           .filter((f) => !f.deleted)
           .map((f) => ({
@@ -99,7 +94,7 @@ export function runnerRequest(
               : { content: decodeText(Buffer.from(f.state, "base64")) }),
           }));
         changed = true;
-        return { job: { ...job, files } };
+        return { job: { ...job, status: "running", files } };
       }
       return { job: null };
     });
@@ -108,37 +103,37 @@ export function runnerRequest(
   }
   const id = text(body, "id", 80),
     job =
-      store.get<Job>(
-        "SELECT * FROM jobs WHERE id=? AND project=? AND runner=?",
-        id,
-        runner.project,
-        runner.id,
-      ) ?? fail(404, "任务不存在");
+      (await store.db.row<Job>(
+        sql`SELECT * FROM jobs WHERE id=${id} AND project=${runner.project} AND runner=${runner.id}`,
+      )) ?? fail(404, "任务不存在");
   if (job.status !== "running") fail(409, "任务已结束或取消");
-  if (!store.can(job.project, job.author, "edit")) {
-    store.run(
-      "UPDATE jobs SET status='failed',result='提交者已无编辑权限，结果未提交' WHERE id=?",
-      id,
+  if (!(await store.can(job.project, job.author, "edit"))) {
+    await store.db.run(
+      sql`UPDATE jobs SET status='failed', result='提交者已无编辑权限，结果未提交' WHERE id=${id}`,
     );
     collab.changed(job.project);
     fail(409, "提交者已无编辑权限");
   }
   if (path === "/api/runner/heartbeat") {
-    store.run("UPDATE jobs SET lease=? WHERE id=?", Date.now() + 60000, id);
+    await store.db.run(
+      sql`UPDATE jobs SET lease=${Date.now() + 60000} WHERE id=${id} AND status='running'`,
+    );
     return { ok: true };
   }
   if (path !== "/api/runner/result") fail(404, "接口不存在");
   const result = text(body, "result", 50000),
     error = body.error === true;
   if (error) {
-    store.run("UPDATE jobs SET status='failed',result=? WHERE id=?", result, id);
+    await store.db.run(
+      sql`UPDATE jobs SET status='failed', result=${result} WHERE id=${id} AND status='running'`,
+    );
     collab.changed(job.project);
     return { ok: true };
   }
   const raw = body.files;
   if (!Array.isArray(raw) || raw.length > 200) fail(400, "任务输出文件无效");
   const snapshot =
-    store.get<{ data: string }>("SELECT data FROM snapshots WHERE id=?", job.base) ??
+    (await store.db.row<{ data: string }>(sql`SELECT data FROM snapshots WHERE id=${job.base}`)) ??
     fail(404, "任务快照不存在");
   const baseline = (JSON.parse(snapshot.data) as Snapshot).files;
   const files = raw.map((value) => {
@@ -160,10 +155,9 @@ export function runnerRequest(
     if (seen.has(f.path)) fail(400, "输出路径重复");
     seen.add(f.path);
   }
-  const usage = store.get<{ count: number; bytes: number }>(
-    "SELECT count(*) as count,coalesce(sum(length(state)),0) as bytes FROM files WHERE project=?",
-    job.project,
-  ) ?? { count: 0, bytes: 0 };
+  const usage = (await store.db.row<{ count: number; bytes: number }>(
+    sql`SELECT count(*) AS count, coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${job.project}`,
+  )) ?? { count: 0, bytes: 0 };
   const added = files.filter((f) => f.binary);
   if (
     usage.count + added.length > PROJECT_FILES ||
@@ -171,20 +165,20 @@ export function runnerRequest(
   )
     fail(413, `项目超过 ${PROJECT_FILES} 个文件或 100 MB，产物未保存`);
   const ids: string[] = [];
-  store.transaction(() => {
+  await store.db.transaction(async (tx) => {
+    // Cancellation can race with the result; only a still-running task may complete.
+    const finished = await tx.run(
+      sql`UPDATE jobs SET status='completed', result=${result} WHERE id=${id} AND status='running'`,
+    );
+    if (!finished) fail(409, "任务已结束或取消");
     for (const f of files) {
       if (f.binary) {
         // Generated assets are new artifacts, never an overwrite of a collaborator's file.
         const path = `artifacts/${job.id}/${f.path}`;
         if (path.length > 240) fail(400, "产物路径过长");
-        const id = uid();
-        store.releasePath(job.project, path);
-        store.run(
-          "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,1)",
-          id,
-          job.project,
-          path,
-          f.binary,
+        await store.releasePath(job.project, path, tx);
+        await tx.run(
+          sql`INSERT INTO files(id, project, path, state, is_binary) VALUES(${uid()}, ${job.project}, ${path}, ${f.binary}, true)`,
         );
         continue;
       }
@@ -196,57 +190,45 @@ export function runnerRequest(
       // proposal on the same document instead of creating an empty copy at the old path.
       let file =
         (old &&
-          store.get<{ id: string; binary: number }>(
-            "SELECT id,binary FROM files WHERE project=? AND id=? AND deleted=0",
-            job.project,
-            old.id,
-          )) ||
-        store.get<{ id: string; binary: number }>(
-          "SELECT id,binary FROM files WHERE project=? AND path=? AND deleted=0",
-          job.project,
-          f.path,
-        );
+          (await tx.row<{ id: string; binary: boolean }>(
+            sql`SELECT id, is_binary AS "binary" FROM files WHERE project=${job.project} AND id=${old.id} AND NOT deleted`,
+          ))) ||
+        (await tx.row<{ id: string; binary: boolean }>(
+          sql`SELECT id, is_binary AS "binary" FROM files WHERE project=${job.project} AND path=${f.path} AND NOT deleted`,
+        ));
       if (file?.binary) fail(400, "不能用文本覆盖二进制文件");
       if (!file) {
-        const id = uid(),
+        const created = uid(),
           doc = textDoc("");
-        store.releasePath(job.project, f.path);
-        store.run(
-          "INSERT INTO files(id,project,path,state,binary) VALUES(?,?,?,?,0)",
-          id,
-          job.project,
-          f.path,
-          Y.encodeStateAsUpdate(doc),
+        await store.releasePath(job.project, f.path, tx);
+        await tx.run(
+          sql`INSERT INTO files(id, project, path, state, is_binary)
+              VALUES(${created}, ${job.project}, ${f.path}, ${Y.encodeStateAsUpdate(doc)}, false)`,
         );
         doc.destroy();
-        file = { id, binary: 0 };
+        file = { id: created, binary: false };
       }
-      const id = uid(),
+      const proposal = uid(),
         hunks = checked(() => reviewHunks(base, f.content || ""));
-      store.run(
-        "INSERT INTO proposals VALUES(?,?,?,?,?,?,?,1,?)",
-        id,
-        job.project,
-        file.id,
-        job.author,
-        base,
-        f.content || "",
-        JSON.stringify(hunks),
-        Date.now(),
+      await tx.run(
+        sql`INSERT INTO proposals(id, project, file, author, base, proposed, hunks, revision, created)
+            VALUES(${proposal}, ${job.project}, ${file.id}, ${job.author}, ${base}, ${f.content || ""},
+                   ${JSON.stringify(hunks)}, 1, ${Date.now()})`,
       );
-      ids.push(id);
+      ids.push(proposal);
     }
-    store.run("UPDATE jobs SET status='completed',result=? WHERE id=?", result, id);
-    store.audit(job.project, job.author, "task.completed", {
-      id,
-      runner: runner.name,
-      proposals: ids,
-    });
+    await store.audit(
+      job.project,
+      job.author,
+      "task.completed",
+      { id, runner: runner.name, proposals: ids },
+      tx,
+    );
   });
   collab.changed(job.project);
   return { ok: true, proposals: ids };
 }
-export function projectJobs(
+export async function projectJobs(
   store: Store,
   collab: Collaboration,
   project: string,
@@ -255,9 +237,9 @@ export function projectJobs(
   rest: string,
   method: string,
   body: Body,
-): unknown {
+): Promise<unknown> {
   if (rest === "runners" && method === "POST") {
-    store.require(project, user.id, "owner");
+    await store.require(project, user.id, "owner");
     const name = text(body, "name", 100),
       capabilities = body.capabilities;
     if (
@@ -268,32 +250,28 @@ export function projectJobs(
       fail(400, "请选择执行器能力");
     const token = randomBytes(32).toString("hex"),
       id = uid();
-    store.run(
-      "INSERT INTO runners VALUES(?,?,?,?,?)",
-      id,
-      project,
-      digest(token),
-      name,
-      JSON.stringify(capabilities),
+    await store.db.run(
+      sql`INSERT INTO runners(id, project, token, name, capabilities)
+          VALUES(${id}, ${project}, ${digest(token)}, ${name}, ${JSON.stringify(capabilities)})`,
     );
     return { id, token };
   }
   if (rest === "runners" && method === "GET") {
-    store.require(project, user.id, "owner");
-    return store.all("SELECT id,name,capabilities FROM runners WHERE project=?", project);
+    await store.require(project, user.id, "owner");
+    return store.db.rows(sql`SELECT id, name, capabilities FROM runners WHERE project=${project}`);
   }
   if (rest.startsWith("runners/") && method === "DELETE") {
-    store.require(project, user.id, "owner");
-    store.run("DELETE FROM runners WHERE project=? AND id=?", project, rest.slice(8));
+    await store.require(project, user.id, "owner");
+    await store.db.run(sql`DELETE FROM runners WHERE project=${project} AND id=${rest.slice(8)}`);
     return { ok: true };
   }
   if (rest === "jobs" && method === "GET")
-    return store.all(
-      "SELECT id,author,prompt,harness,status,result,created FROM jobs WHERE project=? ORDER BY created DESC LIMIT 100",
-      project,
+    return store.db.rows(
+      sql`SELECT id, author, prompt, harness, status, result, created FROM jobs
+          WHERE project=${project} ORDER BY created DESC LIMIT 100`,
     );
   if (rest === "jobs" && method === "POST") {
-    store.require(project, user.id, "edit");
+    await store.require(project, user.id, "edit");
     const prompt = text(body, "prompt", 20000),
       harness = text(body, "harness", 80);
     if (
@@ -312,36 +290,29 @@ export function projectJobs(
       if (!prompt.endsWith(".tex")) fail(400, "请选择 .tex 入口");
     }
     const count =
-      store.get<{ n: number }>(
-        "SELECT count(*) AS n FROM jobs WHERE project=? AND status IN ('queued','running')",
-        project,
+      (
+        await store.db.row<{ n: number }>(
+          sql`SELECT count(*) AS n FROM jobs WHERE project=${project} AND status IN ('queued','running')`,
+        )
       )?.n ?? 0;
     if (count >= 10) fail(429, "本项目最多 10 个排队/执行中的任务");
     const id = uid();
-    store.transaction(() => {
-      const snapshot = store.snapshot(project, user.id, "共享任务输入版本");
-      store.run(
-        "INSERT INTO jobs(id,project,author,prompt,harness,status,created,base) VALUES(?,?,?,?,?,'queued',?,?)",
-        id,
-        project,
-        user.id,
-        prompt,
-        harness,
-        Date.now(),
-        snapshot,
+    await store.db.transaction(async (tx) => {
+      const snapshot = await store.snapshot(project, user.id, "共享任务输入版本", false, tx);
+      await tx.run(
+        sql`INSERT INTO jobs(id, project, author, prompt, harness, status, created, base)
+            VALUES(${id}, ${project}, ${user.id}, ${prompt}, ${harness}, 'queued', ${Date.now()}, ${snapshot})`,
       );
-      store.audit(project, user.id, "task.queued", { id, harness });
+      await store.audit(project, user.id, "task.queued", { id, harness }, tx);
     });
     collab.changed(project);
     return { id };
   }
   if (rest.startsWith("jobs/") && method === "DELETE") {
-    store.require(project, user.id, "edit");
-    const id = rest.slice(5);
-    store.run(
-      "UPDATE jobs SET status='cancelled' WHERE id=? AND project=? AND status IN ('queued','running')",
-      id,
-      project,
+    await store.require(project, user.id, "edit");
+    await store.db.run(
+      sql`UPDATE jobs SET status='cancelled'
+          WHERE id=${rest.slice(5)} AND project=${project} AND status IN ('queued','running')`,
     );
     collab.changed(project);
     return { ok: true };

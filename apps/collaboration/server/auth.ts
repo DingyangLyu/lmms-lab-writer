@@ -1,6 +1,8 @@
 import { randomBytes, scrypt as rawScrypt, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { digest, fail, type Store, type User, uid } from "./store";
+import { sql } from "./db";
+import type { Store, User } from "./store";
+import { digest, fail, uid } from "./util";
 export function allowedOrigin(received: string | undefined, configured: string) {
   if (received === configured) return true;
   try {
@@ -43,25 +45,21 @@ export function cookie(req: IncomingMessage) {
       ?.slice(15) ?? ""
   );
 }
-export function userFor(store: Store, req: IncomingMessage): User {
+export async function userFor(store: Store, req: IncomingMessage): Promise<User> {
   const token = cookie(req);
   if (!/^[a-f0-9]{64}$/.test(token)) fail(401, "请登录");
   return (
-    store.get<User>(
-      "SELECT u.* FROM users u JOIN sessions s ON s.user=u.id WHERE s.token=? AND s.expires>?",
-      digest(token),
-      Date.now(),
-    ) ?? fail(401, "登录已过期")
+    (await store.db.row<User>(
+      sql`SELECT u.id, u.username, u.password, u.admin FROM users u JOIN sessions s ON s.user_id=u.id
+          WHERE s.token=${digest(token)} AND s.expires>${Date.now()}`,
+    )) ?? fail(401, "登录已过期")
   );
 }
-export function session(store: Store, user: User, res: ServerResponse, secure: boolean) {
+export async function session(store: Store, user: User, res: ServerResponse, secure: boolean) {
   const token = randomBytes(32).toString("hex");
-  store.run("DELETE FROM sessions WHERE expires<?", Date.now());
-  store.run(
-    "INSERT INTO sessions VALUES(?,?,?)",
-    digest(token),
-    user.id,
-    Date.now() + 7 * 86400000,
+  await store.db.run(sql`DELETE FROM sessions WHERE expires<${Date.now()}`);
+  await store.db.run(
+    sql`INSERT INTO sessions(token, user_id, expires) VALUES(${digest(token)}, ${user.id}, ${Date.now() + 7 * 86400000})`,
   );
   res.setHeader(
     "Set-Cookie",
@@ -69,8 +67,11 @@ export function session(store: Store, user: User, res: ServerResponse, secure: b
   );
 }
 export async function bootstrap(store: Store, name: string, password: string) {
-  if (store.get("SELECT id FROM users LIMIT 1")) return;
+  if (await store.db.row(sql`SELECT id FROM users LIMIT 1`)) return;
   if (!name || !password)
     throw new Error("首次运行需设置 WRITER_ADMIN_USER 和 WRITER_ADMIN_PASSWORD（至少 12 位）");
-  store.run("INSERT INTO users VALUES(?,?,?,1)", uid(), name, await passwordHash(password));
+  await store.db.run(
+    sql`INSERT INTO users(id, username, password, admin, created)
+        VALUES(${uid()}, ${name}, ${await passwordHash(password)}, true, ${Date.now()})`,
+  );
 }

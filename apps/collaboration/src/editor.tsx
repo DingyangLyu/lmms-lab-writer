@@ -21,7 +21,7 @@ export type Comment = {
   start: string;
   end: string;
   body: string;
-  resolved: number;
+  resolved: boolean;
   created: number;
   replies: { id: string; authorName: string; body: string }[];
 };

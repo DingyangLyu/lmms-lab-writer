@@ -1,12 +1,15 @@
+import { randomBytes } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as encoding from "lib0/encoding";
+import pg from "pg";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { createWriterServer } from "./app";
+import { sql } from "./db";
 import { AUTOMATIC_SNAPSHOTS } from "./store";
 
 type Message = { type: string; state?: string; update?: string; id?: string; message?: string };
@@ -14,16 +17,37 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
+/** PGlite by default; set WRITER_TEST_DATABASE_URL to run against a real PostgreSQL server. */
+async function database(dir: string) {
+  const server = process.env.WRITER_TEST_DATABASE_URL;
+  if (!server) return { url: `pglite:${join(dir, "pg")}`, drop: async () => {} };
+  const name = `writer_test_${randomBytes(6).toString("hex")}`;
+  const admin = async (statement: string) => {
+    const client = new pg.Client({ connectionString: server });
+    await client.connect();
+    try {
+      await client.query(statement);
+    } finally {
+      await client.end();
+    }
+  };
+  await admin(`CREATE DATABASE ${name}`);
+  const url = new URL(server);
+  url.pathname = `/${name}`;
+  return { url: url.toString(), drop: () => admin(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`) };
+}
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), "writer-collab-test-"));
+  const db = await database(dir);
   let app = await createWriterServer({
-    directory: dir,
+    databaseUrl: db.url,
     port: 0,
     adminUser: "owner",
     adminPassword: "test-password-1234",
   });
   cleanups.push(async () => {
     await app.close();
+    await db.drop();
     await rm(dir, { recursive: true, force: true });
   });
   const call = async (
@@ -104,7 +128,7 @@ async function fixture() {
   };
   const restart = async () => {
     await app.close();
-    app = await createWriterServer({ directory: dir, port: 0 });
+    app = await createWriterServer({ databaseUrl: db.url, port: 0 });
   };
   return {
     call,
@@ -445,15 +469,89 @@ describe("real collaboration service", () => {
       await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "x" }, f.owner)
     ).data.id;
     for (let i = 0; i < AUTOMATIC_SNAPSHOTS + 5; i++)
-      f.app.store.snapshot(f.project, me, `auto ${i}`);
-    const rows = f.app.store.all<{ id: string; label: string; manual: number }>(
-      "SELECT id,label,manual FROM snapshots WHERE project=?",
-      f.project,
+      await f.app.store.snapshot(f.project, me, `auto ${i}`);
+    const rows = await f.app.store.db.rows<{ id: string; label: string; manual: boolean }>(
+      sql`SELECT id, label, manual FROM snapshots WHERE project=${f.project}`,
     );
     expect(rows.filter((r) => !r.manual)).toHaveLength(AUTOMATIC_SNAPSHOTS + 1);
     expect(rows.find((r) => r.id === manual.data.id)?.label).toBe("手动版本");
-    const base = f.app.store.get<{ base: string }>("SELECT base FROM jobs WHERE id=?", job)?.base;
+    const base = (
+      await f.app.store.db.row<{ base: string }>(sql`SELECT base FROM jobs WHERE id=${job}`)
+    )?.base;
     expect(rows.some((r) => r.id === base)).toBe(true);
+  });
+  it("appends edits incrementally and compacts them when the last editor leaves", async () => {
+    const f = await fixture();
+    const file = (
+      await f.call(`/projects/${f.project}/files`, { path: "a.tex", content: "base" }, f.owner)
+    ).data.id;
+    const count = async () =>
+      (
+        await f.app.store.db.row<{ n: number }>(
+          sql`SELECT count(*) AS n FROM file_updates WHERE file=${file}`,
+        )
+      )?.n;
+    const p = await f.peer(f.owner, file);
+    for (const [i, text] of ["1", "2", "3"].entries()) {
+      p.send(
+        `u${i}`,
+        p.capture(() => p.doc.getText("content").insert(0, text)),
+      );
+      await p.next("ack");
+    }
+    expect(await count()).toBe(3);
+    // Readers see appended edits before compaction.
+    expect(
+      (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
+    ).toBe("321base");
+    p.ws.close();
+    for (let i = 0; i < 100 && (await count()) !== 0; i++)
+      await new Promise((r) => setTimeout(r, 20));
+    expect(await count()).toBe(0);
+    expect(
+      (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
+    ).toBe("321base");
+  });
+  it("never leases one task twice or applies two decisions on the same revision", async () => {
+    const f = await fixture();
+    const files = `/projects/${f.project}/files`;
+    const file = (await f.call(files, { path: "m.tex", content: "a\nb\n" }, f.owner)).data.id;
+    const token = (
+      await f.call(
+        `/projects/${f.project}/runners`,
+        { name: "w", capabilities: ["codex"] },
+        f.owner,
+      )
+    ).data.token;
+    for (const prompt of ["one", "two"])
+      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt }, f.owner);
+    const lease = () =>
+      fetch(`${f.app.origin}/api/runner/lease`, {
+        method: "POST",
+        headers: { Origin: f.app.origin, Authorization: `Bearer ${token}` },
+        body: "{}",
+      }).then((r) => r.json());
+    const leased = await Promise.all([lease(), lease(), lease()]);
+    const ids = leased.map((l) => l.job?.id).filter(Boolean);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    const proposal = (
+      await f.call(
+        `/projects/${f.project}/proposals`,
+        { file, base: "a\nb\n", proposed: "A\nb\n" },
+        f.owner,
+      )
+    ).data.id;
+    const decide = (status: string) =>
+      f.call(
+        `/projects/${f.project}/proposals/${proposal}/decide`,
+        { revision: 1, part: 0, status },
+        f.owner,
+      );
+    const results = await Promise.all([decide("accepted"), decide("rejected")]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const content = (await f.call(`${files}/${file}`, undefined, f.owner)).data.content;
+    expect(["A\nb\n", "a\nb\n"]).toContain(content);
   });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),
@@ -500,7 +598,7 @@ describe("real collaboration service", () => {
       ).status,
     ).toBe(200);
     const notes = (await f.call(`/projects/${f.project}/comments`, undefined, f.owner)).data;
-    expect(notes[0].resolved).toBe(1);
+    expect(notes[0].resolved).toBe(true);
     expect(notes[0].replies[0].body).toBe("已核对");
     // Comments are additive; they no longer copy the whole project into a version each time.
     expect((await f.call(`/projects/${f.project}/snapshots`, undefined, f.owner)).data).toEqual([]);

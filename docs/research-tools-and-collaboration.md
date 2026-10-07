@@ -23,7 +23,7 @@
 已有能力：
 
 - 独立账号、项目、7 天有效的单次邀请；所有者、编辑者、批注者、只读者四种角色。服务端逐次检查权限，移除成员会关闭其活动连接。
-- Yjs + CodeMirror 实时共同编辑、协作者光标、仅撤销本人的操作、断线重连与 IndexedDB 本机缓存。服务端 SQLite 持久化成功后才返回保存确认。
+- Yjs + CodeMirror 实时共同编辑、协作者光标、仅撤销本人的操作、断线重连与 IndexedDB 本机缓存。服务端把每次修改追加写入 PostgreSQL 成功后才返回保存确认；同一文档累计约 200 次修改或最后一人离开时自动合并，读取始终包含尚未合并的修改。
 - 源码选区批注，使用相对位置锚点；作者、回复线程、已解决/重新打开状态和审计记录。源文字变化或定位失效时会要求重新核对。正文编辑的审计按“每人每文件每分钟一条”汇总，不逐键记录。
 - BibTeX 文献库、DOI 查询、导入去重、项目引用键更新。
 - **尚未写入的修改建议**：逐项接受、拒绝或撤销。应用时再合并当前正文，避免覆盖合作者后续独立编辑。
@@ -44,7 +44,9 @@ pnpm --filter @lmms-lab/writer-collaboration build
 pnpm --filter @lmms-lab/writer-collaboration start
 ```
 
-打开 `http://127.0.0.1:8787`，用配置的账号登录。管理员只在空数据库首次启动时创建，修改环境变量不会重置已有账号密码。数据默认在 `apps/collaboration/.data/writer.sqlite`，可通过 `WRITER_DATA_DIR` 指定持久化位置。
+打开 `http://127.0.0.1:8787`，用配置的账号登录。管理员只在空数据库首次启动时创建，修改环境变量不会重置已有账号密码。
+
+数据库为 PostgreSQL，用 `WRITER_DATABASE_URL=postgres://用户:密码@主机:5432/库名` 指定。不设置时使用内嵌的 PGlite（编译为 WebAssembly 的 PostgreSQL），数据在 `WRITER_DATA_DIR/postgres`（默认 `apps/collaboration/.data/postgres`），适合一个人试用；课题组共用请连接独立的 PostgreSQL 服务（下面的 Docker 部署已包含）。启动时自动执行带版本号的结构迁移，旧版本程序遇到更新的数据库结构会拒绝启动。
 
 本次本机实例使用 `~/Library/Application Support/LMMs-Lab Writer/collaboration/local.env`（仅当前用户可读），数据在其 `data/` 子目录。重新启动这个实例：
 
@@ -53,32 +55,50 @@ WRITER_ENV_FILE="$HOME/Library/Application Support/LMMs-Lab Writer/collaboration
   pnpm --filter @lmms-lab/writer-collaboration start
 ```
 
+### 从 SQLite 版本迁移
+
+此前版本的数据在 `writer.sqlite`。先停止旧服务，再导入到一个**空的** PostgreSQL 数据库（已有账号的数据库会被拒绝，避免重复导入）：
+
+```sh
+WRITER_DATABASE_URL=postgres://writer:密码@127.0.0.1:5432/writer \
+  pnpm --filter @lmms-lab/writer-collaboration migrate-sqlite /path/writer.sqlite
+```
+
+账号、密码、登录会话、项目、成员、邀请、文件、批注与回复、版本快照、审计、修改建议和执行器令牌全部迁移；迁移时仍在排队或执行的共享任务标为失败，可重新提交。原 SQLite 文件不会被修改，确认无误前请保留。Docker 部署中，旧数据仍在 `writer-data` 卷的 `/data/writer.sqlite`：`docker compose run --rm writer pnpm --filter @lmms-lab/writer-collaboration migrate-sqlite /data/writer.sqlite`。
+
 创建项目后导入完整论文文件夹；隐藏目录、依赖及构建目录跳过。已有同名文件不会被上传操作覆盖。通过“成员”生成邀请链接，合作者设置自己的账号或使用已有账号加入。
 
 ## Docker 部署
 
-在仓库根目录创建 `.env`，设置 `WRITER_ADMIN_USER`、`WRITER_ADMIN_PASSWORD`、`WRITER_ORIGIN`。`WRITER_ORIGIN` 必须与浏览器实际地址一致。
+在仓库根目录创建 `.env`，设置 `WRITER_ADMIN_USER`、`WRITER_ADMIN_PASSWORD`、`WRITER_ORIGIN` 和数据库密码 `WRITER_POSTGRES_PASSWORD`（只用字母和数字，它会拼进连接地址）。`WRITER_ORIGIN` 必须与浏览器实际地址一致。
 
 ```sh
 docker compose up -d --build writer
 docker compose logs -f writer
 ```
 
-默认只绑定本机 `127.0.0.1:8787`，数据存于 `writer-data` 命名卷。容器使用非 root 用户、丢弃额外 capabilities，并设定资源限制。不要用 `docker compose down -v` 维护日常服务，否则会删除数据卷。源码可见及商业许可条款适用于本分支，见根目录 LICENSE。
+默认只绑定本机 `127.0.0.1:8787`。PostgreSQL 数据存于 `writer-postgres` 卷，不对外暴露端口；`backup` 服务每天用 `pg_dump` 写一份备份到 `writer-backups` 卷，默认保留 14 天（`WRITER_BACKUP_KEEP_DAYS`）。容器使用非 root 用户、丢弃额外 capabilities，并设定资源限制。不要用 `docker compose down -v` 维护日常服务，否则会删除数据卷。源码可见及商业许可条款适用于本分支，见根目录 LICENSE。
 
 本机服务与 Docker 使用同一默认端口；启动另一种方式前停掉前者，或同时更改 `WRITER_PORT` 与 `WRITER_ORIGIN`。
 
-在线一致性备份使用 SQLite backup API，可在服务运行时执行，不要只复制仍在写入的主数据库文件而漏掉 WAL：
+立即备份或复制到另一台机器：
 
 ```sh
-pnpm --filter @lmms-lab/writer-collaboration backup /path/writer.sqlite /path/backup.sqlite
-# Docker 中先写到持久卷，再用 docker cp 复制到另一块磁盘：
-docker compose exec writer pnpm --filter @lmms-lab/writer-collaboration backup /data/writer.sqlite /data/backups/backup.sqlite
+docker compose exec postgres pg_dump -U writer -Fc writer > writer-$(date +%Y%m%d).dump
+docker compose cp backup:/backups ./writer-backups   # 取出自动备份
 ```
 
-备份目标存在时会拒绝覆盖。恢复整库前先停止服务并另存当前数据库及其 WAL/SHM，再按备份快照恢复；项目内普通误编辑优先用网页的版本恢复，不需要替换整库。
+恢复前先停止 `writer`，再恢复到数据库（会覆盖同名对象）：
 
-部署到服务器时，在前面配置 HTTPS 反向代理，透传 WebSocket Upgrade，设置公网 HTTPS `WRITER_ORIGIN`。SQLite 版本适合单实例，不能启动多个独立副本共同写同一个数据库文件。需要进一步压测、备份恢复演练和运维监控后再开放给更大范围的用户；目前不作容量或生产 SLA 承诺。
+```sh
+docker compose stop writer
+docker compose exec -T postgres pg_restore -U writer -d writer --clean --if-exists < writer-20261007.dump
+docker compose start writer
+```
+
+项目内普通误编辑优先用网页的版本恢复，不需要恢复整库。定期把备份复制到另一块磁盘，并演练一次恢复。
+
+部署到服务器时，在前面配置 HTTPS 反向代理，透传 WebSocket Upgrade，设置公网 HTTPS `WRITER_ORIGIN`。实时协作的文档状态在服务进程内存中协调，目前只能运行一个 `writer` 实例（数据库可以独立部署和备份）。需要进一步压测、备份恢复演练和运维监控后再开放给更大范围的用户；目前不作容量或生产 SLA 承诺。
 
 ## 共享任务执行器
 

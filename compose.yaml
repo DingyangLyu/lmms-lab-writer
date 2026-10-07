@@ -1,15 +1,37 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: writer
+      POSTGRES_DB: writer
+      POSTGRES_PASSWORD: "${WRITER_POSTGRES_PASSWORD:?Set WRITER_POSTGRES_PASSWORD (letters and digits only)}"
+    volumes:
+      - writer-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U writer -d writer"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    mem_limit: 1g
+    security_opt:
+      - no-new-privileges:true
   writer:
     build:
       context: .
       dockerfile: apps/collaboration/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${WRITER_PORT:-8787}:8787"
     environment:
       WRITER_ORIGIN: "${WRITER_ORIGIN:-http://127.0.0.1:8787}"
       WRITER_ADMIN_USER: "${WRITER_ADMIN_USER:-writer}"
       WRITER_ADMIN_PASSWORD: "${WRITER_ADMIN_PASSWORD:?Set an initial admin password of at least 12 characters}"
+      WRITER_DATABASE_URL: "postgres://writer:${WRITER_POSTGRES_PASSWORD}@postgres:5432/writer"
     volumes:
+      # Only needed to import a database from the SQLite versions (migrate-sqlite).
       - writer-data:/data
     restart: unless-stopped
     mem_limit: 1g
@@ -21,6 +43,33 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,size=64m
+  # Daily pg_dump in custom format; keeps WRITER_BACKUP_KEEP_DAYS days (default 14).
+  backup:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: writer
+      PGDATABASE: writer
+      PGPASSWORD: "${WRITER_POSTGRES_PASSWORD}"
+      KEEP_DAYS: "${WRITER_BACKUP_KEEP_DAYS:-14}"
+    volumes:
+      - writer-backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          file=/backups/writer-$$(date +%Y%m%d-%H%M%S).dump
+          if pg_dump -Fc -f "$$file.tmp"; then mv "$$file.tmp" "$$file"; else rm -f "$$file.tmp"; fi
+          find /backups -name 'writer-*.dump' -mtime +"$$KEEP_DAYS" -delete
+          sleep 86400
+        done
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
   tex-image:
     profiles: [tools]
     image: writer-tex:local
@@ -28,4 +77,6 @@ services:
       context: .
       dockerfile: apps/collaboration/Dockerfile.tex
 volumes:
+  writer-postgres:
+  writer-backups:
   writer-data:
