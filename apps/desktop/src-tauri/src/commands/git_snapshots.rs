@@ -177,10 +177,10 @@ pub async fn create_snapshot(
     events: &[String],
 ) -> Result<SnapshotResult, String> {
     let _guard = SNAPSHOT_LOCK.lock().await;
-    repo_root(&project, true).await?;
+    repo_root(project, true).await?;
     // Also keeps Writer data out of an enclosing repository's status and `git add -A`.
     let _ = super::git::protect_private_dirs(project).await;
-    let git_dir = git(&project, &["rev-parse", "--absolute-git-dir"], None).await?;
+    let git_dir = git(project, &["rev-parse", "--absolute-git-dir"], None).await?;
     let index =
         PathBuf::from(git_dir.trim()).join(format!("writer-index-{}", uuid::Uuid::new_v4()));
     let result = snapshot_with_index(project, &index, label, events).await;
@@ -418,6 +418,30 @@ pub async fn git_snapshot_file(
     git(&project, &["show", &format!("{hash}:{path}")], None).await
 }
 
+pub async fn git_snapshot_bytes(project: &str, hash: &str, path: &str) -> Result<Vec<u8>, String> {
+    validate_snapshot(project, hash).await?;
+    if path.is_empty()
+        || Path::new(path)
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        return Err("无效项目文件路径".into());
+    }
+    let output = git_command(project)
+        .await
+        .args(["show", &format!("{hash}:{path}")])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err("该历史版本没有保存原 PDF".into());
+    }
+    if output.stdout.len() > 256 * 1024 * 1024 {
+        return Err("历史 PDF 过大".into());
+    }
+    Ok(output.stdout)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544,28 +568,4 @@ mod tests {
         assert!(!status.contains(".writer"), "{status}");
         tokio::fs::remove_dir_all(outer).await.unwrap();
     }
-}
-
-pub async fn git_snapshot_bytes(project: &str, hash: &str, path: &str) -> Result<Vec<u8>, String> {
-    validate_snapshot(project, hash).await?;
-    if path.is_empty()
-        || Path::new(path)
-            .components()
-            .any(|part| !matches!(part, Component::Normal(_)))
-    {
-        return Err("无效项目文件路径".into());
-    }
-    let output = git_command(project)
-        .await
-        .args(["show", &format!("{hash}:{path}")])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err("该历史版本没有保存原 PDF".into());
-    }
-    if output.stdout.len() > 256 * 1024 * 1024 {
-        return Err("历史 PDF 过大".into());
-    }
-    Ok(output.stdout)
 }

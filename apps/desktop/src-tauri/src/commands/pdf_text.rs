@@ -363,7 +363,7 @@ fn prune(cache: &Path) {
         }
     }
     for (limit, mut list) in [(16, previews), (512, markers)] {
-        list.sort_by(|a, b| b.0.cmp(&a.0));
+        list.sort_by_key(|entry| std::cmp::Reverse(entry.0));
         for (_, path) in list.into_iter().skip(limit) {
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(path.with_extension("json"));

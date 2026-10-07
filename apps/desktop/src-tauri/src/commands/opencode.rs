@@ -726,7 +726,8 @@ mod tests {
             let server = tokio::spawn(async move {
                 let (mut socket, _) = listener.accept().await.unwrap();
                 let mut request = [0; 1024];
-                socket.read(&mut request).await.unwrap();
+                let read = socket.read(&mut request).await.unwrap();
+                assert!(read > 0, "empty health request");
                 let response = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                     body.len(), body

@@ -429,7 +429,7 @@ async fn build(
                     app,
                     state,
                     info.path.as_deref().unwrap(),
-                    &[stem.clone()],
+                    std::slice::from_ref(&stem),
                     &stage,
                     &env,
                 )

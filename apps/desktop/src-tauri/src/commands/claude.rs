@@ -761,14 +761,14 @@ pub async fn claude_start_turn(
         }
         super::writer_bridge::set_busy(&app, "claude", &session_id, false).await;
         emit(&app, &session, &json!({"type":"writer_done"}));
-        app.state::<ClaudeState>().runs.lock().ok().map(|mut runs| {
+        if let Ok(mut runs) = app.state::<ClaudeState>().runs.lock() {
             if runs
                 .get(&session_id)
                 .is_some_and(|active| Arc::ptr_eq(active, &run))
             {
                 runs.remove(&session_id);
             }
-        });
+        }
     });
     Ok(())
 }
@@ -867,6 +867,81 @@ pub async fn claude_stop(
     });
     Ok(())
 }
+/// Subscribe before starting so even a fast response cannot be missed. No polling.
+pub async fn bridge_turn(
+    app: AppHandle,
+    session: super::writer_bridge::Conversation,
+    text: String,
+) -> Result<String, String> {
+    let id = session
+        .id
+        .strip_prefix("claude:")
+        .ok_or("无效 Claude 会话 ID")?
+        .to_string();
+    let state = app.state::<ClaudeState>();
+    let mut events = state.events.subscribe();
+    let options = TurnOptions {
+        model: session.options["model"].as_str().map(String::from),
+        effort: session.options["effort"].as_str().map(String::from),
+        permission_mode: session.options["permissionMode"]
+            .as_str()
+            .unwrap_or("default")
+            .into(),
+    };
+    claude_start_turn(
+        app.clone(),
+        state,
+        session.project,
+        id.clone(),
+        text,
+        vec![],
+        options,
+    )
+    .await?;
+    let mut result = None;
+    loop {
+        let (event_id, event) = events
+            .recv()
+            .await
+            .map_err(|e| format!("Claude 回信连接中断：{e}"))?;
+        if event_id != id {
+            continue;
+        }
+        match event["type"].as_str() {
+            Some("result") => {
+                result = Some(if event["is_error"].as_bool().unwrap_or(false) {
+                    Err(event["errors"]
+                        .as_array()
+                        .map(|v| {
+                            v.iter()
+                                .filter_map(Value::as_str)
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        })
+                        .unwrap_or_else(|| "Claude 执行失败".into()))
+                } else {
+                    Ok(event["result"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(40000)
+                        .collect())
+                });
+            }
+            Some("writer_error") => {
+                result = Some(Err(event["error"]
+                    .as_str()
+                    .unwrap_or("Claude 执行失败")
+                    .into()))
+            }
+            Some("writer_done") => {
+                return result.unwrap_or_else(|| Err("Claude 未返回结果".into()))
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -967,80 +1042,5 @@ mod tests {
         );
         assert!(claude_input("", vec![]).is_err());
         assert!(claude_input("Read", vec!["file:///secret".into()]).is_err());
-    }
-}
-
-/// Subscribe before starting so even a fast response cannot be missed. No polling.
-pub async fn bridge_turn(
-    app: AppHandle,
-    session: super::writer_bridge::Conversation,
-    text: String,
-) -> Result<String, String> {
-    let id = session
-        .id
-        .strip_prefix("claude:")
-        .ok_or("无效 Claude 会话 ID")?
-        .to_string();
-    let state = app.state::<ClaudeState>();
-    let mut events = state.events.subscribe();
-    let options = TurnOptions {
-        model: session.options["model"].as_str().map(String::from),
-        effort: session.options["effort"].as_str().map(String::from),
-        permission_mode: session.options["permissionMode"]
-            .as_str()
-            .unwrap_or("default")
-            .into(),
-    };
-    claude_start_turn(
-        app.clone(),
-        state,
-        session.project,
-        id.clone(),
-        text,
-        vec![],
-        options,
-    )
-    .await?;
-    let mut result = None;
-    loop {
-        let (event_id, event) = events
-            .recv()
-            .await
-            .map_err(|e| format!("Claude 回信连接中断：{e}"))?;
-        if event_id != id {
-            continue;
-        }
-        match event["type"].as_str() {
-            Some("result") => {
-                result = Some(if event["is_error"].as_bool().unwrap_or(false) {
-                    Err(event["errors"]
-                        .as_array()
-                        .map(|v| {
-                            v.iter()
-                                .filter_map(Value::as_str)
-                                .collect::<Vec<_>>()
-                                .join("\n")
-                        })
-                        .unwrap_or_else(|| "Claude 执行失败".into()))
-                } else {
-                    Ok(event["result"]
-                        .as_str()
-                        .unwrap_or("")
-                        .chars()
-                        .take(40000)
-                        .collect())
-                });
-            }
-            Some("writer_error") => {
-                result = Some(Err(event["error"]
-                    .as_str()
-                    .unwrap_or("Claude 执行失败")
-                    .into()))
-            }
-            Some("writer_done") => {
-                return result.unwrap_or_else(|| Err("Claude 未返回结果".into()))
-            }
-            _ => {}
-        }
     }
 }

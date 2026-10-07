@@ -154,7 +154,7 @@ impl CodexClient {
             .remove(&key)
             .ok_or_else(|| "This Codex request is no longer pending".to_string())?;
         let method = request.get("method").and_then(Value::as_str).unwrap_or("");
-        if let Err(error) = validate_server_response(&method, &response) {
+        if let Err(error) = validate_server_response(method, &response) {
             self.server_requests.lock().await.insert(key, request);
             return Err(error);
         }
@@ -625,6 +625,8 @@ pub async fn codex_read_thread(
 }
 
 #[tauri::command]
+// Each parameter is one key of the frontend's IPC payload; bundling them would change the contract.
+#[allow(clippy::too_many_arguments)]
 pub async fn codex_start_turn(
     state: tauri::State<'_, CodexState>,
     app: AppHandle,
@@ -716,6 +718,108 @@ pub async fn codex_respond_to_request(
         .await?
         .respond(request_id, response)
         .await
+}
+
+pub async fn bridge_turn(
+    app: AppHandle,
+    session: super::writer_bridge::Conversation,
+    text: String,
+) -> Result<String, String> {
+    let state = app.state::<CodexState>();
+    let client = ensure_client(&state, app.clone()).await?;
+    let id = session
+        .id
+        .strip_prefix("codex:")
+        .ok_or("无效 Codex 会话 ID")?;
+    let mut events = client.events.subscribe();
+    let current = client
+        .request("thread/read", json!({"threadId":id,"includeTurns":false}))
+        .await?;
+    if current
+        .pointer("/thread/status/type")
+        .and_then(Value::as_str)
+        == Some("active")
+    {
+        return Err("Codex 会话已经在运行，请完成后重新委派".into());
+    }
+    let mut params = json!({"threadId":id,"input":[{"type":"text","text":format!("{}\n{text}",super::writer_bridge::context("codex",id))}]});
+    for name in ["model", "effort"] {
+        if let Some(value) = session.options.get(name).filter(|v| !v.is_null()) {
+            params[name] = value.clone();
+        }
+    }
+    let mode: CodexPermissionMode = serde_json::from_value(
+        session
+            .options
+            .get("permissionMode")
+            .cloned()
+            .unwrap_or(json!("askForApproval")),
+    )
+    .map_err(|e| e.to_string())?;
+    mode.apply_to_turn(&mut params);
+    // Delegated turns edit the paper too; record them like turns started from the panel.
+    super::reviews::begin_or_report(&app, &session.project, &session.id).await;
+    let started = match client.request("turn/start", params).await {
+        Ok(started) => started,
+        Err(error) => {
+            let _ = super::reviews::finish(&app, &session.id).await;
+            return Err(error);
+        }
+    };
+    let turn_id = started
+        .pointer("/turn/id")
+        .and_then(Value::as_str)
+        .ok_or("Codex 未返回轮次 ID")?;
+    loop {
+        let message = events
+            .recv()
+            .await
+            .map_err(|e| format!("Codex 事件连接中断：{e}"))?;
+        if message["method"] == "codex/connectionClosed" {
+            return Err("Codex 连接中断；请检查会话历史".into());
+        }
+        if message["method"] == "turn/completed"
+            && message.pointer("/params/threadId").and_then(Value::as_str) == Some(id)
+            && message.pointer("/params/turn/id").and_then(Value::as_str) == Some(turn_id)
+        {
+            let turn = &message["params"]["turn"];
+            if turn["status"] != "completed" {
+                return Err(format!(
+                    "Codex 任务未完成：{} {}",
+                    turn["status"], turn["error"]
+                ));
+            }
+            let read = client
+                .request("thread/read", json!({"threadId":id,"includeTurns":true}))
+                .await?;
+            let found = read
+                .pointer("/thread/turns")
+                .and_then(Value::as_array)
+                .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
+                .ok_or("找不到已完成轮次")?;
+            let items = found["items"].as_array().ok_or("轮次没有结果")?;
+            let finals: Vec<_> = items
+                .iter()
+                .filter(|item| item["type"] == "agentMessage" && item["phase"] == "final_answer")
+                .filter_map(|item| item["text"].as_str())
+                .collect();
+            let result = if finals.is_empty() {
+                items
+                    .iter()
+                    .filter(|item| item["type"] == "agentMessage")
+                    .filter_map(|item| item["text"].as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n\n")
+            } else {
+                finals.join("\n\n")
+            };
+            return if result.trim().is_empty() {
+                Err("Codex 已完成但没有文字结果".into())
+            } else {
+                Ok(result.chars().take(40000).collect())
+            };
+        }
+    }
 }
 
 #[cfg(test)]
@@ -844,107 +948,5 @@ mod tests {
             find_node_runtime_directory(&local_bin.join("codex")).await,
             Some(tokio::fs::canonicalize(runtime_bin).await.unwrap())
         );
-    }
-}
-
-pub async fn bridge_turn(
-    app: AppHandle,
-    session: super::writer_bridge::Conversation,
-    text: String,
-) -> Result<String, String> {
-    let state = app.state::<CodexState>();
-    let client = ensure_client(&state, app.clone()).await?;
-    let id = session
-        .id
-        .strip_prefix("codex:")
-        .ok_or("无效 Codex 会话 ID")?;
-    let mut events = client.events.subscribe();
-    let current = client
-        .request("thread/read", json!({"threadId":id,"includeTurns":false}))
-        .await?;
-    if current
-        .pointer("/thread/status/type")
-        .and_then(Value::as_str)
-        == Some("active")
-    {
-        return Err("Codex 会话已经在运行，请完成后重新委派".into());
-    }
-    let mut params = json!({"threadId":id,"input":[{"type":"text","text":format!("{}\n{text}",super::writer_bridge::context("codex",id))}]});
-    for name in ["model", "effort"] {
-        if let Some(value) = session.options.get(name).filter(|v| !v.is_null()) {
-            params[name] = value.clone();
-        }
-    }
-    let mode: CodexPermissionMode = serde_json::from_value(
-        session
-            .options
-            .get("permissionMode")
-            .cloned()
-            .unwrap_or(json!("askForApproval")),
-    )
-    .map_err(|e| e.to_string())?;
-    mode.apply_to_turn(&mut params);
-    // Delegated turns edit the paper too; record them like turns started from the panel.
-    super::reviews::begin_or_report(&app, &session.project, &session.id).await;
-    let started = match client.request("turn/start", params).await {
-        Ok(started) => started,
-        Err(error) => {
-            let _ = super::reviews::finish(&app, &session.id).await;
-            return Err(error);
-        }
-    };
-    let turn_id = started
-        .pointer("/turn/id")
-        .and_then(Value::as_str)
-        .ok_or("Codex 未返回轮次 ID")?;
-    loop {
-        let message = events
-            .recv()
-            .await
-            .map_err(|e| format!("Codex 事件连接中断：{e}"))?;
-        if message["method"] == "codex/connectionClosed" {
-            return Err("Codex 连接中断；请检查会话历史".into());
-        }
-        if message["method"] == "turn/completed"
-            && message.pointer("/params/threadId").and_then(Value::as_str) == Some(id)
-            && message.pointer("/params/turn/id").and_then(Value::as_str) == Some(turn_id)
-        {
-            let turn = &message["params"]["turn"];
-            if turn["status"] != "completed" {
-                return Err(format!(
-                    "Codex 任务未完成：{} {}",
-                    turn["status"], turn["error"]
-                ));
-            }
-            let read = client
-                .request("thread/read", json!({"threadId":id,"includeTurns":true}))
-                .await?;
-            let found = read
-                .pointer("/thread/turns")
-                .and_then(Value::as_array)
-                .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
-                .ok_or("找不到已完成轮次")?;
-            let items = found["items"].as_array().ok_or("轮次没有结果")?;
-            let finals: Vec<_> = items
-                .iter()
-                .filter(|item| item["type"] == "agentMessage" && item["phase"] == "final_answer")
-                .filter_map(|item| item["text"].as_str())
-                .collect();
-            let result = if finals.is_empty() {
-                items
-                    .iter()
-                    .filter(|item| item["type"] == "agentMessage")
-                    .filter_map(|item| item["text"].as_str())
-                    .collect::<Vec<_>>()
-                    .join("\n\n")
-            } else {
-                finals.join("\n\n")
-            };
-            return if result.trim().is_empty() {
-                Err("Codex 已完成但没有文字结果".into())
-            } else {
-                Ok(result.chars().take(40000).collect())
-            };
-        }
     }
 }

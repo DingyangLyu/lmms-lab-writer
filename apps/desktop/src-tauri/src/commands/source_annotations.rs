@@ -42,7 +42,7 @@ pub async fn create(project: &str, draft: NewTextAnnotation) -> Result<Annotatio
         document_merge::locate_range(&draft.base, &draft.base, range)?;
         quote.push(range.text.clone());
     }
-    let revision = document_merge::snapshot(&project, &draft.file, &draft.base).await?;
+    let revision = document_merge::snapshot(project, &draft.file, &draft.base).await?;
     let first = document_merge::locate_range(&draft.base, &draft.base, &draft.ranges[0])?;
     let source = annotations::context_at(
         draft.file.clone(),
@@ -73,13 +73,13 @@ pub async fn create(project: &str, draft: NewTextAnnotation) -> Result<Annotatio
         submitted_to: None,
     };
     let _guard = annotations::LOCK.lock().await;
-    let previous = annotations::load(&project).await?;
+    let previous = annotations::load(project).await?;
     let mut items = previous.clone();
     annotations::record(&mut item, "created");
     let event = item.events.last().unwrap().id.clone();
     items.push(item.clone());
     annotations::commit_change(
-        &project,
+        project,
         &previous,
         &items,
         "Writer · 保存文本批注与原文版本",
