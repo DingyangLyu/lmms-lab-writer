@@ -147,11 +147,8 @@ type GitSidebarPanelProps = {
   onStageFile: (path: string) => void;
   onUnstageFile: (path: string) => void;
   onUnstageAll: () => void;
-  showCommitInput: boolean;
   commitMessage: string;
   onCommitMessageChange: (value: string) => void;
-  onShowCommitInput: () => void;
-  onHideCommitInput: () => void;
   onCommit: () => void;
   onPush: () => void | Promise<void>;
   onPull: () => void | Promise<void>;

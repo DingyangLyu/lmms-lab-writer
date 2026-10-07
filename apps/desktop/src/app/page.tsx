@@ -50,13 +50,8 @@ import { useDocumentSaving } from "@/lib/editor/use-document-saving";
 import { usePanelResize } from "@/lib/editor/use-panel-resize";
 import { getReadableErrorMessage, getSynctexLookupMessage } from "@/lib/errors";
 import { resolveLocalFile, revealInFileManager } from "@/lib/file-manager";
-import {
-  AI_COMMIT_DIFF_LIMIT,
-  AI_COMMIT_TIMEOUT_MS,
-  buildAiCommitPrompt,
-  sanitizeAiCommitMessage,
-} from "@/lib/git/ai-commit-message";
 import { parseUnifiedDiffContent } from "@/lib/git/unified-diff";
+import { useGitActions } from "@/lib/git/use-git-actions";
 import type { ConversationTarget } from "@/lib/harness/types";
 import { isHarnessId } from "@/lib/harness/types";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
@@ -64,7 +59,6 @@ import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
 import { compileFailurePrompt } from "@/lib/latex/compile-failure";
 import type { BuildTarget, SynctexResult, TargetBuildResult } from "@/lib/latex/types";
 import { useTargetBuild } from "@/lib/latex/use-target-build";
-import { runOpenCodePrompt } from "@/lib/opencode/run-prompt";
 import { useOpenCodeDaemon } from "@/lib/opencode/use-opencode-daemon";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
@@ -223,11 +217,6 @@ export default function EditorPage() {
   const [sidebarTab, setSidebarTab] = useState<"files" | "git">("files");
   const [highlightedFile, _setHighlightedFile] = useState<string | null>(null);
 
-  const [commitMessage, setCommitMessage] = useState("");
-  const [showCommitInput, setShowCommitInput] = useState(false);
-  const [isGeneratingCommitMessageAI, setIsGeneratingCommitMessageAI] = useState(false);
-  const [showRemoteInput, setShowRemoteInput] = useState(false);
-  const [remoteUrl, setRemoteUrl] = useState("");
   const [createDialog, setCreateDialog] = useState<{
     type: "file" | "directory";
   } | null>(null);
@@ -258,8 +247,6 @@ export default function EditorPage() {
   const [pendingBackend, setPendingBackend] = useState<"opencode" | "codex" | "claude">("opencode");
   const [pendingOpenCodeMessage, setPendingOpenCodeMessage] = useState<string | null>(null);
 
-  const [showGitHubPublishDialog, setShowGitHubPublishDialog] = useState(false);
-  const [ghPublishError, setGhPublishError] = useState<string | null>(null);
   const [showSynctexInstallDialog, setShowSynctexInstallDialog] = useState(false);
   const pendingSynctexRetryRef = useRef<{
     page: number;
@@ -274,14 +261,7 @@ export default function EditorPage() {
   const editorWorkspaceRef = useRef<HTMLDivElement | null>(null);
 
   const gitStatus = daemon.gitStatus;
-  const stagedChanges = useMemo(
-    () => (gitStatus?.changes ?? []).filter((c: { staged: boolean; path: string }) => c.staged),
-    [gitStatus?.changes],
-  );
-  const unstagedChanges = useMemo(
-    () => (gitStatus?.changes ?? []).filter((c: { staged: boolean; path: string }) => !c.staged),
-    [gitStatus?.changes],
-  );
+  const git = useGitActions({ daemon, flush: flushBeforeLeave, ensureOpenCode: opencode.ensure });
 
   // LaTeX settings and editor settings
   const latexSettings = useLatexSettings(daemon.projectPath);
@@ -1718,211 +1698,6 @@ export default function EditorPage() {
     [changeProject],
   );
 
-  const handleStageAll = useCallback(() => {
-    if (!gitStatus) return;
-    const unstaged = gitStatus.changes
-      .filter((c: { staged: boolean }) => !c.staged)
-      .map((c: { path: string }) => c.path);
-    if (unstaged.length > 0) {
-      daemon.gitAdd(unstaged);
-    }
-  }, [gitStatus, daemon]);
-
-  const handleStageFile = useCallback(
-    (path: string) => {
-      daemon.gitAdd([path]);
-    },
-    [daemon],
-  );
-
-  const handleUnstageAll = useCallback(() => {
-    const stagedPaths = (daemon.gitStatus?.changes ?? [])
-      .filter((c: { staged: boolean }) => c.staged)
-      .map((c: { path: string }) => c.path);
-    if (stagedPaths.length > 0) {
-      daemon.gitUnstage(stagedPaths);
-    }
-  }, [daemon]);
-
-  const handleUnstageFile = useCallback(
-    (path: string) => {
-      daemon.gitUnstage([path]);
-    },
-    [daemon],
-  );
-
-  const handleRemoteSubmit = useCallback(() => {
-    const trimmed = remoteUrl.trim();
-    if (!trimmed) return;
-    daemon.gitAddRemote(trimmed);
-    setRemoteUrl("");
-    setShowRemoteInput(false);
-  }, [daemon, remoteUrl]);
-
-  const handleGitPush = useCallback(async () => {
-    const result = await daemon.gitPush();
-    if (result.success) {
-      toast("Changes pushed successfully", "success");
-    } else {
-      toast(result.error || "Failed to push changes", "error");
-    }
-  }, [daemon, toast]);
-
-  const handleGitPull = useCallback(async () => {
-    const result = await daemon.gitPull();
-    if (result.success) {
-      toast("Changes pulled successfully", "success");
-    } else {
-      toast(result.error || "Failed to pull changes", "error");
-    }
-  }, [daemon, toast]);
-
-  const handleRefreshGitStatus = useCallback(() => {
-    void daemon.refreshGitStatus(true);
-  }, [daemon]);
-
-  const handleDiscardAll = useCallback(async () => {
-    if (!(await flushBeforeLeave())) return;
-    const result = await daemon.gitDiscardAll();
-    if (result.success) {
-      toast("All changes discarded", "success");
-    } else {
-      toast(result.error || "Failed to discard changes", "error");
-    }
-  }, [daemon, toast, flushBeforeLeave]);
-
-  const handleDiscardFile = useCallback(
-    async (path: string) => {
-      if (!(await flushBeforeLeave())) return;
-      const result = await daemon.gitDiscardFile(path);
-      if (result.success) {
-        toast(`Discarded changes: ${path}`, "success");
-      } else {
-        toast(result.error || "Failed to discard file", "error");
-      }
-    },
-    [daemon, toast, flushBeforeLeave],
-  );
-
-  const handlePublishToGitHub = useCallback(async () => {
-    setGhPublishError(null);
-
-    const status = await daemon.ghCheck();
-    if (!status.installed) {
-      toast("GitHub CLI (gh) is not installed. Install it from https://cli.github.com", "error");
-      return;
-    }
-
-    if (!status.authenticated) {
-      if (daemon.isAuthenticatingGh) {
-        toast("GitHub authentication is already in progress in the terminal window.", "info");
-        return;
-      }
-
-      toast(
-        "Terminal opened for GitHub login. Complete prompts there (type Y when asked), then continue in browser.",
-        "info",
-      );
-      const loginResult = await daemon.ghAuthLogin();
-      if (!loginResult.success || !loginResult.authenticated) {
-        toast(loginResult.error || "GitHub authentication failed", "error");
-        return;
-      }
-      toast("Authenticated with GitHub", "success");
-    }
-
-    setShowGitHubPublishDialog(true);
-  }, [daemon, toast]);
-
-  const handleGitHubPublish = useCallback(
-    async (name: string, isPrivate: boolean, description: string) => {
-      setGhPublishError(null);
-      const result = await daemon.ghCreateRepo(name, isPrivate, description || undefined);
-      if (result.success) {
-        setShowGitHubPublishDialog(false);
-        toast(`Repository published: ${result.url}`, "success");
-      } else {
-        setGhPublishError(result.error || "Failed to create repository");
-      }
-    },
-    [daemon, toast],
-  );
-
-  const handleGenerateCommitMessageAI = useCallback(async () => {
-    if (!daemon.projectPath) {
-      toast("Please open a project first.", "error");
-      return;
-    }
-
-    if (stagedChanges.length === 0) {
-      toast("Stage files before generating commit message.", "error");
-      return;
-    }
-
-    setShowCommitInput(true);
-    setIsGeneratingCommitMessageAI(true);
-
-    try {
-      const ready = await opencode.ensure(daemon.projectPath);
-      if (!ready) {
-        toast("OpenCode is unavailable. Install it with: npm i -g opencode-ai@latest", "error");
-        return;
-      }
-
-      const diffChunks: string[] = await Promise.all(
-        stagedChanges.map((change: { path: string }) => daemon.gitDiff(change.path, true)),
-      );
-      const mergedDiff = diffChunks
-        .filter((chunk: string) => chunk.trim().length > 0)
-        .join("\n\n")
-        .slice(0, AI_COMMIT_DIFF_LIMIT)
-        .trim();
-
-      if (!mergedDiff) {
-        toast("No textual staged diff available.", "error");
-        return;
-      }
-
-      const prompt = buildAiCommitPrompt(mergedDiff, "staged");
-      const aiRaw = await runOpenCodePrompt({
-        port: ready.port,
-        directory: daemon.projectPath,
-        prompt,
-        timeoutMs: AI_COMMIT_TIMEOUT_MS,
-      });
-      const aiMessage = sanitizeAiCommitMessage(aiRaw);
-
-      if (!aiMessage) {
-        toast("AI returned an empty commit message.", "error");
-        return;
-      }
-
-      setCommitMessage(aiMessage);
-      toast("AI commit draft generated.", "success");
-    } catch (error) {
-      const errorMessage = getReadableErrorMessage(
-        error,
-        "Could not reach OpenCode. Start or restart the Agent and try again.",
-      );
-      console.error(`Failed to generate AI commit message: ${errorMessage}`);
-      toast(`AI draft failed: ${errorMessage}`, "error");
-    } finally {
-      setIsGeneratingCommitMessageAI(false);
-    }
-  }, [daemon, stagedChanges, opencode.ensure, toast]);
-
-  const handleCommit = useCallback(async () => {
-    if (!commitMessage.trim()) return;
-    const result = await daemon.gitCommit(commitMessage.trim());
-    if (result.success) {
-      toast("Changes committed", "success");
-      setCommitMessage("");
-      setShowCommitInput(false);
-    } else {
-      toast(result.error || "Failed to commit", "error");
-    }
-  }, [commitMessage, daemon, toast]);
-
   const validateFileName = useCallback((name: string): string | null => {
     if (!name.trim()) {
       return "Name cannot be empty";
@@ -2536,38 +2311,13 @@ export default function EditorPage() {
                         gitStatus={gitStatus}
                         gitGraph={daemon.gitGraph}
                         gitLogEntries={daemon.gitLogEntries}
-                        stagedChanges={stagedChanges}
-                        unstagedChanges={unstagedChanges}
-                        showRemoteInput={showRemoteInput}
-                        remoteUrl={remoteUrl}
-                        onRemoteUrlChange={(value) => setRemoteUrl(value)}
-                        onShowRemoteInput={() => setShowRemoteInput(true)}
-                        onHideRemoteInput={() => setShowRemoteInput(false)}
-                        onSubmitRemote={handleRemoteSubmit}
+                        {...git.panel}
                         onInitGit={daemon.gitInit}
                         isInitializingGit={daemon.isInitializingGit}
-                        onRefreshStatus={handleRefreshGitStatus}
-                        onStageAll={handleStageAll}
-                        onDiscardAll={handleDiscardAll}
-                        onDiscardFile={handleDiscardFile}
-                        onStageFile={handleStageFile}
-                        onUnstageFile={handleUnstageFile}
-                        onUnstageAll={handleUnstageAll}
-                        showCommitInput={showCommitInput}
-                        commitMessage={commitMessage}
-                        onCommitMessageChange={(value) => setCommitMessage(value)}
-                        onShowCommitInput={() => setShowCommitInput(true)}
-                        onHideCommitInput={() => setShowCommitInput(false)}
-                        onCommit={handleCommit}
-                        onPush={handleGitPush}
-                        onPull={handleGitPull}
                         onPreviewDiff={handlePreviewGitDiff}
-                        onGenerateCommitMessageAI={handleGenerateCommitMessageAI}
                         onOpenFile={(path) => {
                           void handleFileSelect(path);
                         }}
-                        onPublishToGitHub={handlePublishToGitHub}
-                        isGeneratingCommitMessageAI={isGeneratingCommitMessageAI}
                         isPushing={daemon.isPushing}
                         isPulling={daemon.isPulling}
                         isAuthenticatingGh={daemon.isAuthenticatingGh}
@@ -2815,18 +2565,15 @@ export default function EditorPage() {
           onInstallComplete={handleSynctexInstallComplete}
         />
 
-        {showGitHubPublishDialog && (
+        {git.publish.open && (
           <GitHubPublishDialog
             defaultRepoName={
               daemon.projectPath ? pathSync.basename(daemon.projectPath) : "my-project"
             }
-            onPublish={handleGitHubPublish}
-            onCancel={() => {
-              setShowGitHubPublishDialog(false);
-              setGhPublishError(null);
-            }}
+            onPublish={git.publish.submit}
+            onCancel={git.publish.cancel}
             isCreating={daemon.isCreatingRepo}
-            error={ghPublishError}
+            error={git.publish.error}
           />
         )}
 
