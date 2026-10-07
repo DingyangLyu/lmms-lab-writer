@@ -1,7 +1,7 @@
 "use client";
 
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { AnimatePresence, motion, type PanInfo, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -44,9 +44,10 @@ import {
   type EditorSelectionContext,
   type EditorTextRange,
   sameEditorSelection,
-  selectionMatchesDocument,
 } from "@/lib/editor/selection-context";
+import { useAgentDelivery } from "@/lib/editor/use-agent-delivery";
 import { useDocumentSaving } from "@/lib/editor/use-document-saving";
+import { usePanelResize } from "@/lib/editor/use-panel-resize";
 import { getReadableErrorMessage, getSynctexLookupMessage } from "@/lib/errors";
 import { resolveLocalFile, revealInFileManager } from "@/lib/file-manager";
 import {
@@ -75,7 +76,6 @@ import { getPreferredOpenCodeConfig } from "@/lib/opencode/preferences";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
 import { annotationPrompt } from "@/lib/pdf/annotations";
-import { openedProjectPath } from "@/lib/project-root";
 import { useRecentProjects } from "@/lib/recent-projects";
 import { useTauriDaemon } from "@/lib/tauri";
 import { sleep, throttle } from "@/lib/timing";
@@ -152,9 +152,6 @@ const OpenCodeErrorDialog = dynamic(
     import("@/components/opencode/opencode-error-dialog").then((mod) => mod.OpenCodeErrorDialog),
   { ssr: false },
 );
-
-const MIN_PANEL_WIDTH = 200;
-const MAX_SIDEBAR_WIDTH = 480;
 
 export default function EditorPage() {
   const editorSettings = useEditorSettings();
@@ -233,21 +230,8 @@ export default function EditorPage() {
     if (activeHarness) setAgentBackend(activeHarness);
   }, [activeHarness]);
   const [showTerminal, setShowTerminal] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebarWidth");
-      return saved ? parseInt(saved, 10) : 280;
-    }
-    return 280;
-  });
-  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("rightPanelWidth");
-      return saved ? parseInt(saved, 10) : 280;
-    }
-    return 280;
-  });
-  const [resizing, setResizing] = useState<"sidebar" | "right" | null>(null);
+  const { sidebarWidth, rightPanelWidth, resizing, startResize, handleResizeDrag, endResize } =
+    usePanelResize();
   const [sidebarTab, setSidebarTab] = useState<"files" | "git">("files");
   const [highlightedFile, _setHighlightedFile] = useState<string | null>(null);
 
@@ -261,68 +245,7 @@ export default function EditorPage() {
   } | null>(null);
   const saving = useDocumentSaving(() => confirmAgentsIdle("quit"));
   const saveManager = saving.manager;
-  const prepareEditorMessage = useCallback(
-    async (selection: EditorSelectionContext | null) => {
-      if (daemon.projectPath) await saveManager.synchronize(daemon.projectPath);
-      if (!selection) return;
-      if (selection.project !== daemon.projectPath)
-        throw new Error("项目已切换，请重新选择需要引用的文本。");
-      const content = await invoke<string>("read_document", {
-        project: selection.project,
-        path: selection.path,
-      });
-      if (!selectionMatchesDocument(selection, content))
-        throw new Error("选区原文已变化，请重新选择后再发送，避免修改错误位置。");
-      await invoke("checkpoint_document", {
-        project: selection.project,
-        path: selection.path,
-        expected: content,
-      });
-    },
-    [saveManager, daemon.projectPath],
-  );
-  useEffect(() => {
-    let disposed = false;
-    let stop: (() => void) | undefined;
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<{ id: string; project: string; files?: string[]; checkpoint?: boolean }>(
-          "writer://prepare-delivery",
-          async ({ payload }) => {
-            let error: string | null = null;
-            // Buffers are keyed by the opened path; the bridge sends the canonical root.
-            const project = openedProjectPath(payload.project);
-            try {
-              await saveManager.synchronize(project, payload.files);
-              for (const doc of saveManager.documents.values()) {
-                if (
-                  payload.checkpoint !== false &&
-                  doc.project === project &&
-                  (!payload.files || payload.files.includes(doc.path)) &&
-                  /\.(tex|bib)$/i.test(doc.path)
-                )
-                  await invoke("checkpoint_document", {
-                    project: doc.project,
-                    path: doc.path,
-                    expected: doc.content,
-                  });
-              }
-            } catch (cause) {
-              error = `委派前保存失败：${String(cause)}`;
-            }
-            await invoke("writer_delivery_prepared", { id: payload.id, error });
-          },
-        ),
-      )
-      .then((unlisten) => {
-        if (disposed) unlisten();
-        else stop = unlisten;
-      });
-    return () => {
-      disposed = true;
-      stop?.();
-    };
-  }, [saveManager]);
+  const { prepareEditorMessage } = useAgentDelivery(saveManager, daemon.projectPath);
 
   const primaryLoadRequestIdRef = useRef(0);
   const [fileLoadError, setFileLoadError] = useState<string | null>(null);
@@ -366,11 +289,6 @@ export default function EditorPage() {
   const gitDiffRequestIdRef = useRef(0);
   const splitLoadRequestIdRef = useRef(0);
   const editorWorkspaceRef = useRef<HTMLDivElement | null>(null);
-
-  // RAF-based resize refs for 60fps performance
-  const sidebarWidthRef = useRef(sidebarWidth);
-  const rightPanelWidthRef = useRef(rightPanelWidth);
-  const rafIdRef = useRef<number | null>(null);
 
   const gitStatus = daemon.gitStatus;
   const stagedChanges = useMemo(
@@ -780,14 +698,6 @@ The AI assistant will read and update this file during compilation.
   }, [hasOpenCodeTabs, daemon.projectPath, checkOpencodeStatus, startOpencode]);
 
   useEffect(() => {
-    localStorage.setItem("sidebarWidth", String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    localStorage.setItem("rightPanelWidth", String(rightPanelWidth));
-  }, [rightPanelWidth]);
-
-  useEffect(() => {
     checkOpencodeStatus();
   }, [checkOpencodeStatus]);
 
@@ -828,50 +738,6 @@ The AI assistant will read and update this file during compilation.
     return () => {
       unlisten?.();
     };
-  }, []);
-
-  const startResize = useCallback(
-    (panel: "sidebar" | "right") => {
-      setResizing(panel);
-      sidebarWidthRef.current = sidebarWidth;
-      rightPanelWidthRef.current = rightPanelWidth;
-      document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
-      document.documentElement.style.setProperty("--right-panel-width", `${rightPanelWidth}px`);
-    },
-    [sidebarWidth, rightPanelWidth],
-  );
-
-  const handleResizeDrag = useCallback((panel: "sidebar" | "right", info: PanInfo) => {
-    if (rafIdRef.current !== null) return;
-
-    rafIdRef.current = requestAnimationFrame(() => {
-      if (panel === "sidebar") {
-        const newWidth = Math.min(Math.max(info.point.x, MIN_PANEL_WIDTH), MAX_SIDEBAR_WIDTH);
-        sidebarWidthRef.current = newWidth;
-        document.documentElement.style.setProperty("--sidebar-width", `${newWidth}px`);
-      } else if (panel === "right") {
-        const maxRightWidth = Math.floor(window.innerWidth / 2);
-        const newWidth = Math.min(
-          Math.max(window.innerWidth - info.point.x, MIN_PANEL_WIDTH),
-          maxRightWidth,
-        );
-        rightPanelWidthRef.current = newWidth;
-        document.documentElement.style.setProperty("--right-panel-width", `${newWidth}px`);
-      }
-      rafIdRef.current = null;
-    });
-  }, []);
-
-  const endResize = useCallback(() => {
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    setSidebarWidth(sidebarWidthRef.current);
-    setRightPanelWidth(rightPanelWidthRef.current);
-    document.documentElement.style.removeProperty("--sidebar-width");
-    document.documentElement.style.removeProperty("--right-panel-width");
-    setResizing(null);
   }, []);
 
   useEffect(() => {
