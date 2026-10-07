@@ -47,7 +47,15 @@ import {
   selectionMatchesDocument,
 } from "@/lib/editor/selection-context";
 import { useDocumentSaving } from "@/lib/editor/use-document-saving";
+import { getReadableErrorMessage, getSynctexLookupMessage } from "@/lib/errors";
 import { resolveLocalFile, revealInFileManager } from "@/lib/file-manager";
+import {
+  AI_COMMIT_DIFF_LIMIT,
+  AI_COMMIT_TIMEOUT_MS,
+  buildAiCommitPrompt,
+  sanitizeAiCommitMessage,
+} from "@/lib/git/ai-commit-message";
+import { parseUnifiedDiffContent } from "@/lib/git/unified-diff";
 import type { ConversationTarget } from "@/lib/harness/types";
 import { isHarnessId } from "@/lib/harness/types";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
@@ -58,12 +66,19 @@ import type {
   SynctexResult,
   TargetBuildResult,
 } from "@/lib/latex/types";
+import {
+  extractTextParts,
+  type OpenCodeMessageItem,
+  parseOpenCodeMessageResponse,
+} from "@/lib/opencode/messages";
+import { getPreferredOpenCodeConfig } from "@/lib/opencode/preferences";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
 import { annotationPrompt } from "@/lib/pdf/annotations";
 import { openedProjectPath } from "@/lib/project-root";
 import { useRecentProjects } from "@/lib/recent-projects";
 import { useTauriDaemon } from "@/lib/tauri";
+import { sleep, throttle } from "@/lib/timing";
 
 const PdfViewer = dynamic(
   () => import("@/components/editor/pdf-viewer").then((mod) => mod.PdfViewer),
@@ -78,33 +93,6 @@ import {
   SidebarSimpleIcon,
   TerminalIcon,
 } from "@phosphor-icons/react";
-
-function throttle<T extends (...args: Parameters<T>) => void>(fn: T, limit: number): T {
-  let lastCall = 0;
-  return ((...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      fn(...args);
-    }
-  }) as T;
-}
-
-function getReadableErrorMessage(error: unknown, fallback: string): string {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  if (/^(load failed|failed to fetch|networkerror)$/i.test(message.trim())) {
-    return fallback;
-  }
-  return message.trim() || fallback;
-}
-
-function getSynctexLookupMessage(error: unknown): string {
-  const message = getReadableErrorMessage(error, "SyncTeX lookup failed.");
-  if (message.includes("SYNCTEX_FILE_MISSING") || message.includes("No SyncTeX available")) {
-    return "No SyncTeX data is available for this PDF. Recompile with SyncTeX enabled.";
-  }
-  return "SyncTeX lookup failed. Check that your PDF has a .synctex.gz file.";
-}
 
 type OpenCodeStatus = {
   running: boolean;
@@ -138,197 +126,6 @@ type SplitPaneState = {
   pdfRefreshKey: number;
 };
 
-type ParsedUnifiedDiff = {
-  original: string;
-  modified: string;
-  added: number;
-  removed: number;
-  hasRenderableHunks: boolean;
-  isBinary: boolean;
-};
-
-function parseUnifiedDiffContent(content: string): ParsedUnifiedDiff {
-  const normalized = content.replace(/\r\n/g, "\n");
-  const lines = normalized.split("\n");
-  const originalLines: string[] = [];
-  const modifiedLines: string[] = [];
-  let inHunk = false;
-  let added = 0;
-  let removed = 0;
-  let isBinary = false;
-
-  for (const line of lines) {
-    if (line.startsWith("Binary files ") || line.startsWith("GIT binary patch")) {
-      isBinary = true;
-    }
-
-    if (line.startsWith("@@")) {
-      inHunk = true;
-      continue;
-    }
-
-    if (!inHunk) continue;
-    if (line === "\\ No newline at end of file") continue;
-
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      modifiedLines.push(line.slice(1));
-      added += 1;
-      continue;
-    }
-
-    if (line.startsWith("-") && !line.startsWith("---")) {
-      originalLines.push(line.slice(1));
-      removed += 1;
-      continue;
-    }
-
-    if (line.startsWith(" ")) {
-      const contextLine = line.slice(1);
-      originalLines.push(contextLine);
-      modifiedLines.push(contextLine);
-      continue;
-    }
-
-    if (line.length === 0) {
-      originalLines.push("");
-      modifiedLines.push("");
-    }
-  }
-
-  return {
-    original: originalLines.join("\n"),
-    modified: modifiedLines.join("\n"),
-    added,
-    removed,
-    hasRenderableHunks: originalLines.length > 0 || modifiedLines.length > 0,
-    isBinary,
-  };
-}
-
-const AI_COMMIT_DIFF_LIMIT = 30000;
-const AI_COMMIT_TIMEOUT_MS = 90000;
-const OPENCODE_STORAGE_KEY_AGENT = "opencode-selected-agent";
-const OPENCODE_STORAGE_KEY_MODEL = "opencode-selected-model";
-
-type OpenCodeMessagePart = {
-  type?: string;
-  text?: string;
-};
-
-type OpenCodeMessageInfo = {
-  id?: string;
-  role?: string;
-  parentID?: string;
-  error?: {
-    data?: {
-      message?: string;
-    };
-  };
-};
-
-type OpenCodeMessageItem = {
-  info?: OpenCodeMessageInfo;
-  parts?: OpenCodeMessagePart[];
-};
-
-type PreferredOpenCodeConfig = {
-  agent?: string;
-  model?: {
-    providerID: string;
-    modelID: string;
-  };
-  variant?: string;
-};
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function extractTextParts(parts: OpenCodeMessagePart[] | undefined): string[] {
-  if (!Array.isArray(parts)) return [];
-  return parts
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text as string);
-}
-
-function parseOpenCodeMessageResponse(data: unknown): OpenCodeMessageItem | null {
-  if (!data || typeof data !== "object") return null;
-  const candidate = data as OpenCodeMessageItem;
-  return candidate;
-}
-
-function getPreferredOpenCodeConfig(): PreferredOpenCodeConfig {
-  if (typeof window === "undefined") return {};
-
-  let agent: string | undefined;
-  let model:
-    | {
-        providerID: string;
-        modelID: string;
-      }
-    | undefined;
-
-  try {
-    const savedAgent = localStorage.getItem(OPENCODE_STORAGE_KEY_AGENT);
-    if (savedAgent) {
-      agent = savedAgent;
-    }
-
-    const savedModelRaw = localStorage.getItem(OPENCODE_STORAGE_KEY_MODEL);
-    if (savedModelRaw) {
-      const savedModel = JSON.parse(savedModelRaw) as {
-        providerId?: unknown;
-        modelId?: unknown;
-        variant?: unknown;
-      };
-      if (typeof savedModel.providerId === "string" && typeof savedModel.modelId === "string") {
-        model = {
-          providerID: savedModel.providerId,
-          modelID: savedModel.modelId,
-        };
-        if (typeof savedModel.variant === "string" && savedModel.variant.length > 0) {
-          return { agent, model, variant: savedModel.variant };
-        }
-      }
-    }
-  } catch {
-    return {};
-  }
-
-  return { agent, model };
-}
-
-function sanitizeAiCommitMessage(raw: string): string {
-  let text = raw.trim();
-
-  text = text.replace(/^```[a-zA-Z]*\s*/m, "");
-  text = text.replace(/\s*```$/, "");
-  text = text.replace(/^commit message\s*[:：]\s*/i, "");
-
-  if (
-    (text.startsWith('"') && text.endsWith('"')) ||
-    (text.startsWith("'") && text.endsWith("'"))
-  ) {
-    text = text.slice(1, -1).trim();
-  }
-
-  return text.trim();
-}
-
-function buildAiCommitPrompt(diff: string, scope: "staged" | "unstaged"): string {
-  return [
-    `Generate a git commit message from the following ${scope} changes.`,
-    "Do not call tools. Only output the final commit message.",
-    "Output rules:",
-    "1. Return only the commit message text, no markdown and no code block.",
-    "2. First line is a concise subject in imperative mood, <= 72 chars.",
-    "3. Add a short body only when necessary.",
-    "",
-    "Diff:",
-    diff,
-  ].join("\n");
-}
-
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((mod) => mod.MonacoEditor),
   { ssr: false },
@@ -355,8 +152,6 @@ const OpenCodeErrorDialog = dynamic(
     import("@/components/opencode/opencode-error-dialog").then((mod) => mod.OpenCodeErrorDialog),
   { ssr: false },
 );
-
-const _WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "https://writer.lmms-lab.com";
 
 const MIN_PANEL_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 480;

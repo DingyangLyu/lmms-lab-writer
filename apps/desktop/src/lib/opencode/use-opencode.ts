@@ -8,6 +8,7 @@ import {
   type OpenCodeClient,
 } from "./client";
 import { isVariantSupported, selectInitialModel } from "./model-selection";
+import { STORAGE_KEY_AGENT, STORAGE_KEY_MODEL } from "./preferences";
 import {
   buildWebsearchFallbackPrompt,
   getWebsearchFallbackFailure,
@@ -89,8 +90,6 @@ export type UseOpenCodeReturn = {
 };
 
 const DEFAULT_BASE_URL = "http://localhost:4096";
-const STORAGE_KEY_AGENT = "opencode-selected-agent";
-const STORAGE_KEY_MODEL = "opencode-selected-model";
 
 const FALLBACK_MODELS_BY_PROVIDER: Record<string, string[]> = {
   openai: ["gpt-5.4", "gpt-5", "gpt-5.1"],
