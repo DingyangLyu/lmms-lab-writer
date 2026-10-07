@@ -224,6 +224,23 @@ export const migrations: string[] = [
   // 2: account administration for lab deployments.
   `ALTER TABLE users ADD COLUMN disabled BOOLEAN NOT NULL DEFAULT false;
    ALTER TABLE users ADD COLUMN must_change BOOLEAN NOT NULL DEFAULT false;`,
+  // 3: server-side LaTeX builds (latest two per project are kept).
+  `CREATE TABLE builds(
+     id TEXT PRIMARY KEY,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     author TEXT NOT NULL,
+     main TEXT NOT NULL,
+     engine TEXT NOT NULL,
+     status TEXT NOT NULL,
+     issues TEXT NOT NULL,
+     log TEXT NOT NULL,
+     pdf BYTEA,
+     synctex BYTEA,
+     build_dir TEXT NOT NULL,
+     duration INTEGER NOT NULL,
+     created BIGINT NOT NULL
+   );
+   CREATE INDEX builds_project ON builds(project, created);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

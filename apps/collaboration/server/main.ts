@@ -16,6 +16,11 @@ const app = await createWriterServer({
   origin: process.env.WRITER_ORIGIN,
   adminUser: process.env.WRITER_ADMIN_USER,
   adminPassword: process.env.WRITER_ADMIN_PASSWORD,
+  compile: {
+    latexmk: process.env.WRITER_LATEXMK,
+    timeoutMs: Number(process.env.WRITER_COMPILE_TIMEOUT || 120) * 1000,
+    concurrency: Number(process.env.WRITER_COMPILE_CONCURRENCY || 2),
+  },
 });
 console.log(`Writer collaboration ready: ${app.origin} (${app.store.db.kind})`);
 for (const signal of ["SIGINT", "SIGTERM"] as const)

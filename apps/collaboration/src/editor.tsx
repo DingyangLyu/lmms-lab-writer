@@ -58,6 +58,10 @@ export type EditorHandle = {
   selection: () => Selection | null;
   insert: (text: string) => void;
   focusComment: (comment: Comment) => void;
+  /** 1-based line of the cursor, for jumping to the PDF. */
+  line: () => number;
+  /** Move the cursor to the start of a 1-based line and scroll it into view. */
+  reveal: (line: number) => void;
 };
 export function Editor({
   project,
@@ -190,6 +194,12 @@ export function Editor({
       insert: (insert) => {
         if (!p.editable) return;
         v.dispatch(v.state.replaceSelection(insert));
+        v.focus();
+      },
+      line: () => v.state.doc.lineAt(v.state.selection.main.head).number,
+      reveal: (line) => {
+        const target = v.state.doc.line(Math.min(Math.max(line, 1), v.state.doc.lines));
+        v.dispatch({ selection: { anchor: target.from }, scrollIntoView: true });
         v.focus();
       },
       focusComment: (c) => {

@@ -25,9 +25,11 @@ import {
   verifyPassword,
 } from "./auth";
 import { Collaboration } from "./collaboration";
+import { type CompileOptions, Compiler, type Engine, engines } from "./compile";
 import { sql, uniqueViolation } from "./db";
 import { projectJobs, runnerRequest } from "./jobs";
 import { Store, type User, userColumns } from "./store";
+import { forwardSearch, inverseSearch } from "./synctex";
 import {
   checked,
   decodeText,
@@ -129,6 +131,7 @@ export type Options = {
   port?: number;
   origin?: string;
   staticDirectory?: string;
+  compile?: CompileOptions;
 };
 export async function createWriterServer(options: Options) {
   const store = await Store.open(options.databaseUrl);
@@ -140,6 +143,7 @@ export async function createWriterServer(options: Options) {
   }
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
+  const compiler = new Compiler(store, options.compile);
   const attempts = new Map<string, { at: number; count: number }>();
   // Unknown usernames still pay the scrypt cost, so login timing does not reveal accounts.
   const decoy = await passwordHash(randomBytes(16).toString("hex"));
@@ -150,7 +154,7 @@ export async function createWriterServer(options: Options) {
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; font-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
     );
     try {
       const url = new URL(req.url ?? "/", origin),
@@ -251,15 +255,20 @@ export async function createWriterServer(options: Options) {
         const content = await readFile(file).catch(() =>
           fail(404, "资源不存在，请先运行 pnpm build"),
         );
+        // Module scripts and workers (pdf.js) are refused unless served as JavaScript.
         const types: Record<string, string> = {
-          ".html": "text/html",
-          ".js": "application/javascript",
-          ".css": "text/css",
+          ".html": "text/html; charset=utf-8",
+          ".js": "text/javascript; charset=utf-8",
+          ".mjs": "text/javascript; charset=utf-8",
+          ".css": "text/css; charset=utf-8",
+          ".json": "application/json; charset=utf-8",
           ".svg": "image/svg+xml",
           ".png": "image/png",
+          ".wasm": "application/wasm",
+          ".woff2": "font/woff2",
         };
         res.writeHead(200, {
-          "Content-Type": `${types[extname(file)] ?? "application/octet-stream"}; charset=utf-8`,
+          "Content-Type": types[extname(file)] ?? "application/octet-stream",
         });
         res.end(method === "HEAD" ? undefined : content);
         return;
@@ -538,6 +547,41 @@ export async function createWriterServer(options: Options) {
         }
       }
       if (rest === "sources" && method === "GET") return json(res, await store.textFiles(project));
+      if (rest === "builds" && method === "POST") {
+        await store.require(project, user.id, "comment");
+        const body = await jsonBody(req),
+          engine = str(body, "engine", 20) as Engine;
+        if (!engines.includes(engine)) fail(400, "不支持的编译器");
+        const build = await compiler.compile(project, user.id, str(body, "main", 240), engine);
+        collab.changed(project);
+        return json(res, build);
+      }
+      if (rest === "builds/latest" && method === "GET")
+        return json(res, await compiler.latest(project));
+      const buildRoute = /^builds\/([^/]+)\/(pdf|forward|inverse)$/.exec(rest);
+      if (buildRoute?.[1] && method === "GET") {
+        const build = buildRoute[1];
+        if (buildRoute[2] === "pdf") {
+          const pdf = await compiler.pdf(project, build);
+          res.writeHead(200, {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'inline; filename="output.pdf"',
+            "Cache-Control": "private, max-age=3600",
+          });
+          res.end(pdf);
+          return;
+        }
+        const sync = await compiler.synctex(project, build);
+        const q = (name: string) => {
+          const value = Number(url.searchParams.get(name));
+          return Number.isFinite(value) ? value : fail(400, `无效参数 ${name}`);
+        };
+        const hit =
+          buildRoute[2] === "forward"
+            ? forwardSearch(sync, url.searchParams.get("file") ?? "", q("line"))
+            : inverseSearch(sync, q("page"), q("x"), q("y"));
+        return json(res, hit ?? fail(404, "在编译结果中找不到对应位置，请重新编译"));
+      }
       if (rest === "doi" && method === "POST") {
         await edit();
         const body = await jsonBody(req),

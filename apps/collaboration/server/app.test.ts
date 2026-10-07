@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as encoding from "lib0/encoding";
@@ -650,6 +650,15 @@ describe("real collaboration service", () => {
     ).toBe(200);
     expect((await f.call(`/projects/${f.project}`, undefined, f.owner)).status).toBe(403);
     expect((await f.call("/projects", undefined, f.owner)).data).toEqual([]);
+  });
+  it("serves built module scripts as JavaScript so the pdf.js worker can load", async () => {
+    const assets = await readdir(join(import.meta.dirname, "../dist/assets")).catch(() => []);
+    const mjs = assets.find((name) => name.endsWith(".mjs"));
+    if (!mjs) return; // Client not built (pnpm build); nothing to serve.
+    const f = await fixture();
+    const response = await fetch(`${f.app.origin}/assets/${mjs}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/javascript");
   });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),

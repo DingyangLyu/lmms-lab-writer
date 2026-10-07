@@ -31,10 +31,11 @@ services:
       WRITER_ADMIN_PASSWORD: "${WRITER_ADMIN_PASSWORD:?Set an initial admin password of at least 12 characters}"
       WRITER_DATABASE_URL: "postgres://writer:${WRITER_POSTGRES_PASSWORD}@postgres:5432/writer"
     volumes:
-      # Only needed to import a database from the SQLite versions (migrate-sqlite).
+      # TeX font cache, and the old writer.sqlite if you migrate from the SQLite versions.
       - writer-data:/data
     restart: unless-stopped
-    mem_limit: 1g
+    # LaTeX builds run inside this container (see WRITER_COMPILE_* in .env.example).
+    mem_limit: 2g
     cpus: 2
     security_opt:
       - no-new-privileges:true
@@ -42,7 +43,7 @@ services:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp:rw,nosuid,size=64m
+      - /tmp:rw,nosuid,size=1g
   # Daily pg_dump in custom format; keeps WRITER_BACKUP_KEEP_DAYS days (default 14).
   backup:
     image: postgres:17-alpine

@@ -5,11 +5,30 @@ import { AdminPanel, ChangePassword } from "./account";
 import { api, base64, download, unbase64 } from "./api";
 import { type Comment, Editor, type EditorHandle, type Selection } from "./editor";
 import { projectHints } from "./latex-completion";
+import { type Highlight, PdfViewer } from "./pdf-viewer";
 import type { Person, SyncStatus } from "./provider";
 import "./style.css";
 import { type SharedJob, TasksPanel } from "./tasks";
 
 type Project = { id: string; name: string; role: string };
+type Engine = "pdflatex" | "xelatex" | "lualatex";
+type Issue = {
+  level: "error" | "warning";
+  file: string | null;
+  line: number | null;
+  message: string;
+};
+type BuildInfo = {
+  id: string;
+  main: string;
+  engine: Engine;
+  status: "success" | "failed";
+  issues: Issue[];
+  log: string;
+  pdf: boolean;
+  duration: number;
+  created: number;
+};
 type FileInfo = { id: string; path: string; binary: boolean | number; revision: number };
 type Proposal = {
   id: string;
@@ -248,6 +267,13 @@ function Workspace({
     >([]),
     [proposals, setProposals] = useState<Proposal[]>([]);
   const [jobs, setJobs] = useState<SharedJob[]>([]);
+  const [build, setBuild] = useState<BuildInfo | null>(null),
+    [compiling, setCompiling] = useState(false),
+    [pdfOpen, setPdfOpen] = useState(true),
+    [mainFile, setMainFile] = useState(""),
+    [engine, setEngine] = useState<Engine | "">(""),
+    [highlight, setHighlight] = useState<Highlight | null>(null),
+    [reveal, setReveal] = useState<{ file: string; line: number } | null>(null);
   const editor = useRef<EditorHandle | null>(null),
     imports = useRef<HTMLInputElement>(null),
     folder = useRef<HTMLInputElement>(null);
@@ -278,14 +304,16 @@ function Workspace({
     }
   };
   const reload = useCallback(async () => {
-    const [f, c, m, s, p, j] = await Promise.all([
+    const [f, c, m, s, p, j, b] = await Promise.all([
       api<FileInfo[]>(`${prefix}/files`),
       api<Comment[]>(`${prefix}/comments`),
       api<typeof members>(`${prefix}/members`),
       api<typeof snapshots>(`${prefix}/snapshots`),
       api<Proposal[]>(`${prefix}/proposals`),
       api<SharedJob[]>(`${prefix}/jobs`),
+      api<BuildInfo | null>(`${prefix}/builds/latest`),
     ]);
+    setBuild((old) => (old?.id === b?.id ? old : b));
     setFiles(f);
     setComments(c);
     setMembers(m);
@@ -430,6 +458,56 @@ function Workspace({
     .filter((f) => f.path.endsWith(".bib"))
     .flatMap((f) => parseBib(f.content).entries.map((e) => ({ ...e, file: f.id })));
   const sourcesChanged = async () => setSources(await api<typeof sources>(`${prefix}/sources`));
+  const texFiles = files.filter((f) => !f.binary && f.path.endsWith(".tex"));
+  const chosenMain =
+    mainFile ||
+    build?.main ||
+    (texFiles.some((f) => f.path === "main.tex") ? "main.tex" : (texFiles[0]?.path ?? ""));
+  const chosenEngine: Engine =
+    engine ||
+    build?.engine ||
+    (sources.some((f) =>
+      /\\usepackage(\[[^\]]*\])?\{(ctex|xeCJK|fontspec)\}|\\documentclass(\[[^\]]*\])?\{ctex/.test(
+        f.content,
+      ),
+    )
+      ? "xelatex"
+      : "pdflatex");
+  /** Open a source location: switch files if needed, then move the cursor once it has loaded. */
+  const openLocation = (path: string, line: number) => {
+    const target = files.find((f) => f.path === path);
+    if (!target) {
+      setError(`项目中没有 ${path}`);
+      return;
+    }
+    if (file?.id === target.id) editor.current?.reveal(line);
+    else {
+      setFile(target);
+      setReveal({ file: target.id, line });
+    }
+  };
+  useEffect(() => {
+    if (reveal && file?.id === reveal.file && status === "saved") {
+      editor.current?.reveal(reveal.line);
+      setReveal(null);
+    }
+  }, [reveal, file, status]);
+  const compile = () =>
+    void run(async () => {
+      if (!chosenMain) throw new Error("项目里还没有 .tex 文件");
+      setCompiling(true);
+      try {
+        const result = await api<BuildInfo>(`${prefix}/builds`, {
+          main: chosenMain,
+          engine: chosenEngine,
+        });
+        setBuild(result);
+        setHighlight(null);
+        setPdfOpen(true);
+      } finally {
+        setCompiling(false);
+      }
+    });
   return (
     <div className="workspace">
       <header className="workspace-header">
@@ -578,6 +656,59 @@ function Workspace({
         <main className="document">
           <div className="document-toolbar">
             <strong>{file?.path || "导入或创建第一份文稿"}</strong>
+            <div className="row compile-controls">
+              <select
+                aria-label="编译主文件"
+                value={chosenMain}
+                onChange={(e) => setMainFile(e.target.value)}
+              >
+                {texFiles.map((f) => (
+                  <option key={f.id} value={f.path}>
+                    {f.path}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="编译器"
+                value={chosenEngine}
+                onChange={(e) => setEngine(e.target.value as Engine)}
+              >
+                <option value="pdflatex">pdfLaTeX</option>
+                <option value="xelatex">XeLaTeX</option>
+                <option value="lualatex">LuaLaTeX</option>
+              </select>
+              <button
+                type="button"
+                className="primary"
+                disabled={!canComment || compiling || !texFiles.length || status === "saving"}
+                title={status === "saving" ? "等待正文同步完成" : "在服务器上编译"}
+                onClick={compile}
+              >
+                {compiling ? "编译中…" : "编译"}
+              </button>
+              <button type="button" onClick={() => setPdfOpen(!pdfOpen)}>
+                {pdfOpen ? "隐藏 PDF" : "显示 PDF"}
+              </button>
+              {build?.pdf && file && !file.binary && (
+                <button
+                  type="button"
+                  title="跳到光标所在行在 PDF 中的位置"
+                  onClick={() =>
+                    void run(async () => {
+                      const line = editor.current?.line() ?? 1;
+                      setHighlight(
+                        await api<Highlight>(
+                          `${prefix}/builds/${build.id}/forward?file=${encodeURIComponent(file.path)}&line=${line}`,
+                        ),
+                      );
+                      setPdfOpen(true);
+                    })
+                  }
+                >
+                  定位到 PDF
+                </button>
+              )}
+            </div>
             {file && !file.binary && (
               <div className="row">
                 <button
@@ -611,32 +742,54 @@ function Workspace({
               </div>
             )}
           </div>
-          {file ? (
-            file.binary ? (
-              <BinaryPreview key={file.id} prefix={prefix} file={file} />
-            ) : (
-              <Editor
-                key={file.id}
-                project={project.id}
-                file={file.id}
-                user={user}
-                role={role}
-                comments={comments}
-                onRole={setRole}
-                onStatus={setStatus}
-                onError={setError}
-                onReady={(handle) => {
-                  editor.current = handle;
-                }}
-                hints={() => hintsRef.current}
-              />
-            )
-          ) : (
-            <div className="empty">
-              <h2>开始一起写作</h2>
-              <p>导入完整 LaTeX 文件夹，或创建 main.tex。</p>
+          <div className="document-panes">
+            <div className="editor-pane">
+              {file ? (
+                file.binary ? (
+                  <BinaryPreview key={file.id} prefix={prefix} file={file} />
+                ) : (
+                  <Editor
+                    key={file.id}
+                    project={project.id}
+                    file={file.id}
+                    user={user}
+                    role={role}
+                    comments={comments}
+                    onRole={setRole}
+                    onStatus={setStatus}
+                    onError={setError}
+                    onReady={(handle) => {
+                      editor.current = handle;
+                    }}
+                    hints={() => hintsRef.current}
+                  />
+                )
+              ) : (
+                <div className="empty">
+                  <h2>开始一起写作</h2>
+                  <p>导入完整 LaTeX 文件夹，或创建 main.tex。</p>
+                </div>
+              )}
             </div>
-          )}
+            {pdfOpen && (
+              <BuildPane
+                prefix={prefix}
+                build={build}
+                compiling={compiling}
+                highlight={highlight}
+                onOpen={openLocation}
+                onInverse={(page, x, y) =>
+                  build &&
+                  void run(async () => {
+                    const hit = await api<{ file: string; line: number }>(
+                      `${prefix}/builds/${build.id}/inverse?page=${page}&x=${x}&y=${y}`,
+                    );
+                    openLocation(hit.file, hit.line);
+                  })
+                }
+              />
+            )}
+          </div>
         </main>
         <aside className="inspector">
           <nav className="tabs">
@@ -1193,6 +1346,80 @@ function Workspace({
         </aside>
       </div>
     </div>
+  );
+}
+function BuildPane({
+  prefix,
+  build,
+  compiling,
+  highlight,
+  onOpen,
+  onInverse,
+}: {
+  prefix: string;
+  build: BuildInfo | null;
+  compiling: boolean;
+  highlight: Highlight | null;
+  onOpen: (file: string, line: number) => void;
+  onInverse: (page: number, x: number, y: number) => void;
+}) {
+  const errors = build?.issues.filter((i) => i.level === "error") ?? [],
+    warnings = build?.issues.filter((i) => i.level === "warning") ?? [];
+  return (
+    <aside className="pdf-pane" aria-label="PDF 预览">
+      <div className="build-status">
+        {compiling ? (
+          <span>正在服务器上编译…</span>
+        ) : build ? (
+          <span className={build.status === "success" ? "ok" : "failed"}>
+            {build.status === "success" ? "编译成功" : "编译有错误"} · {build.main} ·{" "}
+            {(build.duration / 1000).toFixed(1)} 秒 · {new Date(build.created).toLocaleTimeString()}
+          </span>
+        ) : (
+          <span className="muted">还没有编译结果，点击“编译”。</span>
+        )}
+        {build?.pdf && (
+          <a href={`/api${prefix}/builds/${build.id}/pdf`} download="output.pdf">
+            下载 PDF
+          </a>
+        )}
+      </div>
+      {!!build?.issues.length && (
+        <details className="build-issues" open={!!errors.length}>
+          <summary>
+            {errors.length} 个错误 · {warnings.length} 个警告
+          </summary>
+          {[...errors, ...warnings].map((issue, i) => (
+            <button
+              type="button"
+              // biome-ignore lint/suspicious/noArrayIndexKey: Issues of one immutable build.
+              key={i}
+              className={`issue ${issue.level}`}
+              disabled={!issue.file || !issue.line}
+              onClick={() => issue.file && issue.line && onOpen(issue.file, issue.line)}
+            >
+              {issue.file && issue.line ? `${issue.file}:${issue.line} ` : ""}
+              {issue.message}
+            </button>
+          ))}
+        </details>
+      )}
+      {build?.pdf ? (
+        <PdfViewer
+          url={`/api${prefix}/builds/${build.id}/pdf`}
+          highlight={highlight}
+          onInverse={onInverse}
+        />
+      ) : (
+        build && <p className="muted pdf-empty">这次编译没有生成 PDF，请根据错误或日志修改。</p>
+      )}
+      {build && (
+        <details className="build-log">
+          <summary>完整日志</summary>
+          <pre>{build.log}</pre>
+        </details>
+      )}
+    </aside>
   );
 }
 function BinaryPreview({ prefix, file }: { prefix: string; file: FileInfo }) {

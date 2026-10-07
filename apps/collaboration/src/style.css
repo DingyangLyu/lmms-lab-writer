@@ -562,3 +562,111 @@ button.danger:hover:not(:disabled) {
   background: #fff0f0;
   border-color: #c98a8a;
 }
+.document-panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.editor-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.compile-controls select {
+  padding: 5px;
+  font-size: 11px;
+  max-width: 150px;
+}
+.compile-controls .primary {
+  padding: 6px 14px;
+}
+.pdf-pane {
+  width: 46%;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e5eaed;
+  background: #eef1f3;
+}
+.build-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid #dfe5e9;
+  background: #fff;
+}
+.build-status .ok {
+  color: #2d7a4e;
+}
+.build-status .failed {
+  color: #a93737;
+}
+.build-issues {
+  max-height: 30%;
+  overflow: auto;
+  background: #fff;
+  border-bottom: 1px solid #dfe5e9;
+  font-size: 12px;
+}
+.build-issues summary {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.build-issues .issue {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid #f0f2f4;
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: normal;
+}
+.build-issues .issue.error {
+  color: #a93737;
+}
+.build-issues .issue.warning {
+  color: #8a6d1f;
+}
+.pdf-viewer {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.pdf-page {
+  position: relative;
+  margin: 0 auto 12px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 40, 60, 0.18);
+  cursor: crosshair;
+}
+.pdf-highlight {
+  position: absolute;
+  background: rgba(255, 196, 0, 0.28);
+  border: 1px solid #e0a800;
+  pointer-events: none;
+}
+.pdf-empty {
+  padding: 20px;
+}
+.build-log {
+  max-height: 35%;
+  overflow: auto;
+  background: #fff;
+  border-top: 1px solid #dfe5e9;
+  font-size: 11px;
+}
+.build-log summary {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.build-log pre {
+  margin: 0;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
