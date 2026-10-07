@@ -14,6 +14,7 @@ import {
 } from "@lmms-lab/writing";
 import { zipSync } from "fflate";
 import * as Y from "yjs";
+import { accountRoute, validUsername } from "./accounts";
 import {
   allowedOrigin,
   bootstrap,
@@ -26,7 +27,7 @@ import {
 import { Collaboration } from "./collaboration";
 import { sql, uniqueViolation } from "./db";
 import { projectJobs, runnerRequest } from "./jobs";
-import { Store, type User } from "./store";
+import { Store, type User, userColumns } from "./store";
 import {
   checked,
   decodeText,
@@ -80,7 +81,12 @@ function roleInput(value: string): Role {
   if (!roles.includes(value as Role)) fail(400, "无效角色");
   return value as Role;
 }
-const publicUser = (u: User) => ({ id: u.id, name: u.username, admin: !!u.admin });
+const publicUser = (u: User) => ({
+  id: u.id,
+  name: u.username,
+  admin: !!u.admin,
+  mustChange: !!u.mustChange,
+});
 type Proposal = {
   id: string;
   project: string;
@@ -169,11 +175,13 @@ export async function createWriterServer(options: Options) {
         const body = await jsonBody(req),
           username = str(body, "username", 80),
           password = str(body, "password", 200);
-        const user = await db.row<User>(
-          sql`SELECT id, username, password, admin FROM users WHERE username=${username}`,
-        );
+        const user = await db.row<User & { disabled: boolean }>({
+          text: `SELECT ${userColumns}, disabled FROM users WHERE username=$1`,
+          values: [username],
+        });
         const valid = await verifyPassword(password, user?.password ?? decoy);
         if (!user || !valid) fail(401, "用户名或密码错误");
+        if (user.disabled) fail(403, "账号已停用，请联系管理员");
         await session(store, user, res, origin.startsWith("https:"));
         return json(res, publicUser(user));
       }
@@ -182,7 +190,7 @@ export async function createWriterServer(options: Options) {
           token = str(body, "token", 100),
           username = str(body, "username", 80),
           password = str(body, "password", 200);
-        if (!/^[\p{L}\p{N}_ .-]{2,80}$/u.test(username)) fail(400, "用户名格式无效");
+        if (!validUsername(username)) fail(400, "用户名格式无效");
         const invitation = await db.row<{
           project: string;
           role: Role;
@@ -191,16 +199,19 @@ export async function createWriterServer(options: Options) {
         }>(sql`SELECT project, role, expires, used FROM invites WHERE token=${digest(token)}`);
         if (!invitation || invitation.used || invitation.expires < Date.now())
           fail(410, "邀请已失效");
-        const existing = await db.row<User>(
-          sql`SELECT id, username, password, admin FROM users WHERE username=${username}`,
-        );
+        const existing = await db.row<User & { disabled: boolean }>({
+          text: `SELECT ${userColumns}, disabled FROM users WHERE username=$1`,
+          values: [username],
+        });
         if (existing && !(await verifyPassword(password, existing.password)))
           fail(401, "该用户名已存在，请使用原密码");
+        if (existing?.disabled) fail(403, "账号已停用，请联系管理员");
         const user: User = existing ?? {
           id: uid(),
           username,
           password: await passwordHash(password),
           admin: false,
+          mustChange: false,
         };
         try {
           await db.transaction(async (tx) => {
@@ -266,6 +277,18 @@ export async function createWriterServer(options: Options) {
         collab.disconnectUser(user.id, "已退出登录");
         return json(res, { ok: true });
       }
+      if (user.mustChange && path !== "/api/me/password") fail(403, "请先修改管理员给你的临时密码");
+      const account = await accountRoute(
+        store,
+        collab,
+        user,
+        res,
+        path,
+        method,
+        () => jsonBody(req),
+        origin.startsWith("https:"),
+      );
+      if (account !== undefined) return json(res, account);
       if (path === "/api/projects") {
         if (method === "GET")
           return json(
@@ -303,6 +326,32 @@ export async function createWriterServer(options: Options) {
           ...(await db.row<Body>(sql`SELECT id, name, created FROM projects WHERE id=${project}`)),
           role,
         });
+      if (!rest && method === "PATCH") {
+        await owner();
+        const name = str(await jsonBody(req), "name", 120).trim();
+        if (!name) fail(400, "请填写项目名");
+        await db.transaction(async (tx) => {
+          await tx.run(sql`UPDATE projects SET name=${name} WHERE id=${project}`);
+          await store.audit(project, user.id, "project.rename", { name }, tx);
+        });
+        collab.changed(project);
+        return json(res, { ok: true });
+      }
+      if (!rest && method === "DELETE") {
+        await owner();
+        const current = await db.row<{ name: string }>(
+          sql`SELECT name FROM projects WHERE id=${project}`,
+        );
+        if (str(await jsonBody(req), "confirm", 120) !== current?.name)
+          fail(400, "请输入完整项目名确认删除");
+        // Close editors first so no edit races the cascade.
+        await collab.closeProject(project, "项目已被删除");
+        await db.transaction(async (tx) => {
+          await tx.run(sql`DELETE FROM audit WHERE project=${project}`);
+          await tx.run(sql`DELETE FROM projects WHERE id=${project}`);
+        });
+        return json(res, { ok: true });
+      }
       if (/^(jobs|runners)(\/|$)/.test(rest))
         return json(
           res,
@@ -325,6 +374,26 @@ export async function createWriterServer(options: Options) {
                 WHERE m.project=${project} ORDER BY u.username`,
           ),
         );
+      if (rest.startsWith("members/") && method === "PATCH") {
+        await owner();
+        const target = rest.slice(8),
+          next = roleInput(str(await jsonBody(req), "role"));
+        await db.transaction(async (tx) => {
+          const changed = await tx.run(
+            sql`UPDATE members SET role=${next} WHERE project=${project} AND user_id=${target}`,
+          );
+          if (!changed) fail(404, "成员不存在");
+          const owners = await tx.row<{ n: number }>(
+            sql`SELECT count(*) AS n FROM members WHERE project=${project} AND role='owner'`,
+          );
+          if (!owners?.n) fail(409, "项目至少需要一名所有者");
+          await store.audit(project, user.id, "member.role", { user: target, role: next }, tx);
+        });
+        // Reconnect their editors so the new role applies immediately.
+        collab.refreshMember(project, target);
+        collab.changed(project);
+        return json(res, { ok: true });
+      }
       if (rest.startsWith("members/") && method === "DELETE") {
         await owner();
         const target = rest.slice(8);

@@ -50,8 +50,9 @@ export async function userFor(store: Store, req: IncomingMessage): Promise<User>
   if (!/^[a-f0-9]{64}$/.test(token)) fail(401, "请登录");
   return (
     (await store.db.row<User>(
-      sql`SELECT u.id, u.username, u.password, u.admin FROM users u JOIN sessions s ON s.user_id=u.id
-          WHERE s.token=${digest(token)} AND s.expires>${Date.now()}`,
+      sql`SELECT u.id, u.username, u.password, u.admin, u.must_change AS "mustChange"
+          FROM users u JOIN sessions s ON s.user_id=u.id
+          WHERE s.token=${digest(token)} AND s.expires>${Date.now()} AND NOT u.disabled`,
     )) ?? fail(401, "登录已过期")
   );
 }
@@ -66,6 +67,8 @@ export async function session(store: Store, user: User, res: ServerResponse, sec
     `writer_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${secure ? "; Secure" : ""}`,
   );
 }
+/** Readable one-time password handed out by an administrator (16 characters). */
+export const temporaryPassword = () => randomBytes(12).toString("base64url");
 export async function bootstrap(store: Store, name: string, password: string) {
   if (await store.db.row(sql`SELECT id FROM users LIMIT 1`)) return;
   if (!name || !password)

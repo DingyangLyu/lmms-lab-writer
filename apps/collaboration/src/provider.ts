@@ -3,7 +3,7 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protoc
 import * as Y from "yjs";
 import { base64, unbase64 } from "./api";
 export type SyncStatus = "connecting" | "saved" | "saving" | "offline" | "denied";
-export type Person = { id: string; name: string };
+export type Person = { id: string; name: string; admin?: boolean; mustChange?: boolean };
 /** Keystrokes inside this window travel as one merged update (fewer server writes). */
 const BATCH_MS = 80;
 export class WriterProvider {

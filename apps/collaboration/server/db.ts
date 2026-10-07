@@ -221,6 +221,9 @@ export const migrations: string[] = [
      name TEXT NOT NULL,
      capabilities TEXT NOT NULL DEFAULT '[]'
    );`,
+  // 2: account administration for lab deployments.
+  `ALTER TABLE users ADD COLUMN disabled BOOLEAN NOT NULL DEFAULT false;
+   ALTER TABLE users ADD COLUMN must_change BOOLEAN NOT NULL DEFAULT false;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

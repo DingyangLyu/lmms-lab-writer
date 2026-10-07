@@ -182,8 +182,9 @@ export class Collaboration {
     const match = /^\/api\/projects\/([^/]+)\/socket$/.exec(url.pathname);
     if (!match?.[1]) fail(404, "连接不存在");
     const project = match[1],
-      user = await userFor(this.store, req),
-      role = await this.store.require(project, user.id);
+      user = await userFor(this.store, req);
+    if (user.mustChange) fail(403, "请先修改临时密码");
+    const role = await this.store.require(project, user.id);
     const file = url.searchParams.get("file");
     if (this.peers.size >= 128 || [...this.peers].filter((p) => p.user.id === user.id).length >= 16)
       fail(429, "同时连接数量达到上限");
@@ -341,6 +342,20 @@ export class Collaboration {
   revoke(project: string, user: string) {
     for (const p of this.peers)
       if (p.project === project && p.user.id === user) p.socket.close(1008, "项目权限已变更");
+  }
+  /** Close code 4001 asks clients to reconnect, picking up a changed role. */
+  refreshMember(project: string, user: string) {
+    for (const p of this.peers)
+      if (p.project === project && p.user.id === user) p.socket.close(4001, "权限已更新");
+  }
+  /** Close all editors of a project and wait until their rooms are released. */
+  async closeProject(project: string, reason: string) {
+    for (const p of this.peers) if (p.project === project) p.socket.close(1008, reason);
+    for (const room of [...this.rooms.values()].filter((r) => r.project === project)) {
+      for (const peer of room.peers) peer.socket.terminate();
+      room.peers.clear();
+      await this.release(project, room.file);
+    }
   }
   /** Close every connection of an account (logout, password change, removal). */
   disconnectUser(user: string, reason: string) {

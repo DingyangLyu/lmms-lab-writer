@@ -497,3 +497,50 @@ pre {
     transition: none;
   }
 }
+.account-form label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.auth .account-form .row .primary {
+  width: auto;
+  margin-top: 0;
+}
+.admin-users {
+  width: 100%;
+  margin-top: 24px;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #dee6eb;
+}
+.admin-users th,
+.admin-users td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e8edf1;
+  text-align: left;
+}
+.admin-users th {
+  font-size: 12px;
+  color: #648092;
+  font-weight: 600;
+}
+.admin-users code {
+  font-size: 13px;
+}
+.project-settings {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+.project-settings summary {
+  cursor: pointer;
+  color: #648092;
+}
+button.danger {
+  color: #a93737;
+  border-color: #e7c3c3;
+}
+button.danger:hover:not(:disabled) {
+  background: #fff0f0;
+  border-color: #c98a8a;
+}

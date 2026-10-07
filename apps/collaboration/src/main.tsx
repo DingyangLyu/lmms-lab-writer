@@ -1,6 +1,7 @@
 import { citations, displayBib, normalizeDoi, parseBib, type ReviewHunk } from "@lmms-lab/writing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { AdminPanel, ChangePassword } from "./account";
 import { api, base64, download, unbase64 } from "./api";
 import { type Comment, Editor, type EditorHandle, type Selection } from "./editor";
 import type { Person, SyncStatus } from "./provider";
@@ -41,6 +42,7 @@ function App() {
     [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [name, setName] = useState("");
+  const [view, setView] = useState<"projects" | "admin" | "password">("projects");
   const [invite] = useState(() => new URL(location.href).searchParams.get("invite"));
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -126,6 +128,20 @@ function App() {
         <p className="muted">账号和文件保存在你部署的 Writer 服务中。</p>
       </div>
     );
+  if (user.mustChange)
+    return (
+      <div className="auth">
+        <ChangePassword forced onDone={() => setUser({ ...user, mustChange: false })} />
+      </div>
+    );
+  if (view === "admin" && user.admin)
+    return <AdminPanel me={user.id} onBack={() => setView("projects")} />;
+  if (view === "password")
+    return (
+      <div className="auth">
+        <ChangePassword onDone={() => setView("projects")} onCancel={() => setView("projects")} />
+      </div>
+    );
   if (project)
     return (
       <Workspace
@@ -146,6 +162,14 @@ function App() {
         </div>
         <div className="row">
           <span>{user.name}</span>
+          {user.admin && (
+            <button type="button" onClick={() => setView("admin")}>
+              用户管理
+            </button>
+          )}
+          <button type="button" onClick={() => setView("password")}>
+            修改密码
+          </button>
           <button
             type="button"
             onClick={() =>
@@ -1035,9 +1059,29 @@ function Workspace({
                 )}
                 {members.map((m) => (
                   <div className="member row" key={m.id}>
-                    <span>
-                      {m.username} · {roleName[m.role]}
-                    </span>
+                    <span>{m.username}</span>
+                    {role === "owner" ? (
+                      <select
+                        aria-label={`${m.username} 的角色`}
+                        value={m.role}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          void run(async () => {
+                            await api(`${prefix}/members/${m.id}`, { role: next }, "PATCH");
+                            await reload();
+                          });
+                        }}
+                      >
+                        {Object.entries(roleName).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="muted">{roleName[m.role]}</span>
+                    )}
                     {role === "owner" && m.id !== user.id && (
                       <button
                         type="button"
@@ -1055,6 +1099,44 @@ function Workspace({
                     )}
                   </div>
                 ))}
+                {role === "owner" && (
+                  <details className="project-settings">
+                    <summary>项目设置</summary>
+                    <form
+                      className="row"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const next = new FormData(e.currentTarget).get("name");
+                        void run(async () => {
+                          await api(prefix, { name: next }, "PATCH");
+                          setNotice("项目已改名，返回列表后可见。");
+                        });
+                      }}
+                    >
+                      <input aria-label="项目名" name="name" defaultValue={project.name} required />
+                      <button type="submit" disabled={busy}>
+                        改名
+                      </button>
+                    </form>
+                    <button
+                      type="button"
+                      className="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        const typed = prompt(
+                          `删除后无法恢复，所有文件、批注和版本都会删除。请先导出项目备份。\n输入项目名“${project.name}”确认删除：`,
+                        );
+                        if (typed !== null)
+                          void run(async () => {
+                            await api(prefix, { confirm: typed }, "DELETE");
+                            onBack();
+                          });
+                      }}
+                    >
+                      删除项目
+                    </button>
+                  </details>
+                )}
               </>
             )}
           </div>

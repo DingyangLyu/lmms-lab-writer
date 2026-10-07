@@ -2,7 +2,16 @@ import * as Y from "yjs";
 import { connect, type Database, type Sql, sql } from "./db";
 import { type Access, allows, decodeText, fail, type Role, uid } from "./util";
 
-export type User = { id: string; username: string; password: string; admin: boolean };
+export type User = {
+  id: string;
+  username: string;
+  password: string;
+  admin: boolean;
+  /** Set by an administrator's password reset; the account must choose a new password. */
+  mustChange: boolean;
+};
+/** Column list for `User`; disabled accounts are filtered by the callers. */
+export const userColumns = `id, username, password, admin, must_change AS "mustChange"`;
 export type FileMeta = {
   id: string;
   project: string;

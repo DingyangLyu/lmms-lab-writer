@@ -553,6 +553,104 @@ describe("real collaboration service", () => {
     const content = (await f.call(`${files}/${file}`, undefined, f.owner)).data.content;
     expect(["A\nb\n", "a\nb\n"]).toContain(content);
   });
+  it("lets administrators manage accounts with one-time passwords", async () => {
+    const f = await fixture();
+    const created = await f.call("/admin/users", { username: "student" }, f.owner);
+    expect(created.status).toBe(200);
+    const temporary = created.data.password as string;
+    expect(temporary.length).toBeGreaterThanOrEqual(12);
+    const first = await f.call("/login", { username: "student", password: temporary });
+    expect(first.data.mustChange).toBe(true);
+    expect((await f.call("/projects", undefined, first.cookie)).status).toBe(403);
+    expect((await f.call("/admin/users", undefined, first.cookie)).status).toBe(403);
+    expect(
+      (await f.call("/me/password", { current: "wrong", next: "student-password-1" }, first.cookie))
+        .status,
+    ).toBe(403);
+    const changed = await f.call(
+      "/me/password",
+      { current: temporary, next: "student-password-1" },
+      first.cookie,
+    );
+    expect(changed.status).toBe(200);
+    // The old session is gone; the response carries a fresh one.
+    expect((await f.call("/projects", undefined, first.cookie)).status).toBe(401);
+    expect((await f.call("/projects", undefined, changed.cookie)).status).toBe(200);
+    expect((await f.call("/login", { username: "student", password: temporary })).status).toBe(401);
+    const id = (await f.call("/me", undefined, changed.cookie)).data.id;
+    const reset = await f.call(`/admin/users/${id}/reset`, {}, f.owner);
+    expect((await f.call("/projects", undefined, changed.cookie)).status).toBe(401);
+    expect(
+      (await f.call("/login", { username: "student", password: reset.data.password })).data
+        .mustChange,
+    ).toBe(true);
+    expect((await f.call(`/admin/users/${id}`, { disabled: true }, f.owner, "PATCH")).status).toBe(
+      200,
+    );
+    expect(
+      (await f.call("/login", { username: "student", password: reset.data.password })).status,
+    ).toBe(403);
+    const me = (await f.call("/me", undefined, f.owner)).data.id;
+    expect((await f.call(`/admin/users/${me}`, { admin: false }, f.owner, "PATCH")).status).toBe(
+      400,
+    );
+    const users = (await f.call("/admin/users", undefined, f.owner)).data;
+    expect(users.find((u: { id: string }) => u.id === id)).toMatchObject({
+      disabled: true,
+      mustChange: true,
+    });
+    expect((await f.call("/admin/users", { username: "student" }, f.owner)).status).toBe(409);
+  });
+  it("changes member roles live and deletes projects only with confirmation", async () => {
+    const f = await fixture(),
+      editor = await f.invite("editor", "coauthor");
+    const file = (
+      await f.call(`/projects/${f.project}/files`, { path: "m.tex", content: "x" }, f.owner)
+    ).data.id;
+    const peer = await f.peer(editor, file);
+    const closed = new Promise<number>((resolve) => peer.ws.once("close", resolve));
+    const editorId = (await f.call("/me", undefined, editor)).data.id;
+    const ownerId = (await f.call("/me", undefined, f.owner)).data.id;
+    expect(
+      (
+        await f.call(
+          `/projects/${f.project}/members/${editorId}`,
+          { role: "viewer" },
+          f.owner,
+          "PATCH",
+        )
+      ).status,
+    ).toBe(200);
+    expect(await closed).toBe(4001);
+    expect(
+      (await f.call(`/projects/${f.project}/files`, { path: "n.tex", content: "" }, editor)).status,
+    ).toBe(403);
+    expect(
+      (
+        await f.call(
+          `/projects/${f.project}/members/${ownerId}`,
+          { role: "editor" },
+          f.owner,
+          "PATCH",
+        )
+      ).status,
+    ).toBe(409);
+    expect(
+      (await f.call(`/projects/${f.project}`, { name: "改名后" }, f.owner, "PATCH")).status,
+    ).toBe(200);
+    expect((await f.call(`/projects/${f.project}`, undefined, f.owner)).data.name).toBe("改名后");
+    expect(
+      (await f.call(`/projects/${f.project}`, { confirm: "test-paper" }, f.owner, "DELETE")).status,
+    ).toBe(400);
+    expect(
+      (await f.call(`/projects/${f.project}`, { confirm: "改名后" }, editor, "DELETE")).status,
+    ).toBe(403);
+    expect(
+      (await f.call(`/projects/${f.project}`, { confirm: "改名后" }, f.owner, "DELETE")).status,
+    ).toBe(200);
+    expect((await f.call(`/projects/${f.project}`, undefined, f.owner)).status).toBe(403);
+    expect((await f.call("/projects", undefined, f.owner)).data).toEqual([]);
+  });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),
       reviewer = await f.invite("commenter", "reviewer");
