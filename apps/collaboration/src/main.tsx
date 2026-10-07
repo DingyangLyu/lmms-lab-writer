@@ -1,9 +1,10 @@
 import { citations, displayBib, normalizeDoi, parseBib, type ReviewHunk } from "@lmms-lab/writing";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AdminPanel, ChangePassword } from "./account";
 import { api, base64, download, unbase64 } from "./api";
 import { type Comment, Editor, type EditorHandle, type Selection } from "./editor";
+import { projectHints } from "./latex-completion";
 import type { Person, SyncStatus } from "./provider";
 import "./style.css";
 import { type SharedJob, TasksPanel } from "./tasks";
@@ -347,6 +348,15 @@ function Workspace({
       if (retry) clearTimeout(retry);
     };
   }, [prefix, reload]);
+  // Citation keys and labels for autocomplete; the bibliography tab refreshes them.
+  useEffect(() => {
+    void api<typeof sources>(`${prefix}/sources`)
+      .then(setSources)
+      .catch(() => {});
+  }, [prefix]);
+  const hints = useMemo(() => projectHints(sources, parseBib), [sources]);
+  const hintsRef = useRef(hints);
+  hintsRef.current = hints;
   useEffect(() => {
     if (tab === "bibliography")
       void api<typeof sources>(`${prefix}/sources`)
@@ -507,19 +517,58 @@ function Workspace({
           />
           <nav>
             {files.map((f) => (
-              <button
-                type="button"
-                title={f.path}
-                key={f.id}
-                className={`file ${file?.id === f.id ? "active" : ""}`}
-                onClick={() => {
-                  setFile(f);
-                  setSelection(null);
-                  setProposal("");
-                }}
-              >
-                {f.path}
-              </button>
+              <div className={`file-row ${file?.id === f.id ? "active" : ""}`} key={f.id}>
+                <button
+                  type="button"
+                  title={f.path}
+                  className="file"
+                  onClick={() => {
+                    setFile(f);
+                    setSelection(null);
+                    setProposal("");
+                  }}
+                >
+                  {f.path}
+                </button>
+                {canEdit && (
+                  <span className="file-actions-inline">
+                    <button
+                      type="button"
+                      title="重命名或移动"
+                      aria-label={`重命名 ${f.path}`}
+                      disabled={busy}
+                      onClick={() => {
+                        const next = prompt(
+                          "新的相对路径（可含文件夹，例如 sections/intro.tex）",
+                          f.path,
+                        );
+                        if (next && next !== f.path)
+                          void run(async () => {
+                            await api(`${prefix}/files/${f.id}`, { path: next.trim() }, "PATCH");
+                            await reload();
+                          });
+                      }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      title="删除"
+                      aria-label={`删除 ${f.path}`}
+                      disabled={busy}
+                      onClick={() => {
+                        if (confirm(`删除 ${f.path}？删除前会自动保存一个项目版本。`))
+                          void run(async () => {
+                            await api(`${prefix}/files/${f.id}`, {}, "DELETE");
+                            await reload();
+                          });
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
             ))}
           </nav>
           <p className="muted sidebar-foot">
@@ -579,6 +628,7 @@ function Workspace({
                 onReady={(handle) => {
                   editor.current = handle;
                 }}
+                hints={() => hintsRef.current}
               />
             )
           ) : (

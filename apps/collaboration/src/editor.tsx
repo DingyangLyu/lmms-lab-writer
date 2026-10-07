@@ -1,17 +1,33 @@
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from "@codemirror/autocomplete";
 import { defaultKeymap } from "@codemirror/commands";
 import {
+  bracketMatching,
   defaultHighlightStyle,
   foldGutter,
   StreamLanguage,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
+import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, keymap, lineNumbers } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  highlightActiveLine,
+  keymap,
+  lineNumbers,
+} from "@codemirror/view";
 import { useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 import { base64, unbase64 } from "./api";
+import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
 export type Comment = {
   id: string;
@@ -53,6 +69,7 @@ export function Editor({
   onStatus,
   onError,
   onReady,
+  hints,
 }: {
   project: string;
   file: string;
@@ -63,13 +80,15 @@ export function Editor({
   onStatus: (s: SyncStatus) => void;
   onError: (e: string) => void;
   onReady: (handle: EditorHandle | null) => void;
+  /** Read lazily on each completion, so new keys appear without recreating the editor. */
+  hints: () => ProjectHints;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
   const editability = useRef(new Compartment());
-  const callbacks = useRef({ onRole, onStatus, onError, onReady });
-  callbacks.current = { onRole, onStatus, onError, onReady };
+  const callbacks = useRef({ onRole, onStatus, onError, onReady, hints });
+  callbacks.current = { onRole, onStatus, onError, onReady, hints };
   const readOnly = useRef(role);
   readOnly.current = role;
   useEffect(() => {
@@ -111,7 +130,19 @@ export function Editor({
           StreamLanguage.define(stex),
           syntaxHighlighting(defaultHighlightStyle),
           EditorView.lineWrapping,
-          keymap.of([...yUndoManagerKeymap, ...defaultKeymap]),
+          highlightActiveLine(),
+          bracketMatching(),
+          closeBrackets(),
+          search({ top: true }),
+          highlightSelectionMatches(),
+          autocompletion({ override: [latexCompletion(() => callbacks.current.hints())] }),
+          keymap.of([
+            ...yUndoManagerKeymap,
+            ...closeBracketsKeymap,
+            ...searchKeymap,
+            ...completionKeymap,
+            ...defaultKeymap,
+          ]),
           yCollab(text, p.awareness, { undoManager: undo }),
           editability.current.of(
             EditorState.readOnly.of(!["owner", "editor"].includes(readOnly.current)),

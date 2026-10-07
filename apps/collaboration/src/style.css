@@ -237,10 +237,28 @@ label input {
   text-overflow: ellipsis;
   background: transparent;
 }
-.file.active {
+.file-row {
+  display: flex;
+  align-items: center;
+}
+.file-row.active .file {
   border-left-color: #2d789e;
   background: #e9f0f5;
   color: #174762;
+}
+.file-actions-inline {
+  display: none;
+  flex-shrink: 0;
+}
+.file-row:hover .file-actions-inline,
+.file-row:focus-within .file-actions-inline {
+  display: flex;
+}
+.file-actions-inline button {
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  color: #71818d;
 }
 .sidebar-foot {
   padding: 10px;
