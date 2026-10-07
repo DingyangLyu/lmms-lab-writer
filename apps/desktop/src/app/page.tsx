@@ -37,6 +37,7 @@ import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
 import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
 import { useEditorSettings } from "@/lib/editor";
+import { fileKind, fileLanguage } from "@/lib/editor/file-kind";
 import { buildFileIndex, resolveFileReference } from "@/lib/editor/file-resolution";
 import { ProjectTransition } from "@/lib/editor/project-transition";
 import { projectRelativePath } from "@/lib/editor/save-manager";
@@ -412,109 +413,6 @@ export default function EditorPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const getFileType = useCallback((path: string): "text" | "image" | "pdf" | "binary" => {
-    const ext = path.split(".").pop()?.toLowerCase() || "";
-    const lowerPath = path.toLowerCase();
-    if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "ico"].includes(ext)) {
-      return "image";
-    }
-    if (ext === "pdf") {
-      return "pdf";
-    }
-    if (
-      lowerPath.endsWith(".synctex.gz") ||
-      [
-        "ppt",
-        "pptx",
-        "pps",
-        "ppsx",
-        "potx",
-        "doc",
-        "docx",
-        "xls",
-        "xlsx",
-        "odt",
-        "odp",
-        "ods",
-        "key",
-        "numbers",
-        "pages",
-        "exe",
-        "dmg",
-        "mp3",
-        "mp4",
-        "mov",
-        "zip",
-        "gz",
-        "tgz",
-        "tar",
-        "bz2",
-        "xz",
-        "7z",
-        "rar",
-        "dvi",
-        "ttf",
-        "otf",
-        "woff",
-        "woff2",
-        "eot",
-        "ds_store",
-      ].includes(ext)
-    ) {
-      return "binary";
-    }
-    return "text";
-  }, []);
-
-  const getFileLanguage = useCallback((path: string): string => {
-    const ext = path.split(".").pop()?.toLowerCase() || "";
-    const languageMap: Record<string, string> = {
-      tex: "latex",
-      sty: "latex",
-      cls: "latex",
-      bib: "bibtex",
-      js: "javascript",
-      jsx: "javascript",
-      ts: "typescript",
-      tsx: "typescript",
-      py: "python",
-      md: "markdown",
-      json: "json",
-      css: "css",
-      scss: "scss",
-      less: "less",
-      html: "html",
-      htm: "html",
-      xml: "xml",
-      yaml: "yaml",
-      yml: "yaml",
-      sh: "shell",
-      bash: "shell",
-      zsh: "shell",
-      c: "c",
-      cpp: "cpp",
-      h: "c",
-      hpp: "cpp",
-      java: "java",
-      rs: "rust",
-      go: "go",
-      rb: "ruby",
-      php: "php",
-      sql: "sql",
-      r: "r",
-      lua: "lua",
-      swift: "swift",
-      kt: "kotlin",
-      scala: "scala",
-      toml: "toml",
-      ini: "ini",
-      conf: "ini",
-      dockerfile: "dockerfile",
-      makefile: "makefile",
-    };
-    return languageMap[ext] || "plaintext";
-  }, []);
-
   const fileIndex = useMemo(() => buildFileIndex(daemon.files), [daemon.files]);
   const resolveSelectablePath = useCallback(
     (candidatePath: string) => {
@@ -535,11 +433,7 @@ export default function EditorPage() {
         resolvedPath = resolveSelectablePath(path);
         const local = await resolveLocalFile(project, resolvedPath);
         if (requestId !== primaryLoadRequestIdRef.current) return;
-        if (
-          local.directory ||
-          local.projectPath === null ||
-          getFileType(resolvedPath) === "binary"
-        ) {
+        if (local.directory || local.projectPath === null || fileKind(resolvedPath) === "binary") {
           await revealInFileManager(project, local.path);
           return;
         }
@@ -551,7 +445,7 @@ export default function EditorPage() {
       setFileLoadError(null);
       setEditorViewMode("file");
       setGitDiffPreview(null);
-      const fileType = getFileType(resolvedPath);
+      const fileType = fileKind(resolvedPath);
 
       setOpenTabs((prev) => {
         if (prev.includes(resolvedPath)) return prev;
@@ -619,7 +513,7 @@ export default function EditorPage() {
         setFileContent("");
       }
     },
-    [daemon, getFileType, resolveSelectablePath, toast, saveManager, flushBeforeLeave],
+    [daemon, resolveSelectablePath, toast, saveManager, flushBeforeLeave],
   );
 
   const [pendingPdfPage, setPendingPdfPage] = useState<{ path: string; page: number } | null>(null);
@@ -884,12 +778,12 @@ export default function EditorPage() {
   useEffect(() => {
     const event = daemon.lastFileChange,
       project = daemon.projectPath;
-    if (!event || !project || getFileType(event.path) !== "text") return;
+    if (!event || !project || fileKind(event.path) !== "text") return;
     const doc = saveManager.get(project, event.path);
     if (!doc) return;
     if (["modify", "create", "rename", "remove"].includes(event.kind))
       void saveManager.synchronizeDocument(doc).catch(() => {});
-  }, [daemon.lastFileChange, daemon.projectPath, getFileType, saveManager]);
+  }, [daemon.lastFileChange, daemon.projectPath, saveManager]);
   useEffect(() => {
     if (saving.revision < 0 || !daemon.projectPath) return;
     const doc = selectedFile ? saveManager.get(daemon.projectPath, selectedFile) : undefined;
@@ -1024,7 +918,7 @@ export default function EditorPage() {
         toast(String(cause), "error");
         return;
       }
-      const fileType = getFileType(resolvedPath);
+      const fileType = fileKind(resolvedPath);
       if (fileType === "binary") {
         try {
           await revealInFileManager(project, resolvedPath);
@@ -1165,7 +1059,6 @@ export default function EditorPage() {
     },
     [
       daemon,
-      getFileType,
       resolveSelectablePath,
       toast,
       selectedFile,
@@ -1453,7 +1346,7 @@ export default function EditorPage() {
     (side: SplitPaneSide) => {
       if (!splitPane || splitPane.side !== side) return null;
       const splitSelectedFile = splitPane.selectedFile;
-      const splitFileType = splitSelectedFile ? getFileType(splitSelectedFile) : "text";
+      const splitFileType = splitSelectedFile ? fileKind(splitSelectedFile) : "text";
 
       return (
         <div className="h-full min-h-0 flex flex-col overflow-hidden">
@@ -1544,7 +1437,7 @@ export default function EditorPage() {
                   onSelectionChange={(ranges) =>
                     handleEditorSelection(daemon.projectPath, splitSelectedFile, ranges)
                   }
-                  language={getFileLanguage(splitSelectedFile)}
+                  language={fileLanguage(splitSelectedFile)}
                   editorSettings={editorSettings.settings}
                   editorTheme={editorSettings.editorTheme}
                   className="h-full"
@@ -1559,7 +1452,6 @@ export default function EditorPage() {
       splitPane,
       daemon.projectPath,
       handleEditorSelection,
-      getFileType,
       closeSplitPane,
       splitPaneTabs,
       handleSplitTabSelect,
@@ -1572,7 +1464,6 @@ export default function EditorPage() {
       handleSplitCloseTabsToRight,
       handleSplitSynctexClick,
       handleSplitContentChange,
-      getFileLanguage,
       editorSettings.settings,
       editorSettings.editorTheme,
       toast,
@@ -1883,7 +1774,7 @@ export default function EditorPage() {
           </div>
         ) : binaryPreviewUrl ? (
           <div className="flex-1 flex flex-col bg-accent-hover overflow-hidden">
-            {getFileType(selectedFile) === "image" ? (
+            {fileKind(selectedFile) === "image" ? (
               <div className="flex-1 flex items-center justify-center overflow-auto p-4">
                 <Image
                   unoptimized
@@ -1894,7 +1785,7 @@ export default function EditorPage() {
                   className="max-w-full max-h-full object-contain"
                 />
               </div>
-            ) : getFileType(selectedFile) === "pdf" ? (
+            ) : fileKind(selectedFile) === "pdf" ? (
               <PdfViewer
                 src={binaryPreviewUrl}
                 project={daemon.projectPath ?? undefined}
@@ -1903,7 +1794,7 @@ export default function EditorPage() {
                 refreshKey={pdfRefreshKey}
                 onSynctexClick={handleSynctexClick}
               />
-            ) : getFileType(selectedFile) === "binary" ? (
+            ) : fileKind(selectedFile) === "binary" ? (
               <div className="flex-1 flex items-center justify-center overflow-auto p-4">
                 <button
                   type="button"
@@ -1954,7 +1845,7 @@ export default function EditorPage() {
                 onSelectionChange={(ranges) =>
                   handleEditorSelection(daemon.projectPath, selectedFile, ranges)
                 }
-                language={getFileLanguage(selectedFile)}
+                language={fileLanguage(selectedFile)}
                 editorSettings={editorSettings.settings}
                 editorTheme={editorSettings.editorTheme}
                 goToLine={pendingGoToLine}
