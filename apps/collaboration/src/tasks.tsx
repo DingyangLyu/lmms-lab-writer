@@ -1,13 +1,6 @@
 import { useState } from "react";
+import type { Role, SharedJob } from "../shared/api";
 import { api } from "./api";
-export type SharedJob = {
-  id: string;
-  prompt: string;
-  harness: string;
-  status: string;
-  result: string;
-  created: number;
-};
 export function TasksPanel({
   project,
   role,
@@ -17,7 +10,7 @@ export function TasksPanel({
   onError,
 }: {
   project: string;
-  role: string;
+  role: Role;
   jobs: SharedJob[];
   currentFile?: string;
   reload: () => Promise<void>;

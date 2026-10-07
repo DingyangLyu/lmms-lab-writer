@@ -1,13 +1,12 @@
+/** Shared AI and compile tasks: the project queue and the runner protocol. */
 import { randomBytes } from "node:crypto";
-import type { IncomingMessage } from "node:http";
 import { reviewHunks } from "@lmms-lab/writing";
 import * as Y from "yjs";
-import type { Collaboration } from "./collaboration";
-import { sql } from "./db";
-import type { Store, User } from "./store";
-import { checked, decodeText, digest, fail, type Role, safePath, textDoc, uid } from "./util";
+import type { RunnerInfo, SharedJob } from "../../shared/api";
+import { sql } from "../db";
+import { type Body, type Context, type InProject, route } from "../http";
+import { checked, decodeText, digest, fail, safePath, textDoc, uid } from "../util";
 
-type Body = Record<string, unknown>;
 type Job = {
   id: string;
   project: string;
@@ -37,18 +36,18 @@ const text = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
     : fail(400, `无效字段 ${key}`);
-export async function runnerRequest(
-  store: Store,
-  collab: Collaboration,
-  req: IncomingMessage,
-  path: string,
-  body: Body,
-) {
+/** Runners authenticate with a project token, not a session. */
+export const runnerRoute = route<Context>(
+  "POST",
+  /^\/api\/runner\/(lease|heartbeat|result)$/,
+  async (ctx, [action = ""]) => runnerRequest(ctx, action, await ctx.body()),
+);
+async function runnerRequest({ store, collab, req }: Context, action: string, body: Body) {
   const token = req.headers.authorization?.replace(/^Bearer /, "") || "";
   const runner =
     (await store.db.row<Runner>(sql`SELECT * FROM runners WHERE token=${digest(token)}`)) ??
     fail(401, "Runner 凭据无效");
-  if (path === "/api/runner/lease") {
+  if (action === "lease") {
     const caps = JSON.parse(runner.capabilities) as string[];
     await store.db.run(
       sql`UPDATE jobs SET status='failed', result='执行器失联，可重新提交任务'
@@ -114,13 +113,13 @@ export async function runnerRequest(
     collab.changed(job.project);
     fail(409, "提交者已无编辑权限");
   }
-  if (path === "/api/runner/heartbeat") {
+  if (action === "heartbeat") {
     await store.db.run(
       sql`UPDATE jobs SET lease=${Date.now() + 60000} WHERE id=${id} AND status='running'`,
     );
     return { ok: true };
   }
-  if (path !== "/api/runner/result") fail(404, "接口不存在");
+
   const result = text(body, "result", 50000),
     error = body.error === true;
   if (error) {
@@ -228,63 +227,60 @@ export async function runnerRequest(
   collab.changed(job.project);
   return { ok: true, proposals: ids };
 }
-export async function projectJobs(
-  store: Store,
-  collab: Collaboration,
-  project: string,
-  user: User,
-  _role: Role,
-  rest: string,
-  method: string,
-  body: Body,
-): Promise<unknown> {
-  if (rest === "runners" && method === "POST") {
-    await store.require(project, user.id, "owner");
-    const name = text(body, "name", 100),
-      capabilities = body.capabilities;
+const capabilities = ["compile", "codex", "claude", "opencode"];
+const harnesses = [
+  "codex",
+  "claude",
+  "opencode",
+  "compile:pdflatex",
+  "compile:xelatex",
+  "compile:lualatex",
+];
+
+export const jobRoutes = [
+  route<InProject>("POST", /^runners$/, async (ctx) => {
+    await ctx.need("owner");
+    const body = await ctx.body(),
+      name = text(body, "name", 100),
+      requested = body.capabilities;
     if (
-      !Array.isArray(capabilities) ||
-      !capabilities.length ||
-      capabilities.some((c) => !["compile", "codex", "claude", "opencode"].includes(c))
+      !Array.isArray(requested) ||
+      !requested.length ||
+      requested.some((c) => !capabilities.includes(c))
     )
       fail(400, "请选择执行器能力");
     const token = randomBytes(32).toString("hex"),
       id = uid();
-    await store.db.run(
+    await ctx.store.db.run(
       sql`INSERT INTO runners(id, project, token, name, capabilities)
-          VALUES(${id}, ${project}, ${digest(token)}, ${name}, ${JSON.stringify(capabilities)})`,
+          VALUES(${id}, ${ctx.project}, ${digest(token)}, ${name}, ${JSON.stringify(requested)})`,
     );
     return { id, token };
-  }
-  if (rest === "runners" && method === "GET") {
-    await store.require(project, user.id, "owner");
-    return store.db.rows(sql`SELECT id, name, capabilities FROM runners WHERE project=${project}`);
-  }
-  if (rest.startsWith("runners/") && method === "DELETE") {
-    await store.require(project, user.id, "owner");
-    await store.db.run(sql`DELETE FROM runners WHERE project=${project} AND id=${rest.slice(8)}`);
-    return { ok: true };
-  }
-  if (rest === "jobs" && method === "GET")
-    return store.db.rows(
-      sql`SELECT id, author, prompt, harness, status, result, created FROM jobs
-          WHERE project=${project} ORDER BY created DESC LIMIT 100`,
+  }),
+  route<InProject>("GET", /^runners$/, async (ctx): Promise<RunnerInfo[]> => {
+    await ctx.need("owner");
+    return ctx.store.db.rows<RunnerInfo>(
+      sql`SELECT id, name, capabilities FROM runners WHERE project=${ctx.project}`,
     );
-  if (rest === "jobs" && method === "POST") {
-    await store.require(project, user.id, "edit");
-    const prompt = text(body, "prompt", 20000),
+  }),
+  route<InProject>("DELETE", /^runners\/([^/]+)$/, async (ctx, [id = ""]) => {
+    await ctx.need("owner");
+    await ctx.store.db.run(sql`DELETE FROM runners WHERE project=${ctx.project} AND id=${id}`);
+    return { ok: true };
+  }),
+  route<InProject>("GET", /^jobs$/, (ctx) =>
+    ctx.store.db.rows<SharedJob>(
+      sql`SELECT id, author, prompt, harness, status, result, created FROM jobs
+          WHERE project=${ctx.project} ORDER BY created DESC LIMIT 100`,
+    ),
+  ),
+  route<InProject>("POST", /^jobs$/, async (ctx) => {
+    await ctx.need("edit");
+    const { store, project, user } = ctx,
+      body = await ctx.body(),
+      prompt = text(body, "prompt", 20000),
       harness = text(body, "harness", 80);
-    if (
-      ![
-        "codex",
-        "claude",
-        "opencode",
-        "compile:pdflatex",
-        "compile:xelatex",
-        "compile:lualatex",
-      ].includes(harness)
-    )
-      fail(400, "不支持的执行环境");
+    if (!harnesses.includes(harness)) fail(400, "不支持的执行环境");
     if (harness.startsWith("compile:")) {
       safePath(prompt);
       if (!prompt.endsWith(".tex")) fail(400, "请选择 .tex 入口");
@@ -305,17 +301,16 @@ export async function projectJobs(
       );
       await store.audit(project, user.id, "task.queued", { id, harness }, tx);
     });
-    collab.changed(project);
+    ctx.collab.changed(project);
     return { id };
-  }
-  if (rest.startsWith("jobs/") && method === "DELETE") {
-    await store.require(project, user.id, "edit");
-    await store.db.run(
+  }),
+  route<InProject>("DELETE", /^jobs\/([^/]+)$/, async (ctx, [id = ""]) => {
+    await ctx.need("edit");
+    await ctx.store.db.run(
       sql`UPDATE jobs SET status='cancelled'
-          WHERE id=${rest.slice(5)} AND project=${project} AND status IN ('queued','running')`,
+          WHERE id=${id} AND project=${ctx.project} AND status IN ('queued','running')`,
     );
-    collab.changed(project);
+    ctx.collab.changed(ctx.project);
     return { ok: true };
-  }
-  fail(404, "接口不存在");
-}
+  }),
+];

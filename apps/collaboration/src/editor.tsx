@@ -26,21 +26,10 @@ import {
 import { useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
+import type { Comment, Role } from "../shared/api";
 import { base64, unbase64 } from "./api";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
-export type Comment = {
-  id: string;
-  file: string;
-  authorName: string;
-  quote: string;
-  start: string;
-  end: string;
-  body: string;
-  resolved: boolean;
-  created: number;
-  replies: { id: string; authorName: string; body: string }[];
-};
 export type Selection = { quote: string; start: string; end: string };
 const LIMIT = 2_000_000;
 /** Comment highlights follow edits by position mapping between (throttled) re-anchors. */
@@ -78,9 +67,9 @@ export function Editor({
   project: string;
   file: string;
   user: Person;
-  role: string;
+  role: Role;
   comments: Comment[];
-  onRole: (role: string) => void;
+  onRole: (role: Role) => void;
   onStatus: (s: SyncStatus) => void;
   onError: (e: string) => void;
   onReady: (handle: EditorHandle | null) => void;

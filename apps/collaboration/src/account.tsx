@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { Account, IssuedPassword } from "../shared/api";
 import { api } from "./api";
 
 export function ChangePassword({
@@ -86,20 +87,11 @@ export function ChangePassword({
   );
 }
 
-type Account = {
-  id: string;
-  username: string;
-  admin: boolean;
-  disabled: boolean;
-  mustChange: boolean;
-  created: number;
-  projects: number;
-};
 export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
   const [users, setUsers] = useState<Account[]>([]),
     [name, setName] = useState(""),
     [admin, setAdmin] = useState(false),
-    [issued, setIssued] = useState<{ username: string; password: string } | null>(null),
+    [issued, setIssued] = useState<Required<IssuedPassword> | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const reload = useCallback(async () => setUsers(await api<Account[]>("/admin/users")), []);

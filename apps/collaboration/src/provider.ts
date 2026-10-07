@@ -1,9 +1,11 @@
 import { IndexeddbPersistence } from "y-indexeddb";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
+import type { PublicUser, Role } from "../shared/api";
 import { base64, unbase64 } from "./api";
 export type SyncStatus = "connecting" | "saved" | "saving" | "offline" | "denied";
-export type Person = { id: string; name: string; admin?: boolean; mustChange?: boolean };
+/** The fields of a signed-in user the editor needs. */
+export type Person = Pick<PublicUser, "id" | "name">;
 /** Keystrokes inside this window travel as one merged update (fewer server writes). */
 const BATCH_MS = 80;
 export class WriterProvider {
@@ -30,7 +32,7 @@ export class WriterProvider {
     public file: string,
     public user: Person,
     private status: (status: SyncStatus) => void,
-    private role: (role: string) => void,
+    private role: (role: Role) => void,
     private error: (text: string) => void,
   ) {
     this.cache = new IndexeddbPersistence(

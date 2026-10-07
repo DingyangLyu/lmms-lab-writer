@@ -1,14 +1,9 @@
 import { diffLines } from "diff";
 import { useEffect, useState } from "react";
+import type { Snapshot, SnapshotChange } from "../shared/api";
 import { api } from "./api";
 
-type Change = {
-  id: string;
-  path: string;
-  oldPath?: string;
-  binary: boolean;
-  status: "added" | "removed" | "changed" | "renamed";
-};
+type Change = SnapshotChange;
 const statusName: Record<Change["status"], string> = {
   added: "新增",
   removed: "已删除",
@@ -38,7 +33,7 @@ export function SnapshotCompare({
   onClose,
 }: {
   prefix: string;
-  snapshot: { id: string; label: string; created: number };
+  snapshot: Pick<Snapshot, "id" | "label" | "created">;
   onClose: () => void;
 }) {
   const [changes, setChanges] = useState<Change[] | null>(null),
