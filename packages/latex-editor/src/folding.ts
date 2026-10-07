@@ -1,6 +1,6 @@
 import { foldService } from "@codemirror/language";
 import type { Text } from "@codemirror/state";
-import { getLaTeXFoldingRanges } from "@/lib/monaco/latex-folding";
+import { getLaTeXFoldingRanges } from "./fold-ranges";
 
 export type LatexFold = { from: number; to: number; startLine: number; comment: boolean };
 const cache = new WeakMap<Text, LatexFold[]>();

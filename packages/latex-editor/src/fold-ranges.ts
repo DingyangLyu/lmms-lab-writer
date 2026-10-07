@@ -1,4 +1,4 @@
-/** Line numbers are one-based, as expected by Monaco's folding range provider. */
+/** One-based line numbers, as used by CodeMirror lines and Monaco folding ranges. */
 export type LaTeXFoldingRange = {
   start: number;
   end: number;

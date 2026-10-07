@@ -1,7 +1,7 @@
 import { codeFolding, foldEffect, foldedRanges, unfoldEffect } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { latexFolding, latexFoldRanges } from "./latex-folding";
+import { latexFolding, latexFoldRanges } from "./folding";
 
 function stateFor(doc: string) {
   return EditorState.create({ doc, extensions: [latexFolding, codeFolding()] });

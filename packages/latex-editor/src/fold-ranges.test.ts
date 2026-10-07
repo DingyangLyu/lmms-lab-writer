@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getLaTeXFoldingRanges } from "./latex-folding";
+import { getLaTeXFoldingRanges } from "./fold-ranges";
 
 describe("LaTeX folding ranges", () => {
   it("nests chapters, sections, and subsections until the next peer or parent", () => {

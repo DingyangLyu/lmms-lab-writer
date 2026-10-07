@@ -5,14 +5,7 @@ import {
   completionKeymap,
 } from "@codemirror/autocomplete";
 import { defaultKeymap } from "@codemirror/commands";
-import {
-  bracketMatching,
-  defaultHighlightStyle,
-  foldGutter,
-  StreamLanguage,
-  syntaxHighlighting,
-} from "@codemirror/language";
-import { stex } from "@codemirror/legacy-modes/mode/stex";
+import { bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import {
@@ -23,6 +16,7 @@ import {
   keymap,
   lineNumbers,
 } from "@codemirror/view";
+import { latexFolding, latexHighlighting, latexLanguage } from "@lmms-lab/latex-editor";
 import { useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
@@ -119,9 +113,10 @@ export function Editor({
             return transaction;
           }),
           lineNumbers(),
+          latexLanguage,
+          latexHighlighting(false),
+          latexFolding,
           foldGutter(),
-          StreamLanguage.define(stex),
-          syntaxHighlighting(defaultHighlightStyle),
           EditorView.lineWrapping,
           highlightActiveLine(),
           bracketMatching(),
@@ -133,6 +128,7 @@ export function Editor({
             ...yUndoManagerKeymap,
             ...closeBracketsKeymap,
             ...searchKeymap,
+            ...foldKeymap,
             ...completionKeymap,
             ...defaultKeymap,
           ]),

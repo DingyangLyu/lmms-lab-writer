@@ -38,9 +38,6 @@ importers:
       '@codemirror/language':
         specifier: ^6.12.3
         version: 6.12.3
-      '@codemirror/legacy-modes':
-        specifier: ^6.5.3
-        version: 6.5.3
       '@codemirror/search':
         specifier: ^6.7.0
         version: 6.7.0
@@ -53,6 +50,12 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.8
         version: 0.5.8
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
+      '@lmms-lab/latex-editor':
+        specifier: workspace:*
+        version: link:../../packages/latex-editor
       '@lmms-lab/writing':
         specifier: workspace:*
         version: link:../../packages/writing
@@ -147,6 +150,9 @@ importers:
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
+      '@lmms-lab/latex-editor':
+        specifier: workspace:*
+        version: link:../../packages/latex-editor
       '@lmms-lab/writer-shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -427,6 +433,24 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@25.9.1)(vite@8.3.2(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.15)(yaml@2.9.0))
 
+  packages/latex-editor:
+    devDependencies:
+      '@codemirror/language':
+        specifier: ^6.12.3
+        version: 6.12.3
+      '@codemirror/state':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.7(@types/node@25.9.1)(vite@8.3.2(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.15)(yaml@2.9.0))
+
   packages/shared:
     devDependencies:
       '@types/node':
@@ -551,9 +575,6 @@ packages:
 
   '@codemirror/language@6.12.3':
     resolution: {integrity: sha512-QwCZW6Tt1siP37Jet9Tb02Zs81TQt6qQrZR2H+eGMcFsL1zMrk2/b9CLC7/9ieP1fjIUMgviLWMmgiHoJrj+ZA==}
-
-  '@codemirror/legacy-modes@6.5.3':
-    resolution: {integrity: sha512-xCsmIzH78MyWkib9jlPaaun57XNkfbMIhagfaZVd0iLTqlpw3jXaIcbZm72MTmmn64eTZpBVNjbyYh+QXnxRsg==}
 
   '@codemirror/search@6.7.0':
     resolution: {integrity: sha512-ZvGm99wc/s2cITtMT15LFdn8aH/aS+V+DqyGq/N5ZlV5vWtH+nILvC2nw0zX7ByNoHHDZ2IxxdW38O0tc5nVHg==}
@@ -4996,10 +5017,6 @@ snapshots:
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.10
       style-mod: 4.1.3
-
-  '@codemirror/legacy-modes@6.5.3':
-    dependencies:
-      '@codemirror/language': 6.12.3
 
   '@codemirror/search@6.7.0':
     dependencies:

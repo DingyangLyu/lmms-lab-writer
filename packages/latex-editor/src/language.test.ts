@@ -2,7 +2,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { highlightTree, tagHighlighter, tags } from "@lezer/highlight";
 import { describe, expect, it } from "vitest";
-import { latexLanguage } from "./latex-language";
+import { latexLanguage } from "./language";
 
 function tokens(text: string) {
   const state = EditorState.create({ doc: text, extensions: [latexLanguage] });

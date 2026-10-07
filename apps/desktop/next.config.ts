@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["@lmms-lab/writer-shared", "@lmms-lab/writing"],
+  transpilePackages: ["@lmms-lab/latex-editor", "@lmms-lab/writer-shared", "@lmms-lab/writing"],
   assetPrefix: isProd ? undefined : `http://${internalHost}:3000`,
   productionBrowserSourceMaps: false,
   turbopack: {},

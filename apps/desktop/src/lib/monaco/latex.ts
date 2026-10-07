@@ -1,8 +1,8 @@
 "use client";
 
+import { getLaTeXFoldingRanges } from "@lmms-lab/latex-editor";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages } from "monaco-editor";
-import { getLaTeXFoldingRanges } from "./latex-folding";
 
 const registered = new WeakSet<Monaco>();
 

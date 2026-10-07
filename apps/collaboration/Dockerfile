@@ -12,9 +12,11 @@ RUN corepack enable && corepack prepare pnpm@11.5.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/writing/package.json ./packages/writing/package.json
+COPY packages/latex-editor/package.json ./packages/latex-editor/package.json
 COPY apps/collaboration/package.json ./apps/collaboration/package.json
 RUN pnpm install --frozen-lockfile --filter @lmms-lab/writer-collaboration...
 COPY packages/writing ./packages/writing
+COPY packages/latex-editor ./packages/latex-editor
 COPY apps/collaboration ./apps/collaboration
 COPY LICENSE NOTICE ./
 COPY LICENSES ./LICENSES
