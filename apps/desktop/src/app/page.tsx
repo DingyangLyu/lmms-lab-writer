@@ -67,18 +67,14 @@ import type {
   SynctexResult,
   TargetBuildResult,
 } from "@/lib/latex/types";
-import {
-  extractTextParts,
-  type OpenCodeMessageItem,
-  parseOpenCodeMessageResponse,
-} from "@/lib/opencode/messages";
-import { getPreferredOpenCodeConfig } from "@/lib/opencode/preferences";
+import { runOpenCodePrompt } from "@/lib/opencode/run-prompt";
+import { useOpenCodeDaemon } from "@/lib/opencode/use-opencode-daemon";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
 import { annotationPrompt } from "@/lib/pdf/annotations";
 import { useRecentProjects } from "@/lib/recent-projects";
 import { useTauriDaemon } from "@/lib/tauri";
-import { sleep, throttle } from "@/lib/timing";
+import { throttle } from "@/lib/timing";
 
 const PdfViewer = dynamic(
   () => import("@/components/editor/pdf-viewer").then((mod) => mod.PdfViewer),
@@ -94,15 +90,6 @@ import {
   TerminalIcon,
 } from "@phosphor-icons/react";
 
-type OpenCodeStatus = {
-  running: boolean;
-  port: number;
-  installed: boolean;
-  managed?: boolean;
-  webSearchEnabled?: boolean;
-};
-
-type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
 type EditorViewMode = "file" | "git-diff";
 type GitDiffPreviewState = {
   path: string;
@@ -198,6 +185,10 @@ export default function EditorPage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const conversations = useHarnessWorkspace(daemon.projectPath);
+  const opencode = useOpenCodeDaemon(
+    daemon.projectPath,
+    conversations.tabs.some((t) => t.backend === "opencode"),
+  );
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   /** Drafts are persisted; running or approval-waiting agents need explicit consent. */
@@ -265,14 +256,10 @@ export default function EditorPage() {
       .recoverProject(project, (path) => invoke<string>("read_document", { project, path }))
       .catch((error) => toast(`恢复草稿读取失败：${String(error)}`, "error"));
   }, [daemon.projectPath, saveManager, toast]);
-  const [opencodeDaemonStatus, setOpencodeDaemonStatus] = useState<OpenCodeDaemonStatus>("stopped");
-  const [opencodePort, setOpencodePort] = useState(4096);
-  const [showDisconnectedDialog, setShowDisconnectedDialog] = useState(false);
   const [showLatexSettings, setShowLatexSettings] = useState(false);
   const [showLoginCodeModal, setShowLoginCodeModal] = useState(false);
   const [pendingBackend, setPendingBackend] = useState<"opencode" | "codex" | "claude">("opencode");
   const [pendingOpenCodeMessage, setPendingOpenCodeMessage] = useState<string | null>(null);
-  const [opencodeError, setOpencodeError] = useState<string | null>(null);
 
   const [showGitHubPublishDialog, setShowGitHubPublishDialog] = useState(false);
   const [ghPublishError, setGhPublishError] = useState<string | null>(null);
@@ -284,7 +271,6 @@ export default function EditorPage() {
     context: "main" | "split";
   } | null>(null);
 
-  const opencodeStartedForPathRef = useRef<string | null>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const gitDiffRequestIdRef = useRef(0);
   const splitLoadRequestIdRef = useRef(0);
@@ -424,46 +410,15 @@ The AI assistant will read and update this file during compilation.
         return;
       }
 
-      try {
-        const status = await invoke<OpenCodeStatus>("opencode_status");
-        if (!status.installed) {
-          setOpencodeDaemonStatus("unavailable");
-          toast(
-            "Compilation failed. OpenCode is not installed, so the Agent cannot be started.",
-            "error",
-          );
-          return;
-        }
-
-        if (
-          status.running &&
-          status.managed &&
-          opencodeStartedForPathRef.current === daemon.projectPath
-        ) {
-          setOpencodeDaemonStatus("running");
-          setOpencodePort(status.port);
-          toast("Compilation failed. Sent the log to Agent.", "error");
-          return;
-        }
-
-        setOpencodeDaemonStatus("starting");
-        setOpencodeError(null);
-        const startedStatus = await invoke<OpenCodeStatus>("opencode_start", {
-          directory: daemon.projectPath,
-          port: 4096,
-        });
-        setOpencodeDaemonStatus("running");
-        setOpencodePort(startedStatus.port);
-        opencodeStartedForPathRef.current = daemon.projectPath;
-        toast("Compilation failed. Sent the log to Agent.", "error");
-      } catch (agentError) {
-        const message = agentError instanceof Error ? agentError.message : String(agentError);
-        setOpencodeDaemonStatus("stopped");
-        setOpencodeError(message);
-        toast("Compilation failed. Could not start the Agent automatically.", "error");
-      }
+      const ready = await opencode.ensure(daemon.projectPath);
+      toast(
+        ready
+          ? "Compilation failed. Sent the log to Agent."
+          : "Compilation failed. Could not start the Agent automatically.",
+        "error",
+      );
     },
-    [agentBackend, daemon, toast],
+    [agentBackend, daemon, opencode.ensure, toast],
   );
 
   const runDirectCompile = useCallback(
@@ -529,126 +484,6 @@ The AI assistant will read and update this file during compilation.
     toast,
   ]);
 
-  const checkOpencodeStatus = useCallback(async () => {
-    try {
-      const status = await invoke<OpenCodeStatus>("opencode_status");
-      if (!status.installed) {
-        setOpencodeDaemonStatus("unavailable");
-      } else if (status.running && status.managed) {
-        setOpencodeDaemonStatus("running");
-        setOpencodePort(status.port);
-      } else if (status.running) {
-        setOpencodeDaemonStatus("stopped");
-      } else {
-        setOpencodeDaemonStatus("stopped");
-      }
-      return status;
-    } catch {
-      setOpencodeDaemonStatus("unavailable");
-      return null;
-    }
-  }, []);
-
-  const startOpencode = useCallback(
-    async (directory: string) => {
-      try {
-        setOpencodeDaemonStatus("starting");
-        setOpencodeError(null);
-        const status = await invoke<OpenCodeStatus>("opencode_start", {
-          directory,
-          port: 4096,
-        });
-        setOpencodeDaemonStatus("running");
-        setOpencodePort(status.port);
-        opencodeStartedForPathRef.current = directory;
-        return status;
-      } catch (err) {
-        console.error(`Failed to start OpenCode: ${getReadableErrorMessage(err, "Unknown error")}`);
-        const message = getReadableErrorMessage(err, "Failed to start OpenCode");
-        setOpencodeDaemonStatus(message.includes("OpenCode not found") ? "unavailable" : "stopped");
-        setOpencodeError(message);
-        toast(message, "error");
-        return null;
-      }
-    },
-    [toast],
-  );
-
-  const restartOpencode = useCallback(async () => {
-    if (!daemon.projectPath) {
-      toast("Please open a project first.", "error");
-      return;
-    }
-
-    // If status is "unavailable", re-check if OpenCode is now installed
-    if (opencodeDaemonStatus === "unavailable") {
-      const status = await checkOpencodeStatus();
-      if (!status?.installed) {
-        toast(
-          "OpenCode is still not installed. Please install it first:\nnpm i -g opencode-ai@latest\nor\nbrew install sst/tap/opencode",
-          "error",
-        );
-        return;
-      }
-      const started = await startOpencode(daemon.projectPath);
-      if (started) toast("OpenCode started successfully!", "success");
-      return;
-    }
-
-    try {
-      setOpencodeDaemonStatus("starting");
-      setOpencodeError(null);
-      const currentStatus = await invoke<OpenCodeStatus>("opencode_status");
-
-      if (!currentStatus.installed) {
-        setOpencodeDaemonStatus("unavailable");
-        setOpencodeError(
-          "OpenCode is not installed. Please install it first using npm or Homebrew.",
-        );
-        return;
-      }
-
-      const status = await invoke<OpenCodeStatus>("opencode_restart", {
-        directory: daemon.projectPath,
-      });
-      setOpencodeDaemonStatus("running");
-      setOpencodePort(status.port);
-      opencodeStartedForPathRef.current = daemon.projectPath;
-      toast("OpenCode started successfully!", "success");
-    } catch (err) {
-      const errorMessage = getReadableErrorMessage(err, "Failed to start OpenCode");
-      console.error(`Failed to start OpenCode: ${errorMessage}`);
-      setOpencodeDaemonStatus("stopped");
-      setOpencodeError(errorMessage);
-    }
-  }, [daemon.projectPath, opencodeDaemonStatus, toast, checkOpencodeStatus, startOpencode]);
-
-  const handleMaxReconnectFailed = useCallback(() => {
-    setShowDisconnectedDialog(true);
-  }, []);
-
-  const handleCloseDisconnectedDialog = useCallback(() => {
-    setShowDisconnectedDialog(false);
-  }, []);
-
-  const handleRestartFromDialog = useCallback(() => {
-    setShowDisconnectedDialog(false);
-    restartOpencode();
-  }, [restartOpencode]);
-
-  const handleCloseErrorDialog = useCallback(() => {
-    setOpencodeError(null);
-  }, []);
-
-  const handleKillPort = useCallback(
-    async (port: number) => {
-      await invoke("kill_port_process", { port });
-      setOpencodeError(null);
-      await restartOpencode();
-    },
-    [restartOpencode],
-  );
-
   const handleToggleRightPanel = useCallback(() => {
     setShowRightPanel((open) => !open);
   }, []);
@@ -680,27 +515,6 @@ The AI assistant will read and update this file during compilation.
     localStorage.setItem("lmms-writer-agent-backend", agentBackend);
   }, [agentBackend]);
 
-  const hasOpenCodeTabs = conversations.tabs.some((t) => t.backend === "opencode");
-  useEffect(() => {
-    if (!hasOpenCodeTabs || !daemon.projectPath) return;
-    let cancelled = false;
-    const projectPath = daemon.projectPath;
-    void checkOpencodeStatus().then((status) => {
-      if (cancelled || !status?.installed) return;
-      if (status.running && status.managed && opencodeStartedForPathRef.current === projectPath) {
-        return;
-      }
-      void startOpencode(projectPath);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasOpenCodeTabs, daemon.projectPath, checkOpencodeStatus, startOpencode]);
-
-  useEffect(() => {
-    checkOpencodeStatus();
-  }, [checkOpencodeStatus]);
-
   useEffect(() => {
     if (pendingGoToLine > 0) {
       // Give the editor time to load new file content before clearing
@@ -710,35 +524,12 @@ The AI assistant will read and update this file during compilation.
   }, [pendingGoToLine]);
 
   useEffect(() => {
-    if (!daemon.projectPath) {
-      opencodeStartedForPathRef.current = null;
-      setSplitPane(null);
-    }
+    if (!daemon.projectPath) setSplitPane(null);
   }, [daemon.projectPath]);
 
   useEffect(() => {
     setShowTerminal(Boolean(daemon.projectPath));
   }, [daemon.projectPath]);
-
-  // Listen for opencode logs from Tauri backend
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-
-    import("@tauri-apps/api/event").then(({ listen }) => {
-      listen<{ type: string; message: string }>("opencode-log", (event) => {
-        const { type, message } = event.payload;
-        if (type === "stderr") {
-          console.error("[OpenCode]", message);
-        }
-      }).then((fn) => {
-        unlisten = fn;
-      });
-    });
-
-    return () => {
-      unlisten?.();
-    };
-  }, []);
 
   useEffect(() => {
     const COMPACT_THRESHOLD = 1100;
@@ -2169,149 +1960,6 @@ The AI assistant will read and update this file during compilation.
     [daemon, toast],
   );
 
-  const runOpenCodePrompt = useCallback(
-    async (prompt: string): Promise<string> => {
-      if (!daemon.projectPath) {
-        throw new Error("Project path is missing");
-      }
-
-      const baseUrl = `http://localhost:${opencodePort}`;
-      const query = `?directory=${encodeURIComponent(daemon.projectPath)}`;
-      const headers = {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "x-opencode-directory": encodeURIComponent(daemon.projectPath),
-      };
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), AI_COMMIT_TIMEOUT_MS);
-      let sessionId: string | null = null;
-
-      try {
-        const createSessionResponse = await fetch(`${baseUrl}/session${query}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({}),
-          signal: controller.signal,
-        });
-
-        if (!createSessionResponse.ok) {
-          const errorText = await createSessionResponse.text().catch(() => "");
-          throw new Error(
-            `Failed to create OpenCode session: ${createSessionResponse.status} ${errorText}`,
-          );
-        }
-
-        const sessionData = (await createSessionResponse.json()) as {
-          id?: string;
-        };
-        if (!sessionData.id) {
-          throw new Error("OpenCode session response missing id");
-        }
-        sessionId = sessionData.id;
-        const preferred = getPreferredOpenCodeConfig();
-        const requestBody: {
-          parts: Array<{ type: "text"; text: string }>;
-          noReply: boolean;
-          agent?: string;
-          model?: { providerID: string; modelID: string };
-          variant?: string;
-        } = {
-          parts: [{ type: "text", text: prompt }],
-          noReply: false,
-        };
-        if (preferred.agent) {
-          requestBody.agent = preferred.agent;
-        }
-        if (preferred.model) {
-          requestBody.model = preferred.model;
-        }
-        if (preferred.variant) {
-          requestBody.variant = preferred.variant;
-        }
-
-        const messageResponse = await fetch(`${baseUrl}/session/${sessionId}/message${query}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        });
-
-        if (!messageResponse.ok) {
-          const errorText = await messageResponse.text().catch(() => "");
-          throw new Error(`OpenCode message failed: ${messageResponse.status} ${errorText}`);
-        }
-
-        const messageDataRaw = (await messageResponse.json()) as unknown;
-        const messageData = parseOpenCodeMessageResponse(messageDataRaw);
-        const initialText = extractTextParts(messageData?.parts).join("\n").trim();
-        if (initialText) {
-          return initialText;
-        }
-
-        const parentMessageId =
-          messageData?.info?.role === "user" ? messageData.info.id : undefined;
-        const startedAt = Date.now();
-        while (Date.now() - startedAt < AI_COMMIT_TIMEOUT_MS) {
-          const messagesResponse = await fetch(`${baseUrl}/session/${sessionId}/message${query}`, {
-            method: "GET",
-            headers,
-            signal: controller.signal,
-          });
-
-          if (!messagesResponse.ok) {
-            const errorText = await messagesResponse.text().catch(() => "");
-            throw new Error(
-              `Failed to poll OpenCode messages: ${messagesResponse.status} ${errorText}`,
-            );
-          }
-
-          const messagesData = (await messagesResponse.json()) as unknown;
-          const items = Array.isArray(messagesData)
-            ? (messagesData as OpenCodeMessageItem[])
-            : messagesData &&
-                typeof messagesData === "object" &&
-                Array.isArray((messagesData as { messages?: OpenCodeMessageItem[] }).messages)
-              ? (messagesData as { messages: OpenCodeMessageItem[] }).messages
-              : [];
-
-          for (let i = items.length - 1; i >= 0; i--) {
-            const item = items[i];
-            if (!item) continue;
-            const info = item?.info;
-            if (info?.role !== "assistant") continue;
-            if (parentMessageId && info.parentID && info.parentID !== parentMessageId) {
-              continue;
-            }
-
-            const text = extractTextParts(item.parts).join("\n").trim();
-            if (text) {
-              return text;
-            }
-
-            const errorMessage = info.error?.data?.message;
-            if (errorMessage) {
-              throw new Error(errorMessage);
-            }
-          }
-
-          await sleep(500);
-        }
-
-        throw new Error("OpenCode returned an empty response");
-      } finally {
-        clearTimeout(timeoutId);
-        if (sessionId) {
-          void fetch(`${baseUrl}/session/${sessionId}${query}`, {
-            method: "DELETE",
-            headers,
-          }).catch(() => {});
-        }
-      }
-    },
-    [daemon.projectPath, opencodePort],
-  );
-
   const handleGenerateCommitMessageAI = useCallback(async () => {
     if (!daemon.projectPath) {
       toast("Please open a project first.", "error");
@@ -2327,18 +1975,10 @@ The AI assistant will read and update this file during compilation.
     setIsGeneratingCommitMessageAI(true);
 
     try {
-      const status = await checkOpencodeStatus();
-      if (!status?.installed) {
-        toast("OpenCode is not installed. Run: npm i -g opencode-ai@latest", "error");
+      const ready = await opencode.ensure(daemon.projectPath);
+      if (!ready) {
+        toast("OpenCode is unavailable. Install it with: npm i -g opencode-ai@latest", "error");
         return;
-      }
-
-      if (!status.running) {
-        const started = await startOpencode(daemon.projectPath);
-        if (!started) {
-          toast("Failed to start OpenCode daemon.", "error");
-          return;
-        }
       }
 
       const diffChunks: string[] = await Promise.all(
@@ -2356,7 +1996,12 @@ The AI assistant will read and update this file during compilation.
       }
 
       const prompt = buildAiCommitPrompt(mergedDiff, "staged");
-      const aiRaw = await runOpenCodePrompt(prompt);
+      const aiRaw = await runOpenCodePrompt({
+        port: ready.port,
+        directory: daemon.projectPath,
+        prompt,
+        timeoutMs: AI_COMMIT_TIMEOUT_MS,
+      });
       const aiMessage = sanitizeAiCommitMessage(aiRaw);
 
       if (!aiMessage) {
@@ -2376,7 +2021,7 @@ The AI assistant will read and update this file during compilation.
     } finally {
       setIsGeneratingCommitMessageAI(false);
     }
-  }, [daemon, stagedChanges, checkOpencodeStatus, startOpencode, runOpenCodePrompt, toast]);
+  }, [daemon, stagedChanges, opencode.ensure, toast]);
 
   const handleCommit = useCallback(async () => {
     if (!commitMessage.trim()) return;
@@ -3196,11 +2841,11 @@ The AI assistant will read and update this file during compilation.
                         onBeforeSend: prepareEditorMessage,
                       }}
                       opencode={{
-                        baseUrl: `http://localhost:${opencodePort}`,
-                        autoConnect: opencodeDaemonStatus === "running" && !!daemon.projectPath,
-                        daemonStatus: opencodeDaemonStatus,
-                        onRestartOpenCode: restartOpencode,
-                        onMaxReconnectFailed: handleMaxReconnectFailed,
+                        baseUrl: `http://localhost:${opencode.port}`,
+                        autoConnect: opencode.status === "running" && !!daemon.projectPath,
+                        daemonStatus: opencode.status,
+                        onRestartOpenCode: opencode.restart,
+                        onMaxReconnectFailed: opencode.showDisconnected,
                       }}
                     />
                   </ChatImageDirectory.Provider>
@@ -3211,17 +2856,17 @@ The AI assistant will read and update this file during compilation.
         </main>
 
         <OpenCodeDisconnectedDialog
-          open={showDisconnectedDialog}
-          onClose={handleCloseDisconnectedDialog}
-          onRestart={handleRestartFromDialog}
+          open={opencode.disconnected}
+          onClose={opencode.closeDisconnected}
+          onRestart={opencode.restartFromDisconnected}
         />
 
         <OpenCodeErrorDialog
-          open={!!opencodeError}
-          error={opencodeError ?? ""}
-          onClose={handleCloseErrorDialog}
-          onRetry={restartOpencode}
-          onKillPort={handleKillPort}
+          open={!!opencode.error}
+          error={opencode.error ?? ""}
+          onClose={opencode.clearError}
+          onRetry={opencode.restart}
+          onKillPort={opencode.killPortAndRestart}
         />
 
         {createDialog && (
