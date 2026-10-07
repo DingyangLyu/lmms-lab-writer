@@ -14,7 +14,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:nice": "nice -n 10 tauri build",
-    "tauri:pkg": "tauri build && ./src-tauri/scripts/build-pkg.sh"
+    "tauri:pkg": "tauri build && ./src-tauri/scripts/build-pkg.sh",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",

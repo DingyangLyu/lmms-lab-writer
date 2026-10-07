@@ -91,7 +91,7 @@ jobs:
             libappindicator-gtk3 \
             librsvg \
             patchelf
-          npm install -g pnpm@10.29.3
+          npm install -g pnpm@11.5.0
 
       - uses: actions/checkout@v4
 

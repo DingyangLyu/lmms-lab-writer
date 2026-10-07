@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "npx remotion studio",
     "build": "tsc --noEmit",
-    "render": "npx remotion render MarketingVideo out/marketing.mp4"
+    "render": "npx remotion render MarketingVideo out/marketing.mp4",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@remotion/cli": "4.0.469",

@@ -21,7 +21,9 @@
     "version:sync": "node scripts/sync-version.mjs",
     "version:set": "node scripts/sync-version.mjs --version",
     "tauri:dev": "pnpm --filter @lmms-lab/writer-desktop tauri:dev",
-    "tauri:build": "pnpm --filter @lmms-lab/writer-desktop tauri:build"
+    "tauri:build": "pnpm --filter @lmms-lab/writer-desktop tauri:build",
+    "check": "biome check .",
+    "typecheck": "turbo typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

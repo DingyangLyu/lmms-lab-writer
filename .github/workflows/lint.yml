@@ -26,7 +26,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm lint
+      # Lint and formatting together; `pnpm lint` alone let format drift through.
+      - run: pnpm exec biome ci .
 
   rust-fmt:
     name: Rust Format
