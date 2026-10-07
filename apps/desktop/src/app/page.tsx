@@ -20,7 +20,7 @@ import { GitSidebarPanel } from "@/components/editor/sidebar-git-panel";
 import { TerminalPanel } from "@/components/editor/terminal-panel";
 import { HarnessButtons, HarnessWorkspace } from "@/components/harness/workspace";
 import { LaTeXInstallPrompt, LaTeXSettingsDialog, SynctexInstallDialog } from "@/components/latex";
-import { BuildTargetsEditor, readCompilerOverrides } from "@/components/latex/build-targets-editor";
+import { BuildTargetsEditor } from "@/components/latex/build-targets-editor";
 import { TemplateImportDialog } from "@/components/latex/template-import-dialog";
 import { RecentProjects } from "@/components/recent-projects";
 import { InputDialog } from "@/components/ui/input-dialog";
@@ -61,12 +61,9 @@ import type { ConversationTarget } from "@/lib/harness/types";
 import { isHarnessId } from "@/lib/harness/types";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
 import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
-import type {
-  BuildTarget,
-  LaTeXCompiler,
-  SynctexResult,
-  TargetBuildResult,
-} from "@/lib/latex/types";
+import { compileFailurePrompt } from "@/lib/latex/compile-failure";
+import type { BuildTarget, SynctexResult, TargetBuildResult } from "@/lib/latex/types";
+import { useTargetBuild } from "@/lib/latex/use-target-build";
 import { runOpenCodePrompt } from "@/lib/opencode/run-prompt";
 import { useOpenCodeDaemon } from "@/lib/opencode/use-opencode-daemon";
 import { pathSync } from "@/lib/path";
@@ -288,8 +285,6 @@ export default function EditorPage() {
 
   // LaTeX settings and editor settings
   const latexSettings = useLatexSettings(daemon.projectPath);
-  const [isCompiling, setIsCompiling] = useState(false);
-  const compilingRef = useRef(false);
   const [showTemplateImport, setShowTemplateImport] = useState(false);
   const texFiles = useMemo(() => findTexFiles(daemon.files), [daemon.files]);
 
@@ -307,98 +302,18 @@ export default function EditorPage() {
       latexCompiler.compilersStatus.latexmk.available ||
       latexCompiler.compilersStatus.tectonic.available);
 
-  // Ensure .lmms_lab_writer/COMPILE_NOTES.md exists
-  const ensureCompileNotesFile = useCallback(async () => {
-    if (!daemon.projectPath) return;
-
-    const dirPath = ".lmms_lab_writer";
-    const filePath = ".lmms_lab_writer/COMPILE_NOTES.md";
-
-    try {
-      // Try to read the file first to check if it exists
-      await daemon.readFile(filePath);
-    } catch {
-      // File doesn't exist, create it
-      try {
-        await daemon.createDirectory(dirPath);
-      } catch {
-        // Directory might already exist, ignore
-      }
-
-      const initialContent = `# Compilation Notes
-
-This file stores compilation preferences and notes for this LaTeX project.
-The AI assistant will read and update this file during compilation.
-
-## Project Info
-- Created: ${new Date().toISOString()}
-
-## Compilation History
-(Notes will be added here by the AI assistant)
-`;
-      await daemon.writeFile(filePath, initialContent);
-    }
-  }, [daemon]);
-
-  const queueCompileFailureForAgent = useCallback(
-    async ({
-      mainFile,
-      compiler,
-      compilerPath,
-      args,
-      error,
-      exitCode,
-    }: {
-      mainFile: string;
-      compiler: LaTeXCompiler;
-      compilerPath: string | null;
-      args: string[];
-      error: string;
-      exitCode?: number | null;
-    }) => {
+  const handOffBuildFailure = useCallback(
+    async (target: BuildTarget, result: TargetBuildResult) => {
       if (!daemon.projectPath) return;
-
-      const logFile = mainFile.replace(/\.tex$/i, ".log");
-      let logTail = "";
-      try {
-        const logContent = await daemon.readFile(logFile);
-        if (logContent) {
-          const maxLogChars = 12000;
-          logTail =
-            logContent.length > maxLogChars
-              ? `[Log truncated to last ${maxLogChars} characters]\n${logContent.slice(-maxLogChars)}`
-              : logContent;
-        }
-      } catch {
-        logTail = "(No .log file was available.)";
-      }
-
-      const implicitArgs = ["-interaction=nonstopmode", "-file-line-error", "-synctex=1"];
-      const prompt = [
-        "Local LaTeX compilation failed. Please diagnose and fix this project.",
-        "",
-        `Captured at: ${new Date().toISOString()}`,
-        `Project directory: ${daemon.projectPath}`,
-        `Main file: ${mainFile}`,
-        `Compiler: ${compiler}`,
-        `Compiler path used by the app: ${compilerPath ?? "(resolved from PATH)"}`,
-        `Arguments: ${[...implicitArgs, ...args, mainFile].join(" ")}`,
-        `Exit code: ${exitCode ?? "unknown"}`,
-        `Reported error: ${error}`,
-        "",
-        "LaTeX log tail:",
-        "~~~log",
-        logTail || "(No log content was available.)",
-        "~~~",
-        "",
-        agentBackend === "codex"
-          ? "If current package documentation or a web-only error is relevant, use Codex web search and verify source URLs before relying on them."
-          : "If the error depends on current package documentation, class behavior, or a web-only error message, use perplexity_search when available, websearch for discovery, and webfetch for source URLs. If websearch returns a 429 from Exa, fall back to perplexity_search or webfetch.",
-        "Please inspect the relevant .tex, .bib, .sty, and .cls files, make the minimal fix needed to compile, rerun the local compilation, and summarize what changed.",
-      ].join("\n");
-
       setPendingBackend(agentBackend);
-      setPendingOpenCodeMessage(prompt);
+      setPendingOpenCodeMessage(
+        compileFailurePrompt({
+          projectPath: daemon.projectPath,
+          target,
+          result,
+          backend: agentBackend,
+        }),
+      );
       setShowRightPanel(true);
       if (agentBackend !== "opencode") {
         toast(
@@ -409,7 +324,6 @@ The AI assistant will read and update this file during compilation.
         );
         return;
       }
-
       const ready = await opencode.ensure(daemon.projectPath);
       toast(
         ready
@@ -418,58 +332,32 @@ The AI assistant will read and update this file during compilation.
         "error",
       );
     },
-    [agentBackend, daemon, opencode.ensure, toast],
+    [agentBackend, daemon.projectPath, opencode.ensure, toast],
   );
-
-  const runDirectCompile = useCallback(
-    async (target: BuildTarget) => {
-      if (!daemon.projectPath || compilingRef.current) return;
-      if (!(await flushBeforeLeave())) return;
-      compilingRef.current = true;
-      setIsCompiling(true);
-      toast(`正在编译 ${target.name} · ${target.mainFile}`);
-      try {
-        const result = await invoke<TargetBuildResult>("latex_build_target", {
-          directory: daemon.projectPath,
-          target,
-          compilerOverrides: readCompilerOverrides(),
-        });
-        if (!result.success || !result.pdfPath || !result.pdfRelative) {
-          await queueCompileFailureForAgent({
-            mainFile: target.mainFile,
-            compiler: result.engine as LaTeXCompiler,
-            compilerPath: result.compilerPath,
-            args: [],
-            error: `${result.error || "编译失败"}\n${result.output}`,
-            exitCode: null,
-          });
-          return;
-        }
-        const pdfFile = result.pdfRelative;
-        setEditorViewMode("file");
-        setGitDiffPreview(null);
-        setOpenTabs((prev) => (prev.includes(pdfFile) ? prev : [...prev, pdfFile]));
-        setSelectedFile(pdfFile);
-        setBinaryPreviewUrl(convertFileSrc(result.pdfPath));
-        setFileContent("");
-        setPdfRefreshKey((key) => key + 1);
-        void daemon.refreshFiles();
-        toast(`编译完成：${pdfFile}（${result.engine}）`);
-      } catch (cause) {
-        toast(`编译未完成：${String(cause)}`, "error");
-      } finally {
-        compilingRef.current = false;
-        setIsCompiling(false);
-      }
+  const showBuiltPdf = useCallback(
+    ({ relative, absolute }: { relative: string; absolute: string }) => {
+      setEditorViewMode("file");
+      setGitDiffPreview(null);
+      setOpenTabs((prev) => (prev.includes(relative) ? prev : [...prev, relative]));
+      setSelectedFile(relative);
+      setBinaryPreviewUrl(convertFileSrc(absolute));
+      setFileContent("");
+      setPdfRefreshKey((key) => key + 1);
+      void daemon.refreshFiles();
     },
-    [daemon, flushBeforeLeave, queueCompileFailureForAgent, toast],
+    [daemon],
   );
+  const targetBuild = useTargetBuild({
+    projectPath: daemon.projectPath,
+    prepare: flushBeforeLeave,
+    onBuilt: showBuiltPdf,
+    onFailed: handOffBuildFailure,
+  });
   const handleCompileWithDetection = useCallback(async () => {
     if (!daemon.projectPath || latexSettings.isDetecting || latexSettings.saving) return;
-    await ensureCompileNotesFile();
     const target = latexSettings.activeTarget;
     if (target) {
-      await runDirectCompile(target);
+      await targetBuild.build(target);
       return;
     }
     setShowLatexSettings(true);
@@ -479,8 +367,7 @@ The AI assistant will read and update this file during compilation.
     latexSettings.isDetecting,
     latexSettings.saving,
     latexSettings.activeTarget,
-    ensureCompileNotesFile,
-    runDirectCompile,
+    targetBuild.build,
     toast,
   ]);
 
@@ -1756,7 +1643,7 @@ The AI assistant will read and update this file during compilation.
           current: daemon.projectPath,
           choose,
           confirm: async () => {
-            if (compilingRef.current || latexSettings.saving)
+            if (targetBuild.isBuilding() || latexSettings.saving)
               throw new Error("编译或配置保存仍在进行，请完成后再切换文件夹。");
             return confirmAgentsIdle("switch");
           },
@@ -1809,6 +1696,7 @@ The AI assistant will read and update this file during compilation.
       confirmAgentsIdle,
       projectTransition,
       latexSettings.saving,
+      targetBuild.isBuilding,
     ],
   );
   const handleOpenFolder = useCallback(
@@ -2453,7 +2341,9 @@ The AI assistant will read and update this file during compilation.
                       <select
                         aria-label="编译目标"
                         value={latexSettings.settings.config.activeTarget ?? ""}
-                        disabled={isCompiling || latexSettings.isDetecting || latexSettings.saving}
+                        disabled={
+                          targetBuild.compiling || latexSettings.isDetecting || latexSettings.saving
+                        }
                         onChange={(event) =>
                           void latexSettings.selectTarget(event.target.value).catch(() => {})
                         }
@@ -2480,17 +2370,19 @@ The AI assistant will read and update this file during compilation.
                       <button
                         type="button"
                         onClick={handleCompileWithDetection}
-                        disabled={isCompiling || latexSettings.isDetecting || latexSettings.saving}
+                        disabled={
+                          targetBuild.compiling || latexSettings.isDetecting || latexSettings.saving
+                        }
                         className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
                           latexSettings.isDetecting
                             ? "opacity-50 cursor-not-allowed"
                             : "hover:bg-accent-hover hover:border-border-dark"
                         }`}
-                        title={isCompiling ? "正在编译…" : "编译所选目标 (Ctrl+Shift+B)"}
+                        title={targetBuild.compiling ? "正在编译…" : "编译所选目标 (Ctrl+Shift+B)"}
                       >
                         <PlayCircleIcon className="size-4" />
                       </button>
-                      {isCompiling && (
+                      {targetBuild.compiling && (
                         <button
                           type="button"
                           onClick={() =>

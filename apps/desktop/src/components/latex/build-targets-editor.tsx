@@ -1,16 +1,9 @@
 "use client";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { readCompilerOverrides, writeCompilerOverrides } from "@/lib/latex/compiler-overrides";
 import type { BuildTarget, LaTeXCompilersStatus, ProjectBuildConfig } from "@/lib/latex/types";
 import { makeBuildTarget } from "@/lib/latex/use-latex-settings";
-export const OVERRIDES_KEY = "writer-compiler-paths-v1";
-export function readCompilerOverrides(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
 export function BuildTargetsEditor({
   project,
   config,
@@ -249,7 +242,7 @@ export function BuildTargetsEditor({
               onChange={(e) => {
                 const next = { ...overrides, [engine]: e.target.value };
                 setOverrides(next);
-                localStorage.setItem(OVERRIDES_KEY, JSON.stringify(next));
+                writeCompilerOverrides(next);
               }}
               className="mt-1 w-full border border-border bg-background p-1.5 font-mono"
             />

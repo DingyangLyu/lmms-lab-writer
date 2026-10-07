@@ -19,6 +19,18 @@ pub struct BuildResult {
     pub compiler_path: String,
     pub output: String,
     pub error: Option<String>,
+    /// Tail of a failed run's TeX log; the staging directory holding it is removed afterwards.
+    pub log: Option<String>,
+}
+/// Failed-build logs larger than this keep only their end, where TeX reports the stop.
+const FAILED_LOG_LIMIT: usize = 64 * 1024;
+fn log_tail(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let mut start = text.len().saturating_sub(FAILED_LOG_LIMIT);
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    text[start..].to_string()
 }
 pub async fn resolve(
     name: &str,
@@ -449,6 +461,9 @@ async fn build(
         }
         let pdf = stage.join(format!("{stem}.pdf"));
         if !success || !pdf.is_file() {
+            let tex_log = tokio::fs::read(stage.join(format!("{stem}.log")))
+                .await
+                .ok();
             return Ok(BuildResult {
                 success: false,
                 pdf_path: None,
@@ -457,6 +472,7 @@ async fn build(
                 compiler_path: plan.program.clone(),
                 output: log,
                 error: Some("编译失败或没有生成新 PDF；原 PDF 未替换。".into()),
+                log: tex_log.as_deref().map(log_tail),
             });
         }
         // Only publish outputs after a successful run. Never mistake yesterday's PDF for a fresh build.
@@ -523,6 +539,7 @@ async fn build(
             compiler_path: plan.program.clone(),
             output: log,
             error: None,
+            log: None,
         })
     }
     .await;
@@ -541,6 +558,15 @@ mod tests {
             magic_engine("% !TEX program = LuaLaTeX\nhello"),
             Some("lualatex".into())
         );
+    }
+    #[test]
+    fn failed_log_keeps_the_end_on_a_char_boundary() {
+        let mut log = "中".repeat(FAILED_LOG_LIMIT).into_bytes();
+        log.extend_from_slice(b"\n! Undefined control sequence.");
+        let tail = log_tail(&log);
+        assert!(tail.len() <= FAILED_LOG_LIMIT);
+        assert!(tail.ends_with("! Undefined control sequence."));
+        assert_eq!(log_tail(b"short"), "short");
     }
     #[tokio::test]
     async fn follows_included_chinese_sources() {
@@ -609,6 +635,9 @@ mod integration_tests {
         let failed = build(None, &state, directory, target, None).await.unwrap();
         assert!(!failed.success);
         assert!(failed.pdf_path.is_none());
+        assert!(failed
+            .log
+            .is_some_and(|log| log.contains("UndefinedWriterCommand")));
         assert_eq!(tokio::fs::read(en).await.unwrap(), previous);
     }
 }

@@ -40,6 +40,8 @@ export interface TargetBuildResult {
   compilerPath: string;
   output: string;
   error: string | null;
+  /** Tail of the TeX log when the build failed. */
+  log?: string | null;
 }
 
 export type CompilationStatus = "idle" | "compiling" | "success" | "error";
