@@ -670,3 +670,53 @@ button.danger:hover:not(:disabled) {
   white-space: pre-wrap;
   word-break: break-all;
 }
+.compare {
+  display: grid;
+  gap: 8px;
+}
+.compare-file {
+  text-align: left;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compare-file.active {
+  border-color: #2d789e;
+  background: #e9f0f5;
+}
+.compare-status {
+  font-size: 11px;
+  color: #648092;
+}
+.compare-status.removed {
+  color: #a93737;
+}
+.compare-status.added {
+  color: #2d7a4e;
+}
+.diff {
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #fff;
+  border: 1px solid #e5eaed;
+}
+.diff span {
+  display: block;
+  padding: 0 6px;
+}
+.diff-add {
+  background: #ecf7ef;
+}
+.diff-remove {
+  background: #fff0f0;
+}
+.diff-skip {
+  color: #71818d;
+  background: #f6f8fa;
+}

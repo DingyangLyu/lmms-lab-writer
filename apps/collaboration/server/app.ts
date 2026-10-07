@@ -758,6 +758,44 @@ export async function createWriterServer(options: Options) {
           return json(res, { id }, 201);
         }
       }
+      const compare = /^snapshots\/([^/]+)\/(changes|files\/([^/]+))$/.exec(rest);
+      if (compare?.[1] && method === "GET") {
+        const saved =
+          (await db.row<{ data: string }>(
+            sql`SELECT data FROM snapshots WHERE id=${compare[1]} AND project=${project}`,
+          )) ?? fail(404, "版本不存在");
+        const old = (JSON.parse(saved.data) as SnapshotData).files.filter((f) => !f.deleted);
+        if (compare[3]) {
+          const f = old.find((x) => x.id === compare[3]) ?? fail(404, "该版本不含此文档");
+          if (f.binary) fail(400, "二进制文件不能逐行对比");
+          return json(res, { path: f.path, content: decodeText(Buffer.from(f.state, "base64")) });
+        }
+        const now = await store.projectFiles(project);
+        const changes = [];
+        for (const f of old) {
+          const current = now.find((x) => x.id === f.id);
+          if (!current) {
+            changes.push({ id: f.id, path: f.path, binary: !!f.binary, status: "removed" });
+            continue;
+          }
+          const before = Buffer.from(f.state, "base64");
+          const same = f.binary
+            ? Buffer.compare(before, Buffer.from(current.state)) === 0
+            : decodeText(before) === decodeText(current.state);
+          if (!same || current.path !== f.path)
+            changes.push({
+              id: f.id,
+              path: current.path,
+              oldPath: current.path === f.path ? undefined : f.path,
+              binary: current.binary,
+              status: same ? "renamed" : "changed",
+            });
+        }
+        for (const f of now)
+          if (!old.some((x) => x.id === f.id))
+            changes.push({ id: f.id, path: f.path, binary: f.binary, status: "added" });
+        return json(res, changes);
+      }
       const restore = /^snapshots\/([^/]+)\/restore$/.exec(rest);
       if (restore?.[1] && method === "POST") {
         await owner();

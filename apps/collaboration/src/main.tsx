@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { AdminPanel, ChangePassword } from "./account";
 import { api, base64, download, unbase64 } from "./api";
 import { type Comment, Editor, type EditorHandle, type Selection } from "./editor";
+import { SnapshotCompare } from "./history";
 import { projectHints } from "./latex-completion";
 import { type Highlight, PdfViewer } from "./pdf-viewer";
 import type { Person, SyncStatus } from "./provider";
@@ -273,7 +274,10 @@ function Workspace({
     [mainFile, setMainFile] = useState(""),
     [engine, setEngine] = useState<Engine | "">(""),
     [highlight, setHighlight] = useState<Highlight | null>(null),
-    [reveal, setReveal] = useState<{ file: string; line: number } | null>(null);
+    [reveal, setReveal] = useState<{ file: string; line: number } | null>(null),
+    [comparing, setComparing] = useState<{ id: string; label: string; created: number } | null>(
+      null,
+    );
   const editor = useRef<EditorHandle | null>(null),
     imports = useRef<HTMLInputElement>(null),
     folder = useRef<HTMLInputElement>(null);
@@ -1146,7 +1150,14 @@ function Workspace({
                 ))}
               </>
             )}
-            {tab === "history" && (
+            {tab === "history" && comparing && (
+              <SnapshotCompare
+                prefix={prefix}
+                snapshot={comparing}
+                onClose={() => setComparing(null)}
+              />
+            )}
+            {tab === "history" && !comparing && (
               <>
                 <h2>版本与恢复</h2>
                 <div className="row">
@@ -1180,6 +1191,9 @@ function Workspace({
                       {s.manual === false && <span className="muted"> · 自动</span>}
                     </strong>
                     <p>{new Date(s.created).toLocaleString()}</p>
+                    <button type="button" onClick={() => setComparing(s)}>
+                      对比
+                    </button>{" "}
                     <button
                       type="button"
                       disabled={

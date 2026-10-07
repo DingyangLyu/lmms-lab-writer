@@ -660,6 +660,41 @@ describe("real collaboration service", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/javascript");
   });
+  it("compares a saved version with the current project", async () => {
+    const f = await fixture(),
+      files = `/projects/${f.project}/files`;
+    const create = async (path: string, content: string) =>
+      (await f.call(files, { path, content }, f.owner)).data.id as string;
+    const edited = await create("a.tex", "one\n"),
+      renamed = await create("b.tex", "same\n"),
+      removed = await create("c.tex", "gone\n");
+    const version = (await f.call(`/projects/${f.project}/snapshots`, { label: "v1" }, f.owner))
+      .data.id;
+    await f.call(`${files}/${edited}`, { expected: "one\n", content: "two\n" }, f.owner, "PUT");
+    await f.call(`${files}/${renamed}`, { path: "chapters/b.tex" }, f.owner, "PATCH");
+    await f.call(`${files}/${removed}`, {}, f.owner, "DELETE");
+    const added = await create("d.tex", "new\n");
+    const changes = (
+      await f.call(`/projects/${f.project}/snapshots/${version}/changes`, undefined, f.owner)
+    ).data as Array<{ id: string; status: string; oldPath?: string }>;
+    const status = Object.fromEntries(changes.map((c) => [c.id, c.status]));
+    expect(status).toEqual({
+      [edited]: "changed",
+      [renamed]: "renamed",
+      [removed]: "removed",
+      [added]: "added",
+    });
+    expect(changes.find((c) => c.id === renamed)?.oldPath).toBe("b.tex");
+    expect(
+      (
+        await f.call(
+          `/projects/${f.project}/snapshots/${version}/files/${edited}`,
+          undefined,
+          f.owner,
+        )
+      ).data.content,
+    ).toBe("one\n");
+  });
   it("keeps anchored comments, replies, decisions and restorable versions", async () => {
     const f = await fixture(),
       reviewer = await f.invite("commenter", "reviewer");
