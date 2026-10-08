@@ -49,4 +49,30 @@ describe.skipIf(process.platform === "win32")("local runner", () => {
     expect(result.files.map((f) => f.path)).not.toContain("opencode.json");
     expect(result.files).toHaveLength(3);
   });
+  it("gives the agent none of Writer's secrets", async () => {
+    const cli = join(dir, "env-codex.sh");
+    await writeFile(
+      cli,
+      '#!/bin/sh\ncat >/dev/null\nprintf "%s|%s|%s" "$WRITER_DATABASE_URL" "$WRITER_SHARED_RUNNER_TOKEN" "$WRITER_RUNNER_TOKEN" > seen.txt\n',
+    );
+    await chmod(cli, 0o755);
+    const saved = { ...process.env };
+    Object.assign(process.env, {
+      WRITER_CODEX_BIN: cli,
+      WRITER_DATABASE_URL: "postgres://writer:secret@db/writer",
+      WRITER_SHARED_RUNNER_TOKEN: "f".repeat(64),
+      WRITER_RUNNER_TOKEN: "e".repeat(64),
+    });
+    try {
+      const work = await mkdtemp(join(dir, "work-"));
+      const result = await executeJob(
+        { id: "env", prompt: "x", harness: "codex", files: [] },
+        work,
+        async () => {},
+      );
+      expect(result.files).toEqual([{ path: "seen.txt", content: "||" }]);
+    } finally {
+      process.env = saved;
+    }
+  });
 });

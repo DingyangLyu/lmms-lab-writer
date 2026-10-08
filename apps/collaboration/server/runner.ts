@@ -125,9 +125,10 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
       else args.push("--model", model);
     }
   }
+  // The agent runs collaborators' prompts: it gets none of Writer's tokens, passwords or database.
   const childEnv = { ...process.env };
-  delete childEnv.WRITER_RUNNER_TOKEN;
-  delete childEnv.WRITER_ADMIN_PASSWORD;
+  for (const key of Object.keys(childEnv))
+    if (/^WRITER_.*(TOKEN|PASSWORD|DATABASE_URL)/.test(key)) delete childEnv[key];
   const child = spawn(command, args, {
     cwd: work,
     stdio: ["pipe", "pipe", "pipe"],
