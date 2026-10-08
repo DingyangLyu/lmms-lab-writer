@@ -3,9 +3,7 @@
   "version": "0.1.3",
   "private": true,
   "scripts": {
-    "predev": "pnpm --filter @lmms-lab/writer-shared build",
     "dev": "next dev -p 3000",
-    "prebuild": "pnpm --filter @lmms-lab/writer-shared build",
     "build": "next build",
     "start": "next start",
     "lint": "biome lint .",

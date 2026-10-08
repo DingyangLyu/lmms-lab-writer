@@ -348,27 +348,10 @@ git, latexmk, opencode, sh -c (any), open (macOS), explorer (Windows), xdg-open 
 
 ## Shared Types
 
-The `packages/shared/src/index.ts` package defines types used by both the frontend and potentially by external tools:
-
-**Key types:**
-
-| Type | Fields | Used By |
-|------|--------|---------|
-| `FileNode` | `name`, `path`, `type`, `children?` | File tree |
-| `GitStatus` | `branch`, `remote`, `ahead`, `behind`, `changes[]`, `isRepo` | Git panel |
-| `GitFileChange` | `path`, `status`, `staged` | Git staging |
-| `GitLogEntry` | `hash`, `shortHash`, `message`, `author`, `date` | Git history |
-| `CompileResult` | `success`, `outputFile?`, `logs`, `warnings[]`, `errors[]`, `duration` | Compilation |
-| `CompileError` | `file`, `line`, `message`, `type` | Error display |
-| `LaTeXEngine` | `"pdflatex" \| "xelatex" \| "lualatex"` | Engine selection |
-| `User` | `id`, `email`, `full_name?`, `avatar_url?` | Auth |
-| `Session` | `access_token`, `refresh_token`, `expires_at`, `user` | Auth |
-| `PresenceState` | `user_id`, `username`, `color`, `cursor?`, `selection?` | Realtime (future) |
-
-**Utility functions:**
-- `generatePresenceColor()` — Random HSL color for user cursors
-- `sha256(content)` — Browser-compatible SHA-256 hash
-- `parseLatexLog(log)` — Parse LaTeX log for errors/warnings
+`packages/shared/src/index.ts` holds the JSON shapes the desktop frontend receives from the Rust
+commands: `FileNode` (file tree), `GitInfo`, `GitStatus`, `GitFileChange` and `GitLogEntry`. Like the
+other workspace packages it exports TypeScript source directly; Next.js transpiles it, so there is no
+separate build step.
 
 ## Turbo Build Pipeline
 
