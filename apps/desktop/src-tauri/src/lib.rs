@@ -65,6 +65,7 @@ pub fn run() {
         .manage(commands::saving::SaveGuard::default())
         .manage(LaTeXCompilationState::default())
         .manage(commands::collab::CollabState::default())
+        .manage(commands::runner::RunnerState::default())
         .manage(Mutex::new(WatcherState::default()))
         .manage(Mutex::new(ProjectState::default()))
         .invoke_handler(tauri::generate_handler![
@@ -102,6 +103,12 @@ pub fn run() {
             commands::collab::collab_connect,
             commands::collab::collab_send,
             commands::collab::collab_close,
+            commands::collab::collab_runner_get,
+            commands::collab::collab_runner_register,
+            commands::collab::collab_runner_unregister,
+            commands::collab::collab_runner_call,
+            commands::runner::runner_execute,
+            commands::runner::runner_cancel,
             commands::folder_sync::sync_list,
             commands::folder_sync::sync_read,
             commands::folder_sync::sync_write,

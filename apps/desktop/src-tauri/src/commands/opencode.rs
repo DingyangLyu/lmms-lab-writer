@@ -128,7 +128,7 @@ pub struct OpenCodeStatus {
     pub web_search_enabled: bool,
 }
 
-async fn find_opencode() -> Option<String> {
+pub(crate) async fn find_opencode() -> Option<String> {
     let candidates = if cfg!(target_os = "windows") {
         vec!["opencode.cmd", "opencode.exe", "opencode"]
     } else {

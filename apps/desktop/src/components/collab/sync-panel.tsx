@@ -3,6 +3,7 @@ import type { SyncState } from "@lmms-lab/sync";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { type CollabAccount, listAccounts } from "@/lib/collab/accounts";
+import { RUNNER_HARNESSES, type RunnerHarness, type SharedRunner } from "@/lib/collab/runner";
 import type { FolderSyncControls } from "@/lib/collab/use-folder-sync";
 import { type MessageKey, useI18n } from "@/lib/i18n";
 import { pathSync } from "@/lib/path";
@@ -24,11 +25,13 @@ const DOT: Record<SyncState, string> = {
 /** Header button with the sync state; the dialog links, unlinks and resolves a pause. */
 export function SyncPanel({
   sync,
+  runner,
   projectPath,
   onOpenFromServer,
   onOpenSettings,
 }: {
   sync: FolderSyncControls;
+  runner: SharedRunner;
   projectPath: string;
   onOpenFromServer: () => void;
   onOpenSettings: () => void;
@@ -132,6 +135,7 @@ export function SyncPanel({
                     </div>
                   </div>
                 )}
+                {status?.role === "owner" && <RunnerSection runner={runner} act={act} />}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
@@ -263,5 +267,62 @@ export function SyncPanel({
         </div>
       )}
     </>
+  );
+}
+
+function RunnerSection({
+  runner,
+  act,
+}: {
+  runner: SharedRunner;
+  act: (action: () => Promise<void>) => void;
+}) {
+  const { t } = useI18n();
+  const [chosen, setChosen] = useState<RunnerHarness[]>(["codex", "claude", "opencode"]);
+  const on = !!runner.harnesses?.length;
+  const { activity } = runner;
+  return (
+    <section className="space-y-2 border border-border p-3">
+      <h3 className="text-xs font-bold">{t("collab.runner.title")}</h3>
+      <p className="text-xs text-muted-foreground leading-5">{t("collab.runner.hint")}</p>
+      <fieldset className="flex flex-wrap gap-3 text-xs" disabled={on}>
+        <legend className="sr-only">{t("collab.runner.pick")}</legend>
+        {RUNNER_HARNESSES.map((h) => (
+          <label key={h.id} className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={on ? !!runner.harnesses?.includes(h.id) : chosen.includes(h.id)}
+              onChange={(e) =>
+                setChosen((list) =>
+                  e.target.checked ? [...list, h.id] : list.filter((x) => x !== h.id),
+                )
+              }
+            />
+            {h.label}
+          </label>
+        ))}
+      </fieldset>
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-xs text-muted-foreground">
+          {activity.state === "running"
+            ? t("collab.runner.running", { prompt: activity.prompt ?? "" })
+            : activity.state === "error"
+              ? t("collab.runner.error", { message: activity.message ?? "" })
+              : activity.state === "idle"
+                ? activity.completed
+                  ? t("collab.runner.completed", { count: activity.completed })
+                  : t("collab.runner.idle")
+                : ""}
+        </p>
+        <button
+          type="button"
+          disabled={!on && !chosen.length}
+          className="shrink-0 border border-border px-3 py-1 text-xs hover:border-foreground disabled:opacity-50"
+          onClick={() => act(() => (on ? runner.disable() : runner.enable(chosen)))}
+        >
+          {on ? t("collab.runner.disable") : t("collab.runner.enable")}
+        </button>
+      </div>
+    </section>
   );
 }

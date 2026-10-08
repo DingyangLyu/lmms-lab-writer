@@ -302,7 +302,7 @@ fn default_model(catalog: &Value) -> Result<String, String> {
         .ok_or_else(|| "No Codex models are available for this account".to_string())
 }
 
-async fn find_codex_binary() -> Option<PathBuf> {
+pub(crate) async fn find_codex_binary() -> Option<PathBuf> {
     let names: &[&str] = if cfg!(target_os = "windows") {
         &["codex.exe", "codex.cmd", "codex"]
     } else {
@@ -354,7 +354,7 @@ async fn find_codex_binary() -> Option<PathBuf> {
     binaries.pop()
 }
 
-async fn find_node_runtime_directory(binary: &Path) -> Option<PathBuf> {
+pub(crate) async fn find_node_runtime_directory(binary: &Path) -> Option<PathBuf> {
     let resolved = tokio::fs::canonicalize(binary).await.ok()?;
     let mut candidates = Vec::new();
     if let Some(directory) = binary.parent() {

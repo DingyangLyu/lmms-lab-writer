@@ -37,6 +37,7 @@ import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
 import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
 import { linkedFolders } from "@/lib/collab/accounts";
+import { useSharedRunner } from "@/lib/collab/runner";
 import { useFolderSync } from "@/lib/collab/use-folder-sync";
 import { useEditorSettings } from "@/lib/editor";
 import { fileKind, fileLanguage } from "@/lib/editor/file-kind";
@@ -275,6 +276,7 @@ export default function EditorPage() {
   const gitStatus = daemon.gitStatus;
   const git = useGitActions({ daemon, flush: flushBeforeLeave, ensureOpenCode: opencode.ensure });
   const folderSync = useFolderSync(daemon.projectPath);
+  const sharedRunner = useSharedRunner(folderSync.link);
 
   // LaTeX settings and editor settings
   const latexSettings = useLatexSettings(daemon.projectPath);
@@ -2122,6 +2124,7 @@ export default function EditorPage() {
               daemon.projectPath ? (
                 <SyncPanel
                   sync={folderSync}
+                  runner={sharedRunner}
                   projectPath={daemon.projectPath}
                   onOpenFromServer={() => setOpenFromServer(null)}
                   onOpenSettings={() => openSettings("collab")}

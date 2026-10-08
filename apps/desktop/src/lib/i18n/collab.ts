@@ -65,6 +65,16 @@ export const collabZh = {
   "collab.open.hint": "会在你选择的位置新建一个与项目同名的文件夹，下载全部文件并保持同步。",
   "collab.open.button": "从协作服务器打开",
   "collab.open.working": "正在准备文件夹…",
+  "collab.runner.title": "用这台电脑执行组员提交的 AI 任务",
+  "collab.runner.hint":
+    "开启后，项目打开期间，组员在网页“任务”中提交的任务会在这台电脑上的临时副本里执行：Codex 在沙盒中运行，Claude Code 和 OpenCode 不能执行命令。结果作为修改建议送回审阅，不会直接改动文稿。会消耗你本机 AI 账号的额度。",
+  "collab.runner.pick": "允许执行的工具",
+  "collab.runner.enable": "开启",
+  "collab.runner.disable": "关闭",
+  "collab.runner.idle": "等待任务",
+  "collab.runner.running": "正在执行：{prompt}",
+  "collab.runner.error": "执行器出错：{message}",
+  "collab.runner.completed": "本次已完成 {count} 个任务",
 };
 export const collabEn: Record<keyof typeof collabZh, string> = {
   "collab.status.unlinked": "Collaborate",
@@ -142,4 +152,14 @@ export const collabEn: Record<keyof typeof collabZh, string> = {
     "A folder named after the project is created where you choose; every file is downloaded and kept in sync.",
   "collab.open.button": "Open from collaboration server",
   "collab.open.working": "Preparing the folder…",
+  "collab.runner.title": "Run teammates' AI tasks on this computer",
+  "collab.runner.hint":
+    "While the project is open, tasks submitted under Tasks on the web page run here on a disposable copy: Codex in its sandbox, Claude Code and OpenCode without shell commands. Results come back as proposals for review and never change the manuscript directly. Uses your local AI accounts.",
+  "collab.runner.pick": "Tools it may run",
+  "collab.runner.enable": "Turn on",
+  "collab.runner.disable": "Turn off",
+  "collab.runner.idle": "Waiting for tasks",
+  "collab.runner.running": "Running: {prompt}",
+  "collab.runner.error": "Runner problem: {message}",
+  "collab.runner.completed": "{count} {count|task|tasks} done this session",
 };

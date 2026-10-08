@@ -26,9 +26,26 @@ pub struct AccountInfo {
     user: Value,
 }
 
+/// This computer registered as a project's runner (shared AI tasks); the token is the runner's.
+#[derive(Clone, Serialize, Deserialize)]
+struct RunnerAccount {
+    server: String,
+    project: String,
+    id: String,
+    token: String,
+    capabilities: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct RunnerInfo {
+    id: String,
+    capabilities: Vec<String>,
+}
+
 #[derive(Default)]
 pub struct CollabState {
     accounts: tokio::sync::Mutex<Option<Vec<Account>>>,
+    runners: tokio::sync::Mutex<Option<Vec<RunnerAccount>>>,
     sockets: Mutex<HashMap<u64, mpsc::UnboundedSender<Message>>>,
     next: AtomicU64,
 }
@@ -450,4 +467,170 @@ mod tests {
             (Some(1008), Some("revoked"))
         );
     }
+}
+
+async fn runners<'a>(
+    app: &AppHandle,
+    state: &'a CollabState,
+) -> Result<tokio::sync::MutexGuard<'a, Option<Vec<RunnerAccount>>>, String> {
+    let mut guard = state.runners.lock().await;
+    if guard.is_none() {
+        let file = accounts_file(app)
+            .await?
+            .with_file_name("collaboration-runners.json");
+        let saved = tokio::fs::read(file).await.ok();
+        *guard = Some(
+            saved
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .unwrap_or_default(),
+        );
+    }
+    Ok(guard)
+}
+
+async fn persist_runners(app: &AppHandle, list: &[RunnerAccount]) -> Result<(), String> {
+    let json = serde_json::to_vec(list).map_err(|e| e.to_string())?;
+    let file = accounts_file(app)
+        .await?
+        .with_file_name("collaboration-runners.json");
+    super::saving::atomic_write(&file, &json).await
+}
+
+fn project_id(project: &str) -> Result<&str, String> {
+    if project.is_empty()
+        || project.len() > 80
+        || !project
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        return Err(failure(400, "无效的项目"));
+    }
+    Ok(project)
+}
+
+#[tauri::command]
+pub async fn collab_runner_get(
+    app: AppHandle,
+    state: State<'_, CollabState>,
+    server: String,
+    project: String,
+) -> Result<Option<RunnerInfo>, String> {
+    let guard = runners(&app, &state).await?;
+    Ok(guard
+        .iter()
+        .flatten()
+        .find(|r| r.server == server && r.project == project)
+        .map(|r| RunnerInfo {
+            id: r.id.clone(),
+            capabilities: r.capabilities.clone(),
+        }))
+}
+
+/// Registers this computer as a runner for the project (owners only, checked by the server).
+#[tauri::command]
+pub async fn collab_runner_register(
+    app: AppHandle,
+    state: State<'_, CollabState>,
+    server: String,
+    project: String,
+    name: String,
+    capabilities: Vec<String>,
+) -> Result<RunnerInfo, String> {
+    let project = project_id(&project)?.to_string();
+    let token = token_for(&app, &state, &server).await?;
+    let created = send(
+        client()?
+            .post(format!("{server}/api/projects/{project}/runners"))
+            .bearer_auth(token)
+            .json(&json!({ "name": name, "capabilities": capabilities })),
+    )
+    .await?;
+    let (Some(id), Some(runner_token)) = (created["id"].as_str(), created["token"].as_str()) else {
+        return Err(failure(0, "服务器返回了无效的执行器凭据"));
+    };
+    let mut guard = runners(&app, &state).await?;
+    let list = guard.get_or_insert_with(Vec::new);
+    list.retain(|r| !(r.server == server && r.project == project));
+    list.push(RunnerAccount {
+        server,
+        project,
+        id: id.to_string(),
+        token: runner_token.to_string(),
+        capabilities: capabilities.clone(),
+    });
+    persist_runners(&app, list).await?;
+    Ok(RunnerInfo {
+        id: id.to_string(),
+        capabilities,
+    })
+}
+
+#[tauri::command]
+pub async fn collab_runner_unregister(
+    app: AppHandle,
+    state: State<'_, CollabState>,
+    server: String,
+    project: String,
+) -> Result<(), String> {
+    let project = project_id(&project)?.to_string();
+    let mut guard = runners(&app, &state).await?;
+    let list = guard.get_or_insert_with(Vec::new);
+    if let Some(runner) = list
+        .iter()
+        .find(|r| r.server == server && r.project == project)
+    {
+        // Also remove it on the server; offline, the owner can delete it on the web page.
+        if let (Ok(token), Ok(client)) = (token_for(&app, &state, &server).await, client()) {
+            let _ = send(
+                client
+                    .delete(format!(
+                        "{server}/api/projects/{project}/runners/{}",
+                        runner.id
+                    ))
+                    .bearer_auth(token),
+            )
+            .await;
+        }
+    }
+    list.retain(|r| !(r.server == server && r.project == project));
+    persist_runners(&app, list).await
+}
+
+/// The runner protocol (`lease`, `heartbeat`, `result`) with the runner's own token.
+#[tauri::command]
+pub async fn collab_runner_call(
+    app: AppHandle,
+    state: State<'_, CollabState>,
+    server: String,
+    project: String,
+    action: String,
+    body: Value,
+) -> Result<Value, String> {
+    if !matches!(action.as_str(), "lease" | "heartbeat" | "result") {
+        return Err(failure(400, "无效的执行器请求"));
+    }
+    let token = {
+        let guard = runners(&app, &state).await?;
+        guard
+            .iter()
+            .flatten()
+            .find(|r| r.server == server && r.project == project)
+            .map(|r| r.token.clone())
+            .ok_or_else(|| failure(401, "这台电脑不是该项目的执行器"))?
+    };
+    let result = send(
+        client()?
+            .post(format!("{server}/api/runner/{action}"))
+            .bearer_auth(token)
+            .json(&body),
+    )
+    .await;
+    if matches!(&result, Err(e) if e.contains("\"status\":401")) {
+        // Removed on the web page: forget the token.
+        let mut guard = runners(&app, &state).await?;
+        let list = guard.get_or_insert_with(Vec::new);
+        list.retain(|r| !(r.server == server && r.project == project));
+        persist_runners(&app, list).await?;
+    }
+    result
 }

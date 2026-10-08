@@ -250,7 +250,7 @@ async fn append(
     let _lock = lock.lock().await;
     append_event(path, &event, native).await
 }
-async fn binary() -> Result<PathBuf, String> {
+pub(crate) async fn binary() -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = std::env::var_os("PATH")
         .map(|p| {
             std::env::split_paths(&p)

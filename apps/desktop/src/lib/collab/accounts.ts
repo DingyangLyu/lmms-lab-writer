@@ -16,14 +16,17 @@ const guard = async <T>(pending: Promise<T>) => {
 };
 
 export const listAccounts = () => guard(invoke<CollabAccount[]>("collab_accounts"));
-export async function signIn(server: string, username: string, password: string) {
-  let device = "Writer Desktop";
+/** How this computer appears in the server's device and runner lists. */
+export async function deviceName() {
   try {
     const { hostname } = await import("@tauri-apps/plugin-os");
-    device = `Writer Desktop · ${(await hostname()) ?? "unknown"}`;
+    return `Writer Desktop · ${(await hostname()) ?? "unknown"}`;
   } catch {
-    // The default name is fine.
+    return "Writer Desktop";
   }
+}
+export async function signIn(server: string, username: string, password: string) {
+  const device = await deviceName();
   return guard(invoke<CollabAccount>("collab_sign_in", { server, username, password, device }));
 }
 export const signOut = (server: string) => guard(invoke<void>("collab_sign_out", { server }));
