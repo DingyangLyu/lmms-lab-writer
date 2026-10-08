@@ -45,16 +45,39 @@ export function cookie(req: IncomingMessage) {
       ?.slice(15) ?? ""
   );
 }
+/** `Authorization: Bearer <token>` from the desktop app; browsers send the session cookie. */
+export function bearer(req: IncomingMessage) {
+  return /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization ?? "")?.[1] ?? null;
+}
+/** Device tokens stay valid while used at least every 90 days. */
+const DEVICE_LIFETIME = 90 * 86400000;
 export async function userFor(store: Store, req: IncomingMessage): Promise<User> {
-  const token = cookie(req);
+  const token = bearer(req) ?? cookie(req);
   if (!/^[a-f0-9]{64}$/.test(token)) fail(401, "请登录");
-  return (
-    (await store.db.row<User>(
-      sql`SELECT u.id, u.username, u.password, u.admin, u.must_change AS "mustChange"
+  const now = Date.now();
+  const row =
+    (await store.db.row<User & { device: boolean; used: number | null }>(
+      sql`SELECT u.id, u.username, u.password, u.admin, u.must_change AS "mustChange",
+                 s.name IS NOT NULL AS device, s.used
           FROM users u JOIN sessions s ON s.user_id=u.id
-          WHERE s.token=${digest(token)} AND s.expires>${Date.now()} AND NOT u.disabled`,
-    )) ?? fail(401, "登录已过期")
+          WHERE s.token=${digest(token)} AND s.expires>${now} AND NOT u.disabled`,
+    )) ?? fail(401, "登录已过期");
+  if (row.device && now - (row.used ?? 0) > 3600000)
+    await store.db.run(
+      sql`UPDATE sessions SET used=${now}, expires=${now + DEVICE_LIFETIME} WHERE token=${digest(token)}`,
+    );
+  const { device: _device, used: _used, ...user } = row;
+  return user;
+}
+/** A named token for one device; returned once, stored only as a digest. */
+export async function deviceToken(store: Store, user: User, name: string) {
+  const token = randomBytes(32).toString("hex"),
+    now = Date.now();
+  await store.db.run(
+    sql`INSERT INTO sessions(token, user_id, expires, name, created, used)
+        VALUES(${digest(token)}, ${user.id}, ${now + DEVICE_LIFETIME}, ${name}, ${now}, ${now})`,
   );
+  return token;
 }
 export async function session(store: Store, user: User, res: ServerResponse, secure: boolean) {
   const token = randomBytes(32).toString("hex");

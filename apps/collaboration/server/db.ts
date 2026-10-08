@@ -241,6 +241,10 @@ export const migrations: string[] = [
      created BIGINT NOT NULL
    );
    CREATE INDEX builds_project ON builds(project, created);`,
+  // 4: named device tokens (desktop sync) live beside browser sessions.
+  `ALTER TABLE sessions ADD COLUMN name TEXT;
+   ALTER TABLE sessions ADD COLUMN created BIGINT;
+   ALTER TABLE sessions ADD COLUMN used BIGINT;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

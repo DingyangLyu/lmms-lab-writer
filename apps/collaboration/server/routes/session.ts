@@ -1,7 +1,7 @@
 /** Sign-in, invitations and the current session. */
 import { randomBytes } from "node:crypto";
-import type { PublicUser } from "../../shared/api";
-import { cookie, passwordHash, session, verifyPassword } from "../auth";
+import type { Device, IssuedToken, PublicUser } from "../../shared/api";
+import { bearer, cookie, deviceToken, passwordHash, session, verifyPassword } from "../auth";
 import { sql, uniqueViolation } from "../db";
 import { type Authed, type Context, route, str } from "../http";
 import { type User, userColumns } from "../store";
@@ -33,19 +33,30 @@ export async function sessionRoutes() {
       text: `SELECT ${userColumns}, disabled FROM users WHERE username=$1`,
       values: [username],
     });
+  const signIn = async (ctx: Context) => {
+    limit(ctx);
+    const body = await ctx.body(),
+      username = str(body, "username", 80),
+      password = str(body, "password", 200);
+    const user = await byName(ctx, username);
+    const valid = await verifyPassword(password, user?.password ?? decoy);
+    if (!user || !valid) fail(401, "用户名或密码错误");
+    if (user.disabled) fail(403, "账号已停用，请联系管理员");
+    return user;
+  };
   return {
     public: [
       route<Context>("POST", /^\/api\/login$/, async (ctx) => {
-        limit(ctx);
-        const body = await ctx.body(),
-          username = str(body, "username", 80),
-          password = str(body, "password", 200);
-        const user = await byName(ctx, username);
-        const valid = await verifyPassword(password, user?.password ?? decoy);
-        if (!user || !valid) fail(401, "用户名或密码错误");
-        if (user.disabled) fail(403, "账号已停用，请联系管理员");
+        const user = await signIn(ctx);
         await session(ctx.store, user, ctx.res, ctx.secure);
         return publicUser(user);
+      }),
+      /** Desktop sign-in: a named device token instead of a browser cookie. */
+      route<Context>("POST", /^\/api\/tokens$/, async (ctx): Promise<IssuedToken> => {
+        const user = await signIn(ctx);
+        if (user.mustChange) fail(403, "请先在网页上修改管理员给你的临时密码");
+        const name = str(await ctx.body(), "name", 80).trim() || "Writer Desktop";
+        return { token: await deviceToken(ctx.store, user, name), user: publicUser(user) };
       }),
       route<Context>("POST", /^\/api\/join$/, async (ctx) => {
         limit(ctx);
@@ -110,6 +121,25 @@ export async function sessionRoutes() {
           "writer_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
         );
         ctx.collab.disconnectUser(ctx.user.id, "已退出登录");
+        return { ok: true };
+      }),
+      route<Authed>("GET", /^\/api\/tokens$/, (ctx) =>
+        ctx.store.db.rows<Device>(
+          sql`SELECT left(token, 16) AS id, name, created, used FROM sessions
+              WHERE user_id=${ctx.user.id} AND name IS NOT NULL AND expires>${Date.now()}
+              ORDER BY created`,
+        ),
+      ),
+      /** `current` signs this device out; an id signs out another of the user's devices. */
+      route<Authed>("DELETE", /^\/api\/tokens\/([a-f0-9]{16}|current)$/, async (ctx, [id = ""]) => {
+        const own = bearer(ctx.req);
+        if (id === "current") {
+          if (!own) fail(400, "当前不是设备登录");
+          await ctx.store.db.run(sql`DELETE FROM sessions WHERE token=${digest(own)}`);
+        } else
+          await ctx.store.db.run(
+            sql`DELETE FROM sessions WHERE user_id=${ctx.user.id} AND name IS NOT NULL AND left(token, 16)=${id}`,
+          );
         return { ok: true };
       }),
     ],

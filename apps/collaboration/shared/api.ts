@@ -16,6 +16,9 @@ export type Account = {
   projects: number;
 };
 export type IssuedPassword = { username?: string; password: string };
+/** Returned once when a desktop app signs in; sent as `Authorization: Bearer <token>`. */
+export type IssuedToken = { token: string; user: PublicUser };
+export type Device = { id: string; name: string; created: number; used: number | null };
 
 export type ProjectSummary = { id: string; name: string; role: Role; created?: number };
 export type Member = { id: string; username: string; role: Role };

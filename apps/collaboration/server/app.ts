@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, resolve } from "node:path";
-import { allowedOrigin, bootstrap, userFor } from "./auth";
+import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
 import { sql } from "./db";
@@ -125,7 +125,14 @@ export async function createWriterServer(options: Options) {
     try {
       const ctx = context(services, req, res),
         path = ctx.url.pathname;
-      if (!["GET", "HEAD"].includes(ctx.method) && !allowedOrigin(req.headers.origin, origin))
+      // Bearer tokens are never sent automatically by a browser, so they cannot be forged
+      // cross-site; nor can a page read the token that desktop sign-in returns.
+      if (
+        !["GET", "HEAD"].includes(ctx.method) &&
+        !bearer(req) &&
+        !(ctx.method === "POST" && path === "/api/tokens") &&
+        !allowedOrigin(req.headers.origin, origin)
+      )
         fail(403, "请求来源不匹配");
       if (path === "/api/health") {
         await store.db.row(sql`SELECT 1`);

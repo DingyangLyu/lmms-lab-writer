@@ -11,19 +11,25 @@ import {
   removeAwarenessStates,
 } from "y-protocols/awareness";
 import * as Y from "yjs";
-import { allowedOrigin, userFor } from "./auth";
+import { allowedOrigin, bearer, userFor } from "./auth";
 import { type Sql, sql } from "./db";
 import type { Store, User } from "./store";
-import { fail } from "./util";
+import { fail, HttpError } from "./util";
 
 type Peer = {
   socket: WebSocket;
   user: User;
   project: string;
+  /** The one document of a web editor socket; null for project and sync sockets. */
   file: string | null;
+  /** A desktop folder sync: one socket joins any number of the project's documents. */
+  sync: boolean;
+  rooms: Map<string, Room>;
   clients: Set<number>;
   authenticate: () => Promise<void>;
 };
+/** The project file limit, so one sync socket can follow every document. */
+const MAX_SYNC_ROOMS = 2000;
 type Room = {
   key: string;
   project: string;
@@ -61,6 +67,7 @@ const send = (socket: WebSocket, message: unknown) => {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 };
 const roomKey = (project: string, file: string) => `${project}:${file}`;
+const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 const logFailure = (what: string) => (error: unknown) =>
   console.error(`Writer ${what} failed:`, error instanceof Error ? error.message : error);
 
@@ -154,6 +161,29 @@ export class Collaboration {
       await this.compact(room).catch(logFailure("compaction"));
     });
   }
+  /** Web editors know their document; sync sockets are told which one changed. */
+  private relay(room: Room, from: Peer | null, update: string) {
+    for (const other of room.peers)
+      if (other !== from)
+        send(
+          other.socket,
+          other.sync ? { type: "update", file: room.file, update } : { type: "update", update },
+        );
+  }
+  private leave(peer: Peer, room: Room) {
+    if (!room.peers.delete(peer)) return;
+    peer.rooms.delete(room.file);
+    // Only announce cursors the room actually knows; an unknown ID has no clock.
+    const known = [...peer.clients].filter((id) => room.awareness.meta.has(id));
+    removeAwarenessStates(room.awareness, known, peer);
+    if (known.length && room.peers.size) {
+      const update = base64(encodeAwarenessUpdate(room.awareness, known));
+      for (const other of room.peers)
+        if (!other.sync) send(other.socket, { type: "awareness", update });
+    }
+    if (!room.peers.size)
+      void this.release(room.project, room.file).catch(logFailure("room release"));
+  }
   private async auditEdit(project: string, file: string, user: string, bytes: number) {
     const key = `${project}:${file}:${user}`,
       now = Date.now(),
@@ -177,7 +207,8 @@ export class Collaboration {
     });
   }
   private async accept(req: IncomingMessage, socket: Duplex, head: Buffer) {
-    if (!allowedOrigin(req.headers.origin, this.origin())) fail(403, "Origin 不匹配");
+    if (!bearer(req) && !allowedOrigin(req.headers.origin, this.origin()))
+      fail(403, "Origin 不匹配");
     const url = new URL(req.url ?? "", this.origin());
     const match = /^\/api\/projects\/([^/]+)\/socket$/.exec(url.pathname);
     if (!match?.[1]) fail(404, "连接不存在");
@@ -185,7 +216,9 @@ export class Collaboration {
       user = await userFor(this.store, req);
     if (user.mustChange) fail(403, "请先修改临时密码");
     const role = await this.store.require(project, user.id);
-    const file = url.searchParams.get("file");
+    const file = url.searchParams.get("file"),
+      sync = url.searchParams.get("sync") === "1";
+    if (sync && file) fail(400, "同步连接不指定文件");
     if (this.peers.size >= 128 || [...this.peers].filter((p) => p.user.id === user.id).length >= 16)
       fail(429, "同时连接数量达到上限");
     if (file && (await this.store.fileMeta(project, file)).binary)
@@ -198,35 +231,27 @@ export class Collaboration {
       user,
       project,
       file,
+      sync,
+      rooms: new Map(),
       clients: new Set(),
       authenticate: async () => {
         const live = await userFor(this.store, req);
         await this.store.require(project, live.id);
       },
     };
-    let room: Room | null = null,
-      closed = false;
+    let closed = false;
     const detach = () => {
       this.peers.delete(peer);
-      const r = room;
-      if (!r || !file || !r.peers.delete(peer)) return;
-      // Only announce cursors the room actually knows; an unknown ID has no clock.
-      const known = [...peer.clients].filter((id) => r.awareness.meta.has(id));
-      removeAwarenessStates(r.awareness, known, peer);
-      if (known.length && r.peers.size) {
-        const update = Buffer.from(encodeAwarenessUpdate(r.awareness, known)).toString("base64");
-        for (const other of r.peers) send(other.socket, { type: "awareness", update });
-      }
-      if (!r.peers.size) void this.release(project, file).catch(logFailure("room release"));
+      for (const room of [...peer.rooms.values()]) this.leave(peer, room);
     };
     // Listen before the room opens: an early close or message must not be lost.
-    let opened: (room: Room | null) => void = () => {};
-    const ready = new Promise<Room | null>((resolve) => {
+    let opened: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
       opened = resolve;
     });
     ws.on("message", (raw) => {
       void ready
-        .then((r) => this.message(peer, r, req, raw.toString()))
+        .then(() => this.message(peer, req, raw.toString()))
         .catch((e) => {
           send(ws, { type: "error", message: e instanceof Error ? e.message : "同步失败" });
           ws.close(1008);
@@ -239,9 +264,10 @@ export class Collaboration {
     ws.on("error", () => {});
     try {
       if (file)
-        room = await this.exclusive([roomKey(project, file)], async () => {
+        await this.exclusive([roomKey(project, file)], async () => {
           const r = await this.open(project, file);
           r.peers.add(peer);
+          peer.rooms.set(file, r);
           // Encoded under the lock, so no acknowledged update can be missing from it.
           send(ws, {
             type: "ready",
@@ -256,63 +282,35 @@ export class Collaboration {
                 encodeAwarenessUpdate(r.awareness, [...r.awareness.getStates().keys()]),
               ).toString("base64"),
             });
-          return r;
         });
       else
-        send(ws, { type: "ready", role, user: { id: user.id, name: user.username }, state: null });
+        send(ws, {
+          type: "ready",
+          role,
+          user: { id: user.id, name: user.username },
+          state: null,
+          sync,
+        });
     } catch (e) {
       ws.close(1008, e instanceof Error ? e.message : "文档不可用");
       return;
     }
     this.peers.add(peer);
-    opened(room);
+    opened();
     if (closed) detach();
   }
-  private async message(peer: Peer, room: Room | null, req: IncomingMessage, raw: string) {
+  private async message(peer: Peer, req: IncomingMessage, raw: string) {
     const { project, file } = peer;
     const current = await userFor(this.store, req);
     await this.store.require(project, current.id);
-    if (file && !(await this.store.fileExists(project, file))) fail(404, "文档不存在");
     const msg = JSON.parse(raw) as Record<string, unknown>;
-    if (msg.type === "update" && room && file) {
-      await this.store.require(project, current.id, "edit");
-      if (
-        typeof msg.id !== "string" ||
-        msg.id.length > 80 ||
-        typeof msg.update !== "string" ||
-        msg.update.length > 2_800_000 ||
-        !/^[A-Za-z0-9+/]*={0,2}$/.test(msg.update)
-      )
-        fail(400, "无效更新");
-      const update = Buffer.from(msg.update, "base64"),
-        id = msg.id,
-        encoded = msg.update;
-      await this.exclusive([room.key], async () => {
-        const candidate = new Y.Doc();
-        try {
-          Y.applyUpdate(candidate, Y.encodeStateAsUpdate(room.doc));
-          Y.applyUpdate(candidate, update);
-          if (
-            Buffer.byteLength(candidate.getText("content").toString()) > 2_000_000 ||
-            [...candidate.share.keys()].some((k) => k !== "content")
-          )
-            fail(413, "文档超过限制");
-          if (Y.encodeStateAsUpdate(candidate).length > 8_000_000)
-            fail(413, "文档历史过大，请创建新文档快照");
-        } finally {
-          candidate.destroy();
-        }
-        await this.store.appendUpdate(file, update);
-        room.pending++;
-        room.pendingBytes += update.length;
-        Y.applyUpdate(room.doc, update, peer);
-        for (const other of room.peers)
-          if (other !== peer) send(other.socket, { type: "update", update: encoded });
-        send(peer.socket, { type: "ack", id });
-        if (room.pending >= COMPACT_UPDATES || room.pendingBytes >= COMPACT_BYTES)
-          await this.compact(room).catch(logFailure("compaction"));
-      });
-      await this.auditEdit(project, file, current.id, update.length);
+    if (msg.type === "ping") return send(peer.socket, { type: "pong" });
+    if (peer.sync) return this.syncMessage(peer, current, msg);
+    const room = file ? (peer.rooms.get(file) ?? null) : null;
+    if (file && !(await this.store.fileExists(project, file))) fail(404, "文档不存在");
+    if (msg.type === "update" && room) {
+      await this.applyUpdate(peer, room, current, msg);
+      send(peer.socket, { type: "ack", id: msg.id });
     } else if (msg.type === "awareness" && room) {
       if (typeof msg.update !== "string" || msg.update.length > 16_000) fail(400, "无效光标信息");
       const bytes = Buffer.from(msg.update, "base64");
@@ -329,11 +327,101 @@ export class Collaboration {
         state === null ? null : { ...state, user },
       );
       applyAwarenessUpdate(room.awareness, safe, peer);
-      const update = Buffer.from(safe).toString("base64");
+      const update = base64(safe);
       for (const other of room.peers)
-        if (other !== peer) send(other.socket, { type: "awareness", update });
-    } else if (msg.type === "ping") send(peer.socket, { type: "pong" });
-    else fail(400, "未知消息");
+        if (other !== peer && !other.sync) send(other.socket, { type: "awareness", update });
+    } else fail(400, "未知消息");
+  }
+  /**
+   * Desktop sync: `join` (optionally with the state vector it already has) answers with the
+   * missing part of the document; updates and acks name their document. A problem with one
+   * document is reported for that document and leaves the socket open.
+   */
+  private async syncMessage(peer: Peer, current: User, msg: Record<string, unknown>) {
+    const file = typeof msg.file === "string" && msg.file.length <= 80 ? msg.file : null;
+    if (!file) fail(400, "无效文档");
+    const { project } = peer;
+    try {
+      if (msg.type === "join") {
+        if (peer.rooms.size >= MAX_SYNC_ROOMS && !peer.rooms.has(file))
+          fail(429, "同步的文档数量达到上限");
+        if ((await this.store.fileMeta(project, file)).binary)
+          fail(400, "二进制文件不支持共同编辑");
+        let vector: Uint8Array | undefined;
+        if (typeof msg.vector === "string")
+          try {
+            vector = Buffer.from(msg.vector, "base64");
+            Y.decodeStateVector(vector);
+          } catch {
+            fail(400, "无效状态向量");
+          }
+        await this.exclusive([roomKey(project, file)], async () => {
+          const room = await this.open(project, file);
+          room.peers.add(peer);
+          peer.rooms.set(file, room);
+          send(peer.socket, {
+            type: "joined",
+            file,
+            update: base64(Y.encodeStateAsUpdate(room.doc, vector)),
+          });
+        });
+      } else if (msg.type === "leave") {
+        const room = peer.rooms.get(file);
+        if (room) this.leave(peer, room);
+      } else if (msg.type === "update") {
+        const room = peer.rooms.get(file) ?? fail(409, "请先加入文档");
+        if (!(await this.store.fileExists(project, file))) fail(404, "文档不存在");
+        await this.applyUpdate(peer, room, current, msg);
+        send(peer.socket, { type: "ack", file, id: msg.id });
+      } else fail(400, "未知消息");
+    } catch (error) {
+      if (!(error instanceof HttpError) || error.status >= 500) throw error;
+      send(peer.socket, {
+        type: "rejected",
+        file,
+        id: typeof msg.id === "string" ? msg.id : undefined,
+        status: error.status,
+        message: error.message,
+      });
+    }
+  }
+  /** Validates, stores, applies and relays one update; the caller acknowledges it. */
+  private async applyUpdate(peer: Peer, room: Room, current: User, msg: Record<string, unknown>) {
+    await this.store.require(peer.project, current.id, "edit");
+    if (
+      typeof msg.id !== "string" ||
+      msg.id.length > 80 ||
+      typeof msg.update !== "string" ||
+      msg.update.length > 2_800_000 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(msg.update)
+    )
+      fail(400, "无效更新");
+    const update = Buffer.from(msg.update, "base64"),
+      encoded = msg.update;
+    await this.exclusive([room.key], async () => {
+      const candidate = new Y.Doc();
+      try {
+        Y.applyUpdate(candidate, Y.encodeStateAsUpdate(room.doc));
+        Y.applyUpdate(candidate, update);
+        if (
+          Buffer.byteLength(candidate.getText("content").toString()) > 2_000_000 ||
+          [...candidate.share.keys()].some((k) => k !== "content")
+        )
+          fail(413, "文档超过限制");
+        if (Y.encodeStateAsUpdate(candidate).length > 8_000_000)
+          fail(413, "文档历史过大，请创建新文档快照");
+      } finally {
+        candidate.destroy();
+      }
+      await this.store.appendUpdate(room.file, update);
+      room.pending++;
+      room.pendingBytes += update.length;
+      Y.applyUpdate(room.doc, update, peer);
+      this.relay(room, peer, encoded);
+      if (room.pending >= COMPACT_UPDATES || room.pendingBytes >= COMPACT_BYTES)
+        await this.compact(room).catch(logFailure("compaction"));
+    });
+    await this.auditEdit(peer.project, room.file, current.id, update.length);
   }
   changed(project: string) {
     for (const peer of this.peers)
@@ -362,7 +450,14 @@ export class Collaboration {
     for (const p of this.peers) if (p.user.id === user) p.socket.close(1008, reason);
   }
   closeFile(file: string, reason: string) {
-    for (const p of this.peers) if (p.file === file) p.socket.close(1008, reason);
+    for (const p of this.peers) {
+      const room = p.rooms.get(file);
+      if (p.file === file) p.socket.close(1008, reason);
+      else if (p.sync && room) {
+        send(p.socket, { type: "closed", file, reason });
+        this.leave(p, room);
+      }
+    }
   }
   /** Current text of a document, including edits not yet compacted. */
   async text(project: string, file: string) {
@@ -450,8 +545,7 @@ export class Collaboration {
             Y.applyUpdate(p.room.doc, p.update);
             p.room.pending++;
             p.room.pendingBytes += p.update.length;
-            const update = Buffer.from(p.update).toString("base64");
-            for (const peer of p.room.peers) send(peer.socket, { type: "update", update });
+            this.relay(p.room, null, base64(p.update));
           }
         },
       );
