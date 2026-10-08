@@ -6,7 +6,7 @@
 
 建议沿用 Writer 的 LaTeX 编辑器、PDF 阅读器、批注与三种 AI 后端，新增 Web 客户端和项目服务。桌面版继续保留，本地项目走现有 Tauri 接口，团队项目走 HTTPS / WebSocket。协作采用 CodeMirror 6 + Yjs，服务端可选 Hocuspocus。先做单机 Docker Compose 部署，稳定后再拆分服务。
 
-当前 `apps/desktop` 是 Next.js 静态导出 + Tauri Rust 后端：读写文件、Git、编译、代理进程都通过 Tauri IPC 访问本机。`apps/web` 是介绍网站，不是多人编辑器。仓库虽有 yjs/y-protocols 依赖，目前没有文档同步 provider、多人编辑绑定或持久化服务。直接把 `.app`、静态 `out` 文件夹或共享磁盘放到服务器上，不能得到完整多人协作。
+当前 `apps/desktop` 是 Next.js 静态导出 + Tauri Rust 后端：读写文件、Git、编译、代理进程都通过 Tauri IPC 访问本机。仓库虽有 yjs/y-protocols 依赖，目前没有文档同步 provider、多人编辑绑定或持久化服务。直接把 `.app`、静态 `out` 文件夹或共享磁盘放到服务器上，不能得到完整多人协作。
 
 ## 可部署的目标结构
 

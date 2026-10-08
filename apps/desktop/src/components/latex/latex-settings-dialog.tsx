@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { UserProfile } from "@/lib/auth";
 import {
   DEFAULT_EDITOR_SETTINGS,
   type EditorSettings,
@@ -31,12 +30,6 @@ interface LaTeXSettingsDialogProps {
   onUpdateEditorSettings: (updates: Partial<EditorSettings>) => void;
   texFiles: string[];
   buildSettings?: React.ReactNode;
-  authLoading: boolean;
-  authConfigured: boolean;
-  authProfile: UserProfile | null;
-  authError: string | null;
-  onOpenLogin: () => void;
-  onSignOut: () => Promise<void>;
 }
 
 // Section header component for visual grouping - editorial style
@@ -157,16 +150,8 @@ export function LaTeXSettingsDialog({
   onUpdateEditorSettings,
   texFiles,
   buildSettings,
-  authLoading,
-  authConfigured,
-  authProfile,
-  authError,
-  onOpenLogin,
-  onSignOut,
 }: LaTeXSettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<string>("build");
-  const canResetActiveTab = activeTab === "build" || activeTab === "editor";
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleResetLatexSettings = useCallback(() => {
     onUpdateSettings(DEFAULT_LATEX_SETTINGS);
@@ -175,15 +160,6 @@ export function LaTeXSettingsDialog({
   const handleResetEditorSettings = useCallback(() => {
     onUpdateEditorSettings(DEFAULT_EDITOR_SETTINGS);
   }, [onUpdateEditorSettings]);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      setIsSigningOut(true);
-      await onSignOut();
-    } finally {
-      setIsSigningOut(false);
-    }
-  }, [onSignOut]);
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
@@ -228,13 +204,6 @@ export function LaTeXSettingsDialog({
                 className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative text-muted-foreground hover:text-foreground data-[state=active]:text-foreground"
               >
                 Editor
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="account"
-                className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative text-muted-foreground hover:text-foreground data-[state=active]:text-foreground"
-              >
-                Account
                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
               </Tabs.Trigger>
             </Tabs.List>
@@ -1033,97 +1002,20 @@ export function LaTeXSettingsDialog({
             </Tabs.Content>
 
             {/* ===== ACCOUNT TAB ===== */}
-            <Tabs.Content value="account" className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-              <SectionHeader>Account</SectionHeader>
-
-              <div className="border-2 border-foreground bg-accent-hover/40 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] px-1.5 py-0.5 border border-foreground font-bold uppercase tracking-wider">
-                    Testing
-                  </span>
-                  <span className="text-sm font-medium text-foreground-secondary">
-                    Login Testing
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-6">
-                  Desktop login is experimental and may not work reliably on all operating systems.
-                </p>
-              </div>
-
-              <div className="border border-border p-4 bg-background">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground-secondary">
-                      {authProfile ? "Signed In" : "Not Signed In"}
-                    </p>
-                    {authLoading ? (
-                      <p className="text-xs text-muted mt-1">Checking account status...</p>
-                    ) : authProfile ? (
-                      <>
-                        <p className="text-sm text-foreground mt-1 truncate">
-                          {authProfile.name || authProfile.email}
-                        </p>
-                        {authProfile.name && (
-                          <p className="text-xs text-muted mt-0.5 truncate">{authProfile.email}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted mt-1">
-                        Login is available for testing, but may fail on some systems.
-                      </p>
-                    )}
-                  </div>
-
-                  {authProfile ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleSignOut();
-                      }}
-                      disabled={authLoading || isSigningOut}
-                      className="px-3 py-2 text-sm border border-border hover:border-border-dark hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSigningOut ? "Signing out..." : "Sign Out"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={onOpenLogin}
-                      disabled={authLoading || !authConfigured}
-                      className="px-3 py-2 text-sm border-2 border-foreground bg-background text-foreground shadow-[3px_3px_0_0_var(--foreground)] hover:shadow-[1px_1px_0_0_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[3px_3px_0_0_var(--foreground)]"
-                      title="Login is under testing and may not work reliably on all operating systems (especially macOS)."
-                    >
-                      Login
-                    </button>
-                  )}
-                </div>
-
-                {!authConfigured && (
-                  <p className="text-xs text-red-600 mt-3">
-                    Authentication is not configured in this desktop build.
-                  </p>
-                )}
-                {authError && <p className="text-xs text-red-600 mt-2 break-words">{authError}</p>}
-              </div>
-            </Tabs.Content>
           </Tabs.Root>
 
           {/* Footer */}
           <div className="flex items-center justify-between px-5 py-4 border-t border-border">
-            {canResetActiveTab ? (
-              <button
-                type="button"
-                onClick={
-                  activeTab === "editor" ? handleResetEditorSettings : handleResetLatexSettings
-                }
-                className="text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5 group"
-              >
-                <ArrowCounterClockwiseIcon className="size-3.5 group-hover:rotate-[-45deg] transition-transform" />
-                Reset to Defaults
-              </button>
-            ) : (
-              <div className="text-xs text-muted-foreground">Account settings are in preview.</div>
-            )}
+            <button
+              type="button"
+              onClick={
+                activeTab === "editor" ? handleResetEditorSettings : handleResetLatexSettings
+              }
+              className="text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5 group"
+            >
+              <ArrowCounterClockwiseIcon className="size-3.5 group-hover:rotate-[-45deg] transition-transform" />
+              Reset to Defaults
+            </button>
             <Dialog.Close className="px-6 py-2 text-sm font-medium bg-background text-foreground border-2 border-foreground shadow-[3px_3px_0_0_var(--foreground)] hover:shadow-[1px_1px_0_0_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
               Done
             </Dialog.Close>

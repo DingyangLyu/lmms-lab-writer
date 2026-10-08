@@ -15,7 +15,6 @@ lmms-lab-writer/
 │   │   │   ├── components/          # 40+ React components
 │   │   │   │   ├── editor/          # Editor, file tree, terminal, diff, git panel
 │   │   │   │   ├── opencode/        # AI chat panel, messages, tools, sessions
-│   │   │   │   ├── auth/            # Login, deep-link, user dropdown
 │   │   │   │   ├── latex/           # Compiler settings, install prompt, main file picker
 │   │   │   │   └── ui/              # Shared UI (tabs, dialogs, toast, context menu, scroll)
 │   │   │   └── lib/tauri/           # Tauri IPC hooks (useTauriDaemon)
@@ -29,21 +28,19 @@ lmms-lab-writer/
 │   │       │       ├── latex.rs     # Compilation, compiler detection, distribution install
 │   │       │       ├── terminal.rs  # PTY spawn, write, resize, kill
 │   │       │       ├── opencode.rs  # AI daemon start/stop/status
-│   │       │       ├── auth.rs      # OAuth callback server
 │   │       │       └── util.rs      # Path validation utilities
 │   │       ├── capabilities/
 │   │       │   └── default.json     # Tauri permissions & allowed shell commands
 │   │       ├── tauri.conf.json      # App config (window, CSP, plugins, bundle)
 │   │       └── Cargo.toml           # Rust dependencies
-│   ├── web/                         # Marketing website (Next.js 15, Vercel)
-│   │   ├── src/app/                 # Pages: landing, docs, auth, download, tools
-│   │   ├── src/components/          # Home, docs, download, auth sections
-│   │   ├── src/lib/supabase/        # Supabase auth client (browser + server)
-│   │   └── content/docs/            # MDX documentation files
-│   └── video/                       # Marketing video (Remotion)
+│   └── collaboration/               # Self-hosted multi-user server + web editor
+│       ├── server/                  # Node HTTP/WebSocket API, PostgreSQL, LaTeX builds
+│       ├── shared/api.ts            # JSON shapes shared by server and web client
+│       └── src/                     # React + CodeMirror + Yjs web client
 ├── packages/
-│   └── shared/                      # Shared TypeScript types & utilities
-│       └── src/index.ts             # FileNode, GitStatus, CompileResult, etc.
+│   ├── shared/                      # Types shared with the desktop app
+│   ├── writing/                     # Three-way merge, review hunks, bibliography
+│   └── latex-editor/                # CodeMirror LaTeX grammar and folding
 ├── docs/                            # Project documentation
 │   ├── dev.md                       # This file
 │   ├── DESIGN.md                    # Design system (retro-terminal, monochrome + orange)
@@ -59,21 +56,21 @@ lmms-lab-writer/
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Desktop Framework | Tauri v2 (Rust backend) | 2.x |
-| Frontend Framework | Next.js | 16.1.5 (desktop), 15.x (web) |
+| Frontend Framework | Next.js (desktop), Vite (collaboration) | 16.x / 8.x |
 | UI Library | React | 19.2.4 |
 | LaTeX Editor | CodeMirror 6 | 6.x |
 | File Editor / Diff | Monaco Editor | 0.55.1 |
 | Terminal Emulator | xterm.js | 6.0.0 |
 | PTY | portable-pty | 0.8 |
-| UI Styling | Tailwind CSS 4 | 4.1.18 (desktop), 3.4 (web) |
+| UI Styling | Tailwind CSS 4 | 4.x (desktop) |
 | UI Components | Radix UI | various |
-| Icons | Phosphor Icons (desktop), Lucide (web) | |
+| Icons | Phosphor Icons | |
 | Animation | Framer Motion | 12.29.2 |
 | Async Runtime | Tokio | 1.x (full features) |
 | File Watching | notify | 6.x |
 | HTTP Client | reqwest | 0.12 |
 | Serialization | serde + serde_json | 1.x |
-| Database / Auth | Supabase | 2.93.1 |
+| Collaboration Database | PostgreSQL (PGlite for tests) | 17 |
 | CRDT / Realtime | Yjs | 13.6.29 |
 | Build Orchestration | Turbo | 2.9.16 |
 | Package Manager | pnpm | 11.5.0 |
@@ -105,8 +102,8 @@ pnpm install
 # Run desktop app in dev mode (frontend + Tauri)
 pnpm tauri:dev
 
-# Run website in dev mode
-pnpm --filter @lmms-lab/writer-web dev
+# Run the collaboration server and web editor
+pnpm --filter @lmms-lab/writer-collaboration dev
 ```
 
 ### All Commands
@@ -114,16 +111,16 @@ pnpm --filter @lmms-lab/writer-web dev
 ```bash
 # Development
 pnpm tauri:dev                              # Desktop app with hot reload
-pnpm --filter @lmms-lab/writer-web dev      # Website with Turbopack
+pnpm --filter @lmms-lab/writer-collaboration dev   # Collaboration server
 
 # Build
 pnpm build                                  # Build all packages
 pnpm tauri:build                            # Build desktop app (.app/.pkg/.exe/.msi)
-pnpm --filter @lmms-lab/writer-web build    # Build website for Vercel
+pnpm --filter @lmms-lab/writer-collaboration build # Build the web editor
 
 # Type Checking
 cd apps/desktop/src-tauri && cargo check    # Rust
-cd apps/web && pnpm tsc --noEmit            # Website TypeScript
+pnpm typecheck                              # TypeScript in every package
 
 # Lint & Format
 pnpm lint                                   # Biome check
@@ -298,15 +295,6 @@ Default shells: Bash/Zsh (macOS/Linux), PowerShell (Windows). User-configurable 
 
 The OpenCode daemon runs as a separate process (`opencode serve`) with stdio piped for log streaming.
 
-#### `auth.rs` — Authentication (3 commands)
-
-| Command | Purpose |
-|---------|---------|
-| `start_auth_callback_server` | Start local OAuth callback server |
-| `stop_auth_callback_server` | Stop callback server |
-
-Uses deep-link scheme `lmms-writer://` for desktop OAuth callback.
-
 #### `util.rs` — Shared Utilities
 
 Path validation: ensures all file operations target paths within the project directory to prevent directory traversal.
@@ -356,7 +344,7 @@ git, latexmk, opencode, sh -c (any), open (macOS), explorer (Windows), xdg-open 
 | Frontend (dev) | `http://localhost:3000` |
 | Frontend (prod) | Bundled static export (`../out`) |
 | macOS Minimum | 10.15 |
-| CSP | Allows self, unsafe-inline, unsafe-eval, assets, GitHub, Supabase |
+| CSP | Allows self, unsafe-inline, unsafe-eval, assets and local servers |
 
 ## Shared Types
 
@@ -382,45 +370,6 @@ The `packages/shared/src/index.ts` package defines types used by both the fronte
 - `sha256(content)` — Browser-compatible SHA-256 hash
 - `parseLatexLog(log)` — Parse LaTeX log for errors/warnings
 
-## Website Architecture
-
-The marketing website (`apps/web/`) is a standard Next.js 15 app deployed on Vercel.
-
-### Pages
-
-| Route | File | Purpose |
-|-------|------|---------|
-| `/` | `app/page.tsx` | Landing page (hero, features, demo, comparison) |
-| `/download` | `app/download/page.tsx` | Platform-specific download with OS detection |
-| `/docs` | `app/docs/page.tsx` | Documentation hub |
-| `/docs/[slug]` | `app/docs/[slug]/page.tsx` | Individual doc pages (MDX rendering) |
-| `/login` | `app/(auth)/login/page.tsx` | Authentication |
-| `/signup` | `app/(auth)/signup/page.tsx` | Registration |
-| `/profile` | `app/(app)/profile/page.tsx` | User profile |
-| `/tools/latex-error-explainer` | `app/tools/…/page.tsx` | LaTeX error explanation tool |
-
-### MDX Documentation
-
-Docs are MDX files in `apps/web/content/docs/`. Rendered with `next-mdx-remote` and these rehype plugins:
-
-- `rehype-slug` — Add IDs to headings
-- `rehype-autolink-headings` — Make headings linkable
-- `rehype-pretty-code` — Syntax highlighting with Shiki (github-dark theme)
-
-Current docs: `installation.mdx`, `quick-start.mdx`, `opencode.mdx`, `ai-agents.mdx`, `compilation.mdx`, `terminal.mdx`, `git.mdx`.
-
-### Key Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| `HeroSection` | `components/home-sections.tsx` | Landing page hero |
-| `FeaturesSection` | `components/home-sections.tsx` | 6-card feature grid |
-| `ComparisonSection` | `components/home-sections.tsx` | Overleaf vs Writer table |
-| `PaperDemo` | `components/paper-demo.tsx` | Animated typing demo |
-| `DownloadSection` | `components/download-sections.tsx` | OS-detected download buttons |
-| `DocsContent` | `components/docs-sections.tsx` | Docs navigation layout |
-| `Header` | `components/header.tsx` | Sticky nav with auth |
-
 ## Turbo Build Pipeline
 
 Defined in `turbo.json`:
@@ -438,7 +387,6 @@ Defined in `turbo.json`:
 }
 ```
 
-Environment variables (Supabase, Postgres) are declared as global dependencies so Turbo invalidates caches when they change.
 
 ## Conventions
 
@@ -634,7 +582,6 @@ strip = true
 | framer-motion | 12.29.2 | Animations |
 | tailwindcss | 4.1.18 | Styling |
 | @tauri-apps/api | 2.9.1 | Tauri IPC bridge |
-| @supabase/supabase-js | 2.93.1 | Auth + database |
 | yjs | 13.6.29 | CRDT for realtime (future) |
 | react-arborist | 3.4.3 | File tree |
 | react-pdf | 10.3.0 | PDF preview |

@@ -1,4 +1,3 @@
-pub mod auth;
 pub mod chat_images;
 pub mod codex;
 pub mod fs;

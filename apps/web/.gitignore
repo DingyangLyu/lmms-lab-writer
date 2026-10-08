@@ -1,5 +1,0 @@
-.vercel
-.env*.local
-
-# Supabase local temp files
-supabase/.temp/

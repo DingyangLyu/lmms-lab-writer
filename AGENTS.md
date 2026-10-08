@@ -17,21 +17,19 @@ lmms-lab-writer/
 │   │   │   ├── components/   # React components (40+ files)
 │   │   │   │   ├── editor/   # Editor, file tree, terminal, diff, git panel
 │   │   │   │   ├── opencode/ # AI chat panel, messages, tools, sessions
-│   │   │   │   ├── auth/     # Login, deep-link, user dropdown
 │   │   │   │   ├── latex/    # Compiler settings, install prompt, main file picker
 │   │   │   │   └── ui/       # Shared UI (tabs, dialogs, toast, context menu, scroll)
 │   │   │   └── lib/tauri/    # Tauri IPC hooks
 │   │   └── src-tauri/        # Rust backend
-│   │       └── src/commands/ # Tauri commands (fs, git, latex, terminal, opencode, auth)
-│   ├── web/                  # Marketing website (Next.js 16, Vercel)
-│   │   ├── src/app/          # Next.js pages (landing, docs, auth, download)
-│   │   ├── content/docs/     # MDX documentation
-│   │   └── src/lib/supabase/ # Supabase auth client
-│   └── video/                # Marketing video (Remotion)
-│       └── src/              # Video generation components
+│   │       └── src/commands/ # Tauri commands (fs, git, latex, terminal, opencode, agents)
+│   └── collaboration/        # Self-hosted multi-user server + web editor
+│       ├── server/           # Node HTTP/WebSocket API, PostgreSQL, LaTeX builds
+│       ├── shared/api.ts     # JSON shapes shared by server and web client
+│       └── src/              # React + CodeMirror + Yjs web client
 ├── packages/
-│   └── shared/               # Shared TypeScript types & utilities
-│       └── src/index.ts      # FileNode, GitStatus, CompileResult, etc.
+│   ├── shared/               # Types shared with the desktop app
+│   ├── writing/              # Three-way merge, review hunks, bibliography
+│   └── latex-editor/         # CodeMirror LaTeX grammar and folding
 ├── docs/                     # Project documentation
 │   ├── DESIGN.md             # Design system (retro-terminal, monochrome + orange)
 │   ├── MARKETING.md          # Marketing copy & launch strategy
@@ -60,7 +58,6 @@ lmms-lab-writer/
 | OpenCode Panel   | `apps/desktop/src/components/opencode/opencode-panel.tsx` | AI chat interface                      |
 | LaTeX Settings   | `apps/desktop/src/components/latex/latex-settings-dialog.tsx` | Compiler configuration             |
 | LaTeX Install    | `apps/desktop/src/components/latex/latex-install-prompt.tsx` | Missing LaTeX detection              |
-| Auth             | `apps/desktop/src/components/auth/`                   | Login, deep-link, user dropdown             |
 | Shared Types     | `packages/shared/src/index.ts`                        | FileNode, GitStatus, CompileResult, etc.    |
 
 ### Rust Command Modules
@@ -72,35 +69,33 @@ lmms-lab-writer/
 | `latex`    | `apps/desktop/src-tauri/src/commands/latex.rs`        | latex_detect_compilers, latex_stop_compilation, latex_synctex_edit (builds: `latex_build.rs`) |
 | `terminal` | `apps/desktop/src-tauri/src/commands/terminal.rs`     | spawn_pty, write_pty, resize_pty, kill_pty       |
 | `opencode` | `apps/desktop/src-tauri/src/commands/opencode.rs`     | opencode_status, opencode_start, opencode_stop   |
-| `auth`     | `apps/desktop/src-tauri/src/commands/auth.rs`         | start_auth_callback_server, stop_auth_callback_server |
 | `util`     | `apps/desktop/src-tauri/src/commands/util.rs`         | Shared utilities for path validation             |
 
-### Website
+### Collaboration Server
 
-| Task          | Location                             | Notes                        |
-| ------------- | ------------------------------------ | ---------------------------- |
-| Landing Page  | `apps/web/src/app/page.tsx`          | Hero, features, CTA          |
-| Download Page | `apps/web/src/app/download/page.tsx` | Platform downloads           |
-| Docs Index    | `apps/web/src/app/docs/page.tsx`     | Documentation navigation     |
-| Auth Pages    | `apps/web/src/app/(auth)/`           | Login, signup                |
-| Supabase      | `apps/web/src/lib/supabase/`         | Auth client (browser/server) |
-| MDX Docs      | `apps/web/content/docs/`             | Quick start, installation    |
+| Task          | Location                                   | Notes                                  |
+| ------------- | ------------------------------------------ | -------------------------------------- |
+| HTTP routes   | `apps/collaboration/server/routes/`        | One module per area, `route()` tables  |
+| Realtime      | `apps/collaboration/server/collaboration.ts` | Yjs rooms over WebSocket             |
+| Database      | `apps/collaboration/server/db.ts`          | PostgreSQL / PGlite, versioned migrations |
+| API types     | `apps/collaboration/shared/api.ts`         | Imported by server and web client      |
+| Web workspace | `apps/collaboration/src/workspace/`        | Editor, files, review, history tabs    |
 
 ## Commands
 
 ```bash
 # Development
 pnpm tauri:dev                              # Run Tauri desktop app in dev mode
-pnpm --filter @lmms-lab/writer-web dev      # Run website in dev mode
+pnpm --filter @lmms-lab/writer-collaboration dev   # Run the collaboration server
 
 # Build
 pnpm build                                  # Build all packages
 pnpm tauri:build                            # Build desktop app (.app/.dmg/.exe/.deb)
-pnpm --filter @lmms-lab/writer-web build    # Build website
+pnpm --filter @lmms-lab/writer-collaboration build # Build the web editor
 
 # Verify
 cd apps/desktop/src-tauri && cargo check    # Check Rust
-cd apps/web && pnpm tsc --noEmit            # Check website TypeScript
+pnpm typecheck                              # Check TypeScript in every package
 
 # Lint & Format
 pnpm exec biome check .                     # Biome lint + format check

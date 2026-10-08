@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { DeepLinkHandler } from "@/components/auth/deep-link-handler";
 import { ExternalLinkHandler } from "@/components/external-link-handler";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
@@ -32,7 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
           <ToastProvider>
             <ExternalLinkHandler />
-            <DeepLinkHandler />
             {children}
           </ToastProvider>
         </ThemeProvider>

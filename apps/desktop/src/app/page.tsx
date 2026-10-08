@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LoginCodeModal } from "@/components/auth";
 import { ChatImageDirectory } from "@/components/chat/chat-image";
 import {
   type DockviewPanelItem,
@@ -32,7 +31,6 @@ import {
   type TabReorderPosition,
 } from "@/components/ui/tab-bar";
 import { useToast } from "@/components/ui/toast";
-import { useAuth } from "@/lib/auth";
 import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
 import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
@@ -139,7 +137,6 @@ export default function EditorPage() {
     gitAutoFetchIntervalMs: editorSettings.settings.gitAutoFetchIntervalSeconds * 1000,
   });
   const prefersReducedMotion = useReducedMotion();
-  const auth = useAuth();
   const { toast } = useToast();
   const recentProjects = useRecentProjects();
   const [projectTransition] = useState(() => new ProjectTransition());
@@ -244,7 +241,6 @@ export default function EditorPage() {
       .catch((error) => toast(`恢复草稿读取失败：${String(error)}`, "error"));
   }, [daemon.projectPath, saveManager, toast]);
   const [showLatexSettings, setShowLatexSettings] = useState(false);
-  const [showLoginCodeModal, setShowLoginCodeModal] = useState(false);
   const [pendingBackend, setPendingBackend] = useState<"opencode" | "codex" | "claude">("opencode");
   const [pendingOpenCodeMessage, setPendingOpenCodeMessage] = useState<string | null>(null);
 
@@ -1909,17 +1905,7 @@ export default function EditorPage() {
           <header className="h-12 border-b border-border flex items-center">
             <div className="w-full px-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    import("@tauri-apps/plugin-shell").then(({ open }) => {
-                      open("https://writer.lmms-lab.com");
-                    });
-                  }}
-                  className="hover:opacity-70 transition-opacity flex items-center"
-                  title="Visit writer.lmms-lab.com"
-                  aria-label="Open LMMs-Lab website"
-                >
+                <div className="flex items-center">
                   <Image
                     src="/logo-small-light.svg"
                     alt="LMMs-Lab Writer"
@@ -1934,7 +1920,7 @@ export default function EditorPage() {
                     height={28}
                     className="h-7 w-auto hidden dark:block"
                   />
-                </button>
+                </div>
                 <span className="text-border">/</span>
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="text-sm font-medium px-2 py-1 -ml-2 truncate">
@@ -2436,15 +2422,6 @@ export default function EditorPage() {
               />
             ) : undefined
           }
-          authLoading={auth.loading}
-          authConfigured={auth.isConfigured}
-          authProfile={auth.profile}
-          authError={auth.error}
-          onOpenLogin={() => {
-            setShowLatexSettings(false);
-            setShowLoginCodeModal(true);
-          }}
-          onSignOut={auth.signOut}
         />
 
         <SynctexInstallDialog
@@ -2467,20 +2444,6 @@ export default function EditorPage() {
             error={git.publish.error}
           />
         )}
-
-        <LoginCodeModal
-          isOpen={showLoginCodeModal}
-          onClose={() => setShowLoginCodeModal(false)}
-          onSuccess={async (accessToken) => {
-            if (accessToken) {
-              // Session storage failed, use access token directly
-              await auth.setAuthWithToken(accessToken);
-            } else {
-              // Session was stored properly, refresh normally
-              await auth.refreshAuth();
-            }
-          }}
-        />
       </div>
     </AnnotationProvider>
   );

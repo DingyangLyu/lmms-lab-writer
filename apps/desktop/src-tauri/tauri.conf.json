@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' asset: http://asset.localhost data: blob: https:; media-src 'self' asset: http://asset.localhost data: blob:; frame-src 'self' asset: http://asset.localhost blob:; connect-src 'self' asset: http://asset.localhost https://asset.localhost http://localhost:* ws://localhost:* wss://localhost:* ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co",
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' asset: http://asset.localhost data: blob: https:; media-src 'self' asset: http://asset.localhost data: blob:; frame-src 'self' asset: http://asset.localhost blob:; connect-src 'self' asset: http://asset.localhost https://asset.localhost http://localhost:* ws://localhost:* wss://localhost:* ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]
