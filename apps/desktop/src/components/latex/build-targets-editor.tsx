@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { readCompilerOverrides, writeCompilerOverrides } from "@/lib/latex/compiler-overrides";
 import type { BuildTarget, LaTeXCompilersStatus, ProjectBuildConfig } from "@/lib/latex/types";
 import { makeBuildTarget } from "@/lib/latex/use-latex-settings";
+import { useI18n } from "@/lib/i18n";
 export function BuildTargetsEditor({
   project,
   config,
@@ -15,6 +16,7 @@ export function BuildTargetsEditor({
   texFiles: string[];
   onSave: (next: ProjectBuildConfig) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(config);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,25 +47,22 @@ export function BuildTargetsEditor({
   };
   return (
     <section className="space-y-3 py-2 text-xs">
-      <p className="text-sm font-medium">编译目标 · 中英文／不同模板可分别配置</p>
-      <p className="text-muted">
-        主文件、工作目录和输出目录都相对项目根目录，保存在
-        .writer/latex.json，随项目迁移。每个目标应使用不同 PDF 输出位置。
-      </p>
+      <p className="text-sm font-medium">{t("latex.buildTargetsEGOnePerLanguageOrTemplate")}</p>
+      <p className="text-muted">{t("latex.mainFileWorkingDirectoryAndOutputDirecto")}</p>
       {draft.targets.map((target) => (
         <div key={target.id} className="space-y-2 border border-border p-3">
           <div className="flex gap-2">
             <label className="min-w-0 flex-1">
-              名称
+              {t("latex.name")}
               <input
-                aria-label={`目标名称 ${target.name}`}
+                aria-label={t("latex.targetNameName", { name: target.name })}
                 value={target.name}
                 onChange={(e) => update(target.id, { name: e.target.value })}
                 className="mt-1 w-full border border-border bg-background p-1.5"
               />
             </label>
             <label className="w-36">
-              引擎
+              {t("latex.engine")}
               <select
                 value={target.engine}
                 onChange={(e) =>
@@ -71,17 +70,17 @@ export function BuildTargetsEditor({
                 }
                 className="mt-1 w-full border border-border bg-background p-1.5"
               >
-                <option value="auto">自动检测</option>
+                <option value="auto">{t("latex.detectAutomatically")}</option>
                 <option value="xelatex">XeLaTeX</option>
                 <option value="pdflatex">pdfLaTeX</option>
                 <option value="lualatex">LuaLaTeX</option>
-                <option value="latexmk">latexmk · 自动引擎</option>
+                <option value="latexmk">{t("latex.latexmkAutomaticEngine")}</option>
                 <option value="tectonic">Tectonic</option>
               </select>
             </label>
           </div>
           <label className="block">
-            主文件
+            {t("latex.mainFile")}
             <input
               value={target.mainFile}
               list="latex-entry-files"
@@ -91,7 +90,7 @@ export function BuildTargetsEditor({
           </label>
           <div className="grid grid-cols-2 gap-2">
             <label>
-              工作目录
+              {t("latex.workingDirectory")}
               <input
                 value={target.workDir}
                 onChange={(e) => update(target.id, { workDir: e.target.value })}
@@ -99,7 +98,7 @@ export function BuildTargetsEditor({
               />
             </label>
             <label>
-              输出目录
+              {t("latex.outputDirectory")}
               <input
                 value={target.outputDir}
                 onChange={(e) => update(target.id, { outputDir: e.target.value })}
@@ -115,7 +114,7 @@ export function BuildTargetsEditor({
                 checked={draft.activeTarget === target.id}
                 onChange={() => setDraft((current) => ({ ...current, activeTarget: target.id }))}
               />
-              当前编译目标
+              {t("latex.activeTarget")}
             </label>
             <button
               type="button"
@@ -130,7 +129,7 @@ export function BuildTargetsEditor({
                 }))
               }
             >
-              移除目标
+              {t("latex.removeTarget")}
             </button>
           </div>
         </div>
@@ -142,8 +141,8 @@ export function BuildTargetsEditor({
       </datalist>
       <div className="flex flex-wrap gap-2">
         <input
-          aria-label="新增主文件路径"
-          placeholder="例如 main_en.tex 或 en/main.tex"
+          aria-label={t("latex.newMainFilePath")}
+          placeholder={t("latex.eGMainEnTexOrEnMainTex")}
           list="latex-entry-files"
           value={newEntry}
           onChange={(e) => setNewEntry(e.target.value)}
@@ -155,7 +154,7 @@ export function BuildTargetsEditor({
           onClick={() => {
             const path = newEntry.trim();
             if (draft.targets.some((t) => t.mainFile === path)) {
-              setError("该入口已存在");
+              setError(t("latex.thatEntryAlreadyExists"));
               return;
             }
             const target = makeBuildTarget(path);
@@ -168,7 +167,7 @@ export function BuildTargetsEditor({
           }}
           className="border border-border px-2"
         >
-          添加目标
+          {t("latex.addTarget")}
         </button>
         <button
           type="button"
@@ -192,7 +191,7 @@ export function BuildTargetsEditor({
           }
           className="border border-border px-2"
         >
-          扫描入口
+          {t("latex.scanForMainFiles")}
         </button>
       </div>
       <button
@@ -205,7 +204,7 @@ export function BuildTargetsEditor({
         }
         className="border border-foreground bg-foreground px-3 py-1.5 text-background"
       >
-        {busy ? "正在保存…" : "保存编译配置"}
+        {busy ? t("latex.saving") : t("latex.saveBuildSettings")}
       </button>
       {error && (
         <p role="alert" className="whitespace-pre-wrap text-red-600">
@@ -213,11 +212,10 @@ export function BuildTargetsEditor({
         </p>
       )}
       <details className="border-t border-border pt-3">
-        <summary className="cursor-pointer">本机编译器 · 自动探测与路径覆盖</summary>
-        <p className="my-2 text-muted">
-          本机路径不会写入项目配置。覆盖失效时会重新自动查找；新电脑仍需安装 LaTeX
-          环境及模板需要的字体。
-        </p>
+        <summary className="cursor-pointer">
+          {t("latex.compilersOnThisComputerDetectionAndPathO")}
+        </summary>
+        <p className="my-2 text-muted">{t("latex.pathsOnThisComputerAreNotWrittenToThePro")}</p>
         <button
           type="button"
           onClick={() =>
@@ -227,18 +225,19 @@ export function BuildTargetsEditor({
           }
           className="mb-2 border border-border px-2 py-1"
         >
-          重新检测编译器
+          {t("latex.detectCompilersAgain")}
         </button>
         {["pdflatex", "xelatex", "lualatex", "latexmk", "tectonic"].map((engine) => (
           <label key={engine} className="mb-2 block">
             {engine}{" "}
             <span className="text-muted">
-              {catalog?.[engine as keyof LaTeXCompilersStatus]?.path ?? (catalog ? "未找到" : "")}
+              {catalog?.[engine as keyof LaTeXCompilersStatus]?.path ??
+                (catalog ? t("latex.notFound") : "")}
             </span>
             <input
-              aria-label={`${engine} 本机路径覆盖`}
+              aria-label={t("latex.enginePathOnThisComputer", { engine })}
               value={overrides[engine] || ""}
-              placeholder="留空自动探测"
+              placeholder={t("latex.leaveEmptyToDetect")}
               onChange={(e) => {
                 const next = { ...overrides, [engine]: e.target.value };
                 setOverrides(next);

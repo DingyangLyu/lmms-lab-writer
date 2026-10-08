@@ -5,12 +5,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { useLatexInstaller } from "@/lib/latex";
+import { useI18n } from "@/lib/i18n";
 
 interface LaTeXInstallPromptProps {
   onRefreshCompilers?: () => void;
 }
 
 export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptProps) {
+  const { t } = useI18n();
   const {
     distributions,
     progress,
@@ -48,10 +50,9 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h3 className="font-bold text-amber-800">LaTeX Not Detected</h3>
+              <h3 className="font-bold text-amber-800">{t("latex.latexNotDetected")}</h3>
               <p className="text-sm text-amber-700 mt-1">
-                No LaTeX compiler was found on your system. Install a LaTeX distribution to compile
-                documents.
+                {t("latex.noLatexCompilerWasFoundOnYourSystemInsta")}
               </p>
             </div>
             {!isInstalling && !result && (
@@ -59,7 +60,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                 type="button"
                 onClick={handleRefresh}
                 className="flex-shrink-0 p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition-colors"
-                title="Refresh compiler detection"
+                title={t("latex.refreshCompilerDetection")}
               >
                 <ArrowClockwiseIcon className="size-4" />
               </button>
@@ -114,10 +115,10 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                       onClick={handleRefresh}
                       className="btn btn-sm border-2 border-green-600 bg-green-600 text-white hover:bg-green-700 transition-colors"
                     >
-                      Refresh Compilers
+                      {t("latex.refreshCompilers")}
                     </button>
                     <span className="text-xs text-green-600">
-                      Click to detect the newly installed compiler
+                      {t("latex.clickToDetectTheNewlyInstalledCompiler")}
                     </span>
                   </div>
                 )}
@@ -127,7 +128,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                     onClick={reset}
                     className="mt-2 text-sm text-amber-700 hover:text-amber-900 underline"
                   >
-                    Try again
+                    {t("latex.tryAgain")}
                   </button>
                 )}
               </motion.div>
@@ -154,7 +155,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                         {dist.name}
                         {index === 0 && (
                           <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 font-normal">
-                            Recommended
+                            {t("latex.recommended")}
                           </span>
                         )}
                       </div>
@@ -171,7 +172,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                               : "border-foreground bg-foreground text-background shadow-[2px_2px_0_0_#fbbf24] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
                           }`}
                         >
-                          Install
+                          {t("latex.install")}
                         </button>
                       )}
                       {downloadUrl && (
@@ -184,7 +185,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
                               : "border-amber-600 bg-background text-amber-700 hover:bg-amber-50"
                           }`}
                         >
-                          Download
+                          {t("latex.download")}
                         </button>
                       )}
                     </div>
@@ -198,7 +199,7 @@ export function LaTeXInstallPrompt({ onRefreshCompilers }: LaTeXInstallPromptPro
           {!isInstalling && !result && distributions.length === 0 && (
             <div className="mt-4 flex items-center gap-2 text-sm text-amber-600">
               <Spinner className="size-4" />
-              Loading available distributions...
+              {t("latex.loadingAvailableDistributions")}
             </div>
           )}
         </div>

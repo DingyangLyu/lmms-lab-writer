@@ -3,6 +3,7 @@ import { agentsEn, agentsZh } from "./agents";
 import { collabEn, collabZh } from "./collab";
 import { commonEn, commonZh } from "./common";
 import { editorEn, editorZh } from "./editor";
+import { latexEn, latexZh } from "./latex";
 import { pageEn, pageZh } from "./page";
 import { settingsEn, settingsZh } from "./settings";
 
@@ -11,6 +12,7 @@ const zh = {
   ...collabZh,
   ...commonZh,
   ...editorZh,
+  ...latexZh,
   ...pageZh,
   ...settingsZh,
 };
@@ -19,6 +21,7 @@ const en: Record<keyof typeof zh, string> = {
   ...collabEn,
   ...commonEn,
   ...editorEn,
+  ...latexEn,
   ...pageEn,
   ...settingsEn,
 };

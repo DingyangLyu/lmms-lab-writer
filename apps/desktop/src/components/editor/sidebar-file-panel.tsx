@@ -79,7 +79,7 @@ export function FileSidebarPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section
-        aria-label="项目文件"
+        aria-label={t("files.projectFiles")}
         className={`flex min-h-0 flex-col ${filesOpen ? "flex-[1.3]" : "shrink-0"}`}
       >
         <div
@@ -89,7 +89,7 @@ export function FileSidebarPanel({
           <button
             type="button"
             aria-expanded={filesOpen}
-            aria-label={filesOpen ? "折叠文件列表" : "展开文件列表"}
+            aria-label={filesOpen ? t("files.collapseFileList") : t("files.expandFileList")}
             onClick={() =>
               setFilesOpen((value) => {
                 localStorage.setItem("writer-files-open", String(!value));

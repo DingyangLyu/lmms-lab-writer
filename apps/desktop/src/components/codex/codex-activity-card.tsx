@@ -14,6 +14,7 @@ import {
 import { open } from "@tauri-apps/plugin-shell";
 import { memo, useId, useState } from "react";
 import { type CodexItem, textForCodexItem } from "@/lib/codex/events";
+import { i18n, useI18n } from "@/lib/i18n";
 
 type Props = {
   item: CodexItem;
@@ -73,7 +74,7 @@ function relativePath(path: string, directory?: string): string {
 }
 
 function commandPreview(command?: string): string {
-  if (!command) return "执行命令";
+  if (!command) return i18n.t("activity.runACommand");
   return command
     .replace(/\s+/g, " ")
     .trim()
@@ -91,16 +92,18 @@ function previewForItem(item: CodexItem, directory?: string): string {
         item.action?.query ??
         item.action?.queries?.join(" · ") ??
         item.action?.url ??
-        "网页"
+        i18n.t("activity.web")
       );
     case "fileChange": {
       const paths = item.changes?.map((change) => relativePath(change.path, directory)) ?? [];
-      return paths.length ? paths.join(" · ") : "项目文件";
+      return paths.length ? paths.join(" · ") : i18n.t("activity.projectFiles");
     }
     case "reasoning":
-      return textForCodexItem(item).replace(/\s+/g, " ").trim() || "分析当前任务";
+      return (
+        textForCodexItem(item).replace(/\s+/g, " ").trim() || i18n.t("activity.analysingTheTask")
+      );
     case "mcpToolCall":
-      return [item.server, item.tool].filter(Boolean).join(" / ") || "调用工具";
+      return [item.server, item.tool].filter(Boolean).join(" / ") || i18n.t("activity.useATool");
     default:
       return item.type;
   }
@@ -135,6 +138,7 @@ function DetailBlock({ label, value }: { label: string; value?: string }) {
 }
 
 function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
   const kind = kindForItem(item);
@@ -144,11 +148,11 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
     : item.status === "inProgress";
   const failed = ["failed", "error", "declined"].includes(item.status ?? "") || Boolean(item.error);
   const title = {
-    command: "终端",
-    search: "搜索",
-    change: "修改",
-    tool: "工具",
-    thinking: "思考",
+    command: t("activity.terminal"),
+    search: t("activity.search2"),
+    change: t("activity.edit"),
+    tool: t("activity.tool"),
+    thinking: t("activity.thinking2"),
   }[kind];
   const preview = previewForItem(item, directory);
   const reasoningText = kind === "thinking" ? textForCodexItem(item).trim() : "";
@@ -164,7 +168,9 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
         type="button"
         aria-expanded={expanded}
         aria-controls={detailId}
-        aria-label={`${expanded ? "收起" : "展开"}${title}详情`}
+        aria-label={t(expanded ? "activity.hideTitleDetails" : "activity.showTitleDetails", {
+          title,
+        })}
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full min-w-0 items-center gap-2 px-2.5 py-2 text-left hover:bg-foreground/[0.035] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground"
       >
@@ -181,15 +187,15 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
           {failed ? (
             <>
               <WarningCircleIcon className="size-3.5" aria-hidden="true" />
-              失败
+              {t("activity.failed")}
             </>
           ) : running ? (
             <>
               <CircleNotchIcon className="size-3.5 codex-activity-spinner" aria-hidden="true" />
-              {kind === "thinking" ? "思考中" : "进行中"}
+              {kind === "thinking" ? t("activity.thinking") : t("activity.running")}
             </>
           ) : (
-            <CheckIcon className="size-3.5" aria-label="已完成" />
+            <CheckIcon className="size-3.5" aria-label={t("activity.done")} />
           )}
         </span>
         <CaretDownIcon
@@ -200,7 +206,7 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
 
       <section
         id={detailId}
-        aria-label={`${title}详情`}
+        aria-label={t("activity.titleDetails", { title })}
         hidden={!expanded}
         className="codex-activity-detail border-t border-border/70 p-2.5"
       >
@@ -208,13 +214,17 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
           <div className="space-y-2.5">
             {kind === "command" && (
               <>
-                <DetailBlock label="命令" value={item.command} />
-                <DetailBlock label="输出" value={item.aggregatedOutput ?? undefined} />
+                <DetailBlock label={t("activity.command")} value={item.command} />
+                <DetailBlock
+                  label={t("activity.output")}
+                  value={item.aggregatedOutput ?? undefined}
+                />
                 {(item.exitCode != null || item.durationMs != null) && (
                   <p className="text-[10px] text-muted">
-                    {item.exitCode != null && `退出码 ${item.exitCode}`}
+                    {item.exitCode != null && t("activity.exitCodeCode", { code: item.exitCode })}
                     {item.exitCode != null && item.durationMs != null && " · "}
-                    {item.durationMs != null && `耗时 ${(item.durationMs / 1000).toFixed(1)} 秒`}
+                    {item.durationMs != null &&
+                      t("activity.tookSecondsS", { seconds: (item.durationMs / 1000).toFixed(1) })}
                   </p>
                 )}
               </>
@@ -222,7 +232,7 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
             {kind === "search" && (
               <>
                 <DetailBlock
-                  label="搜索内容"
+                  label={t("activity.search")}
                   value={
                     item.query ??
                     item.action?.query ??
@@ -274,23 +284,31 @@ function CodexActivityCardInner({ item, directory, onFileClick }: Props) {
                       ? ` · ${typeof change.kind === "string" ? change.kind : change.kind.type}`
                       : ""}
                   </button>
-                  <DetailBlock label="变更" value={change.diff} />
+                  <DetailBlock label={t("activity.changes")} value={change.diff} />
                 </div>
-              )) ?? <div className="text-[11px] text-muted">项目文件已修改</div>)}
+              )) ?? (
+                <div className="text-[11px] text-muted">{t("activity.projectFilesChanged")}</div>
+              ))}
             {kind === "thinking" && (
-              <DetailBlock label="思考摘要" value={reasoningText || "正在分析…"} />
+              <DetailBlock
+                label={t("activity.reasoningSummary")}
+                value={reasoningText || t("activity.analysing")}
+              />
             )}
             {kind === "tool" && (
               <>
                 <DetailBlock
-                  label="工具"
+                  label={t("activity.tool")}
                   value={[item.server, item.tool].filter(Boolean).join(" / ")}
                 />
-                <DetailBlock label="内容" value={item.text} />
-                <DetailBlock label="输出" value={item.aggregatedOutput ?? undefined} />
+                <DetailBlock label={t("activity.content")} value={item.text} />
+                <DetailBlock
+                  label={t("activity.output")}
+                  value={item.aggregatedOutput ?? undefined}
+                />
               </>
             )}
-            <DetailBlock label="错误" value={item.error} />
+            <DetailBlock label={t("activity.error")} value={item.error} />
             {running && (
               <div
                 className="codex-activity-dots text-[11px] text-amber-700 dark:text-amber-300"

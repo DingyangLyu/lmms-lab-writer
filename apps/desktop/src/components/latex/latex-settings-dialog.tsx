@@ -452,8 +452,8 @@ export function LaTeXSettingsDialog({
                 onChange={(enabled) =>
                   onUpdateEditorSettings({ highlightAmbiguousUnicode: enabled })
                 }
-                label="中文标点方框"
-                description="标记容易与英文符号混淆的全角标点；关闭只改变显示，不改动文稿。"
+                label={t("settings.boxesAroundChinesePunctuation")}
+                description={t("settings.marksFullWidthPunctuationThatIsEasilyCon")}
               />
 
               <div className="space-y-3 pt-1">

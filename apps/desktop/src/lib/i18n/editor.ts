@@ -356,6 +356,9 @@ export const editorZh = {
   "tree.rename": "重命名",
   "tree.delete": "删除",
   "tree.cancel": "取消",
+  "files.collapseFileList": "折叠文件列表",
+  "files.expandFileList": "展开文件列表",
+  "files.projectFiles": "项目文件",
 };
 export const editorEn: Record<keyof typeof editorZh, string> = {
   "save.eachSaveKeepsThePreviousTextTheLatest30A":
@@ -735,4 +738,7 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "tree.rename": "Rename",
   "tree.delete": "Delete",
   "tree.cancel": "Cancel",
+  "files.collapseFileList": "Collapse file list",
+  "files.expandFileList": "Expand file list",
+  "files.projectFiles": "Project files",
 };

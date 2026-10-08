@@ -115,6 +115,9 @@ export const settingsZh = {
   "settings.fit": "适应",
   "settings.git": "Git",
   "settings.on": "开",
+  "settings.marksFullWidthPunctuationThatIsEasilyCon":
+    "标记容易与英文符号混淆的全角标点；关闭只改变显示，不改动文稿。",
+  "settings.boxesAroundChinesePunctuation": "中文标点方框",
 };
 export const settingsEn: Record<keyof typeof settingsZh, string> = {
   "settings.autoModeChoosesShellPerOsFallbackRules":
@@ -234,4 +237,7 @@ export const settingsEn: Record<keyof typeof settingsZh, string> = {
   "settings.fit": "Fit",
   "settings.git": "Git",
   "settings.on": "On",
+  "settings.marksFullWidthPunctuationThatIsEasilyCon":
+    "Marks full-width punctuation that is easily confused with ASCII; turning it off only changes the display, never the document.",
+  "settings.boxesAroundChinesePunctuation": "Boxes around Chinese punctuation",
 };

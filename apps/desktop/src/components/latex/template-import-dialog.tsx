@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 export function TemplateImportDialog({
   onClose,
   onImported,
@@ -9,6 +10,7 @@ export function TemplateImportDialog({
   onClose: () => void;
   onImported: (path: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [source, setSource] = useState("");
   const [parent, setParent] = useState("");
   const [name, setName] = useState("paper-template");
@@ -19,8 +21,10 @@ export function TemplateImportDialog({
       const path = await open({
         directory,
         multiple: false,
-        title: directory ? "选择完整模板文件夹" : "选择 LaTeX 模板 ZIP",
-        ...(!directory ? { filters: [{ name: "ZIP 模板", extensions: ["zip"] }] } : {}),
+        title: directory
+          ? t("latex.chooseTheCompleteTemplateFolder")
+          : t("latex.chooseALatexTemplateZip"),
+        ...(!directory ? { filters: [{ name: t("latex.zipTemplate"), extensions: ["zip"] }] } : {}),
       });
       if (typeof path === "string") {
         setSource(path);
@@ -40,20 +44,17 @@ export function TemplateImportDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="导入 LaTeX 模板"
+      aria-label={t("latex.importALatexTemplate")}
       className="fixed inset-0 z-[180] flex items-center justify-center bg-black/40 p-6"
     >
       <div className="w-full max-w-xl space-y-4 border border-border bg-background p-5 text-sm">
         <div className="flex justify-between">
-          <strong>导入 LaTeX 模板</strong>
+          <strong>{t("latex.importALatexTemplate")}</strong>
           <button type="button" disabled={busy} onClick={onClose}>
-            关闭
+            {t("latex.close")}
           </button>
         </div>
-        <p className="text-xs text-muted">
-          选择下载好的完整模板（例如 ICLR 模板），将
-          .tex、.sty、.cls、.bst、图片等复制到一个新项目，不覆盖已有论文。
-        </p>
+        <p className="text-xs text-muted">{t("latex.chooseACompleteDownloadedTemplateForExam")}</p>
         <div className="flex gap-2">
           <button
             type="button"
@@ -61,7 +62,7 @@ export function TemplateImportDialog({
             onClick={() => void choose(false)}
             className="border border-border px-3 py-2"
           >
-            选择 ZIP
+            {t("latex.chooseZip")}
           </button>
           <button
             type="button"
@@ -69,15 +70,19 @@ export function TemplateImportDialog({
             onClick={() => void choose(true)}
             className="border border-border px-3 py-2"
           >
-            选择文件夹
+            {t("latex.chooseFolder")}
           </button>
         </div>
-        <p className="break-all text-xs">{source || "尚未选择模板"}</p>
+        <p className="break-all text-xs">{source || t("latex.noTemplateChosen")}</p>
         <button
           type="button"
           disabled={busy}
           onClick={() =>
-            void open({ directory: true, multiple: false, title: "选择新项目存放目录" })
+            void open({
+              directory: true,
+              multiple: false,
+              title: t("latex.chooseWhereToPutTheNewProject"),
+            })
               .then((value) => {
                 if (typeof value === "string") setParent(value);
               })
@@ -85,11 +90,11 @@ export function TemplateImportDialog({
           }
           className="border border-border px-3 py-2"
         >
-          选择存放位置
+          {t("latex.chooseLocation")}
         </button>
-        <p className="break-all text-xs">{parent || "尚未选择存放目录"}</p>
+        <p className="break-all text-xs">{parent || t("latex.noLocationChosen")}</p>
         <label className="block">
-          新项目文件夹名称
+          {t("latex.newProjectFolderName")}
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -116,7 +121,7 @@ export function TemplateImportDialog({
           }}
           className="border border-foreground bg-foreground px-4 py-2 text-background disabled:opacity-40"
         >
-          {busy ? "正在导入…" : "导入并打开新项目"}
+          {busy ? t("latex.importing") : t("latex.importAndOpenTheNewProject")}
         </button>
       </div>
     </div>
