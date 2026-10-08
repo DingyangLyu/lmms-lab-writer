@@ -43,6 +43,11 @@ ttf-parser = "0.25"
 sha2 = "0.10"
 md-5 = "0.10"
 similar = "2.7"
+ignore = "0.4"
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
+futures-util = "0.3"
+# Both rustls backends end up enabled; the app installs aws-lc-rs explicitly (see lib.rs).
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

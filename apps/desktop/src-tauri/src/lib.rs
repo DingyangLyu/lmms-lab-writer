@@ -45,6 +45,9 @@ fn is_writer_page(url: &url::Url) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // reqwest and tokio-tungstenite together enable both rustls backends, which leaves no
+    // default; without one, the first wss:// connection would panic.
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
@@ -61,6 +64,7 @@ pub fn run() {
         .manage(commands::writer_bridge::BridgeState::default())
         .manage(commands::saving::SaveGuard::default())
         .manage(LaTeXCompilationState::default())
+        .manage(commands::collab::CollabState::default())
         .manage(Mutex::new(WatcherState::default()))
         .manage(Mutex::new(ProjectState::default()))
         .invoke_handler(tauri::generate_handler![
@@ -91,6 +95,23 @@ pub fn run() {
             commands::writing::writing_apply_changes,
             commands::writing::bibliography_lookup_doi,
             commands::writing::bibliography_zotero_local,
+            commands::collab::collab_sign_in,
+            commands::collab::collab_sign_out,
+            commands::collab::collab_accounts,
+            commands::collab::collab_request,
+            commands::collab::collab_connect,
+            commands::collab::collab_send,
+            commands::collab::collab_close,
+            commands::folder_sync::sync_list,
+            commands::folder_sync::sync_read,
+            commands::folder_sync::sync_write,
+            commands::folder_sync::sync_remove,
+            commands::folder_sync::sync_move,
+            commands::folder_sync::sync_state_load,
+            commands::folder_sync::sync_state_save,
+            commands::folder_sync::sync_link_get,
+            commands::folder_sync::sync_link_set,
+            commands::folder_sync::sync_create_folder,
             commands::reviews::review_begin,
             commands::reviews::review_list,
             commands::reviews::review_read,

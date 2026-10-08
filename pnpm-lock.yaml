@@ -153,9 +153,15 @@ importers:
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
+      '@lmms-lab/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@lmms-lab/latex-editor':
         specifier: workspace:*
         version: link:../../packages/latex-editor
+      '@lmms-lab/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@lmms-lab/writer-shared':
         specifier: workspace:*
         version: link:../../packages/shared

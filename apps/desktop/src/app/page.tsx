@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatImageDirectory } from "@/components/chat/chat-image";
+import { OpenFromServer } from "@/components/collab/open-from-server";
+import { SyncPanel } from "@/components/collab/sync-panel";
 import {
   type DockviewPanelItem,
   DockviewPanelLayout,
@@ -34,6 +36,8 @@ import { useToast } from "@/components/ui/toast";
 import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
 import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
+import { linkedFolders } from "@/lib/collab/accounts";
+import { useFolderSync } from "@/lib/collab/use-folder-sync";
 import { useEditorSettings } from "@/lib/editor";
 import { fileKind, fileLanguage } from "@/lib/editor/file-kind";
 import { buildFileIndex, resolveFileReference } from "@/lib/editor/file-resolution";
@@ -54,6 +58,7 @@ import { useGitActions } from "@/lib/git/use-git-actions";
 import type { ConversationTarget } from "@/lib/harness/types";
 import { isHarnessId } from "@/lib/harness/types";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
+import { useI18n } from "@/lib/i18n";
 import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
 import { compileFailurePrompt } from "@/lib/latex/compile-failure";
 import type { BuildTarget, SynctexResult, TargetBuildResult } from "@/lib/latex/types";
@@ -138,6 +143,7 @@ export default function EditorPage() {
   });
   const prefersReducedMotion = useReducedMotion();
   const { toast } = useToast();
+  const { t } = useI18n();
   const recentProjects = useRecentProjects();
   const [projectTransition] = useState(() => new ProjectTransition());
   const [choosingProject, setChoosingProject] = useState(false);
@@ -241,6 +247,15 @@ export default function EditorPage() {
       .catch((error) => toast(`恢复草稿读取失败：${String(error)}`, "error"));
   }, [daemon.projectPath, saveManager, toast]);
   const [showLatexSettings, setShowLatexSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"build" | "editor" | "collab">("build");
+  const openSettings = useCallback((tab: "build" | "editor" | "collab" = "build") => {
+    setSettingsTab(tab);
+    setShowLatexSettings(true);
+  }, []);
+  /** false: closed; otherwise open, optionally preselecting a project from a web link. */
+  const [openFromServer, setOpenFromServer] = useState<
+    false | { server: string; project: string } | null
+  >(false);
   const [pendingBackend, setPendingBackend] = useState<"opencode" | "codex" | "claude">("opencode");
   const [pendingOpenCodeMessage, setPendingOpenCodeMessage] = useState<string | null>(null);
 
@@ -259,6 +274,7 @@ export default function EditorPage() {
 
   const gitStatus = daemon.gitStatus;
   const git = useGitActions({ daemon, flush: flushBeforeLeave, ensureOpenCode: opencode.ensure });
+  const folderSync = useFolderSync(daemon.projectPath);
 
   // LaTeX settings and editor settings
   const latexSettings = useLatexSettings(daemon.projectPath);
@@ -1584,6 +1600,41 @@ export default function EditorPage() {
     (path: string) => changeProject(async () => path),
     [changeProject],
   );
+  // "Open in desktop" on the web page: lmms-writer://open?server=…&project=…
+  useEffect(() => {
+    let stop: (() => void) | undefined,
+      disposed = false;
+    const handle = (urls: string[]) => {
+      for (const raw of urls) {
+        let url: URL;
+        try {
+          url = new URL(raw);
+        } catch {
+          continue;
+        }
+        const server = url.searchParams.get("server"),
+          project = url.searchParams.get("project");
+        if (url.protocol !== "lmms-writer:" || url.hostname !== "open" || !server || !project)
+          continue;
+        const known = linkedFolders().find((f) => f.server === server && f.project === project);
+        if (known) void handleOpenRecentProject(known.path);
+        else setOpenFromServer({ server, project });
+      }
+    };
+    void import("@tauri-apps/plugin-deep-link")
+      .then(async ({ getCurrent, onOpenUrl }) => {
+        const initial = await getCurrent();
+        if (initial && !disposed) handle(initial);
+        const unlisten = await onOpenUrl(handle);
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [handleOpenRecentProject]);
 
   const validateFileName = useCallback((name: string): string | null => {
     if (!name.trim()) {
@@ -2050,7 +2101,7 @@ export default function EditorPage() {
 
                       <button
                         type="button"
-                        onClick={() => setShowLatexSettings(true)}
+                        onClick={() => openSettings()}
                         className="h-8 w-8 border border-border bg-background text-foreground hover:bg-accent-hover hover:border-border-dark transition-colors flex items-center justify-center"
                         title="Settings"
                         aria-label="Settings"
@@ -2067,6 +2118,16 @@ export default function EditorPage() {
 
         {daemon.projectPath && (
           <SaveStatus
+            collaboration={
+              daemon.projectPath ? (
+                <SyncPanel
+                  sync={folderSync}
+                  projectPath={daemon.projectPath}
+                  onOpenFromServer={() => setOpenFromServer(null)}
+                  onOpenSettings={() => openSettings("collab")}
+                />
+              ) : null
+            }
             onOpenFile={handleChatFileClick}
             onConflictResolved={(conflict) => {
               if (!conflict.owner.startsWith("agent:")) return;
@@ -2269,6 +2330,13 @@ export default function EditorPage() {
                     >
                       导入 LaTeX 模板（ZIP／文件夹）
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpenFromServer(null)}
+                      className="mt-3 border border-border px-4 py-2 text-sm"
+                    >
+                      {t("collab.open.button")}
+                    </button>
                     <RecentProjects
                       projects={recentProjects.projects}
                       onSelect={handleOpenRecentProject}
@@ -2404,7 +2472,18 @@ export default function EditorPage() {
             onImported={handleOpenRecentProject}
           />
         )}
+        {openFromServer !== false && (
+          <OpenFromServer
+            initial={openFromServer}
+            onClose={() => setOpenFromServer(false)}
+            onOpened={(path) => {
+              setOpenFromServer(false);
+              void handleOpenRecentProject(path);
+            }}
+          />
+        )}
         <LaTeXSettingsDialog
+          initialTab={settingsTab}
           open={showLatexSettings}
           onClose={() => setShowLatexSettings(false)}
           settings={latexSettings.settings}

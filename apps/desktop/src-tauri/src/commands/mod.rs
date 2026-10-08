@@ -1,5 +1,7 @@
 pub mod chat_images;
 pub mod codex;
+pub mod collab;
+pub mod folder_sync;
 pub mod fs;
 pub mod git;
 pub mod git_snapshots;

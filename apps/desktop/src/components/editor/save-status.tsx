@@ -8,7 +8,6 @@ import type { DocumentSave, SaveManager } from "@/lib/editor/save-manager";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import { AnnotationManager } from "./annotation-manager";
 import { BibliographyPanel } from "./bibliography-panel";
-import { CollaborationButton } from "./collaboration-button";
 import { ConflictCenter } from "./conflict-center";
 import { GitVersions } from "./git-versions";
 import { ReviewCenter } from "./review-center";
@@ -16,6 +15,7 @@ import { ReviewCenter } from "./review-center";
 export function SaveStatus({
   agentBusy = false,
   rightActions,
+  collaboration,
   onConflictResolved,
   manager,
   project,
@@ -30,6 +30,8 @@ export function SaveStatus({
 }: {
   agentBusy?: boolean;
   rightActions?: ReactNode;
+  /** The collaboration sync button for the open project. */
+  collaboration?: ReactNode;
   onConflictResolved?: (conflict: DocumentConflict) => void;
   manager: SaveManager;
   project?: string | null;
@@ -120,7 +122,7 @@ export function SaveStatus({
           字符方框：{highlightAmbiguousUnicode ? "开" : "关"}
         </button>
         {project && <AnnotationManager />}
-        {project && <CollaborationButton project={project} manager={manager} />}
+        {project && collaboration}
         {project && (
           <BibliographyPanel
             key={`bib:${project}`}

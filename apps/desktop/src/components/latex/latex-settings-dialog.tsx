@@ -4,7 +4,8 @@ import { ArrowCounterClockwiseIcon, MinusIcon, PlusIcon, XIcon } from "@phosphor
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useTheme } from "next-themes";
-import { useCallback, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
+import { ServerAccounts } from "@/components/collab/server-accounts";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -19,6 +20,7 @@ import {
   type EditorSettings,
   type MinimapSettings,
 } from "@/lib/editor/types";
+import { useI18n } from "@/lib/i18n";
 import { DEFAULT_LATEX_SETTINGS, type LaTeXSettings } from "@/lib/latex/types";
 
 interface LaTeXSettingsDialogProps {
@@ -30,6 +32,8 @@ interface LaTeXSettingsDialogProps {
   onUpdateEditorSettings: (updates: Partial<EditorSettings>) => void;
   texFiles: string[];
   buildSettings?: React.ReactNode;
+  /** The tab shown each time the dialog opens. */
+  initialTab?: "build" | "editor" | "collab";
 }
 
 // Section header component for visual grouping - editorial style
@@ -150,8 +154,13 @@ export function LaTeXSettingsDialog({
   onUpdateEditorSettings,
   texFiles,
   buildSettings,
+  initialTab = "build",
 }: LaTeXSettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<string>("build");
+  const { t, locale, setLocale } = useI18n();
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  useEffect(() => {
+    if (open) setActiveTab(initialTab);
+  }, [open, initialTab]);
 
   const handleResetLatexSettings = useCallback(() => {
     onUpdateSettings(DEFAULT_LATEX_SETTINGS);
@@ -206,10 +215,31 @@ export function LaTeXSettingsDialog({
                 Editor
                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
               </Tabs.Trigger>
+              <Tabs.Trigger
+                value="collab"
+                className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative text-muted-foreground hover:text-foreground data-[state=active]:text-foreground"
+              >
+                {t("collab.accounts.tab")}
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
+              </Tabs.Trigger>
             </Tabs.List>
 
             {/* ===== EDITOR TAB ===== */}
             <Tabs.Content value="editor" className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+              <SectionHeader>{t("settings.language")}</SectionHeader>
+              <div className="flex items-center justify-between gap-4 py-2">
+                <p className="text-xs text-muted-foreground">{t("settings.language.hint")}</p>
+                <select
+                  aria-label={t("settings.language")}
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value === "en" ? "en" : "zh")}
+                  className="border border-border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="zh">中文</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+
               <SectionHeader>Appearance</SectionHeader>
 
               {/* Light/Dark Mode Toggle */}
@@ -1001,21 +1031,27 @@ export function LaTeXSettingsDialog({
               )}
             </Tabs.Content>
 
-            {/* ===== ACCOUNT TAB ===== */}
+            <Tabs.Content value="collab" className="flex-1 overflow-y-auto px-5 py-4">
+              <ServerAccounts />
+            </Tabs.Content>
           </Tabs.Root>
 
           {/* Footer */}
           <div className="flex items-center justify-between px-5 py-4 border-t border-border">
-            <button
-              type="button"
-              onClick={
-                activeTab === "editor" ? handleResetEditorSettings : handleResetLatexSettings
-              }
-              className="text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5 group"
-            >
-              <ArrowCounterClockwiseIcon className="size-3.5 group-hover:rotate-[-45deg] transition-transform" />
-              Reset to Defaults
-            </button>
+            {activeTab === "collab" ? (
+              <span />
+            ) : (
+              <button
+                type="button"
+                onClick={
+                  activeTab === "editor" ? handleResetEditorSettings : handleResetLatexSettings
+                }
+                className="text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5 group"
+              >
+                <ArrowCounterClockwiseIcon className="size-3.5 group-hover:rotate-[-45deg] transition-transform" />
+                Reset to Defaults
+              </button>
+            )}
             <Dialog.Close className="px-6 py-2 text-sm font-medium bg-background text-foreground border-2 border-foreground shadow-[3px_3px_0_0_var(--foreground)] hover:shadow-[1px_1px_0_0_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
               Done
             </Dialog.Close>
