@@ -544,7 +544,7 @@ fn project_id(project: &str) -> Result<&str, String> {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-')
     {
-        return Err(failure(400, "无效的项目"));
+        return Err(failure(400, tr!("无效的项目", "Invalid project")));
     }
     Ok(project)
 }
@@ -587,7 +587,13 @@ pub async fn collab_runner_register(
     )
     .await?;
     let (Some(id), Some(runner_token)) = (created["id"].as_str(), created["token"].as_str()) else {
-        return Err(failure(0, "服务器返回了无效的执行器凭据"));
+        return Err(failure(
+            0,
+            tr!(
+                "服务器返回了无效的执行器凭据",
+                "The server returned invalid runner credentials"
+            ),
+        ));
     };
     let mut guard = runners(&app, &state).await?;
     let list = guard.get_or_insert_with(Vec::new);
@@ -648,7 +654,10 @@ pub async fn collab_runner_call(
     body: Value,
 ) -> Result<Value, String> {
     if !matches!(action.as_str(), "lease" | "heartbeat" | "result") {
-        return Err(failure(400, "无效的执行器请求"));
+        return Err(failure(
+            400,
+            tr!("无效的执行器请求", "Invalid runner request"),
+        ));
     }
     let token = {
         let guard = runners(&app, &state).await?;
@@ -657,7 +666,15 @@ pub async fn collab_runner_call(
             .flatten()
             .find(|r| r.server == server && r.project == project)
             .map(|r| r.token.clone())
-            .ok_or_else(|| failure(401, "这台电脑不是该项目的执行器"))?
+            .ok_or_else(|| {
+                failure(
+                    401,
+                    tr!(
+                        "这台电脑不是该项目的执行器",
+                        "This computer is not a runner for this project"
+                    ),
+                )
+            })?
     };
     let result = send(
         client()?

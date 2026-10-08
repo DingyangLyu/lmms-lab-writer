@@ -1004,7 +1004,10 @@ pub async fn repair_annotation_quotes(project: String) -> Result<usize, String> 
         if let Some(note) = items.iter_mut().find(|n| n.id == id) {
             note.quote = quote;
             note.mapping_note
-                .push_str(" 已根据原 PDF 字体映射与保存的源码校正选文。");
+                .push_str(tr!(
+                    " 已根据原 PDF 字体映射与保存的源码校正选文。",
+                    " Corrected the selected text from the original PDF font mapping and the saved source."
+                ));
             record(note, "quote_repaired");
             events.push(note.events.last().unwrap().id.clone());
         }
@@ -1013,7 +1016,10 @@ pub async fn repair_annotation_quotes(project: String) -> Result<usize, String> 
         &project,
         &previous,
         &items,
-        "Writer PDF · 修复历史选文乱码",
+        tr!(
+            "Writer PDF · 修复历史选文乱码",
+            "Writer PDF · Repair garbled selections in history"
+        ),
         &events,
     )
     .await?;

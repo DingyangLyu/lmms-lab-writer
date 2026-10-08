@@ -753,10 +753,15 @@ pub fn locate_range(
     current: &str,
     range: &AnchorRange,
 ) -> Result<LocatedRange, String> {
-    let from = utf16_byte(base, range.start).ok_or("无效选区起点")?;
-    let to = utf16_byte(base, range.end).ok_or("无效选区终点")?;
+    let from =
+        utf16_byte(base, range.start).ok_or(tr!("无效选区起点", "Invalid selection start"))?;
+    let to = utf16_byte(base, range.end).ok_or(tr!("无效选区终点", "Invalid selection end"))?;
     if from > to || base.get(from..to) != Some(range.text.as_str()) {
-        return Err("选区与基准版本不一致".into());
+        return Err(tr!(
+            "选区与基准版本不一致",
+            "The selection does not match the base version"
+        )
+        .into());
     }
     let changes = edits(base, current, 0);
     let mut a = map_position(from, &changes, true).min(current.len());
@@ -796,7 +801,11 @@ pub fn locate_range(
         state = "deleted";
     }
     if !current.is_char_boundary(a) || !current.is_char_boundary(b) {
-        return Err("无法可靠定位 Unicode 选区".into());
+        return Err(tr!(
+            "无法可靠定位 Unicode 选区",
+            "The Unicode selection cannot be located reliably"
+        )
+        .into());
     }
     Ok(LocatedRange {
         start: current[..a].encode_utf16().count(),

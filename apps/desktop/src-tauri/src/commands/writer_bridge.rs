@@ -1006,8 +1006,8 @@ async fn prepare_files(
         .await
         .remove(&id);
     result
-        .map_err(|_| "编辑器未确认保存，委派未启动。请重新打开 Writer 后重试。".to_string())?
-        .map_err(|_| "保存确认通道已关闭".to_string())?
+        .map_err(|_| tr!("编辑器未确认保存，委派未启动。请重新打开 Writer 后重试。", "The editor did not confirm saving, so the delegation did not start. Reopen Writer and try again.").to_string())?
+        .map_err(|_| tr!("保存确认通道已关闭", "The save confirmation channel closed").to_string())?
 }
 #[tauri::command]
 pub async fn writer_delivery_prepared(
@@ -1041,17 +1041,29 @@ pub async fn writer_unregister_conversation(
     let mut data = state.data.lock().await;
     if let Some(session) = data.sessions.get(&id) {
         if session.project != project {
-            return Err("对话不属于当前项目".into());
+            return Err(tr!(
+                "对话不属于当前项目",
+                "The conversation does not belong to the current project"
+            )
+            .into());
         }
         if session.busy || session.active_job.is_some() {
-            return Err("对话正在执行，请完成或停止后再关闭标签。".into());
+            return Err(tr!(
+                "对话正在执行，请完成或停止后再关闭标签。",
+                "The conversation is running; finish or stop it before closing the tab."
+            )
+            .into());
         }
     }
     data.sessions.remove(&id);
     for task in &mut data.tasks {
         if task.to == id && task.status == "queued" {
             task.status = "cancelled".into();
-            task.result = "目标对话已关闭，任务没有执行。".into();
+            task.result = tr!(
+                "目标对话已关闭，任务没有执行。",
+                "The target conversation was closed, so the task did not run."
+            )
+            .into();
             task.callback = "queued".into();
             task.updated_at = now();
         }
