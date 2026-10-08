@@ -107,7 +107,7 @@ async fn canonical(project: &str) -> Result<String, String> {
         .into_owned())
 }
 async fn record_file(project: &str, kind: &str, id: &str) -> Result<std::path::PathBuf, String> {
-    uuid::Uuid::parse_str(id).map_err(|_| "无效审阅 ID")?;
+    uuid::Uuid::parse_str(id).map_err(|_| tr!("无效审阅 ID", "Invalid review ID"))?;
     Ok(writing::metadata(project, kind)
         .await?
         .join(format!("{id}.json")))
@@ -118,7 +118,11 @@ async fn path(project: &str, id: &str) -> Result<std::path::PathBuf, String> {
 async fn read_bounded(p: &std::path::Path) -> Result<Vec<u8>, String> {
     let meta = fs::symlink_metadata(p).await.map_err(|e| e.to_string())?;
     if meta.file_type().is_symlink() || meta.len() > 70_000_000 {
-        return Err("审阅文件无效或过大".into());
+        return Err(tr!(
+            "审阅文件无效或过大",
+            "The review file is invalid or too large"
+        )
+        .into());
     }
     fs::read(p).await.map_err(|e| e.to_string())
 }
@@ -175,7 +179,11 @@ pub async fn begin(project: &str, actor: &str) -> Result<String, String> {
             .get(actor)
             .is_some_and(|(old, _, _)| *old != project)
         {
-            return Err("该会话属于其他项目".into());
+            return Err(tr!(
+                "该会话属于其他项目",
+                "This conversation belongs to another project"
+            )
+            .into());
         }
         running.remove(actor)
     };
@@ -186,9 +194,13 @@ pub async fn begin(project: &str, actor: &str) -> Result<String, String> {
         finish_record(&old, &id).await?;
     }
     let baseline = writing::sources(&project).await?;
-    let version = git_snapshots::create_snapshot(&project, Some("Writer · AI 修改前"), &[])
-        .await?
-        .hash;
+    let version = git_snapshots::create_snapshot(
+        &project,
+        Some(tr!("Writer · AI 修改前", "Writer · Before AI edits")),
+        &[],
+    )
+    .await?
+    .hash;
     let annotations = super::annotations::load(&project)
         .await?
         .iter()
@@ -217,7 +229,7 @@ pub async fn begin(project: &str, actor: &str) -> Result<String, String> {
 }
 pub async fn begin_or_report(app: &AppHandle, project: &str, actor: &str) {
     if let Err(error) = begin(project, actor).await {
-        let message = format!("本轮 AI 修改未能记录审阅（不影响任务执行）：{error}");
+        let message = trf!("本轮 AI 修改未能记录审阅（不影响任务执行）：{error}", "The AI edits in this turn could not be recorded for review (the task itself is not affected): {error}");
         emit_changed(app, project, Some(&message));
     }
 }
@@ -327,7 +339,15 @@ async fn finish_record(project: &str, id: &str) -> Result<(), String> {
     if let Ok(file) = record_file(project, "review-baselines", id).await {
         let _ = fs::remove_file(file).await;
     }
-    git_snapshots::create_snapshot(project, Some("Writer · AI 修改后待审阅"), &[]).await?;
+    git_snapshots::create_snapshot(
+        project,
+        Some(tr!(
+            "Writer · AI 修改后待审阅",
+            "Writer · After AI edits, awaiting review"
+        )),
+        &[],
+    )
+    .await?;
     Ok(())
 }
 /// A person's save during an agent turn is not an agent edit. Apply the saved delta
@@ -418,7 +438,11 @@ pub async fn review_list(project: String) -> Result<Vec<serde_json::Value>, Stri
 pub async fn review_finalize(app: AppHandle, project: String, id: String) -> Result<(), String> {
     let record = load(&project, &id).await?;
     if super::writer_bridge::conversation_is_busy(&app, &record.actor).await {
-        return Err("任务仍在运行，请结束后审阅".into());
+        return Err(tr!(
+            "任务仍在运行，请结束后审阅",
+            "The task is still running; review it after it finishes"
+        )
+        .into());
     }
     {
         let mut running = ACTIVE.lock().await;
@@ -459,24 +483,28 @@ async fn decide_record(
     status: String,
 ) -> Result<Review, String> {
     if !["pending", "accepted", "rejected"].contains(&status.as_str()) {
-        return Err("无效审阅状态".into());
+        return Err(tr!("无效审阅状态", "Invalid review status").into());
     }
     let _guard = REVIEW_LOCK.lock().await;
     let mut r = load(&project, &id).await?;
     if r.finished_at.is_none() || r.revision != expected_revision {
-        return Err("审阅版本已变化，请刷新".into());
+        return Err(tr!(
+            "审阅版本已变化，请刷新",
+            "The review version changed; refresh"
+        )
+        .into());
     }
     let change = r
         .changes
         .iter_mut()
         .find(|c| c.path == file)
-        .ok_or("文件不在修改集里")?;
+        .ok_or(tr!("文件不在修改集里", "The file is not in the change set"))?;
     let base = render(change);
     let p = change
         .parts
         .get_mut(part)
         .filter(|p| p.changed)
-        .ok_or("修改项不存在")?;
+        .ok_or(tr!("修改项不存在", "The change does not exist"))?;
     let from = p.status.clone();
     if from == status {
         return Ok(r);
@@ -495,7 +523,7 @@ async fn decide_record(
         )
         .await?;
         if result.status == "conflict" {
-            return Err("此处已有后续修改，双方内容已保留，请到冲突面板合并后再审阅。".into());
+            return Err(tr!("此处已有后续修改，双方内容已保留，请到冲突面板合并后再审阅。", "This place has later changes; both versions were kept. Merge them in the conflict panel before reviewing.").into());
         }
     } else if !proposed.is_empty() {
         writing::apply(
@@ -505,7 +533,7 @@ async fn decide_record(
                 expected: None,
                 content: proposed,
             }],
-            "恢复审阅文件",
+            tr!("恢复审阅文件", "Restore reviewed files"),
         )
         .await?;
     }
@@ -519,7 +547,15 @@ async fn decide_record(
     });
     r.revision += 1;
     store(&project, &r).await?;
-    git_snapshots::create_snapshot(&project, Some("Writer · 文稿审阅决定"), &[]).await?;
+    git_snapshots::create_snapshot(
+        &project,
+        Some(tr!(
+            "Writer · 文稿审阅决定",
+            "Writer · Manuscript review decision"
+        )),
+        &[],
+    )
+    .await?;
     Ok(r)
 }
 

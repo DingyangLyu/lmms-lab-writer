@@ -42,7 +42,11 @@ pub async fn metadata(project: &str, name: &str) -> Result<PathBuf, String> {
                 .map_err(|e| e.to_string())?
                 .starts_with(&root)
         {
-            return Err("项目元数据目录不能是符号链接".into());
+            return Err(tr!(
+                "项目元数据目录不能是符号链接",
+                "The project metadata folder must not be a symbolic link"
+            )
+            .into());
         }
     }
     Ok(dir)
@@ -91,7 +95,11 @@ pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
                     .replace('\\', "/"),
             );
             if paths.len() > 2000 {
-                return Err("项目文本文件超过 2000 个，请缩小工作目录".into());
+                return Err(tr!(
+                    "项目文本文件超过 2000 个，请缩小工作目录",
+                    "The project has more than 2000 text files; narrow the working folder"
+                )
+                .into());
             }
         }
         paths.sort();
@@ -117,7 +125,11 @@ pub async fn sources(project: &str) -> Result<Vec<SourceFile>, String> {
         };
         total += content.len();
         if total > 32_000_000 {
-            return Err("项目文本超过 32 MB，请拆分项目".into());
+            return Err(tr!(
+                "项目文本超过 32 MB，请拆分项目",
+                "The project text is over 32 MB; split the project"
+            )
+            .into());
         }
         files.push(SourceFile {
             revision: hash(&content),
@@ -134,7 +146,11 @@ pub async fn writing_list_sources(project: String) -> Result<Vec<SourceFile>, St
 
 pub async fn apply(project: &str, changes: Vec<FileEdit>, label: &str) -> Result<(), String> {
     if changes.is_empty() || changes.len() > 2000 {
-        return Err("修改列表为空或过长".into());
+        return Err(tr!(
+            "修改列表为空或过长",
+            "The list of changes is empty or too long"
+        )
+        .into());
     }
     let _guard = saving::SAVE_LOCK.lock().await;
     let mut prepared = vec![];
@@ -144,7 +160,7 @@ pub async fn apply(project: &str, changes: Vec<FileEdit>, label: &str) -> Result
             || !seen.insert(edit.path.clone())
             || edit.path.starts_with('.')
         {
-            return Err("无效文稿修改".into());
+            return Err(tr!("无效文稿修改", "Invalid manuscript change").into());
         }
         let (_, target) = saving::target_path(project, &edit.path).await?;
         let current = match fs::read_to_string(&target).await {
@@ -153,15 +169,23 @@ pub async fn apply(project: &str, changes: Vec<FileEdit>, label: &str) -> Result
             Err(e) => return Err(e.to_string()),
         };
         if current != edit.expected {
-            return Err(format!(
+            return Err(trf!(
                 "{} 已有新的修改，请刷新后重试；尚未覆盖文件。",
+                "{} has newer changes; refresh and try again. The file was not overwritten.",
                 edit.path
             ));
         }
         prepared.push(target);
     }
-    git_snapshots::create_snapshot(project, Some(&format!("Writer · {label} · 修改前")), &[])
-        .await?;
+    git_snapshots::create_snapshot(
+        project,
+        Some(&trf!(
+            "Writer · {label} · 修改前",
+            "Writer · {label} · before"
+        )),
+        &[],
+    )
+    .await?;
     let journal = metadata(project, "writing-transactions")
         .await?
         .join(format!("{}.json", uuid::Uuid::new_v4()));
@@ -179,7 +203,11 @@ pub async fn apply(project: &str, changes: Vec<FileEdit>, label: &str) -> Result
                 Err(e) => return Err(e.to_string()),
             };
             if disk != edit.expected {
-                return Err(format!("{} 在保存时又有变化", edit.path));
+                return Err(trf!(
+                    "{} 在保存时又有变化",
+                    "{} changed again while saving",
+                    edit.path
+                ));
             }
             saving::atomic_write(target, edit.content.as_bytes()).await?;
             written += 1;
@@ -210,21 +238,35 @@ pub async fn apply(project: &str, changes: Vec<FileEdit>, label: &str) -> Result
         return Err(format!(
             "{cause}；{}",
             if rollback_errors.is_empty() {
-                "本次已写入的文件已恢复".into()
+                tr!(
+                    "本次已写入的文件已恢复",
+                    "files written in this run were restored"
+                )
+                .into()
             } else {
-                format!(
-                    "保留外部修改，原文和提案在 {}，需恢复：{}",
+                trf!("保留外部修改，原文和提案在 {}，需恢复：{}", "External changes were kept; the original text and proposal are in {}, to restore: {}",
                     journal.display(),
                     rollback_errors.join("、")
                 )
             }
         ));
     }
-    let version =
-        git_snapshots::create_snapshot(project, Some(&format!("Writer · {label} · 修改后")), &[])
-            .await;
+    let version = git_snapshots::create_snapshot(
+        project,
+        Some(&trf!(
+            "Writer · {label} · 修改后",
+            "Writer · {label} · after"
+        )),
+        &[],
+    )
+    .await;
     let _ = fs::remove_file(&journal).await;
-    version.map_err(|e| format!("文件已保存，但 Git 版本失败：{e}"))?;
+    version.map_err(|e| {
+        trf!(
+            "文件已保存，但 Git 版本失败：{e}",
+            "The files were saved, but the Git version failed: {e}"
+        )
+    })?;
     Ok(())
 }
 #[tauri::command]
@@ -263,7 +305,7 @@ pub async fn bibliography_lookup_doi(doi: String) -> Result<String, String> {
         || value.len() > 300
         || value.chars().any(char::is_whitespace)
     {
-        return Err("无效 DOI".into());
+        return Err(tr!("无效 DOI", "Invalid DOI").into());
     }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
@@ -280,12 +322,12 @@ pub async fn bibliography_lookup_doi(doi: String) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?
         .error_for_status()
-        .map_err(|e| format!("DOI 查询失败：{e}"))?;
+        .map_err(|e| trf!("DOI 查询失败：{e}", "DOI lookup failed: {e}"))?;
     let mut bytes = vec![];
     while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
         bytes.extend(chunk);
         if bytes.len() > 100_000 {
-            return Err("DOI 返回内容过大".into());
+            return Err(tr!("DOI 返回内容过大", "The DOI response is too large").into());
         }
     }
     String::from_utf8(bytes).map_err(|e| e.to_string())
@@ -301,7 +343,7 @@ pub async fn bibliography_zotero_local() -> Result<String, String> {
     let mut result = Vec::new();
     for start in (0..2000).step_by(100) {
         let mut response=client.get(format!("http://127.0.0.1:23119/api/users/0/items/top?format=bibtex&limit=100&start={start}"))
-            .header("Zotero-API-Version","3").send().await.map_err(|_|"无法连接本机 Zotero。请打开 Zotero 7，并启用本地 API；也可导出 .bib 后导入。")?
+            .header("Zotero-API-Version","3").send().await.map_err(|_|tr!("无法连接本机 Zotero。请打开 Zotero 7，并启用本地 API；也可导出 .bib 后导入。", "Could not connect to Zotero on this computer. Open Zotero 7 and enable its local API, or export a .bib file and import that."))?
             .error_for_status().map_err(|e|e.to_string())?;
         let total = response
             .headers()
@@ -310,7 +352,11 @@ pub async fn bibliography_zotero_local() -> Result<String, String> {
             .and_then(|s| s.parse::<usize>().ok());
         while let Some(bytes) = response.chunk().await.map_err(|e| e.to_string())? {
             if result.len() + bytes.len() > 2_000_000 {
-                return Err("Zotero 库过大，请按集合导出 BibTeX 导入".into());
+                return Err(tr!(
+                    "Zotero 库过大，请按集合导出 BibTeX 导入",
+                    "The Zotero library is too large; export BibTeX by collection and import that"
+                )
+                .into());
             }
             result.extend_from_slice(&bytes);
         }
@@ -319,7 +365,11 @@ pub async fn bibliography_zotero_local() -> Result<String, String> {
             break;
         }
         if start == 1900 {
-            return Err("Zotero 超过 2000 条，请按集合导出后导入".into());
+            return Err(tr!(
+                "Zotero 超过 2000 条，请按集合导出后导入",
+                "Zotero has more than 2000 items; export by collection and import that"
+            )
+            .into());
         }
     }
     String::from_utf8(result).map_err(|e| e.to_string())

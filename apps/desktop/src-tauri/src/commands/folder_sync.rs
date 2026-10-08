@@ -67,7 +67,7 @@ fn relative(path: &str) -> Result<PathBuf, String> {
             .components()
             .any(|c| !matches!(c, Component::Normal(_)))
     {
-        return Err(format!("无效的同步路径：{path}"));
+        return Err(trf!("无效的同步路径：{path}", "Invalid sync path: {path}"));
     }
     Ok(parts.iter().collect())
 }
@@ -77,18 +77,27 @@ async fn inside(root: &Path, path: &str) -> Result<PathBuf, String> {
     let target = root.join(relative(path)?);
     if let Ok(meta) = tokio::fs::symlink_metadata(&target).await {
         if meta.file_type().is_symlink() {
-            return Err(format!("同步不处理符号链接：{path}"));
+            return Err(trf!(
+                "同步不处理符号链接：{path}",
+                "Sync skips symbolic links: {path}"
+            ));
         }
     }
-    let mut ancestor = target.parent().ok_or("无效路径")?.to_path_buf();
+    let mut ancestor = target
+        .parent()
+        .ok_or(tr!("无效路径", "Invalid path"))?
+        .to_path_buf();
     while !ancestor.exists() {
-        ancestor = ancestor.parent().ok_or("无效路径")?.to_path_buf();
+        ancestor = ancestor
+            .parent()
+            .ok_or(tr!("无效路径", "Invalid path"))?
+            .to_path_buf();
     }
     let canonical = tokio::fs::canonicalize(&ancestor)
         .await
         .map_err(|e| e.to_string())?;
     if !canonical.starts_with(root) {
-        return Err("路径指向项目外部".into());
+        return Err(tr!("路径指向项目外部", "The path points outside the project").into());
     }
     Ok(target)
 }
@@ -334,7 +343,7 @@ pub async fn sync_create_folder(parent: String, name: String) -> Result<String, 
         .trim_matches('.')
         .to_string();
     if clean.is_empty() {
-        return Err("无效的文件夹名".into());
+        return Err(tr!("无效的文件夹名", "Invalid folder name").into());
     }
     let parent = tokio::fs::canonicalize(&parent)
         .await
@@ -343,7 +352,10 @@ pub async fn sync_create_folder(parent: String, name: String) -> Result<String, 
     tokio::fs::create_dir(&folder)
         .await
         .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AlreadyExists => format!("“{clean}”已存在，请选择别的位置"),
+            std::io::ErrorKind::AlreadyExists => trf!(
+                "“{clean}”已存在，请选择别的位置",
+                "“{clean}” already exists; choose another location"
+            ),
             _ => e.to_string(),
         })?;
     Ok(folder.to_string_lossy().into_owned())

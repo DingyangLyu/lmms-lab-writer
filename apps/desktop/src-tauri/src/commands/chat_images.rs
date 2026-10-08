@@ -26,16 +26,23 @@ pub struct ChatImage {
 pub async fn read_chat_image(path: String) -> Result<ChatImage, String> {
     let path = Path::new(&path);
     if !path.is_absolute() {
-        return Err("图片路径必须是绝对路径".into());
+        return Err(tr!("图片路径必须是绝对路径", "The image path must be absolute").into());
     }
     let metadata = tokio::fs::metadata(path).await.map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_BYTES as u64 {
-        return Err("请选择小于 10 MB 的图片文件".into());
+        return Err(tr!(
+            "请选择小于 10 MB 的图片文件",
+            "Choose an image file under 10 MB"
+        )
+        .into());
     }
     let bytes = tokio::fs::read(path).await.map_err(|e| e.to_string())?;
-    let mime = mime(&bytes).ok_or("支持 PNG、JPEG、GIF、WebP 图片")?;
+    let mime = mime(&bytes).ok_or(tr!(
+        "支持 PNG、JPEG、GIF、WebP 图片",
+        "PNG, JPEG, GIF and WebP images are supported"
+    ))?;
     if bytes.len() > MAX_BYTES {
-        return Err("图片超过 10 MB".into());
+        return Err(tr!("图片超过 10 MB", "The image is over 10 MB").into());
     }
     Ok(ChatImage {
         url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
@@ -50,7 +57,7 @@ pub async fn read_chat_image(path: String) -> Result<ChatImage, String> {
 
 pub fn codex_input(text: &str, images: Vec<String>) -> Result<Vec<serde_json::Value>, String> {
     if images.len() > 6 {
-        return Err("一次最多发送 6 张图片".into());
+        return Err(tr!("一次最多发送 6 张图片", "Send at most 6 images at a time").into());
     }
     if text.trim().is_empty() && images.is_empty() {
         return Err("Codex message cannot be empty".into());
@@ -60,14 +67,18 @@ pub fn codex_input(text: &str, images: Vec<String>) -> Result<Vec<serde_json::Va
         input.push(serde_json::json!({"type":"text", "text":text}));
     }
     for url in images {
-        let (header, encoded) = url.split_once(',').ok_or("无效图片")?;
+        let (header, encoded) = url
+            .split_once(',')
+            .ok_or(tr!("无效图片", "Invalid image"))?;
         if encoded.len() > MAX_BYTES.div_ceil(3) * 4 {
-            return Err("图片超过 10 MB".into());
+            return Err(tr!("图片超过 10 MB", "The image is over 10 MB").into());
         }
-        let bytes = STANDARD.decode(encoded).map_err(|_| "图片编码无效")?;
-        let mime = mime(&bytes).ok_or("图片格式无效")?;
+        let bytes = STANDARD
+            .decode(encoded)
+            .map_err(|_| tr!("图片编码无效", "Invalid image encoding"))?;
+        let mime = mime(&bytes).ok_or(tr!("图片格式无效", "Invalid image format"))?;
         if bytes.len() > MAX_BYTES || header != format!("data:{mime};base64") {
-            return Err("图片格式或大小不正确".into());
+            return Err(tr!("图片格式或大小不正确", "Wrong image format or size").into());
         }
         input.push(serde_json::json!({"type":"image", "url":url}));
     }

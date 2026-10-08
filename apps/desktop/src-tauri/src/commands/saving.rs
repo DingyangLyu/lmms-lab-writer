@@ -61,7 +61,7 @@ pub async fn atomic_write(path: &Path, content: &[u8]) -> Result<(), String> {
     let permissions = match fs::metadata(path).await {
         Ok(metadata) => {
             if metadata.permissions().readonly() {
-                return Err("文件为只读，无法保存。请另存副本或恢复写入权限。".into());
+                return Err(tr!("文件为只读，无法保存。请另存副本或恢复写入权限。", "The file is read-only and cannot be saved. Save a copy or restore write permission.").into());
             }
             Some(metadata.permissions())
         }
@@ -116,9 +116,13 @@ async fn history_dir(root: &Path, target: &Path) -> Result<PathBuf, String> {
     {
         return Err("Backup folder is outside the project".into());
     }
-    fs::create_dir_all(&dir)
-        .await
-        .map_err(|e| format!("无法创建备份目录，原文件未覆盖：{}", e))?;
+    fs::create_dir_all(&dir).await.map_err(|e| {
+        trf!(
+            "无法创建备份目录，原文件未覆盖：{}",
+            "Could not create the backup folder; the original file was not overwritten: {}",
+            e
+        )
+    })?;
     Ok(dir)
 }
 
@@ -180,7 +184,13 @@ pub(crate) async fn create_backup(
     let backup = dir.join(format!("{}-{}.bak", timestamp, uuid::Uuid::new_v4()));
     atomic_write(&backup, content.as_bytes())
         .await
-        .map_err(|e| format!("备份失败，操作已取消：{}", e))?;
+        .map_err(|e| {
+            trf!(
+                "备份失败，操作已取消：{}",
+                "The backup failed and the operation was cancelled: {}",
+                e
+            )
+        })?;
     if let Ok(items) = backups(&dir).await {
         for old in items.iter().skip(HISTORY_LIMIT) {
             let _ = fs::remove_file(dir.join(&old.id)).await;
@@ -202,7 +212,11 @@ pub async fn checkpoint_document(
         .await
         .map_err(|e| e.to_string())?;
     if content != expected {
-        return Err("选区文件已变化，请重新选择后再发送。".into());
+        return Err(tr!(
+            "选区文件已变化，请重新选择后再发送。",
+            "The selected file changed; select again before sending."
+        )
+        .into());
     }
     let dir = create_backup(&root, &target, &content).await?;
     if fs::read_to_string(&target)
@@ -210,7 +224,11 @@ pub async fn checkpoint_document(
         .map_err(|e| e.to_string())?
         != content
     {
-        return Err("备份期间文件已变化，请重新选择后再发送。".into());
+        return Err(tr!(
+            "备份期间文件已变化，请重新选择后再发送。",
+            "The file changed during the backup; select again before sending."
+        )
+        .into());
     }
     if let Ok(items) = backups(&dir).await {
         for old in items.iter().skip(HISTORY_LIMIT) {

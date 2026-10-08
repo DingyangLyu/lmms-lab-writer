@@ -598,7 +598,11 @@ pub async fn codex_rename_thread(
 ) -> Result<Value, String> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 120 {
-        return Err("对话名称需为 1–120 个字符。".to_string());
+        return Err(tr!(
+            "对话名称需为 1–120 个字符。",
+            "Conversation names must be 1–120 characters."
+        )
+        .to_string());
     }
     ensure_client(&state, app)
         .await?
@@ -730,7 +734,7 @@ pub async fn bridge_turn(
     let id = session
         .id
         .strip_prefix("codex:")
-        .ok_or("无效 Codex 会话 ID")?;
+        .ok_or(tr!("无效 Codex 会话 ID", "Invalid Codex session ID"))?;
     let mut events = client.events.subscribe();
     let current = client
         .request("thread/read", json!({"threadId":id,"includeTurns":false}))
@@ -740,7 +744,11 @@ pub async fn bridge_turn(
         .and_then(Value::as_str)
         == Some("active")
     {
-        return Err("Codex 会话已经在运行，请完成后重新委派".into());
+        return Err(tr!(
+            "Codex 会话已经在运行，请完成后重新委派",
+            "The Codex session is already running; delegate again after it finishes"
+        )
+        .into());
     }
     let mut params = json!({"threadId":id,"input":[{"type":"text","text":format!("{}\n{text}",super::writer_bridge::context("codex",id))}]});
     for name in ["model", "effort"] {
@@ -769,14 +777,20 @@ pub async fn bridge_turn(
     let turn_id = started
         .pointer("/turn/id")
         .and_then(Value::as_str)
-        .ok_or("Codex 未返回轮次 ID")?;
+        .ok_or(tr!("Codex 未返回轮次 ID", "Codex returned no turn ID"))?;
     loop {
-        let message = events
-            .recv()
-            .await
-            .map_err(|e| format!("Codex 事件连接中断：{e}"))?;
+        let message = events.recv().await.map_err(|e| {
+            trf!(
+                "Codex 事件连接中断：{e}",
+                "The Codex event connection dropped: {e}"
+            )
+        })?;
         if message["method"] == "codex/connectionClosed" {
-            return Err("Codex 连接中断；请检查会话历史".into());
+            return Err(tr!(
+                "Codex 连接中断；请检查会话历史",
+                "The Codex connection dropped; check the conversation history"
+            )
+            .into());
         }
         if message["method"] == "turn/completed"
             && message.pointer("/params/threadId").and_then(Value::as_str) == Some(id)
@@ -784,9 +798,11 @@ pub async fn bridge_turn(
         {
             let turn = &message["params"]["turn"];
             if turn["status"] != "completed" {
-                return Err(format!(
+                return Err(trf!(
                     "Codex 任务未完成：{} {}",
-                    turn["status"], turn["error"]
+                    "The Codex task did not finish: {} {}",
+                    turn["status"],
+                    turn["error"]
                 ));
             }
             let read = client
@@ -796,8 +812,10 @@ pub async fn bridge_turn(
                 .pointer("/thread/turns")
                 .and_then(Value::as_array)
                 .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
-                .ok_or("找不到已完成轮次")?;
-            let items = found["items"].as_array().ok_or("轮次没有结果")?;
+                .ok_or(tr!("找不到已完成轮次", "Could not find the finished turn"))?;
+            let items = found["items"]
+                .as_array()
+                .ok_or(tr!("轮次没有结果", "The turn has no result"))?;
             let finals: Vec<_> = items
                 .iter()
                 .filter(|item| item["type"] == "agentMessage" && item["phase"] == "final_answer")
@@ -814,7 +832,11 @@ pub async fn bridge_turn(
                 finals.join("\n\n")
             };
             return if result.trim().is_empty() {
-                Err("Codex 已完成但没有文字结果".into())
+                Err(tr!(
+                    "Codex 已完成但没有文字结果",
+                    "Codex finished without a text result"
+                )
+                .into())
             } else {
                 Ok(result.chars().take(40000).collect())
             };

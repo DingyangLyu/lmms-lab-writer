@@ -96,7 +96,7 @@ async fn harness(kind: &str) -> Result<Command, String> {
         "codex" => Command {
             program: super::codex::find_codex_binary()
                 .await
-                .ok_or("本机未安装 Codex")?,
+                .ok_or(tr!("本机未安装 Codex", "Codex is not installed on this computer"))?,
             args: strings(&[
                 "exec",
                 "--skip-git-repo-check",
@@ -126,7 +126,7 @@ async fn harness(kind: &str) -> Result<Command, String> {
             program: PathBuf::from(
                 super::opencode::find_opencode()
                     .await
-                    .ok_or("本机未安装 OpenCode")?,
+                    .ok_or(tr!("本机未安装 OpenCode", "OpenCode is not installed on this computer"))?,
             ),
             args: strings(&["run"]),
             env: vec![(
@@ -135,7 +135,7 @@ async fn harness(kind: &str) -> Result<Command, String> {
                     .into(),
             )],
         },
-        _ => return Err("这台电脑只执行 Codex、Claude Code 或 OpenCode 任务".into()),
+        _ => return Err(tr!("这台电脑只执行 Codex、Claude Code 或 OpenCode 任务", "This computer only runs Codex, Claude Code or OpenCode tasks").into()),
     })
 }
 
@@ -232,7 +232,7 @@ pub async fn collect(
                 }
             }
             if outputs.len() > 200 {
-                return Err("任务产物过多".into());
+                return Err(tr!("任务产物过多", "The task produced too many files").into());
             }
         }
     }
@@ -296,7 +296,7 @@ async fn run_with(
     process.process_group(0);
     let mut child = process
         .spawn()
-        .map_err(|e| format!("无法启动 {}：{e}", job.harness))?;
+        .map_err(|e| trf!("无法启动 {}：{e}", "Could not start {}: {e}", job.harness))?;
     let input = format!(
         "You are editing a disposable snapshot for Writer collaboration. Follow this user task: {}\nEdit project text files only. Do not read credentials or unrelated directories. Your changes will be returned as proposals; reviewers choose whether to apply them. Do not publish or push anything.\n",
         job.prompt
@@ -341,8 +341,8 @@ async fn run_with(
     let pid = child.id();
     let outcome = tokio::select! {
         status = child.wait() => status.map_err(|e| e.to_string()),
-        _ = tokio::time::sleep(timeout) => Err("任务超时，已停止".into()),
-        _ = cancel => Err("任务已取消".into()),
+        _ = tokio::time::sleep(timeout) => Err(tr!("任务超时，已停止", "The task timed out and was stopped").into()),
+        _ = cancel => Err(tr!("任务已取消", "The task was cancelled").into()),
     };
     if outcome.is_err() {
         #[cfg(unix)]
@@ -355,8 +355,9 @@ async fn run_with(
     let log = tail(&log.lock().await);
     let status = outcome?;
     if !status.success() {
-        return Err(format!(
+        return Err(trf!(
             "任务失败（{}）：{log}",
+            "The task failed ({}): {log}",
             status.code().unwrap_or(-1)
         ));
     }
@@ -377,7 +378,11 @@ pub async fn runner_execute(state: State<'_, RunnerState>, job: Job) -> Result<J
         Ok(JobResult {
             files: collect(&work, &job, &withheld).await?,
             result: if log.trim().is_empty() {
-                "任务完成，输出已提交审阅。".into()
+                tr!(
+                    "任务完成，输出已提交审阅。",
+                    "The task finished and its output was submitted for review."
+                )
+                .into()
             } else {
                 log
             },

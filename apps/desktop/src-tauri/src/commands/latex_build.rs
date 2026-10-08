@@ -67,8 +67,7 @@ pub async fn resolve(
     if info.available {
         Ok(info)
     } else {
-        Err(format!(
-            "未找到可运行的 {name}。请安装 LaTeX 环境，或在‘编译目标’中设置本机路径。"
+        Err(trf!("未找到可运行的 {name}。请安装 LaTeX 环境，或在‘编译目标’中设置本机路径。", "Could not find a runnable {name}. Install a LaTeX distribution, or set its path under Build targets."
         ))
     }
 }
@@ -177,9 +176,16 @@ async fn plan(
     }
     let (engine, path) = selected.ok_or_else(|| {
         if unicode {
-            "中文／Unicode 文稿需要 XeLaTeX、LuaLaTeX 或 Tectonic，当前未检测到。".to_string()
+            tr!(
+                "中文／Unicode 文稿需要 XeLaTeX、LuaLaTeX 或 Tectonic，当前未检测到。",
+                "Chinese/Unicode documents need XeLaTeX, LuaLaTeX or Tectonic, and none was found."
+            )
+            .to_string()
         } else {
-            format!("无法找到编译器：{requested}")
+            trf!(
+                "无法找到编译器：{requested}",
+                "Could not find the compiler: {requested}"
+            )
         }
     })?;
     let input = entry.to_string_lossy().into_owned();
@@ -267,9 +273,12 @@ async fn run_program(
         .kill_on_drop(true);
     #[cfg(unix)]
     command.process_group(0);
-    let mut child = command
-        .spawn()
-        .map_err(|e| format!("无法启动编译器 {program}：{e}"))?;
+    let mut child = command.spawn().map_err(|e| {
+        trf!(
+            "无法启动编译器 {program}：{e}",
+            "Could not start the compiler {program}: {e}"
+        )
+    })?;
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     *state.current_process.lock().await = Some(child);
@@ -315,7 +324,7 @@ async fn run_program(
                 for reader in readers {
                     reader.abort()
                 }
-                return Err("编译已取消".into());
+                return Err(tr!("编译已取消", "The build was cancelled").into());
             };
             if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
                 guard.take();
@@ -327,7 +336,11 @@ async fn run_program(
                 for reader in readers {
                     reader.abort()
                 }
-                return Err("编译超过 10 分钟，已停止；原 PDF 保留。".into());
+                return Err(tr!(
+                    "编译超过 10 分钟，已停止；原 PDF 保留。",
+                    "The build ran over 10 minutes and was stopped; the previous PDF was kept."
+                )
+                .into());
             }
         }
         tokio::time::sleep(std::time::Duration::from_millis(60)).await;
@@ -360,10 +373,12 @@ async fn build(
     target: BuildTarget,
     compiler_overrides: Option<HashMap<String, String>>,
 ) -> Result<BuildResult, String> {
-    let _job = state
-        .build_lock
-        .try_lock()
-        .map_err(|_| "另一个编译正在进行，请完成或停止后再编译")?;
+    let _job = state.build_lock.try_lock().map_err(|_| {
+        tr!(
+            "另一个编译正在进行，请完成或停止后再编译",
+            "Another build is running; let it finish or stop it first"
+        )
+    })?;
     super::latex_project::validate(&ProjectConfig {
         version: 1,
         active_target: Some(target.id.clone()),
@@ -374,9 +389,18 @@ async fn build(
     let work =
         tokio::fs::canonicalize(root.join(super::latex_project::relative(&target.work_dir, true)?))
             .await
-            .map_err(|e| format!("工作目录不可用：{e}"))?;
+            .map_err(|e| {
+                trf!(
+                    "工作目录不可用：{e}",
+                    "The working folder is unavailable: {e}"
+                )
+            })?;
     if !work.starts_with(&root) || !work.is_dir() {
-        return Err("工作目录不属于当前项目".into());
+        return Err(tr!(
+            "工作目录不属于当前项目",
+            "The working folder is not part of the current project"
+        )
+        .into());
     }
     let output_dir = super::latex_project::writable_dir(&root, &target.output_dir).await?;
     let stage = super::latex_project::writable_dir(
@@ -418,7 +442,7 @@ async fn build(
     ];
     let stem = entry
         .file_stem()
-        .ok_or("无效主文件名")?
+        .ok_or(tr!("无效主文件名", "Invalid main file name"))?
         .to_string_lossy()
         .into_owned();
     let outcome = async {
@@ -471,7 +495,7 @@ async fn build(
                 engine: plan.engine.clone(),
                 compiler_path: plan.program.clone(),
                 output: log,
-                error: Some("编译失败或没有生成新 PDF；原 PDF 未替换。".into()),
+                error: Some(tr!("编译失败或没有生成新 PDF；原 PDF 未替换。", "The build failed or produced no new PDF; the previous PDF was not replaced.").into()),
                 log: tex_log.as_deref().map(log_tail),
             });
         }
@@ -514,7 +538,7 @@ async fn build(
             }
             let target = output_dir.join(&name);
             if target.is_symlink() {
-                return Err(format!("输出目标不能是符号链接：{}", target.display()));
+                return Err(trf!("输出目标不能是符号链接：{}", "The output target must not be a symbolic link: {}", target.display()));
             }
             publications.push((entry.path(), target));
         }

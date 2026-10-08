@@ -44,8 +44,6 @@ pub struct RunnerInfo {
 
 #[derive(Default)]
 pub struct CollabState {
-    /// The interface language, so the server words its errors to match ("zh" or "en").
-    locale: Mutex<String>,
     accounts: tokio::sync::Mutex<Option<Vec<Account>>>,
     runners: tokio::sync::Mutex<Option<Vec<RunnerAccount>>>,
     sockets: Mutex<HashMap<u64, mpsc::UnboundedSender<Message>>>,
@@ -81,19 +79,28 @@ fn private_host(host: &str) -> bool {
 /// `scheme://host[:port]`. Passwords and tokens cross the internet only over HTTPS; plain HTTP
 /// is allowed on this machine and on private networks.
 pub fn server_origin(input: &str) -> Result<String, String> {
-    let url = url::Url::parse(input.trim()).map_err(|_| failure(0, "服务器地址无效"))?;
+    let url = url::Url::parse(input.trim())
+        .map_err(|_| failure(0, tr!("服务器地址无效", "Invalid server address")))?;
     if !matches!(url.scheme(), "http" | "https")
         || !url.username().is_empty()
         || url.password().is_some()
     {
         return Err(failure(
             0,
-            "请输入以 http(s):// 开头、不含账号密码的服务器地址",
+            tr!("请输入以 http(s):// 开头、不含账号密码的服务器地址", "Enter a server address that starts with http(s):// and contains no user name or password"),
         ));
     }
-    let host = url.host_str().ok_or_else(|| failure(0, "服务器地址无效"))?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| failure(0, tr!("服务器地址无效", "Invalid server address")))?;
     if url.scheme() == "http" && !private_host(host) {
-        return Err(failure(0, "公网上的协作服务器请使用 HTTPS 地址"));
+        return Err(failure(
+            0,
+            tr!(
+                "公网上的协作服务器请使用 HTTPS 地址",
+                "Use an HTTPS address for collaboration servers on the internet"
+            ),
+        ));
     }
     Ok(url.origin().ascii_serialization())
 }
@@ -135,20 +142,21 @@ async fn token_for(app: &AppHandle, state: &CollabState, server: &str) -> Result
         .flatten()
         .find(|a| a.server == server)
         .map(|a| a.token.clone())
-        .ok_or_else(|| failure(401, "尚未登录这个协作服务器"))
+        .ok_or_else(|| {
+            failure(
+                401,
+                tr!(
+                    "尚未登录这个协作服务器",
+                    "You are not signed in to this collaboration server"
+                ),
+            )
+        })
 }
 
-fn locale(state: &CollabState) -> String {
-    state
-        .locale
-        .lock()
-        .map(|l| if l.as_str() == "en" { "en" } else { "zh" }.to_string())
-        .unwrap_or_else(|_| "zh".into())
-}
-
-fn client(state: &CollabState) -> Result<reqwest::Client, String> {
+fn client() -> Result<reqwest::Client, String> {
     let mut headers = reqwest::header::HeaderMap::new();
-    if let Ok(value) = locale(state).parse() {
+    // The server words its errors in the interface language.
+    if let Ok(value) = crate::l10n::locale().parse() {
         headers.insert("X-Writer-Locale", value);
     }
     reqwest::Client::builder()
@@ -158,17 +166,16 @@ fn client(state: &CollabState) -> Result<reqwest::Client, String> {
         .map_err(|e| failure(0, e.to_string()))
 }
 
-#[tauri::command]
-pub fn collab_set_locale(state: State<'_, CollabState>, locale: String) -> Result<(), String> {
-    *state.locale.lock().map_err(|e| e.to_string())? = locale;
-    Ok(())
-}
-
 async fn send(request: reqwest::RequestBuilder) -> Result<Value, String> {
-    let response = request
-        .send()
-        .await
-        .map_err(|e| failure(0, format!("无法连接协作服务器：{e}")))?;
+    let response = request.send().await.map_err(|e| {
+        failure(
+            0,
+            trf!(
+                "无法连接协作服务器：{e}",
+                "Could not connect to the collaboration server: {e}"
+            ),
+        )
+    })?;
     let status = response.status();
     let body: Value = response.json().await.unwrap_or(Value::Null);
     if !status.is_success() {
@@ -193,7 +200,7 @@ pub async fn collab_sign_in(
 ) -> Result<AccountInfo, String> {
     let server = server_origin(&server)?;
     let issued = send(
-        client(&state)?
+        client()?
             .post(format!("{server}/api/tokens"))
             .json(&json!({ "username": username, "password": password, "name": device })),
     )
@@ -201,7 +208,15 @@ pub async fn collab_sign_in(
     let token = issued["token"]
         .as_str()
         .filter(|t| t.len() == 64)
-        .ok_or_else(|| failure(0, "服务器返回了无效的登录凭据"))?
+        .ok_or_else(|| {
+            failure(
+                0,
+                tr!(
+                    "服务器返回了无效的登录凭据",
+                    "The server returned invalid sign-in credentials"
+                ),
+            )
+        })?
         .to_string();
     let user = issued["user"].clone();
     let mut guard = accounts(&app, &state).await?;
@@ -226,7 +241,7 @@ pub async fn collab_sign_out(
     let list = guard.get_or_insert_with(Vec::new);
     if let Some(account) = list.iter().find(|a| a.server == server) {
         // Revoke it on the server too; offline, it simply expires there.
-        if let Ok(client) = client(&state) {
+        if let Ok(client) = client() {
             let _ = send(
                 client
                     .delete(format!("{server}/api/tokens/current"))
@@ -266,12 +281,12 @@ pub async fn collab_request(
     body: Option<Value>,
 ) -> Result<Value, String> {
     if !path.starts_with("/api/") || path.contains("..") {
-        return Err(failure(400, "无效的请求路径"));
+        return Err(failure(400, tr!("无效的请求路径", "Invalid request path")));
     }
     let token = token_for(&app, &state, &server).await?;
     let method = reqwest::Method::from_bytes(method.as_bytes())
-        .map_err(|_| failure(400, "无效的请求方法"))?;
-    let mut request = client(&state)?
+        .map_err(|_| failure(400, tr!("无效的请求方法", "Invalid request method")))?;
+    let mut request = client()?
         .request(method, format!("{server}{path}"))
         .bearer_auth(token);
     if let Some(body) = body {
@@ -356,7 +371,10 @@ pub async fn collab_connect(
     path: String,
 ) -> Result<u64, String> {
     if !path.starts_with("/api/projects/") || !path.contains("/socket") || path.contains("..") {
-        return Err(failure(400, "无效的连接路径"));
+        return Err(failure(
+            400,
+            tr!("无效的连接路径", "Invalid connection path"),
+        ));
     }
     let token = token_for(&app, &state, &server).await?;
     let id = state.next.fetch_add(1, Ordering::Relaxed) + 1;
@@ -373,7 +391,7 @@ pub async fn collab_connect(
             .replacen("https://", "wss://", 1)
             .replacen("http://", "ws://", 1),
         path,
-        locale(&state)
+        crate::l10n::locale()
     );
     tauri::async_runtime::spawn(async move {
         let emitter = app.clone();
@@ -393,9 +411,9 @@ pub fn collab_send(state: State<'_, CollabState>, id: u64, data: String) -> Resu
     let sockets = state.sockets.lock().map_err(|e| e.to_string())?;
     sockets
         .get(&id)
-        .ok_or("连接已关闭")?
+        .ok_or(tr!("连接已关闭", "The connection is closed"))?
         .send(Message::text(data))
-        .map_err(|_| "连接已关闭".to_string())
+        .map_err(|_| tr!("连接已关闭", "The connection is closed").to_string())
 }
 
 #[tauri::command]
@@ -562,7 +580,7 @@ pub async fn collab_runner_register(
     let project = project_id(&project)?.to_string();
     let token = token_for(&app, &state, &server).await?;
     let created = send(
-        client(&state)?
+        client()?
             .post(format!("{server}/api/projects/{project}/runners"))
             .bearer_auth(token)
             .json(&json!({ "name": name, "capabilities": capabilities })),
@@ -603,7 +621,7 @@ pub async fn collab_runner_unregister(
         .find(|r| r.server == server && r.project == project)
     {
         // Also remove it on the server; offline, the owner can delete it on the web page.
-        if let (Ok(token), Ok(client)) = (token_for(&app, &state, &server).await, client(&state)) {
+        if let (Ok(token), Ok(client)) = (token_for(&app, &state, &server).await, client()) {
             let _ = send(
                 client
                     .delete(format!(
@@ -642,7 +660,7 @@ pub async fn collab_runner_call(
             .ok_or_else(|| failure(401, "这台电脑不是该项目的执行器"))?
     };
     let result = send(
-        client(&state)?
+        client()?
             .post(format!("{server}/api/runner/{action}"))
             .bearer_auth(token)
             .json(&body),

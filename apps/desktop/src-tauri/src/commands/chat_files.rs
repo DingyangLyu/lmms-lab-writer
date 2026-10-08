@@ -25,7 +25,11 @@ fn filename(name: &str) -> Result<String, String> {
             .chars()
             .any(|c| c.is_control() || ['/', '\\', ':'].contains(&c))
     {
-        return Err("附件文件名无效或过长".into());
+        return Err(tr!(
+            "附件文件名无效或过长",
+            "The attachment file name is invalid or too long"
+        )
+        .into());
     }
     Ok(name.into())
 }
@@ -60,7 +64,11 @@ async fn directory(root: &Path, parts: &[&str]) -> Result<PathBuf, String> {
             .await
             .map_err(|e| e.to_string())?;
         if !meta.is_dir() || meta.file_type().is_symlink() {
-            return Err("附件目录不能是链接或普通文件".into());
+            return Err(tr!(
+                "附件目录不能是链接或普通文件",
+                "The attachment folder must not be a link or a regular file"
+            )
+            .into());
         }
     }
     Ok(dir)
@@ -68,10 +76,14 @@ async fn directory(root: &Path, parts: &[&str]) -> Result<PathBuf, String> {
 async fn bounded_read(path: &Path) -> Result<Vec<u8>, String> {
     let file = fs::File::open(path)
         .await
-        .map_err(|e| format!("无法读取附件：{e}"))?;
+        .map_err(|e| trf!("无法读取附件：{e}", "Could not read the attachment: {e}"))?;
     let meta = file.metadata().await.map_err(|e| e.to_string())?;
     if !meta.is_file() || meta.len() > LIMIT {
-        return Err("请选择不超过 25 MB 的普通文件；文件夹请先压缩。".into());
+        return Err(tr!(
+            "请选择不超过 25 MB 的普通文件；文件夹请先压缩。",
+            "Choose a regular file of 25 MB or less; compress folders first."
+        )
+        .into());
     }
     let mut bytes = Vec::with_capacity(meta.len() as usize);
     file.take(LIMIT + 1)
@@ -79,7 +91,7 @@ async fn bounded_read(path: &Path) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| e.to_string())?;
     if bytes.len() as u64 > LIMIT {
-        return Err("附件超过 25 MB".into());
+        return Err(tr!("附件超过 25 MB", "The attachment is over 25 MB").into());
     }
     Ok(bytes)
 }
@@ -100,7 +112,7 @@ async fn write_copy(target: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 async fn stage(project: &str, name: &str, bytes: &[u8]) -> Result<ChatFile, String> {
     if bytes.len() as u64 > LIMIT {
-        return Err("附件超过 25 MB".into());
+        return Err(tr!("附件超过 25 MB", "The attachment is over 25 MB").into());
     }
     let name = filename(name)?;
     let root = super::annotations::root(project).await?;
@@ -131,9 +143,12 @@ async fn stage(project: &str, name: &str, bytes: &[u8]) -> Result<ChatFile, Stri
                 ],
             )
             .await?;
-            fs::rename(&target, aside.join(&name))
-                .await
-                .map_err(|e| format!("附件副本已改变且无法移开：{e}"))?;
+            fs::rename(&target, aside.join(&name)).await.map_err(|e| {
+                trf!(
+                    "附件副本已改变且无法移开：{e}",
+                    "The attachment copy changed and could not be moved aside: {e}"
+                )
+            })?;
             write_copy(&target, bytes).await?;
         } else if !meta.permissions().readonly() {
             read_only(&target).await?;
@@ -145,7 +160,7 @@ async fn stage(project: &str, name: &str, bytes: &[u8]) -> Result<ChatFile, Stri
     Ok(ChatFile {
         kind: "document".into(),
         url: url::Url::from_file_path(&target)
-            .map_err(|_| "附件路径无效")?
+            .map_err(|_| tr!("附件路径无效", "Invalid attachment path"))?
             .into(),
         mime: mime(&name).into(),
         filename: name,
@@ -158,12 +173,16 @@ async fn stage(project: &str, name: &str, bytes: &[u8]) -> Result<ChatFile, Stri
 pub async fn import_chat_file(project: String, path: String) -> Result<ChatFile, String> {
     let source = Path::new(&path);
     if !source.is_absolute() {
-        return Err("附件路径必须为绝对路径".into());
+        return Err(tr!(
+            "附件路径必须为绝对路径",
+            "The attachment path must be absolute"
+        )
+        .into());
     }
     let name = source
         .file_name()
         .and_then(|s| s.to_str())
-        .ok_or("附件文件名无效")?;
+        .ok_or(tr!("附件文件名无效", "Invalid attachment file name"))?;
     stage(&project, name, &bounded_read(source).await?).await
 }
 #[tauri::command]
@@ -173,9 +192,11 @@ pub async fn import_chat_file_data(
     base64: String,
 ) -> Result<ChatFile, String> {
     if base64.len() > LIMIT.div_ceil(3) as usize * 4 {
-        return Err("附件超过 25 MB".into());
+        return Err(tr!("附件超过 25 MB", "The attachment is over 25 MB").into());
     }
-    let bytes = STANDARD.decode(base64).map_err(|_| "附件编码无效")?;
+    let bytes = STANDARD
+        .decode(base64)
+        .map_err(|_| tr!("附件编码无效", "Invalid attachment encoding"))?;
     stage(&project, &name, &bytes).await
 }
 #[tauri::command]
@@ -184,7 +205,11 @@ pub async fn validate_chat_files(
     files: Vec<ChatFile>,
 ) -> Result<Vec<ChatFile>, String> {
     if files.len() > 6 {
-        return Err("一次最多发送 6 个附件".into());
+        return Err(tr!(
+            "一次最多发送 6 个附件",
+            "Send at most 6 attachments at a time"
+        )
+        .into());
     }
     let root = super::annotations::root(&project).await?;
     for file in &files {
@@ -194,13 +219,21 @@ pub async fn validate_chat_files(
             || !file.sha256.bytes().all(|c| c.is_ascii_hexdigit())
             || file.path != format!(".writer/attachments/{}/{name}", file.sha256)
         {
-            return Err("附件引用无效，请重新添加。".into());
+            return Err(tr!(
+                "附件引用无效，请重新添加。",
+                "Invalid attachment reference; add it again."
+            )
+            .into());
         }
         let target = super::annotations::project_file(&root, &file.path).await?;
         let bytes = bounded_read(&target).await?;
         if format!("{:x}", Sha256::digest(&bytes)) != file.sha256 || bytes.len() as u64 != file.size
         {
-            return Err(format!("附件 {} 已改变，请重新添加。", name));
+            return Err(trf!(
+                "附件 {} 已改变，请重新添加。",
+                "The attachment {} changed; add it again.",
+                name
+            ));
         }
     }
     Ok(files)

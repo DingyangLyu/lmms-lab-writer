@@ -132,13 +132,17 @@ pub fn ensure(
         };
         if let Ok(path) = journal(app) {
             if let Ok(bytes) = tokio::fs::read(path).await {
-                let mut tasks: Vec<Task> =
-                    serde_json::from_slice(&bytes).map_err(|e| format!("协作历史读取失败：{e}"))?;
+                let mut tasks: Vec<Task> = serde_json::from_slice(&bytes).map_err(|e| {
+                    trf!(
+                        "协作历史读取失败：{e}",
+                        "Could not read the collaboration history: {e}"
+                    )
+                })?;
                 for task in &mut tasks {
                     if ["queued", "running"].contains(&task.status.as_str()) {
                         task.status = "interrupted".into();
                         task.result =
-                            "Writer 已重启，原任务未自动重放。请核对对方历史后重新委派。".into();
+                            tr!("Writer 已重启，原任务未自动重放。请核对对方历史后重新委派。", "Writer restarted, so the original task was not replayed automatically. Check the other conversation's history, then delegate again.").into();
                     }
                     if ["queued", "running"].contains(&task.callback.as_str()) {
                         task.callback = "interrupted".into();
@@ -206,7 +210,7 @@ fn ensure_document_write(sender: &Conversation) -> Result<(), String> {
         || (sender.backend == "opencode" && sender.options["agent"].as_str() == Some("plan"))
     {
         return Err(
-            "当前会话处于只读／规划模式，不能修改文稿。请由用户在输入栏切换到可编辑模式。".into(),
+            tr!("当前会话处于只读／规划模式，不能修改文稿。请由用户在输入栏切换到可编辑模式。", "This conversation is in read-only/plan mode and cannot change the manuscript. Ask the user to switch to an editing mode in the input bar.").into(),
         );
     }
     Ok(())
@@ -274,9 +278,13 @@ async fn call_tool(app: &AppHandle, backend: &str, params: &Value) -> Result<Val
         .sessions
         .get(from)
         .cloned()
-        .ok_or("此会话未在 Writer 中打开，请使用输入栏显示的完整会话 ID")?;
+        .ok_or(tr!("此会话未在 Writer 中打开，请使用输入栏显示的完整会话 ID", "This conversation is not open in Writer. Use the full conversation ID shown in the input bar."))?;
     if sender.backend != backend {
-        return Err("conversation_id 与调用后端不匹配".into());
+        return Err(tr!(
+            "conversation_id 与调用后端不匹配",
+            "conversation_id does not match the calling backend"
+        )
+        .into());
     }
     match params["name"].as_str().unwrap_or("") {
         "writer_list_conversations" => Ok(
@@ -294,7 +302,10 @@ async fn call_tool(app: &AppHandle, backend: &str, params: &Value) -> Result<Val
                     t.id == args["task_id"].as_str().unwrap_or("")
                         && (t.from == from || t.to == from)
                 })
-                .ok_or("任务不存在或不属于此会话")?;
+                .ok_or(tr!(
+                    "任务不存在或不属于此会话",
+                    "The task does not exist or does not belong to this conversation"
+                ))?;
             Ok(json!(task))
         }
         "writer_get_pdf_annotations" | "writer_get_annotations" => {
@@ -367,7 +378,10 @@ async fn call_tool(app: &AppHandle, backend: &str, params: &Value) -> Result<Val
             ensure_document_write(&sender)?;
             let id = arg(args, "id")?;
             let notes = super::annotations::load(&sender.project).await?;
-            let note = notes.iter().find(|n| n.id == id).ok_or("批注不存在")?;
+            let note = notes
+                .iter()
+                .find(|n| n.id == id)
+                .ok_or(tr!("批注不存在", "The annotation does not exist"))?;
             let files = note.source.as_ref().map(|s| vec![s.file.clone()]);
             if let Err(error) = prepare_files(app, &sender.project, files, false).await {
                 return Ok(
@@ -390,23 +404,38 @@ async fn call_tool(app: &AppHandle, backend: &str, params: &Value) -> Result<Val
     }
 }
 fn can_delegate(data: &Data, from: &str, to: &str, message: &str) -> Result<(), String> {
-    let source = data.sessions.get(from).ok_or("发送会话未注册")?;
+    let source = data.sessions.get(from).ok_or(tr!(
+        "发送会话未注册",
+        "The sending conversation is not registered"
+    ))?;
     let target = data
         .sessions
         .get(to)
-        .ok_or("目标会话未在 Writer 中打开。先在对应面板打开该历史会话，再复制其 ID。")?;
+        .ok_or(tr!("目标会话未在 Writer 中打开。先在对应面板打开该历史会话，再复制其 ID。", "The target conversation is not open in Writer. Open that conversation from history in its panel first, then copy its ID."))?;
     if source.id == target.id || source.project != target.project {
-        return Err("只能委派给同一项目的另一个对话".into());
+        return Err(tr!(
+            "只能委派给同一项目的另一个对话",
+            "You can only delegate to another conversation in the same project"
+        )
+        .into());
     }
     if !source.enabled || !target.enabled {
-        return Err("请先开启双方输入栏的‘允许协作’".into());
+        return Err(tr!(
+            "请先开启双方输入栏的‘允许协作’",
+            "Turn on 'Allow collaboration' in both input bars first"
+        )
+        .into());
     }
     if message.trim().is_empty() || message.len() > 20000 {
-        return Err("委派内容不能为空或超过 20000 字节".into());
+        return Err(tr!(
+            "委派内容不能为空或超过 20000 字节",
+            "The delegated task must not be empty or longer than 20000 bytes"
+        )
+        .into());
     }
     if source.active_job.is_some() {
         return Err(
-            "当前是委派／回信处理轮次，不能再次委派，避免循环调用。请直接完成并回复。".into(),
+            tr!("当前是委派／回信处理轮次，不能再次委派，避免循环调用。请直接完成并回复。", "This turn is handling a delegation or reply, so it cannot delegate again (to avoid loops). Finish and reply directly.").into(),
         );
     }
     if data
@@ -420,14 +449,18 @@ fn can_delegate(data: &Data, from: &str, to: &str, message: &str) -> Result<(), 
         .count()
         >= 4
     {
-        return Err("此会话最多有 4 个尚未完成回信的委派".into());
+        return Err(tr!(
+            "此会话最多有 4 个尚未完成回信的委派",
+            "This conversation already has 4 delegations waiting for replies"
+        )
+        .into());
     }
     if data
         .tasks
         .iter()
         .any(|t| t.from == to && t.to == from && ["queued", "running"].contains(&t.status.as_str()))
     {
-        return Err("对方正在等待本会话，不能循环委派".into());
+        return Err(tr!("对方正在等待本会话，不能循环委派", "The other conversation is waiting for this one, so delegating back would create a loop").into());
     }
     Ok(())
 }
@@ -462,7 +495,10 @@ async fn delegate(app: &AppHandle, from: &str, to: &str, message: &str) -> Resul
     drop(data);
     if let Err(e) = persist(app).await {
         state.data.lock().await.tasks.retain(|t| t.id != id);
-        return Err(format!("委派未发送：历史保存失败 {e}"));
+        return Err(trf!(
+            "委派未发送：历史保存失败 {e}",
+            "The delegation was not sent: could not save the history {e}"
+        ));
     }
     changed(app);
     Ok(
@@ -515,9 +551,9 @@ async fn dispatch_ready(app: &AppHandle) {
         tokio::spawn(async move {
             changed(&app);
             let text = if delivery.callback {
-                format!("[Writer 自动回信 / task {} / from {} / status {}]\n以下是对方的任务结果。请核对后继续用户原任务或总结，不要再次委派或轮询。\n\n{}",delivery.task.id,delivery.task.to,delivery.task.status,delivery.task.result)
+                trf!("[Writer 自动回信 / task {} / from {} / status {}]\n以下是对方的任务结果。请核对后继续用户原任务或总结，不要再次委派或轮询。\n\n{}", "[Writer automatic reply / task {} / from {} / status {}]\nBelow is the other conversation's result. Check it, then continue the user's original task or summarise; do not delegate again or poll.\n\n{}",delivery.task.id,delivery.task.to,delivery.task.status,delivery.task.result)
             } else {
-                format!("[Writer 委派任务 / task {} / from {}]\n完成以下任务并直接给出结果，Writer 会自动送回原会话。不要再调用 writer_delegate，也不要主动给发送方重复发消息。保留当前项目中的其他修改。\n\n{}",delivery.task.id,delivery.task.from,delivery.task.prompt)
+                trf!("[Writer 委派任务 / task {} / from {}]\n完成以下任务并直接给出结果，Writer 会自动送回原会话。不要再调用 writer_delegate，也不要主动给发送方重复发消息。保留当前项目中的其他修改。\n\n{}", "[Writer delegated task / task {} / from {}]\nComplete the task below and give the result directly; Writer sends it back to the original conversation automatically. Do not call writer_delegate again or message the sender yourself. Keep other changes in the current project.\n\n{}",delivery.task.id,delivery.task.from,delivery.task.prompt)
             };
             let prepared = prepare_delivery(&app, &delivery.session.project).await;
             let result = if let Err(error) = prepared {
@@ -550,7 +586,10 @@ async fn dispatch_ready(app: &AppHandle) {
                     }
                     .into();
                     if let Err(error) = result {
-                        task.result.push_str(&format!("\n回信发送失败：{error}"));
+                        task.result.push_str(&trf!(
+                            "\n回信发送失败：{error}",
+                            "\nCould not send the reply: {error}"
+                        ));
                     }
                 } else {
                     match result {
@@ -597,7 +636,7 @@ async fn opencode_turn(
     let id = session
         .id
         .strip_prefix("opencode:")
-        .ok_or("无效 OpenCode ID")?;
+        .ok_or(tr!("无效 OpenCode ID", "Invalid OpenCode ID"))?;
     let mut body =
         json!({"parts":[{"type":"text","text":format!("{}\n{text}",context("opencode",id))}]});
     for name in ["model", "variant", "agent"] {
@@ -621,8 +660,9 @@ async fn opencode_turn(
         .await
         .map_err(|e| e.to_string())?;
     if !response.status().is_success() {
-        return Err(format!(
+        return Err(trf!(
             "OpenCode 请求失败：{}",
+            "OpenCode request failed: {}",
             response.text().await.unwrap_or_default()
         ));
     }
@@ -639,7 +679,11 @@ async fn opencode_turn(
         .collect::<Vec<_>>()
         .join("\n\n");
     if texts.trim().is_empty() {
-        return Err("对方已结束，但没有可返回的文本；请核对目标会话历史。".into());
+        return Err(tr!(
+            "对方已结束，但没有可返回的文本；请核对目标会话历史。",
+            "The other conversation finished without any text to return; check its history."
+        )
+        .into());
     }
     Ok(texts.chars().take(40000).collect())
 }
@@ -655,7 +699,7 @@ pub async fn writer_register_conversation(
             .starts_with(&format!("{}:", conversation.backend))
         || conversation.id.len() > 180
     {
-        return Err("无效会话 ID".into());
+        return Err(tr!("无效会话 ID", "Invalid conversation ID").into());
     }
     conversation.project = super::annotations::root(&conversation.project)
         .await?
@@ -668,7 +712,7 @@ pub async fn writer_register_conversation(
         .get(&conversation.id)
         .is_some_and(|existing| existing.project != conversation.project)
     {
-        return Err("会话属于另一个项目，等待当前项目会话载入后再协作".into());
+        return Err(tr!("会话属于另一个项目，等待当前项目会话载入后再协作", "The conversation belongs to another project; wait for this project's conversations to load before collaborating").into());
     }
     conversation.active_job = data
         .sessions
@@ -700,15 +744,19 @@ pub async fn writer_cancel_queued_task(app: AppHandle, id: String) -> Result<(),
         .tasks
         .iter_mut()
         .find(|t| t.id == id)
-        .ok_or("任务不存在")?;
+        .ok_or(tr!("任务不存在", "The task does not exist"))?;
     if t.status == "queued" {
         t.status = "cancelled".into();
-        t.result = "用户取消了排队任务".into();
+        t.result = tr!("用户取消了排队任务", "The user cancelled the queued task").into();
         t.callback = "queued".into()
     } else if t.callback == "queued" {
         t.callback = "cancelled".into()
     } else {
-        return Err("运行中的任务请使用对应面板的停止按钮".into());
+        return Err(tr!(
+            "运行中的任务请使用对应面板的停止按钮",
+            "Stop a running task with the stop button in its panel"
+        )
+        .into());
     }
     drop(data);
     persist(&app).await?;

@@ -18,30 +18,45 @@ async fn resolve(project: &str, path: &str) -> Result<(PathBuf, LocalFileTarget)
         || path.starts_with("//")
         || path.starts_with("\\\\")
     {
-        return Err("无效的本地文件路径".into());
+        return Err(tr!("无效的本地文件路径", "Invalid local file path").into());
     }
-    let root = fs::canonicalize(project)
-        .await
-        .map_err(|e| format!("无法读取项目目录：{e}"))?;
+    let root = fs::canonicalize(project).await.map_err(|e| {
+        trf!(
+            "无法读取项目目录：{e}",
+            "Could not read the project folder: {e}"
+        )
+    })?;
     let supplied = Path::new(path);
     if !supplied.is_absolute()
         && supplied
             .components()
             .any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
     {
-        return Err("请使用项目相对路径或完整的本机绝对路径".into());
+        return Err(tr!(
+            "请使用项目相对路径或完整的本机绝对路径",
+            "Use a path relative to the project or a full absolute path on this computer"
+        )
+        .into());
     }
     let candidate = if supplied.is_absolute() {
         supplied.to_path_buf()
     } else {
         root.join(supplied)
     };
-    let actual = fs::canonicalize(&candidate)
-        .await
-        .map_err(|e| format!("文件不存在或无法访问：{}（{e}）", candidate.display()))?;
+    let actual = fs::canonicalize(&candidate).await.map_err(|e| {
+        trf!(
+            "文件不存在或无法访问：{}（{e}）",
+            "The file does not exist or cannot be accessed: {} ({e})",
+            candidate.display()
+        )
+    })?;
     let meta = fs::metadata(&actual).await.map_err(|e| e.to_string())?;
     if !meta.is_file() && !meta.is_dir() {
-        return Err("此路径不是普通文件或文件夹".into());
+        return Err(tr!(
+            "此路径不是普通文件或文件夹",
+            "This path is not a regular file or folder"
+        )
+        .into());
     }
     let project_path = actual
         .strip_prefix(&root)
@@ -78,7 +93,12 @@ pub async fn reveal_local_file(
     })
     .await
     .map_err(|e| e.to_string())?
-    .map_err(|e| format!("无法在文件管理器中定位：{e}"))
+    .map_err(|e| {
+        trf!(
+            "无法在文件管理器中定位：{e}",
+            "Could not reveal it in the file manager: {e}"
+        )
+    })
 }
 
 #[cfg(test)]

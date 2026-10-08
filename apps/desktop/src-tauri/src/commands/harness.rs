@@ -11,7 +11,10 @@ impl Harness {
             "codex" => Ok(Self::Codex),
             "opencode" => Ok(Self::OpenCode),
             "claude" => Ok(Self::Claude),
-            _ => Err(format!("不支持的 AI 后端：{value}")),
+            _ => Err(trf!(
+                "不支持的 AI 后端：{value}",
+                "Unsupported AI backend: {value}"
+            )),
         }
     }
 }

@@ -109,12 +109,13 @@ async fn directory(path: &str) -> Result<PathBuf, String> {
         .await
         .map_err(|e| e.to_string())?;
     if !p.is_dir() {
-        return Err("请先打开项目文件夹。".into());
+        return Err(tr!("请先打开项目文件夹。", "Open a project folder first.").into());
     }
     Ok(p)
 }
 fn session_path(app: &AppHandle, dir: &Path, id: &str) -> Result<PathBuf, String> {
-    uuid::Uuid::parse_str(id).map_err(|_| "无效 Claude 会话 ID")?;
+    uuid::Uuid::parse_str(id)
+        .map_err(|_| tr!("无效 Claude 会话 ID", "Invalid Claude session ID"))?;
     let hash = dir
         .to_string_lossy()
         .bytes()
@@ -225,9 +226,12 @@ async fn append_event(path: &Path, event: &Value, native: bool) -> Result<(), St
     Ok(())
 }
 async fn store(path: &Path, transcript: &Transcript) -> Result<(), String> {
-    tokio::fs::create_dir_all(path.parent().ok_or("无效存储目录")?)
-        .await
-        .map_err(|e| e.to_string())?;
+    tokio::fs::create_dir_all(
+        path.parent()
+            .ok_or(tr!("无效存储目录", "Invalid storage folder"))?,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     let temp = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     tokio::fs::write(
         &temp,
@@ -283,7 +287,7 @@ pub(crate) async fn binary() -> Result<PathBuf, String> {
             return Ok(path);
         }
     }
-    Err("未找到 Claude Code。请先在终端安装 Claude Code，并完成 claude auth login。".into())
+    Err(tr!("未找到 Claude Code。请先在终端安装 Claude Code，并完成 claude auth login。", "Claude Code was not found. Install Claude Code in a terminal and run claude auth login first.").into())
 }
 fn emit(app: &AppHandle, session: &Session, event: &Value) {
     let _ = app
@@ -348,8 +352,19 @@ async fn probe_models(dir: &Path) -> Result<Value, String> {
     let mut child = protocol_command(&bin, dir)
         .spawn()
         .map_err(|e| e.to_string())?;
-    let input = Mutex::new(child.stdin.take().ok_or("Claude stdin 不可用")?);
-    let mut lines = BufReader::new(child.stdout.take().ok_or("Claude stdout 不可用")?).lines();
+    let input = Mutex::new(
+        child
+            .stdin
+            .take()
+            .ok_or(tr!("Claude stdin 不可用", "Claude stdin is unavailable"))?,
+    );
+    let mut lines = BufReader::new(
+        child
+            .stdout
+            .take()
+            .ok_or(tr!("Claude stdout 不可用", "Claude stdout is unavailable"))?,
+    )
+    .lines();
     send(&input, json!({"type":"control_request","request_id":"writer-init","request":{"subtype":"initialize"}})).await?;
     let result = timeout(Duration::from_secs(40), async {
         while let Some(line) = lines.next_line().await.map_err(|e| e.to_string())? {
@@ -366,10 +381,14 @@ async fn probe_models(dir: &Path) -> Result<Value, String> {
                 }
             }
         }
-        Err("Claude Code 初始化退出，请检查本机 CLI 配置。".into())
+        Err(tr!(
+            "Claude Code 初始化退出，请检查本机 CLI 配置。",
+            "Claude Code exited during start-up. Check the CLI setup on this computer."
+        )
+        .into())
     })
     .await
-    .map_err(|_| "Claude Code 初始化超时".to_string())
+    .map_err(|_| tr!("Claude Code 初始化超时", "Claude Code start-up timed out").to_string())
     .and_then(|v| v);
     #[cfg(unix)]
     if let Some(pid) = child.id() {
@@ -385,7 +404,11 @@ pub async fn claude_list_sessions(app: AppHandle, cwd: String) -> Result<Value, 
     let dir = directory(&cwd).await?;
     let path = session_path(&app, &dir, &uuid::Uuid::nil().to_string())?;
     let mut sessions = Vec::new();
-    if let Ok(mut entries) = tokio::fs::read_dir(path.parent().ok_or("存储目录不可用")?).await
+    if let Ok(mut entries) = tokio::fs::read_dir(
+        path.parent()
+            .ok_or(tr!("存储目录不可用", "The storage folder is unavailable"))?,
+    )
+    .await
     {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
@@ -420,7 +443,7 @@ pub async fn claude_create_session(
     let dir = directory(&cwd).await?;
     let session = Session {
         id: uuid::Uuid::new_v4().to_string(),
-        name: "新对话".into(),
+        name: tr!("新对话", "New conversation").into(),
         directory: dir.to_string_lossy().into_owned(),
         updated_at: now(),
         native: false,
@@ -473,7 +496,11 @@ pub async fn claude_rename_session(
 ) -> Result<(), String> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 120 {
-        return Err("对话名称需为 1–120 个字符。".into());
+        return Err(tr!(
+            "对话名称需为 1–120 个字符。",
+            "Conversation names must be 1–120 characters."
+        )
+        .into());
     }
     let dir = directory(&cwd).await?;
     let path = session_path(&app, &dir, &session_id)?;
@@ -488,7 +515,9 @@ fn claude_input(text: &str, images: Vec<String>) -> Result<Value, String> {
     let mut content = Vec::new();
     for part in validated {
         if let Some(url) = part["url"].as_str() {
-            let (header, data) = url.split_once(',').ok_or("无效图片")?;
+            let (header, data) = url
+                .split_once(',')
+                .ok_or(tr!("无效图片", "Invalid image"))?;
             content.push(json!({"type":"image","source":{"type":"base64","media_type":header.trim_start_matches("data:").trim_end_matches(";base64"),"data":data}}));
         } else {
             content.push(part);
@@ -513,7 +542,11 @@ fn permission_args(mode: &str) -> Result<Vec<&str>, String> {
             mode,
             "--dangerously-skip-permissions",
         ]),
-        _ => Err("不支持的 Claude 权限模式".into()),
+        _ => Err(tr!(
+            "不支持的 Claude 权限模式",
+            "Unsupported Claude permission mode"
+        )
+        .into()),
     }
 }
 #[tauri::command]
@@ -532,7 +565,7 @@ pub async fn claude_start_turn(
         .as_ref()
         .is_some_and(|e| !["low", "medium", "high", "xhigh", "max"].contains(&e.as_str()))
     {
-        return Err("无效推理强度".into());
+        return Err(tr!("无效推理强度", "Invalid reasoning effort").into());
     }
     let input_message = claude_input(&text, images)?;
     let dir = directory(&cwd).await?;
@@ -547,7 +580,7 @@ pub async fn claude_start_turn(
         .get(&session_id)
         .is_some_and(|r| r.busy.load(Ordering::Acquire))
     {
-        return Err("该对话仍在执行。".into());
+        return Err(tr!("该对话仍在执行。", "This conversation is still running.").into());
     }
     let mut t = load_meta(&path).await?;
     migrate(&path, &mut t).await?;
@@ -576,13 +609,27 @@ pub async fn claude_start_turn(
     let actor = format!("claude:{session_id}");
     super::reviews::begin_or_report(&app, &cwd, &actor).await;
     let review = super::reviews::TurnGuard::new(&app, &actor);
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Claude Code 启动失败：{e}"))?;
-    let stdout = child.stdout.take().ok_or("Claude stdout 不可用")?;
-    let stderr = child.stderr.take().ok_or("Claude stderr 不可用")?;
+    let mut child = cmd.spawn().map_err(|e| {
+        trf!(
+            "Claude Code 启动失败：{e}",
+            "Could not start Claude Code: {e}"
+        )
+    })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or(tr!("Claude stdout 不可用", "Claude stdout is unavailable"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or(tr!("Claude stderr 不可用", "Claude stderr is unavailable"))?;
     let run = Arc::new(Run {
-        input: Mutex::new(child.stdin.take().ok_or("Claude stdin 不可用")?),
+        input: Mutex::new(
+            child
+                .stdin
+                .take()
+                .ok_or(tr!("Claude stdin 不可用", "Claude stdin is unavailable"))?,
+        ),
         pending: Mutex::new(HashMap::new()),
         cancel: Notify::new(),
         busy: AtomicBool::new(true),
@@ -599,7 +646,7 @@ pub async fn claude_start_turn(
             .lines()
             .map(str::trim)
             .find(|line| !line.is_empty())
-            .unwrap_or("图片任务")
+            .unwrap_or(tr!("图片任务", "Image task"))
             .chars()
             .take(40)
             .collect();
@@ -663,8 +710,8 @@ pub async fn claude_start_turn(
         tokio::pin!(deadline);
         loop {
             let line = tokio::select! {
-                _=run.cancel.notified()=>{ failure=Some("已停止 Claude Code。".to_string()); break; },
-                _=&mut deadline, if !initialized=>{ failure=Some("Claude Code 初始化超时。".to_string()); break; },
+                _=run.cancel.notified()=>{ failure=Some(tr!("已停止 Claude Code。", "Claude Code was stopped.").to_string()); break; },
+                _=&mut deadline, if !initialized=>{ failure=Some(tr!("Claude Code 初始化超时。", "Claude Code start-up timed out.").to_string()); break; },
                 line=lines.next_line()=>match line {Ok(Some(line))=>line,Ok(None)=>break,Err(e)=>{failure=Some(e.to_string());break;}}
             };
             let Ok(event) = serde_json::from_str::<Value>(&line) else {
@@ -721,7 +768,7 @@ pub async fn claude_start_turn(
                 )
                 .await
                 {
-                    failure = Some(format!("历史保存失败：{e}"));
+                    failure = Some(trf!("历史保存失败：{e}", "Could not save the history: {e}"));
                 }
             }
             emit(&app, &session, &event);
@@ -751,7 +798,11 @@ pub async fn claude_start_turn(
             .unwrap_or_default();
         if !result_seen && failure.is_none() {
             failure = Some(if stderr.trim().is_empty() {
-                "Claude Code 提前退出，请检查本机登录和模型配置。".into()
+                tr!(
+                    "Claude Code 提前退出，请检查本机登录和模型配置。",
+                    "Claude Code exited early. Check the sign-in and model setup on this computer."
+                )
+                .into()
             } else {
                 stderr
             });
@@ -793,13 +844,24 @@ pub async fn claude_steer_turn(
         .map_err(|e| e.to_string())?
         .get(&session_id)
         .cloned()
-        .ok_or("当前任务已结束，请正常发送。")?;
+        .ok_or(tr!(
+            "当前任务已结束，请正常发送。",
+            "The current task has finished; send normally."
+        ))?;
     let mut delivery = run.delivery.lock().await;
     if !run.busy.load(Ordering::Acquire) || !delivery.accepting || !delivery.initialized {
-        return Err("当前任务已结束或尚未就绪，请稍后正常发送。".into());
+        return Err(tr!(
+            "当前任务已结束或尚未就绪，请稍后正常发送。",
+            "The current task has finished or is not ready yet; send normally in a moment."
+        )
+        .into());
     }
     if delivery.outstanding > 1 {
-        return Err("上一条指导正在接入，请稍后发送或加入队列。".into());
+        return Err(tr!(
+            "上一条指导正在接入，请稍后发送或加入队列。",
+            "The previous guidance is still being delivered; send later or add it to the queue."
+        )
+        .into());
     }
     let session = load_meta(&path).await?.session;
     // Interrupt and user input share ordered stdin. Keep reading through the interrupted
@@ -832,9 +894,14 @@ pub async fn claude_respond_permission(
         .map_err(|e| e.to_string())?
         .get(&session_id)
         .cloned()
-        .ok_or("Claude 对话已结束")?;
+        .ok_or(tr!(
+            "Claude 对话已结束",
+            "The Claude conversation has ended"
+        ))?;
     let mut pending = run.pending.lock().await;
-    let request = pending.get(&request_id).ok_or("该权限请求已结束")?;
+    let request = pending
+        .get(&request_id)
+        .ok_or(tr!("该权限请求已结束", "This permission request has ended"))?;
     let mut input = request["request"]["input"].clone();
     if request["request"]["tool_name"] == "AskUserQuestion" && allow {
         input["answers"] = answers.unwrap_or(json!({}));
@@ -842,7 +909,7 @@ pub async fn claude_respond_permission(
     let decision = if allow {
         json!({"behavior":"allow","updatedInput":input})
     } else {
-        json!({"behavior":"deny","message":"用户拒绝了本次操作。"})
+        json!({"behavior":"deny","message":tr!("用户拒绝了本次操作。", "The user denied this action.")})
     };
     send(&run.input,json!({"type":"control_response","response":{"subtype":"success","request_id":request_id,"response":decision}})).await?;
     pending.remove(&request_id);
@@ -859,7 +926,10 @@ pub async fn claude_stop(
         .map_err(|e| e.to_string())?
         .get(&session_id)
         .cloned()
-        .ok_or("Claude 对话已结束")?;
+        .ok_or(tr!(
+            "Claude 对话已结束",
+            "The Claude conversation has ended"
+        ))?;
     run.delivery.lock().await.accepting = false;
     let _=send(&run.input,json!({"type":"control_request","request_id":uuid::Uuid::new_v4().to_string(),"request":{"subtype":"interrupt"}})).await;
     tokio::spawn(async move {
@@ -879,7 +949,7 @@ pub async fn bridge_turn(
     let id = session
         .id
         .strip_prefix("claude:")
-        .ok_or("无效 Claude 会话 ID")?
+        .ok_or(tr!("无效 Claude 会话 ID", "Invalid Claude session ID"))?
         .to_string();
     let state = app.state::<ClaudeState>();
     let mut events = state.events.subscribe();
@@ -903,10 +973,12 @@ pub async fn bridge_turn(
     .await?;
     let mut result = None;
     loop {
-        let (event_id, event) = events
-            .recv()
-            .await
-            .map_err(|e| format!("Claude 回信连接中断：{e}"))?;
+        let (event_id, event) = events.recv().await.map_err(|e| {
+            trf!(
+                "Claude 回信连接中断：{e}",
+                "The Claude reply connection dropped: {e}"
+            )
+        })?;
         if event_id != id {
             continue;
         }
@@ -921,7 +993,7 @@ pub async fn bridge_turn(
                                 .collect::<Vec<_>>()
                                 .join("\n")
                         })
-                        .unwrap_or_else(|| "Claude 执行失败".into()))
+                        .unwrap_or_else(|| tr!("Claude 执行失败", "Claude failed").into()))
                 } else {
                     Ok(event["result"]
                         .as_str()
@@ -934,11 +1006,13 @@ pub async fn bridge_turn(
             Some("writer_error") => {
                 result = Some(Err(event["error"]
                     .as_str()
-                    .unwrap_or("Claude 执行失败")
+                    .unwrap_or(tr!("Claude 执行失败", "Claude failed"))
                     .into()))
             }
             Some("writer_done") => {
-                return result.unwrap_or_else(|| Err("Claude 未返回结果".into()))
+                return result.unwrap_or_else(|| {
+                    Err(tr!("Claude 未返回结果", "Claude returned no result").into())
+                })
             }
             _ => {}
         }

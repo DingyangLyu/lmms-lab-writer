@@ -158,7 +158,11 @@ pub fn merge(base: &str, ours: &str, theirs: &str) -> MergeResult {
 }
 fn bounded(text: &str) -> Result<(), String> {
     if text.len() > LIMIT {
-        Err("文本超过 2 MB，无法自动合并，请先拆分文件。".into())
+        Err(tr!(
+            "文本超过 2 MB，无法自动合并，请先拆分文件。",
+            "The text is over 2 MB and cannot be merged automatically; split the file first."
+        )
+        .into())
     } else {
         Ok(())
     }
@@ -175,7 +179,7 @@ async fn metadata_dir(project: &str, kind: &str) -> Result<std::path::PathBuf, S
 }
 fn identifier(value: &str) -> Result<(), String> {
     if value.len() != 64 || !value.bytes().all(|c| c.is_ascii_hexdigit()) {
-        Err("无效版本标识".into())
+        Err(tr!("无效版本标识", "Invalid version ID").into())
     } else {
         Ok(())
     }
@@ -185,7 +189,11 @@ async fn read_metadata(file: &std::path::Path) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() > 20_000_000 {
-        return Err("无效或过大的版本元数据".into());
+        return Err(tr!(
+            "无效或过大的版本元数据",
+            "Invalid or oversized version metadata"
+        )
+        .into());
     }
     fs::read(file).await.map_err(|e| e.to_string())
 }
@@ -194,7 +202,11 @@ pub async fn snapshot(project: &str, path: &str, content: &str) -> Result<Revisi
     if path.split('/').any(|part| part.starts_with('.'))
         || ["auth.json", "credentials.json"].contains(&path.rsplit('/').next().unwrap_or(""))
     {
-        return Err("此内部或凭据文件不能作为文稿版本保存。".into());
+        return Err(tr!(
+            "此内部或凭据文件不能作为文稿版本保存。",
+            "This internal or credential file cannot be saved as a manuscript version."
+        )
+        .into());
     }
     super::saving::target_path(project, path).await?;
     let id = format!("{:x}", Sha256::digest(format!("{path}\0{content}")));
@@ -220,11 +232,12 @@ pub async fn revision(project: &str, id: &str, path: &str) -> Result<Revision, S
     let file = metadata_dir(project, "revisions")
         .await?
         .join(format!("{id}.json"));
-    let data: Revision = serde_json::from_slice(
-        &read_metadata(&file)
-            .await
-            .map_err(|_| "基准版本不存在或无效，请重新读取文档版本。")?,
-    )
+    let data: Revision = serde_json::from_slice(&read_metadata(&file).await.map_err(|_| {
+        tr!(
+            "基准版本不存在或无效，请重新读取文档版本。",
+            "The base version is missing or invalid; read the document version again."
+        )
+    })?)
     .map_err(|e| e.to_string())?;
     if data.path != path
         || data.id != id
@@ -233,7 +246,11 @@ pub async fn revision(project: &str, id: &str, path: &str) -> Result<Revision, S
             Sha256::digest(format!("{}\0{}", data.path, data.content))
         ) != id
     {
-        return Err("版本不属于此文件或内容校验失败".into());
+        return Err(tr!(
+            "版本不属于此文件或内容校验失败",
+            "The version does not belong to this file or failed its content check"
+        )
+        .into());
     }
     Ok(data)
 }
@@ -315,9 +332,12 @@ async fn save_inner(
 ) -> Result<SaveResult, String> {
     let (root, target) = super::saving::target_path(project, path).await?;
     for _ in 0..3 {
-        let disk = fs::read_to_string(&target)
-            .await
-            .map_err(|e| format!("无法读取文件，修改已保留：{e}"))?;
+        let disk = fs::read_to_string(&target).await.map_err(|e| {
+            trf!(
+                "无法读取文件，修改已保留：{e}",
+                "Could not read the file; the changes were kept: {e}"
+            )
+        })?;
         bounded(&disk)?;
         let (ours, theirs) = if owner == "editor" {
             (proposal, &disk[..])
@@ -374,7 +394,12 @@ async fn save_inner(
             let mut version_error = super::saving::create_backup(&root, &target, &content)
                 .await
                 .err()
-                .map(|e| format!("文稿已保存，但保存后备份失败：{e}"));
+                .map(|e| {
+                    trf!(
+                        "文稿已保存，但保存后备份失败：{e}",
+                        "The manuscript was saved, but the backup after saving failed: {e}"
+                    )
+                });
             let record = metadata_dir(project, "conflicts")
                 .await?
                 .join(format!("{id}.json"));
@@ -384,7 +409,7 @@ async fn save_inner(
                         prior.status = "merged".into();
                         prior.updated_at = now();
                         if let Err(e) = store_conflict(project, &prior).await {
-                            version_error = Some(format!("文稿已保存，但冲突状态更新失败：{e}"));
+                            version_error = Some(trf!("文稿已保存，但冲突状态更新失败：{e}", "The manuscript was saved, but the conflict status could not be updated: {e}"));
                         }
                     }
                 }
@@ -426,7 +451,11 @@ async fn save_inner(
             previous: None,
         });
     }
-    Err("文件仍在连续变化，本次修改已保留，请稍后重试合并。".into())
+    Err(tr!(
+        "文件仍在连续变化，本次修改已保留，请稍后重试合并。",
+        "The file keeps changing; this edit was kept. Try merging again in a moment."
+    )
+    .into())
 }
 #[tauri::command]
 pub async fn merge_save_document(
@@ -494,7 +523,11 @@ pub async fn resolve_conflict(
     let mut conflict: Conflict =
         serde_json::from_slice(&read_metadata(&file).await?).map_err(|e| e.to_string())?;
     if conflict.status != "pending" || conflict.revision != expected_revision {
-        return Err("冲突记录已更新，请重新查看最新双方内容。".into());
+        return Err(tr!(
+            "冲突记录已更新，请重新查看最新双方内容。",
+            "The conflict record changed; review both latest versions again."
+        )
+        .into());
     }
     let mut result = save_inner(
         project,
@@ -519,13 +552,25 @@ pub async fn resolve_conflict(
         .into();
         conflict.updated_at = now();
         if let Err(e) = store_conflict(project, &conflict).await {
-            result.version_error = Some(format!("结果已保存，但冲突状态更新失败：{e}"));
+            result.version_error = Some(trf!(
+                "结果已保存，但冲突状态更新失败：{e}",
+                "The result was saved, but the conflict status could not be updated: {e}"
+            ));
         }
-        if let Err(e) =
-            super::git_snapshots::create_snapshot(project, Some("Writer · 解决文稿合并冲突"), &[])
-                .await
+        if let Err(e) = super::git_snapshots::create_snapshot(
+            project,
+            Some(tr!(
+                "Writer · 解决文稿合并冲突",
+                "Writer · Resolve manuscript merge conflict"
+            )),
+            &[],
+        )
+        .await
         {
-            result.version_error = Some(format!("内容已保存，但 Git 版本保存失败：{e}"));
+            result.version_error = Some(trf!(
+                "内容已保存，但 Git 版本保存失败：{e}",
+                "The content was saved, but saving a Git version failed: {e}"
+            ));
         }
     }
     Ok(result)
@@ -567,17 +612,28 @@ pub fn utf16_byte(text: &str, offset: usize) -> Option<usize> {
 }
 pub fn patch(base: &str, edits: &[TextEdit]) -> Result<String, String> {
     if edits.is_empty() || edits.len() > 64 {
-        return Err("请提供 1–64 个明确的替换片段".into());
+        return Err(tr!(
+            "请提供 1–64 个明确的替换片段",
+            "Provide 1–64 unambiguous replacements"
+        )
+        .into());
     }
     let mut spans = vec![];
     for e in edits {
         if e.old_text.is_empty() {
-            return Err("oldText 不能为空，请提供插入位置附近的原文。".into());
+            return Err(tr!(
+                "oldText 不能为空，请提供插入位置附近的原文。",
+                "oldText must not be empty; give the original text near the insertion point."
+            )
+            .into());
         }
         let start = if let Some(start) = e.start {
             utf16_byte(base, start)
                 .filter(|p| base[*p..].starts_with(&e.old_text))
-                .ok_or("指定位置与基准原文不一致")?
+                .ok_or(tr!(
+                    "指定位置与基准原文不一致",
+                    "The given position does not match the base text"
+                ))?
         } else {
             let found: Vec<_> = base
                 .match_indices(&e.old_text)
@@ -585,7 +641,7 @@ pub fn patch(base: &str, edits: &[TextEdit]) -> Result<String, String> {
                 .take(2)
                 .collect();
             if found.len() != 1 {
-                return Err("基准原文不存在或有多处，请提供 start（UTF-16 偏移）明确定位。".into());
+                return Err(tr!("基准原文不存在或有多处，请提供 start（UTF-16 偏移）明确定位。", "The base text is missing or appears more than once; give start (UTF-16 offset) to locate it.").into());
             }
             found[0]
         };
@@ -593,7 +649,7 @@ pub fn patch(base: &str, edits: &[TextEdit]) -> Result<String, String> {
     }
     spans.sort_by_key(|e| e.0);
     if spans.windows(2).any(|w| w[0].1 > w[1].0) {
-        return Err("替换片段相互重叠".into());
+        return Err(tr!("替换片段相互重叠", "The replacements overlap").into());
     }
     let mut result = base.to_string();
     for (start, end, text) in spans.into_iter().rev() {

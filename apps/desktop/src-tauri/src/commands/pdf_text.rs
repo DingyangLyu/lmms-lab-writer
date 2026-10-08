@@ -96,7 +96,8 @@ fn dictionary_value<'a>(
         .map_err(|e| e.to_string())
 }
 fn recover_map(embedded: &[u8], name: &str, db: &Database) -> Result<BTreeMap<u16, char>, String> {
-    let subset = Face::parse(embedded, 0).map_err(|_| "嵌入字体无法解析".to_string())?;
+    let subset = Face::parse(embedded, 0)
+        .map_err(|_| tr!("嵌入字体无法解析", "The embedded font cannot be parsed").to_string())?;
     let glyphs: Vec<_> = (1..subset.number_of_glyphs())
         .filter_map(|id| {
             let mut outline = Outline::default();
@@ -109,7 +110,11 @@ fn recover_map(embedded: &[u8], name: &str, db: &Database) -> Result<BTreeMap<u1
         })
         .collect();
     if glyphs.is_empty() {
-        return Err("嵌入字体没有可核验的字形".into());
+        return Err(tr!(
+            "嵌入字体没有可核验的字形",
+            "The embedded font has no glyphs that can be checked"
+        )
+        .into());
     }
     for info in db.faces().filter(|f| f.post_script_name == name) {
         let result = db
@@ -157,7 +162,11 @@ fn recover_map(embedded: &[u8], name: &str, db: &Database) -> Result<BTreeMap<u1
             return Ok(map);
         }
     }
-    Err("本机没有可通过字形校验的同版本字体".into())
+    Err(tr!(
+        "本机没有可通过字形校验的同版本字体",
+        "No font of the same version on this computer passes the glyph check"
+    )
+    .into())
 }
 fn cmap(map: &BTreeMap<u16, char>) -> Vec<u8> {
     let mut s=String::from("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Writer-Recovered-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
@@ -198,7 +207,17 @@ fn repair(doc: &mut Document) -> (Vec<String>, Vec<String>, Vec<BTreeMap<u16, ch
     }
     let mut fonts = match FONTS.lock() {
         Ok(f) => f,
-        Err(_) => return (vec![], vec!["字体映射检查不可用".into()], vec![]),
+        Err(_) => {
+            return (
+                vec![],
+                vec![tr!(
+                    "字体映射检查不可用",
+                    "The font mapping check is unavailable"
+                )
+                .into()],
+                vec![],
+            )
+        }
     };
     let db = fonts.get_or_insert_with(font_database);
     let mut repaired = vec![];
@@ -221,32 +240,38 @@ fn repair(doc: &mut Document) -> (Vec<String>, Vec<String>, Vec<BTreeMap<u16, ch
             .as_array()
             .map_err(|e| e.to_string())?
             .first()
-            .ok_or("无子字体")?;
+            .ok_or(tr!("无子字体", "No descendant font"))?;
             let descendant = object(doc, descendant)?
                 .as_dict()
                 .map_err(|e| e.to_string())?;
             if descendant.get(b"Subtype").and_then(Object::as_name).ok() != Some(b"CIDFontType2") {
-                return Err(format!("{name} 缺少文字映射，暂不能可靠恢复"));
+                return Err(trf!(
+                    "{name} 缺少文字映射，暂不能可靠恢复",
+                    "{name} has no text mapping, so its text cannot be recovered reliably yet"
+                ));
             }
             if descendant
                 .get(b"CIDToGIDMap")
                 .is_ok_and(|v| v.as_name().ok() != Some(b"Identity"))
             {
-                return Err(format!("{name} 使用未支持的字形映射"));
+                return Err(trf!(
+                    "{name} 使用未支持的字形映射",
+                    "{name} uses an unsupported glyph mapping"
+                ));
             }
             let descriptor = dictionary_value(doc, descendant, b"FontDescriptor")?;
             let data = object(
                 doc,
                 descriptor
                     .get(b"FontFile2")
-                    .map_err(|_| format!("{name} 未嵌入字体"))?,
+                    .map_err(|_| trf!("{name} 未嵌入字体", "{name} is not embedded"))?,
             )?
             .as_stream()
             .map_err(|e| e.to_string())?
             .get_plain_content()
             .map_err(|e| e.to_string())?;
             if data.len() > 64 * 1024 * 1024 {
-                return Err("字体过大".into());
+                return Err(tr!("字体过大", "The font is too large").into());
             }
             let map =
                 recover_map(&data, base_name(&name), db).map_err(|e| format!("{name}：{e}"))?;
@@ -268,11 +293,19 @@ fn repair(doc: &mut Document) -> (Vec<String>, Vec<String>, Vec<BTreeMap<u16, ch
 }
 fn prepare(path: &Path, cache: &Path) -> Result<Preview, String> {
     if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > 256 * 1024 * 1024 {
-        return Err("PDF 超过文字映射检查的大小上限".into());
+        return Err(tr!(
+            "PDF 超过文字映射检查的大小上限",
+            "The PDF is over the size limit for the text mapping check"
+        )
+        .into());
     }
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     if bytes.len() > 256 * 1024 * 1024 {
-        return Err("PDF 超过文字映射检查的大小上限".into());
+        return Err(tr!(
+            "PDF 超过文字映射检查的大小上限",
+            "The PDF is over the size limit for the text mapping check"
+        )
+        .into());
     }
     let hash = format!("{:x}", Sha256::digest(&bytes));
     let cached = cache.join(format!("v1-{hash}.pdf"));

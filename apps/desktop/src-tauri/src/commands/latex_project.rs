@@ -31,13 +31,20 @@ pub fn relative(path: &str, allow_dot: bool) -> Result<PathBuf, String> {
             .components()
             .any(|c| !matches!(c, Component::Normal(_)))
     {
-        return Err(format!("必须使用项目内的相对路径：{path}"));
+        return Err(trf!(
+            "必须使用项目内的相对路径：{path}",
+            "Use a path relative to the project: {path}"
+        ));
     }
     Ok(PathBuf::from(path))
 }
 pub fn validate(config: &ProjectConfig) -> Result<(), String> {
     if config.version != 1 || config.targets.len() > 64 {
-        return Err("不支持的编译配置版本或目标过多".into());
+        return Err(tr!(
+            "不支持的编译配置版本或目标过多",
+            "Unsupported build configuration version, or too many targets"
+        )
+        .into());
     }
     let mut ids = std::collections::HashSet::new();
     let mut outputs = std::collections::HashSet::new();
@@ -50,10 +57,14 @@ pub fn validate(config: &ProjectConfig) -> Result<(), String> {
                 .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
             || !ids.insert(&target.id)
         {
-            return Err("编译目标 ID 无效或重复".into());
+            return Err(tr!(
+                "编译目标 ID 无效或重复",
+                "A build target ID is invalid or duplicated"
+            )
+            .into());
         }
         if target.name.trim().is_empty() || target.name.len() > 200 {
-            return Err("请填写编译目标名称".into());
+            return Err(tr!("请填写编译目标名称", "Enter a name for the build target").into());
         }
         relative(&target.main_file, false)?;
         relative(&target.work_dir, true)?;
@@ -64,8 +75,9 @@ pub fn validate(config: &ProjectConfig) -> Result<(), String> {
             .to_string_lossy();
         let pdf = format!("{}/{}.pdf", target.output_dir, stem).to_lowercase();
         if !outputs.insert(pdf.clone()) {
-            return Err(format!(
-                "多个目标写入同一个 PDF：{pdf}，请设置不同输出目录。"
+            return Err(trf!(
+                "多个目标写入同一个 PDF：{pdf}，请设置不同输出目录。",
+                "Several targets write the same PDF: {pdf}. Give them different output folders."
             ));
         }
 
@@ -75,7 +87,11 @@ pub fn validate(config: &ProjectConfig) -> Result<(), String> {
             ]
             .contains(&target.engine.as_str())
         {
-            return Err("主文件或 LaTeX 引擎无效".into());
+            return Err(tr!(
+                "主文件或 LaTeX 引擎无效",
+                "Invalid main file or LaTeX engine"
+            )
+            .into());
         }
     }
     if config
@@ -83,7 +99,11 @@ pub fn validate(config: &ProjectConfig) -> Result<(), String> {
         .as_ref()
         .is_some_and(|id| !ids.contains(id))
     {
-        return Err("当前编译目标不存在".into());
+        return Err(tr!(
+            "当前编译目标不存在",
+            "The current build target does not exist"
+        )
+        .into());
     }
     Ok(())
 }
@@ -194,14 +214,21 @@ pub async fn writable_dir(root: &Path, path: &str) -> Result<PathBuf, String> {
     let target = root.join(relative);
     let mut ancestor = target.clone();
     while !ancestor.exists() {
-        ancestor = ancestor.parent().ok_or("无效路径")?.into();
+        ancestor = ancestor
+            .parent()
+            .ok_or(tr!("无效路径", "Invalid path"))?
+            .into();
     }
     if !tokio::fs::canonicalize(&ancestor)
         .await
         .map_err(|e| e.to_string())?
         .starts_with(root)
     {
-        return Err("目录链接指向项目外部".into());
+        return Err(tr!(
+            "目录链接指向项目外部",
+            "A folder link points outside the project"
+        )
+        .into());
     }
     tokio::fs::create_dir_all(&target)
         .await
@@ -210,7 +237,7 @@ pub async fn writable_dir(root: &Path, path: &str) -> Result<PathBuf, String> {
         .await
         .map_err(|e| e.to_string())?;
     if !canonical.starts_with(root) {
-        return Err("目录不属于项目".into());
+        return Err(tr!("目录不属于项目", "The folder is not part of the project").into());
     }
     Ok(canonical)
 }
@@ -223,7 +250,11 @@ async fn config_path(directory: &str) -> Result<PathBuf, String> {
             .map_err(|e| e.to_string())?
             .starts_with(root)
     {
-        return Err("编译配置链接指向项目外".into());
+        return Err(tr!(
+            "编译配置链接指向项目外",
+            "The build configuration link points outside the project"
+        )
+        .into());
     }
     Ok(path)
 }
@@ -251,7 +282,12 @@ pub async fn latex_project_load(
     if path.exists() {
         let config: ProjectConfig =
             serde_json::from_slice(&tokio::fs::read(path).await.map_err(|e| e.to_string())?)
-                .map_err(|e| format!("编译配置读取失败，原文件已保留：{e}"))?;
+                .map_err(|e| {
+                    trf!(
+                        "编译配置读取失败，原文件已保留：{e}",
+                        "Could not read the build configuration; the original file was kept: {e}"
+                    )
+                })?;
         validate(&config)?;
         return Ok(config);
     }

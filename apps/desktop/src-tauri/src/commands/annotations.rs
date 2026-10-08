@@ -75,7 +75,7 @@ pub async fn root(project: &str) -> Result<PathBuf, String> {
         .await
         .map_err(|e| e.to_string())?;
     if !root.is_dir() {
-        return Err("项目目录不存在".into());
+        return Err(tr!("项目目录不存在", "The project folder does not exist").into());
     }
     Ok(root)
 }
@@ -85,13 +85,17 @@ pub async fn project_file(root: &Path, relative: &str) -> Result<PathBuf, String
             .components()
             .any(|c| !matches!(c, Component::Normal(_)))
     {
-        return Err("无效的项目内文件路径".into());
+        return Err(tr!("无效的项目内文件路径", "Invalid file path in the project").into());
     }
     let path = tokio::fs::canonicalize(root.join(relative))
         .await
         .map_err(|e| e.to_string())?;
     if !path.starts_with(root) {
-        return Err("文件超出当前项目".into());
+        return Err(tr!(
+            "文件超出当前项目",
+            "The file is outside the current project"
+        )
+        .into());
     }
     Ok(path)
 }
@@ -106,7 +110,11 @@ async fn store_path(project: &str) -> Result<PathBuf, String> {
         .map_err(|e| e.to_string())?
         .starts_with(&root)
     {
-        return Err("批注目录不在项目中".into());
+        return Err(tr!(
+            "批注目录不在项目中",
+            "The annotation folder is not in the project"
+        )
+        .into());
     }
     let path = dir.join("pdf-annotations.json");
     if path.exists()
@@ -115,14 +123,23 @@ async fn store_path(project: &str) -> Result<PathBuf, String> {
             .map_err(|e| e.to_string())?
             .starts_with(&root)
     {
-        return Err("批注文件不在项目中".into());
+        return Err(tr!(
+            "批注文件不在项目中",
+            "The annotation file is not in the project"
+        )
+        .into());
     }
     Ok(path)
 }
 pub async fn load(project: &str) -> Result<Vec<Annotation>, String> {
     let path = store_path(project).await?;
     match tokio::fs::read(&path).await {
-        Ok(b) => serde_json::from_slice(&b).map_err(|e| format!("批注文件损坏，已保留原文件：{e}")),
+        Ok(b) => serde_json::from_slice(&b).map_err(|e| {
+            trf!(
+                "批注文件损坏，已保留原文件：{e}",
+                "The annotation file is damaged; the original file was kept: {e}"
+            )
+        }),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
         Err(e) => Err(e.to_string()),
     }
@@ -212,7 +229,7 @@ pub async fn locate(
                         .replace('\\', "/");
                     return Ok((
                         Some(context_at(file, &text, hit.line, "synctex")),
-                        "SyncTeX 定位；修改前请核对选中文字和当前源码。".into(),
+                        tr!("SyncTeX 定位；修改前请核对选中文字和当前源码。", "Located with SyncTeX; check the selected text against the current source before editing.").into(),
                     ));
                 }
             }
@@ -276,10 +293,14 @@ pub async fn locate(
     if candidates.len() == 1 {
         Ok((
             candidates.pop(),
-            "通过唯一段落文字匹配定位；请核对 LaTeX 命令与引用。".into(),
+            tr!(
+                "通过唯一段落文字匹配定位；请核对 LaTeX 命令与引用。",
+                "Located by a unique passage match; check LaTeX commands and citations."
+            )
+            .into(),
         ))
     } else {
-        Ok((None,format!("未可靠定位源码（{}）；已保留 PDF 页码、选文和坐标，请 AI 按原文核对，不要猜测行号。",hit.err().unwrap_or_else(||"匹配存在歧义".into()))))
+        Ok((None,trf!("未可靠定位源码（{}）；已保留 PDF 页码、选文和坐标，请 AI 按原文核对，不要猜测行号。", "The source could not be located reliably ({}); the PDF page, selected text and coordinates were kept. The AI should check against the text instead of guessing line numbers.",hit.err().unwrap_or_else(||tr!("匹配存在歧义", "the match is ambiguous").into()))))
     }
 }
 #[tauri::command]
@@ -306,7 +327,11 @@ pub async fn add_annotation(
         || annotation.marks.is_empty()
         || annotation.marks.len() > 200
     {
-        return Err("请选择 PDF 文字并填写批注（选文上限 20000 字节）".into());
+        return Err(tr!(
+            "请选择 PDF 文字并填写批注（选文上限 20000 字节）",
+            "Select PDF text and write an annotation (selection limit 20000 bytes)"
+        )
+        .into());
     }
     for m in &annotation.marks {
         if m.page == 0
@@ -322,7 +347,7 @@ pub async fn add_annotation(
             || m.page_width <= 0.
             || m.page_height <= 0.
         {
-            return Err("无效的 PDF 选区坐标".into());
+            return Err(tr!("无效的 PDF 选区坐标", "Invalid PDF selection coordinates").into());
         }
     }
     let (source, note) = locate(
@@ -355,7 +380,7 @@ pub async fn add_annotation(
         &project,
         &previous,
         &items,
-        "Writer PDF · 保存批注",
+        tr!("Writer PDF · 保存批注", "Writer PDF · Save annotation"),
         &[event_id],
     )
     .await?;
@@ -372,7 +397,10 @@ pub async fn update_annotation(
     let _guard = LOCK.lock().await;
     let mut items = load(&project).await?;
     let previous = items.clone();
-    let item = items.iter_mut().find(|a| a.id == id).ok_or("找不到批注")?;
+    let item = items
+        .iter_mut()
+        .find(|a| a.id == id)
+        .ok_or(tr!("找不到批注", "Annotation not found"))?;
     let old_comment = item.comment.clone();
     let old_resolution = item.resolution.clone();
     let old_resolved = item.resolved;
@@ -385,7 +413,11 @@ pub async fn update_annotation(
     };
     if let Some(comment) = comment {
         if comment.trim().is_empty() || comment.len() > 10000 {
-            return Err("批注不能为空或过长".into());
+            return Err(tr!(
+                "批注不能为空或过长",
+                "Annotations must not be empty or too long"
+            )
+            .into());
         }
         if item.comment != comment {
             item.resolved = false;
@@ -417,9 +449,12 @@ pub async fn update_annotation(
         &previous,
         &items,
         if action == "resolved" {
-            "Writer PDF · 解决批注与修改后版本"
+            tr!(
+                "Writer PDF · 解决批注与修改后版本",
+                "Writer PDF · Resolve annotation and edited version"
+            )
         } else {
-            "Writer PDF · 更新批注"
+            tr!("Writer PDF · 更新批注", "Writer PDF · Update annotation")
         },
         &[event_id],
     )
@@ -452,9 +487,12 @@ pub(crate) async fn commit_change(
         Ok(version) => Ok(version.hash),
         Err(error) => {
             save(project, previous).await.map_err(|restore| {
-                format!("Git 保存失败：{error}；批注回退也失败：{restore}。请保留项目并重试。")
+                trf!("Git 保存失败：{error}；批注回退也失败：{restore}。请保留项目并重试。", "Git save failed: {error}; restoring the annotations also failed: {restore}. Keep the project as it is and try again.")
             })?;
-            Err(format!("Git 版本保存失败，批注状态未更改：{error}"))
+            Err(trf!(
+                "Git 版本保存失败，批注状态未更改：{error}",
+                "Could not save a Git version; the annotation status was not changed: {error}"
+            ))
         }
     }
 }
@@ -489,7 +527,10 @@ async fn ensure_versions(project: &str) -> Result<(), String> {
             project,
             &previous,
             &items,
-            "Writer PDF · 现有批注基线",
+            tr!(
+                "Writer PDF · 现有批注基线",
+                "Writer PDF · Existing annotation baseline"
+            ),
             &events,
         )
         .await?;
@@ -498,7 +539,7 @@ async fn ensure_versions(project: &str) -> Result<(), String> {
 }
 async fn prepare_annotations(project: &str, ids: &[String], backend: &str) -> Result<(), String> {
     if ids.is_empty() || ids.len() > 100 || super::harness::Harness::parse(backend).is_err() {
-        return Err("无效的批注提交".into());
+        return Err(tr!("无效的批注提交", "Invalid annotation submission").into());
     }
     let _guard = LOCK.lock().await;
     let mut items = load(project).await?;
@@ -508,9 +549,13 @@ async fn prepare_annotations(project: &str, ids: &[String], backend: &str) -> Re
         let item = items
             .iter_mut()
             .find(|item| item.id == *id)
-            .ok_or("批注不存在")?;
+            .ok_or(tr!("批注不存在", "The annotation does not exist"))?;
         if item.resolved {
-            return Err("已解决的批注请先重新打开".into());
+            return Err(tr!(
+                "已解决的批注请先重新打开",
+                "Reopen a resolved annotation first"
+            )
+            .into());
         }
         item.submitted_to = Some(backend.into());
         record(item, "submitted");
@@ -520,7 +565,10 @@ async fn prepare_annotations(project: &str, ids: &[String], backend: &str) -> Re
         project,
         &previous,
         &items,
-        "Writer PDF · 提交批注与修改前版本",
+        tr!(
+            "Writer PDF · 提交批注与修改前版本",
+            "Writer PDF · Submit annotations and version before edits"
+        ),
         &events,
     )
     .await?;

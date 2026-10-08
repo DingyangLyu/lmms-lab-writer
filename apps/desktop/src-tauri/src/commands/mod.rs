@@ -6,6 +6,7 @@ pub mod fs;
 pub mod git;
 pub mod git_snapshots;
 pub mod latex;
+pub mod locale;
 pub mod opencode;
 pub mod saving;
 pub mod terminal;

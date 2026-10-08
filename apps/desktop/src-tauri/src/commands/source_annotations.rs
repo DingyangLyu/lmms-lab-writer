@@ -32,12 +32,16 @@ pub async fn create(project: &str, draft: NewTextAnnotation) -> Result<Annotatio
         || draft.comment.len() > 10000
         || !["highlight", "underline"].contains(&draft.style.as_str())
     {
-        return Err("请选择文字并填写批注".into());
+        return Err(tr!(
+            "请选择文字并填写批注",
+            "Select text and write an annotation"
+        )
+        .into());
     }
     let mut quote = vec![];
     for range in &draft.ranges {
         if range.start >= range.end || range.text.len() > 20000 {
-            return Err("选区为空或过长".into());
+            return Err(tr!("选区为空或过长", "The selection is empty or too long").into());
         }
         document_merge::locate_range(&draft.base, &draft.base, range)?;
         quote.push(range.text.clone());
@@ -67,7 +71,11 @@ pub async fn create(project: &str, draft: NewTextAnnotation) -> Result<Annotatio
         created_at: now(),
         resolved: false,
         source: Some(source),
-        mapping_note: "文本选区；位置随文档版本重新定位。".into(),
+        mapping_note: tr!(
+            "文本选区；位置随文档版本重新定位。",
+            "Text selection; its position is re-located for each document version."
+        )
+        .into(),
         resolution: String::new(),
         events: vec![],
         submitted_to: None,
@@ -82,7 +90,10 @@ pub async fn create(project: &str, draft: NewTextAnnotation) -> Result<Annotatio
         project,
         &previous,
         &items,
-        "Writer · 保存文本批注与原文版本",
+        tr!(
+            "Writer · 保存文本批注与原文版本",
+            "Writer · Save text annotation and original version"
+        ),
         &[event],
     )
     .await?;
@@ -186,7 +197,11 @@ pub async fn annotation_marks_for_document(
     content: String,
 ) -> Result<Vec<SourceMark>, String> {
     if content.len() > 2_000_000 {
-        return Err("文件过大，无法显示批注标记".into());
+        return Err(tr!(
+            "文件过大，无法显示批注标记",
+            "The file is too large to show annotation marks"
+        )
+        .into());
     }
     let notes = annotations::load(&project).await?;
     let mut result = vec![];
@@ -311,13 +326,13 @@ pub async fn apply_edit(
     let note = items
         .iter_mut()
         .find(|n| n.id == request.id)
-        .ok_or("批注不存在")?;
+        .ok_or(tr!("批注不存在", "The annotation does not exist"))?;
     if note.resolved {
         return Ok(serde_json::json!({"status":"already_resolved"}));
     }
     if annotation_revision(note) != request.annotation_revision {
         return Ok(
-            serde_json::json!({"status":"annotation_changed","message":"批注要求已更新，请重新读取后再修改。"}),
+            serde_json::json!({"status":"annotation_changed","message":tr!("批注要求已更新，请重新读取后再修改。", "The annotation request was updated; read it again before editing.")}),
         );
     }
     let base = document_merge::revision(project, &request.base_revision, &request.file).await?;
@@ -333,15 +348,22 @@ pub async fn apply_edit(
     .await?;
     if result.status == "reviewed" {
         return Ok(
-            serde_json::json!({"status":"already_reviewed","message":"用户已经处理此提案，请读取合并后的文稿；不要重复应用旧提案。"}),
+            serde_json::json!({"status":"already_reviewed","message":tr!("用户已经处理此提案，请读取合并后的文稿；不要重复应用旧提案。", "The user has already handled this proposal; read the merged manuscript and do not apply the old proposal again.")}),
         );
     }
     if result.status == "conflict" {
         emit(app, "writer://conflicts-changed", project);
-        super::git_snapshots::create_snapshot(project, Some("Writer · 保存待合并的批注修改"), &[])
-            .await?;
+        super::git_snapshots::create_snapshot(
+            project,
+            Some(tr!(
+                "Writer · 保存待合并的批注修改",
+                "Writer · Save annotation edits waiting to merge"
+            )),
+            &[],
+        )
+        .await?;
         return Ok(
-            serde_json::json!({"status":"conflict","conflictId":result.conflict.as_ref().map(|c|&c.id),"message":"双方修改已保存，文件未被覆盖。请等待冲突处理，可先处理其他批注。"}),
+            serde_json::json!({"status":"conflict","conflictId":result.conflict.as_ref().map(|c|&c.id),"message":tr!("双方修改已保存，文件未被覆盖。请等待冲突处理，可先处理其他批注。", "Both sets of changes were saved and the file was not overwritten. Wait for the conflict to be handled; you can work on other annotations meanwhile.")}),
         );
     }
     let current = document_merge::snapshot(project, &request.file, &result.content).await?;
@@ -381,7 +403,10 @@ pub async fn apply_edit(
         project,
         &previous,
         &items,
-        "Writer · 合并批注修改与当前文稿",
+        tr!(
+            "Writer · 合并批注修改与当前文稿",
+            "Writer · Merge annotation edits with the current manuscript"
+        ),
         &[event],
     )
     .await
@@ -405,13 +430,16 @@ pub async fn resolve(
     let _guard = annotations::LOCK.lock().await;
     let previous = annotations::load(project).await?;
     let mut items = previous.clone();
-    let note = items.iter_mut().find(|n| n.id == id).ok_or("批注不存在")?;
+    let note = items
+        .iter_mut()
+        .find(|n| n.id == id)
+        .ok_or(tr!("批注不存在", "The annotation does not exist"))?;
     if note.resolved {
         return Ok(serde_json::json!({"resolved":true,"status":"already_resolved"}));
     }
     if expected_annotation.is_some_and(|v| v != annotation_revision(note)) {
         return Ok(
-            serde_json::json!({"resolved":false,"status":"annotation_changed","message":"批注要求有更新，请读取最新要求。"}),
+            serde_json::json!({"resolved":false,"status":"annotation_changed","message":tr!("批注要求有更新，请读取最新要求。", "The annotation request changed; read the latest request.")}),
         );
     }
     let conflicts = document_merge::list_document_conflicts(project.into()).await?;
@@ -422,7 +450,7 @@ pub async fn resolve(
         .collect();
     if !pending.is_empty() {
         return Ok(
-            serde_json::json!({"resolved":false,"status":"conflict","conflicts":pending,"message":"此批注仍有未合并提案，暂不标记完成。"}),
+            serde_json::json!({"resolved":false,"status":"conflict","conflicts":pending,"message":tr!("此批注仍有未合并提案，暂不标记完成。", "This annotation still has unmerged proposals, so it is not marked done yet.")}),
         );
     }
     if let (Some(expected), Some(source)) = (expected_source, note.source.as_ref()) {
@@ -448,7 +476,7 @@ pub async fn resolve(
             };
             if !unchanged {
                 return Ok(
-                    serde_json::json!({"resolved":false,"status":"source_changed","sourceRevision":current.id,"message":"目标段落在核验后又改变，请读取当前版本核验后再标记；不需要用户重新选择。"}),
+                    serde_json::json!({"resolved":false,"status":"source_changed","sourceRevision":current.id,"message":tr!("目标段落在核验后又改变，请读取当前版本核验后再标记；不需要用户重新选择。", "The target passage changed after it was checked; read the current version and check again before marking it. The user does not need to reselect.")}),
                 );
             }
         }
@@ -462,7 +490,10 @@ pub async fn resolve(
         project,
         &previous,
         &items,
-        "Writer · 完成批注与修改后版本",
+        tr!(
+            "Writer · 完成批注与修改后版本",
+            "Writer · Complete annotation and edited version"
+        ),
         &[event],
     )
     .await?;
@@ -482,7 +513,7 @@ pub async fn reanchor(
     let range = if let Some(start) = start {
         let end = start
             .checked_add(quote.encode_utf16().count())
-            .ok_or("无效选区偏移")?;
+            .ok_or(tr!("无效选区偏移", "Invalid selection offset"))?;
         let r = AnchorRange {
             start,
             end,
@@ -491,13 +522,19 @@ pub async fn reanchor(
         document_merge::locate_range(&base.content, &base.content, &r)?;
         r
     } else {
-        range_for_context(&base.content, quote).ok_or("原文不唯一，请提供 start 精确定位。")?
+        range_for_context(&base.content, quote).ok_or(tr!(
+            "原文不唯一，请提供 start 精确定位。",
+            "The original text is not unique; give start to locate it exactly."
+        ))?
     };
     let located = document_merge::locate_range(&base.content, &base.content, &range)?;
     let _guard = annotations::LOCK.lock().await;
     let previous = annotations::load(project).await?;
     let mut items = previous.clone();
-    let note = items.iter_mut().find(|n| n.id == id).ok_or("批注不存在")?;
+    let note = items
+        .iter_mut()
+        .find(|n| n.id == id)
+        .ok_or(tr!("批注不存在", "The annotation does not exist"))?;
     note.source = Some(annotations::context_at(
         file.into(),
         &base.content,
@@ -515,7 +552,10 @@ pub async fn reanchor(
         project,
         &previous,
         &items,
-        "Writer · 更新批注定位",
+        tr!(
+            "Writer · 更新批注定位",
+            "Writer · Update annotation location"
+        ),
         &[event],
     )
     .await?;

@@ -60,14 +60,20 @@ async fn git(project: &str, args: &[&str], index: Option<&Path>) -> Result<Strin
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
-    String::from_utf8(output.stdout).map_err(|_| "此版本含二进制内容，无法作为文本读取".into())
+    String::from_utf8(output.stdout).map_err(|_| {
+        tr!(
+            "此版本含二进制内容，无法作为文本读取",
+            "This version has binary content and cannot be read as text"
+        )
+        .into()
+    })
 }
 async fn repo_root(project: &str, initialize: bool) -> Result<bool, String> {
     let canonical = tokio::fs::canonicalize(project)
         .await
         .map_err(|e| e.to_string())?;
     if !canonical.is_dir() {
-        return Err("项目目录不存在".into());
+        return Err(tr!("项目目录不存在", "The project folder does not exist").into());
     }
     match git(project, &["rev-parse", "--show-toplevel"], None).await {
         Ok(root) => {
@@ -103,7 +109,11 @@ async fn init_private(project: &str) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
     if !meta.is_dir() || meta.file_type().is_symlink() {
-        return Err(".writer 不能是链接或普通文件".into());
+        return Err(tr!(
+            ".writer 不能是链接或普通文件",
+            ".writer must not be a link or a regular file"
+        )
+        .into());
     }
     let dir = private_dir(project);
     let output = command("git")
@@ -267,7 +277,7 @@ async fn snapshot_with_index(
     }
     let message = format!(
         "{}\n\nSource-HEAD: {}\n{}",
-        label.unwrap_or("Writer 论文版本"),
+        label.unwrap_or(tr!("Writer 论文版本", "Writer paper version")),
         head.as_deref().unwrap_or("unborn"),
         events
             .iter()
@@ -364,7 +374,7 @@ pub async fn git_snapshot_history(project: String) -> Result<Vec<SnapshotEntry>,
 async fn validate_snapshot(project: &str, hash: &str) -> Result<(), String> {
     repo_root(project, false).await?;
     if ![40, 64].contains(&hash.len()) || !hash.bytes().all(|c| c.is_ascii_hexdigit()) {
-        return Err("无效版本号".into());
+        return Err(tr!("无效版本号", "Invalid version").into());
     }
     git(
         project,
@@ -393,8 +403,9 @@ pub async fn git_snapshot_diff(project: String, hash: String) -> Result<String, 
     )
     .await?;
     if diff.chars().count() > 150_000 {
-        Ok(format!(
+        Ok(trf!(
             "{}\n…差异过长，已截断预览。",
+            "{}\n… The diff is too long; the preview was truncated.",
             diff.chars().take(150_000).collect::<String>()
         ))
     } else {
@@ -413,7 +424,7 @@ pub async fn git_snapshot_file(
             .components()
             .any(|part| !matches!(part, Component::Normal(_)))
     {
-        return Err("无效项目文件路径".into());
+        return Err(tr!("无效项目文件路径", "Invalid project file path").into());
     }
     git(&project, &["show", &format!("{hash}:{path}")], None).await
 }
@@ -425,7 +436,7 @@ pub async fn git_snapshot_bytes(project: &str, hash: &str, path: &str) -> Result
             .components()
             .any(|part| !matches!(part, Component::Normal(_)))
     {
-        return Err("无效项目文件路径".into());
+        return Err(tr!("无效项目文件路径", "Invalid project file path").into());
     }
     let output = git_command(project)
         .await
@@ -434,10 +445,14 @@ pub async fn git_snapshot_bytes(project: &str, hash: &str, path: &str) -> Result
         .await
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err("该历史版本没有保存原 PDF".into());
+        return Err(tr!(
+            "该历史版本没有保存原 PDF",
+            "This version did not save its PDF"
+        )
+        .into());
     }
     if output.stdout.len() > 256 * 1024 * 1024 {
-        return Err("历史 PDF 过大".into());
+        return Err(tr!("历史 PDF 过大", "The PDF of this version is too large").into());
     }
     Ok(output.stdout)
 }
