@@ -27,6 +27,8 @@ services:
       - "127.0.0.1:${WRITER_PORT:-8787}:8787"
     environment:
       WRITER_ORIGIN: "${WRITER_ORIGIN:-http://127.0.0.1:8787}"
+      # 1 when the caddy service below (or another proxy) forwards the requests.
+      WRITER_TRUST_PROXY: "${WRITER_TRUST_PROXY:-0}"
       WRITER_ADMIN_USER: "${WRITER_ADMIN_USER:-writer}"
       WRITER_ADMIN_PASSWORD: "${WRITER_ADMIN_PASSWORD:?Set an initial admin password of at least 12 characters}"
       WRITER_DATABASE_URL: "postgres://writer:${WRITER_POSTGRES_PASSWORD}@postgres:5432/writer"
@@ -71,6 +73,26 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+  # Public HTTPS with automatic certificates: docker compose --profile https up -d
+  # Needs WRITER_DOMAIN, WRITER_ORIGIN=https://<domain> and WRITER_TRUST_PROXY=1 in .env.
+  caddy:
+    profiles: [https]
+    image: caddy:2-alpine
+    depends_on:
+      - writer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      WRITER_DOMAIN: "${WRITER_DOMAIN:-}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
   tex-image:
     profiles: [tools]
     image: writer-tex:local
@@ -81,3 +103,5 @@ volumes:
   writer-postgres:
   writer-backups:
   writer-data:
+  caddy-data:
+  caddy-config:

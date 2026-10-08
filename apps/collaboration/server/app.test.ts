@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
-import { createWriterServer } from "./app";
+import { createWriterServer, type Options } from "./app";
 import { sql } from "./db";
 import { AUTOMATIC_SNAPSHOTS } from "./store";
 
@@ -36,7 +36,7 @@ async function database(dir: string) {
   url.pathname = `/${name}`;
   return { url: url.toString(), drop: () => admin(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`) };
 }
-async function fixture() {
+async function fixture(options: Partial<Options> = {}) {
   const dir = await mkdtemp(join(tmpdir(), "writer-collab-test-"));
   const db = await database(dir);
   let app = await createWriterServer({
@@ -44,6 +44,7 @@ async function fixture() {
     port: 0,
     adminUser: "owner",
     adminPassword: "test-password-1234",
+    ...options,
   });
   cleanups.push(async () => {
     await app.close();
@@ -143,6 +144,30 @@ async function fixture() {
   };
 }
 describe("real collaboration service", () => {
+  it("rate-limits sign-in per client, trusting X-Forwarded-For only behind a proxy", async () => {
+    const attempt = async (f: Awaited<ReturnType<typeof fixture>>, forwardedFor: string) =>
+      (
+        await fetch(`${f.app.origin}/api/login`, {
+          method: "POST",
+          headers: {
+            Origin: f.app.origin,
+            "Content-Type": "application/json",
+            "X-Forwarded-For": forwardedFor,
+          },
+          body: JSON.stringify({ username: "owner", password: "wrong-password-0000" }),
+        })
+      ).status;
+    const proxied = await fixture({ trustProxy: true });
+    // The proxy appends the address it saw; a client-supplied first entry does not pick the bucket.
+    for (let i = 0; i < 12; i++)
+      expect(await attempt(proxied, "198.51.100.7, 203.0.113.5")).toBe(401);
+    expect(await attempt(proxied, "203.0.113.5")).toBe(429);
+    expect(await attempt(proxied, "203.0.113.6")).toBe(401);
+    const direct = await fixture();
+    const statuses: number[] = [];
+    for (let i = 0; i < 13; i++) statuses.push(await attempt(direct, `203.0.113.${i}`));
+    expect(statuses).toContain(429);
+  });
   it("leases shared tasks only to scoped runners and submits AI changes as unapplied proposals", async () => {
     const f = await fixture();
     const file = (

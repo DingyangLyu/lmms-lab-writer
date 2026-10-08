@@ -1,0 +1,8 @@
+# HTTPS in front of Writer. Caddy obtains and renews the certificate for WRITER_DOMAIN
+# through ports 80 and 443, which must reach this machine from the internet.
+{$WRITER_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Also proxies the realtime WebSocket; X-Forwarded-For carries the client address.
+	reverse_proxy writer:8787
+}

@@ -50,6 +50,8 @@ export type Services = {
   collab: Collaboration;
   compiler: Compiler;
   origin: () => string;
+  /** Behind a reverse proxy: take the client address from its X-Forwarded-For. */
+  trustProxy: boolean;
 };
 export type Context = Services & {
   req: IncomingMessage;
@@ -59,6 +61,8 @@ export type Context = Services & {
   /** JSON request body, read once on first use. */
   body: () => Promise<Body>;
   secure: boolean;
+  /** Client address, used to rate-limit sign-in attempts. */
+  ip: string;
 };
 export type Authed = Context & { user: User };
 export type InProject = Authed & {
@@ -67,6 +71,18 @@ export type InProject = Authed & {
   /** Throws 403 unless the member's role allows `minimum`. */
   need: (minimum: Access) => Promise<Role>;
 };
+/** The proxy appends the address it saw last, so earlier (client-supplied) entries are ignored. */
+export function clientAddress(req: IncomingMessage, trustProxy: boolean) {
+  const forwarded = trustProxy ? req.headers["x-forwarded-for"] : undefined;
+  const last = [forwarded ?? []]
+    .flat()
+    .join(",")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .at(-1);
+  return last || req.socket.remoteAddress || "unknown";
+}
 export function context(services: Services, req: IncomingMessage, res: ServerResponse): Context {
   let body: Promise<Body> | null = null;
   return {
@@ -80,6 +96,7 @@ export function context(services: Services, req: IncomingMessage, res: ServerRes
       return body;
     },
     secure: services.origin().startsWith("https:"),
+    ip: clientAddress(req, services.trustProxy),
   };
 }
 

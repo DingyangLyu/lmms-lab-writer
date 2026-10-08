@@ -20,7 +20,7 @@ export async function sessionRoutes() {
   // Unknown usernames still pay the scrypt cost, so login timing does not reveal accounts.
   const decoy = await passwordHash(randomBytes(16).toString("hex"));
   const limit = (ctx: Context) => {
-    const ip = ctx.req.socket.remoteAddress ?? "unknown",
+    const ip = ctx.ip,
       old = attempts.get(ip),
       attempt = old && Date.now() - old.at < 60000 ? old : { at: Date.now(), count: 0 };
     attempts.set(ip, attempt);

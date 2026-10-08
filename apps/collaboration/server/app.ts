@@ -27,6 +27,8 @@ export type Options = {
   host?: string;
   port?: number;
   origin?: string;
+  /** Set when a reverse proxy (Caddy, nginx) forwards the requests. */
+  trustProxy?: boolean;
   staticDirectory?: string;
   compile?: CompileOptions;
 };
@@ -100,6 +102,7 @@ export async function createWriterServer(options: Options) {
     collab,
     compiler: new Compiler(store, options.compile),
     origin: () => origin,
+    trustProxy: options.trustProxy ?? false,
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
