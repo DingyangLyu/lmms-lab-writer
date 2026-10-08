@@ -102,4 +102,9 @@ pub fn install(app: &AppHandle) {
             c"Q@:@".as_ptr(),
         );
     }
+    // AppKit may record which optional delegate methods exist when the delegate is assigned;
+    // assign it again so it sees the ones just added.
+    let ns_app = NSApplication::sharedApplication(mtm);
+    ns_app.setDelegate(None);
+    ns_app.setDelegate(Some(&delegate));
 }
