@@ -103,6 +103,7 @@ pub fn run() {
             commands::collab::collab_connect,
             commands::collab::collab_send,
             commands::collab::collab_close,
+            commands::collab::collab_set_locale,
             commands::collab::collab_runner_get,
             commands::collab::collab_runner_register,
             commands::collab::collab_runner_unregister,

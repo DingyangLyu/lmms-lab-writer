@@ -44,6 +44,8 @@ pub struct RunnerInfo {
 
 #[derive(Default)]
 pub struct CollabState {
+    /// The interface language, so the server words its errors to match ("zh" or "en").
+    locale: Mutex<String>,
     accounts: tokio::sync::Mutex<Option<Vec<Account>>>,
     runners: tokio::sync::Mutex<Option<Vec<RunnerAccount>>>,
     sockets: Mutex<HashMap<u64, mpsc::UnboundedSender<Message>>>,
@@ -136,11 +138,30 @@ async fn token_for(app: &AppHandle, state: &CollabState, server: &str) -> Result
         .ok_or_else(|| failure(401, "尚未登录这个协作服务器"))
 }
 
-fn client() -> Result<reqwest::Client, String> {
+fn locale(state: &CollabState) -> String {
+    state
+        .locale
+        .lock()
+        .map(|l| if l.as_str() == "en" { "en" } else { "zh" }.to_string())
+        .unwrap_or_else(|_| "zh".into())
+}
+
+fn client(state: &CollabState) -> Result<reqwest::Client, String> {
+    let mut headers = reqwest::header::HeaderMap::new();
+    if let Ok(value) = locale(state).parse() {
+        headers.insert("X-Writer-Locale", value);
+    }
     reqwest::Client::builder()
         .timeout(Duration::from_secs(120))
+        .default_headers(headers)
         .build()
         .map_err(|e| failure(0, e.to_string()))
+}
+
+#[tauri::command]
+pub fn collab_set_locale(state: State<'_, CollabState>, locale: String) -> Result<(), String> {
+    *state.locale.lock().map_err(|e| e.to_string())? = locale;
+    Ok(())
 }
 
 async fn send(request: reqwest::RequestBuilder) -> Result<Value, String> {
@@ -172,7 +193,7 @@ pub async fn collab_sign_in(
 ) -> Result<AccountInfo, String> {
     let server = server_origin(&server)?;
     let issued = send(
-        client()?
+        client(&state)?
             .post(format!("{server}/api/tokens"))
             .json(&json!({ "username": username, "password": password, "name": device })),
     )
@@ -205,7 +226,7 @@ pub async fn collab_sign_out(
     let list = guard.get_or_insert_with(Vec::new);
     if let Some(account) = list.iter().find(|a| a.server == server) {
         // Revoke it on the server too; offline, it simply expires there.
-        if let Ok(client) = client() {
+        if let Ok(client) = client(&state) {
             let _ = send(
                 client
                     .delete(format!("{server}/api/tokens/current"))
@@ -250,7 +271,7 @@ pub async fn collab_request(
     let token = token_for(&app, &state, &server).await?;
     let method = reqwest::Method::from_bytes(method.as_bytes())
         .map_err(|_| failure(400, "无效的请求方法"))?;
-    let mut request = client()?
+    let mut request = client(&state)?
         .request(method, format!("{server}{path}"))
         .bearer_auth(token);
     if let Some(body) = body {
@@ -345,12 +366,14 @@ pub async fn collab_connect(
         .lock()
         .map_err(|e| e.to_string())?
         .insert(id, sender);
+    let separator = if path.contains('?') { '&' } else { '?' };
     let url = format!(
-        "{}{}",
+        "{}{}{separator}locale={}",
         server
             .replacen("https://", "wss://", 1)
             .replacen("http://", "ws://", 1),
-        path
+        path,
+        locale(&state)
     );
     tauri::async_runtime::spawn(async move {
         let emitter = app.clone();
@@ -539,7 +562,7 @@ pub async fn collab_runner_register(
     let project = project_id(&project)?.to_string();
     let token = token_for(&app, &state, &server).await?;
     let created = send(
-        client()?
+        client(&state)?
             .post(format!("{server}/api/projects/{project}/runners"))
             .bearer_auth(token)
             .json(&json!({ "name": name, "capabilities": capabilities })),
@@ -580,7 +603,7 @@ pub async fn collab_runner_unregister(
         .find(|r| r.server == server && r.project == project)
     {
         // Also remove it on the server; offline, the owner can delete it on the web page.
-        if let (Ok(token), Ok(client)) = (token_for(&app, &state, &server).await, client()) {
+        if let (Ok(token), Ok(client)) = (token_for(&app, &state, &server).await, client(&state)) {
             let _ = send(
                 client
                     .delete(format!(
@@ -619,7 +642,7 @@ pub async fn collab_runner_call(
             .ok_or_else(|| failure(401, "这台电脑不是该项目的执行器"))?
     };
     let result = send(
-        client()?
+        client(&state)?
             .post(format!("{server}/api/runner/{action}"))
             .bearer_auth(token)
             .json(&body),

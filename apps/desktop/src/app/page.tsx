@@ -144,7 +144,11 @@ export default function EditorPage() {
   });
   const prefersReducedMotion = useReducedMotion();
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  // Collaboration servers word their errors in the interface language.
+  useEffect(() => {
+    void invoke("collab_set_locale", { locale }).catch(() => {});
+  }, [locale]);
   const recentProjects = useRecentProjects();
   const [projectTransition] = useState(() => new ProjectTransition());
   const [choosingProject, setChoosingProject] = useState(false);
