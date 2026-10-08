@@ -22,6 +22,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@lezer/highlight": "^1.2.3",
     "@lmms-lab/latex-editor": "workspace:*",
+    "@lmms-lab/sync": "workspace:*",
     "@lmms-lab/writing": "workspace:*",
     "diff": "^8.0.4",
     "fflate": "^0.8.3",

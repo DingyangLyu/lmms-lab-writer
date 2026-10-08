@@ -363,6 +363,8 @@ export class Collaboration {
             type: "joined",
             file,
             update: base64(Y.encodeStateAsUpdate(room.doc, vector)),
+            // Lets the client send back whatever the server is missing.
+            vector: base64(Y.encodeStateVector(room.doc)),
           });
         });
       } else if (msg.type === "leave") {
