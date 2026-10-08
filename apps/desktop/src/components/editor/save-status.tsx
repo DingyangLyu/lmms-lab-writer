@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ask, save } from "@tauri-apps/plugin-dialog";
 import { type ReactNode, useState } from "react";
 import type { DocumentSave, SaveManager } from "@/lib/editor/save-manager";
+import { useI18n } from "@/lib/i18n";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import { AnnotationManager } from "./annotation-manager";
 import { BibliographyPanel } from "./bibliography-panel";
@@ -44,6 +45,7 @@ export function SaveStatus({
   closeError: string | null;
   clearCloseError: () => void;
 }) {
+  const { t } = useI18n();
   const annotations = useAnnotations();
   const [message, setMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<{
@@ -67,12 +69,12 @@ export function SaveStatus({
   };
   const exportCopy = async (doc: DocumentSave) => {
     const destination = await save({
-      title: "另存恢复副本（请选择新文件名）",
+      title: t("save.saveARecoveryCopyChooseANewFileName"),
       defaultPath: `${doc.project}/${doc.path}.recovered-${Date.now()}.txt`,
     });
     if (destination) {
       await invoke("export_document_copy", { path: destination, content: doc.content });
-      setMessage(`恢复副本已保存到 ${destination}。原草稿仍保留。`);
+      setMessage(t("save.recoveryCopySavedToDestinationTheDraftIs", { destination }));
     }
   };
   return (
@@ -80,19 +82,19 @@ export function SaveStatus({
       <div className="flex flex-wrap items-center gap-3 px-3 py-1.5">
         <span role="status">
           {problems.some((doc) => doc.error)
-            ? "保存失败 · 请处理下方提示"
+            ? t("save.saveFailedSeeBelow")
             : saving
-              ? "正在保存…"
+              ? t("save.saving")
               : pending
-                ? "有未保存修改"
-                : "全部已保存"}
+                ? t("save.unsavedChanges")
+                : t("save.allSaved")}
         </span>
         <button
           type="button"
           className="border border-border px-2 py-1"
           onClick={() => void perform(() => manager.flushAll())}
         >
-          保存全部 ⌘S / Ctrl+S
+          {t("save.saveAllSCtrlS")}
         </button>
         <button
           type="button"
@@ -110,16 +112,18 @@ export function SaveStatus({
             })
           }
         >
-          历史备份
+          {t("save.backups")}
         </button>
         <button
           type="button"
           aria-pressed={highlightAmbiguousUnicode}
-          title="切换易混淆全角标点的方框提示"
+          title={t("save.toggleBoxesAroundEasilyConfusedFullWidth")}
           className="border border-border px-2 py-1 shrink-0 hover:border-foreground"
           onClick={onToggleUnicodeHighlight}
         >
-          字符方框：{highlightAmbiguousUnicode ? "开" : "关"}
+          {t("save.characterBoxesState", {
+            state: highlightAmbiguousUnicode ? t("save.on") : t("save.off"),
+          })}
         </button>
         {project && <AnnotationManager />}
         {project && collaboration}
@@ -169,15 +173,15 @@ export function SaveStatus({
         <div key={`${doc.project}/${doc.path}`} className="border-t border-border px-3 py-2">
           <p className="break-all">
             {doc.path}：
-            {doc.error || doc.draftError || "发现并恢复了未保存草稿。请检查内容，再点击保存。"}
+            {doc.error || doc.draftError || t("save.anUnsavedDraftWasFoundAndRestoredCheckIt")}
           </p>
           {doc.error && doc.draftError && <p>{doc.draftError}</p>}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={() => onOpenDraft(doc.path, doc.content)}>
-              打开草稿
+              {t("save.openDraft")}
             </button>
             <button type="button" onClick={() => void perform(() => manager.flushDocument(doc))}>
-              重试保存
+              {t("save.retrySaving")}
             </button>
             <button
               type="button"
@@ -185,7 +189,7 @@ export function SaveStatus({
                 void exportCopy(doc).catch((error) => setMessage(String(error)));
               }}
             >
-              另存副本
+              {t("save.saveACopy")}
             </button>
             <button
               type="button"
@@ -193,10 +197,10 @@ export function SaveStatus({
               onClick={() =>
                 void perform(async () => {
                   if (
-                    !(await ask(
-                      "放弃这个文件的未保存草稿，重新读取磁盘文件？如需保留草稿，请先另存副本。",
-                      { title: "重新读取磁盘版本", kind: "warning" },
-                    ))
+                    !(await ask(t("save.discardThisFileSUnsavedDraftAndReloadItF"), {
+                      title: t("save.reloadFromDisk"),
+                      kind: "warning",
+                    }))
                   )
                     return;
                   const content = await invoke<string>("read_document", {
@@ -208,7 +212,7 @@ export function SaveStatus({
                 })
               }
             >
-              重新读取磁盘版本
+              {t("save.reloadFromDisk")}
             </button>
           </div>
         </div>
@@ -218,19 +222,19 @@ export function SaveStatus({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="历史备份"
+            aria-label={t("save.backups")}
             className="bg-background border border-border p-5 w-[700px] max-w-[95vw] max-h-[85vh] overflow-auto"
           >
             <div className="flex justify-between gap-3">
-              <strong>历史备份：{history.path}</strong>
+              <strong>{t("save.backupsPath", { path: history.path })}</strong>
               <button type="button" onClick={() => setHistory(null)}>
-                关闭
+                {t("save.close")}
               </button>
             </div>
-            <p className="my-3">
-              每次覆盖保存前保留原文，每个文件保留最近 30 份。选择版本可预览，确认恢复后会自动保存。
-            </p>
-            {history.items.length === 0 && <p>暂无历史版本。首次修改并保存后会出现备份。</p>}
+            <p className="my-3">{t("save.eachSaveKeepsThePreviousTextTheLatest30A")}</p>
+            {history.items.length === 0 && (
+              <p>{t("save.noBackupsYetTheyAppearAfterTheFirstSaved")}</p>
+            )}
             <div className="max-h-40 overflow-auto">
               {history.items.map((item) => (
                 <button
@@ -264,10 +268,10 @@ export function SaveStatus({
                   onClick={() =>
                     void perform(async () => {
                       if (
-                        !(await ask(
-                          "将此历史版本恢复到编辑器？当前未保存的修改会被替换，请先保存或另存副本。",
-                          { title: "恢复历史版本", kind: "warning" },
-                        ))
+                        !(await ask(t("save.restoreThisBackupIntoTheEditorUnsavedCha"), {
+                          title: t("save.restoreBackup"),
+                          kind: "warning",
+                        }))
                       )
                         return;
                       manager.edit(history.project, history.path, preview);
@@ -276,7 +280,7 @@ export function SaveStatus({
                     })
                   }
                 >
-                  恢复此版本
+                  {t("save.restoreThisVersion")}
                 </button>
               </>
             )}

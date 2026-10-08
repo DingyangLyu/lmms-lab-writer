@@ -114,16 +114,19 @@ function SelectField({
 }
 
 function AppearanceToggle() {
+  const { t } = useI18n();
   const { theme, setTheme } = useTheme();
 
   return (
     <div className="py-2">
-      <span className="text-sm font-medium block mb-2 text-foreground-secondary">Color Mode</span>
+      <span className="text-sm font-medium block mb-2 text-foreground-secondary">
+        {t("settings.colorMode")}
+      </span>
       <div className="flex">
         {(
           [
-            { value: "light", label: "Light" },
-            { value: "dark", label: "Dark" },
+            { value: "light", label: t("settings.light") },
+            { value: "dark", label: t("settings.dark") },
           ] as const
         ).map((mode, index) => (
           <button
@@ -140,7 +143,7 @@ function AppearanceToggle() {
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted mt-1.5">Controls the app and editor theme</p>
+      <p className="text-xs text-muted mt-1.5">{t("settings.controlsTheAppAndEditorTheme")}</p>
     </div>
   );
 }
@@ -181,14 +184,16 @@ export function LaTeXSettingsDialog({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div className="flex items-center gap-3">
-              <Dialog.Title className="text-lg font-bold tracking-tight">Settings</Dialog.Title>
+              <Dialog.Title className="text-lg font-bold tracking-tight">
+                {t("settings.settings")}
+              </Dialog.Title>
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Auto-saved
+                {t("settings.autoSaved")}
               </span>
             </div>
             <Dialog.Close
               className="p-1.5 hover:bg-accent-hover transition-colors border border-transparent hover:border-border"
-              aria-label="Close"
+              aria-label={t("settings.close")}
             >
               <XIcon className="size-4" />
             </Dialog.Close>
@@ -205,14 +210,14 @@ export function LaTeXSettingsDialog({
                 value="build"
                 className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative text-muted-foreground hover:text-foreground data-[state=active]:text-foreground"
               >
-                Build
+                {t("settings.build")}
                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
               </Tabs.Trigger>
               <Tabs.Trigger
                 value="editor"
                 className="flex-1 px-4 py-3 text-sm font-medium transition-colors relative text-muted-foreground hover:text-foreground data-[state=active]:text-foreground"
               >
-                Editor
+                {t("settings.editor")}
                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground transition-opacity opacity-0 data-[state=active]:opacity-100" />
               </Tabs.Trigger>
               <Tabs.Trigger
@@ -240,12 +245,12 @@ export function LaTeXSettingsDialog({
                 </select>
               </div>
 
-              <SectionHeader>Appearance</SectionHeader>
+              <SectionHeader>{t("settings.appearance")}</SectionHeader>
 
               {/* Light/Dark Mode Toggle */}
               <AppearanceToggle />
 
-              <SectionHeader>Keybindings</SectionHeader>
+              <SectionHeader>{t("settings.keybindings")}</SectionHeader>
 
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
@@ -261,7 +266,7 @@ export function LaTeXSettingsDialog({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground-secondary">
-                        Vim Mode
+                        {t("settings.vimMode")}
                       </span>
                       {editorSettings.vimMode && (
                         <span className="text-[10px] px-1.5 py-0.5 bg-foreground text-background font-mono font-bold tracking-wider">
@@ -270,7 +275,7 @@ export function LaTeXSettingsDialog({
                       )}
                     </div>
                     <p className="text-xs text-muted mt-0.5">
-                      Modal Vim-style keybindings in editor
+                      {t("settings.modalVimStyleKeybindingsInEditor")}
                     </p>
                   </div>
                 </div>
@@ -280,14 +285,14 @@ export function LaTeXSettingsDialog({
                 />
               </div>
 
-              <SectionHeader>Display</SectionHeader>
+              <SectionHeader>{t("settings.display")}</SectionHeader>
 
               <div className="flex items-center justify-between py-2 gap-4">
                 <label
                   htmlFor="editor-font-family"
                   className="text-sm font-medium text-foreground-secondary shrink-0"
                 >
-                  Font Family
+                  {t("settings.fontFamily")}
                 </label>
                 <input
                   id="editor-font-family"
@@ -298,7 +303,7 @@ export function LaTeXSettingsDialog({
                       fontFamily: e.target.value,
                     })
                   }
-                  placeholder="Default monospace stack"
+                  placeholder={t("settings.defaultMonospaceStack")}
                   className="w-full max-w-sm px-3 py-2 text-sm border border-border hover:border-border-dark focus:outline-none focus:border-foreground font-mono bg-background"
                 />
               </div>
@@ -308,7 +313,7 @@ export function LaTeXSettingsDialog({
                   htmlFor="editor-font-size"
                   className="text-sm font-medium text-foreground-secondary"
                 >
-                  Font Size
+                  {t("settings.fontSize")}
                 </label>
                 <div className="flex items-center border border-border hover:border-border-dark transition-colors">
                   <button
@@ -319,7 +324,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-r border-border"
-                    aria-label="Decrease font size"
+                    aria-label={t("settings.decreaseFontSize")}
                   >
                     <MinusIcon className="size-3" />
                   </button>
@@ -344,7 +349,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-l border-border"
-                    aria-label="Increase font size"
+                    aria-label={t("settings.increaseFontSize")}
                   >
                     <PlusIcon className="size-3" />
                   </button>
@@ -359,7 +364,7 @@ export function LaTeXSettingsDialog({
                   htmlFor="editor-line-height"
                   className="text-sm font-medium text-foreground-secondary"
                 >
-                  Line Height
+                  {t("settings.lineHeight")}
                 </label>
                 <div className="flex items-center border border-border hover:border-border-dark transition-colors">
                   <button
@@ -373,7 +378,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-r border-border"
-                    aria-label="Decrease line height"
+                    aria-label={t("settings.decreaseLineHeight")}
                   >
                     <MinusIcon className="size-3" />
                   </button>
@@ -402,7 +407,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-l border-border"
-                    aria-label="Increase line height"
+                    aria-label={t("settings.increaseLineHeight")}
                   >
                     <PlusIcon className="size-3" />
                   </button>
@@ -410,7 +415,7 @@ export function LaTeXSettingsDialog({
               </div>
 
               <SelectField
-                label="Line Numbers"
+                label={t("settings.lineNumbers")}
                 value={editorSettings.lineNumbers}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -418,15 +423,15 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "on", label: "On" },
-                  { value: "off", label: "Off" },
-                  { value: "relative", label: "Relative" },
-                  { value: "interval", label: "Interval (every 10)" },
+                  { value: "on", label: t("settings.on") },
+                  { value: "off", label: t("settings.off") },
+                  { value: "relative", label: t("settings.relative") },
+                  { value: "interval", label: t("settings.intervalEvery10") },
                 ]}
               />
 
               <SelectField
-                label="Render Whitespace"
+                label={t("settings.renderWhitespace")}
                 value={editorSettings.renderWhitespace}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -434,11 +439,11 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "none", label: "None" },
-                  { value: "boundary", label: "Boundary" },
-                  { value: "selection", label: "Selection" },
-                  { value: "trailing", label: "Trailing" },
-                  { value: "all", label: "All" },
+                  { value: "none", label: t("settings.none") },
+                  { value: "boundary", label: t("settings.boundary") },
+                  { value: "selection", label: t("settings.selection") },
+                  { value: "trailing", label: t("settings.trailing") },
+                  { value: "all", label: t("settings.all") },
                 ]}
               />
 
@@ -455,24 +460,24 @@ export function LaTeXSettingsDialog({
                 <CheckboxItem
                   checked={editorSettings.smoothScrolling}
                   onChange={(v) => onUpdateEditorSettings({ smoothScrolling: v })}
-                  label="Smooth Scrolling"
-                  description="Enable smooth scroll animation"
+                  label={t("settings.smoothScrolling")}
+                  description={t("settings.enableSmoothScrollAnimation")}
                 />
               </div>
 
-              <SectionHeader>Minimap</SectionHeader>
+              <SectionHeader>{t("settings.minimap")}</SectionHeader>
 
               <div className="flex items-center justify-between py-2">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground-secondary">
-                      Enable Minimap
+                      {t("settings.enableMinimap")}
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 border border-border text-muted font-medium uppercase tracking-wider">
-                      Preview
+                      {t("settings.preview")}
                     </span>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">Code overview panel</p>
+                  <p className="text-xs text-muted mt-0.5">{t("settings.codeOverviewPanel")}</p>
                 </div>
                 <Switch
                   checked={editorSettings.minimap.enabled}
@@ -490,7 +495,9 @@ export function LaTeXSettingsDialog({
               {editorSettings.minimap.enabled && (
                 <div className="space-y-1 pl-4 border-l-2 border-border ml-1">
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-foreground-secondary">Position</span>
+                    <span className="text-sm font-medium text-foreground-secondary">
+                      {t("settings.position")}
+                    </span>
                     <div className="flex">
                       {(["left", "right"] as const).map((side, index) => (
                         <button
@@ -510,7 +517,7 @@ export function LaTeXSettingsDialog({
                               : "bg-background text-muted border-border hover:border-border-dark"
                           } ${index === 0 ? "" : "-ml-px"}`}
                         >
-                          {side === "left" ? "Left" : "Right"}
+                          {side === "left" ? t("settings.left") : t("settings.right")}
                         </button>
                       ))}
                     </div>
@@ -518,7 +525,7 @@ export function LaTeXSettingsDialog({
 
                   {/* Size Mode */}
                   <SelectField
-                    label="Size Mode"
+                    label={t("settings.sizeMode")}
                     value={editorSettings.minimap.size}
                     onChange={(v) =>
                       onUpdateEditorSettings({
@@ -529,16 +536,16 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     options={[
-                      { value: "proportional", label: "Proportional" },
-                      { value: "fill", label: "Fill" },
-                      { value: "fit", label: "Fit" },
+                      { value: "proportional", label: t("settings.proportional") },
+                      { value: "fill", label: t("settings.fill") },
+                      { value: "fit", label: t("settings.fit") },
                     ]}
-                    description="How the minimap scales relative to content"
+                    description={t("settings.howTheMinimapScalesRelativeToContent")}
                   />
 
                   {/* Show Slider */}
                   <SelectField
-                    label="Show Slider"
+                    label={t("settings.showSlider")}
                     value={editorSettings.minimap.showSlider}
                     onChange={(v) =>
                       onUpdateEditorSettings({
@@ -549,10 +556,10 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     options={[
-                      { value: "mouseover", label: "On Hover" },
-                      { value: "always", label: "Always" },
+                      { value: "mouseover", label: t("settings.onHover") },
+                      { value: "always", label: t("settings.always") },
                     ]}
-                    description="When to show the viewport indicator"
+                    description={t("settings.whenToShowTheViewportIndicator")}
                   />
 
                   {/* Render Characters */}
@@ -567,17 +574,17 @@ export function LaTeXSettingsDialog({
                           },
                         })
                       }
-                      label="Render Characters"
-                      description="Show actual characters instead of blocks"
+                      label={t("settings.renderCharacters")}
+                      description={t("settings.showActualCharactersInsteadOfBlocks")}
                     />
                   </div>
                 </div>
               )}
 
-              <SectionHeader>Cursor</SectionHeader>
+              <SectionHeader>{t("settings.cursor")}</SectionHeader>
 
               <SelectField
-                label="Cursor Style"
+                label={t("settings.cursorStyle")}
                 value={editorSettings.cursorStyle}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -585,17 +592,17 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "line", label: "Line" },
-                  { value: "line-thin", label: "Line (Thin)" },
-                  { value: "block", label: "Block" },
-                  { value: "block-outline", label: "Block Outline" },
-                  { value: "underline", label: "Underline" },
-                  { value: "underline-thin", label: "Underline (Thin)" },
+                  { value: "line", label: t("settings.line") },
+                  { value: "line-thin", label: t("settings.lineThin") },
+                  { value: "block", label: t("settings.block") },
+                  { value: "block-outline", label: t("settings.blockOutline") },
+                  { value: "underline", label: t("settings.underline") },
+                  { value: "underline-thin", label: t("settings.underlineThin") },
                 ]}
               />
 
               <SelectField
-                label="Cursor Blinking"
+                label={t("settings.cursorBlinking")}
                 value={editorSettings.cursorBlinking}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -603,29 +610,29 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "blink", label: "Blink" },
-                  { value: "smooth", label: "Smooth" },
-                  { value: "phase", label: "Phase" },
-                  { value: "expand", label: "Expand" },
-                  { value: "solid", label: "Solid" },
+                  { value: "blink", label: t("settings.blink") },
+                  { value: "smooth", label: t("settings.smooth") },
+                  { value: "phase", label: t("settings.phase") },
+                  { value: "expand", label: t("settings.expand") },
+                  { value: "solid", label: t("settings.solid") },
                 ]}
               />
 
-              <SectionHeader>Editing</SectionHeader>
+              <SectionHeader>{t("settings.editing")}</SectionHeader>
 
               <SelectField
-                label="Tab Size"
+                label={t("settings.tabSize")}
                 value={editorSettings.tabSize}
                 onChange={(v) => onUpdateEditorSettings({ tabSize: parseInt(v, 10) })}
                 options={[
-                  { value: 2, label: "2 spaces" },
-                  { value: 4, label: "4 spaces" },
-                  { value: 8, label: "8 spaces" },
+                  { value: 2, label: t("settings.2Spaces") },
+                  { value: 4, label: t("settings.4Spaces") },
+                  { value: 8, label: t("settings.8Spaces") },
                 ]}
               />
 
               <SelectField
-                label="Word Wrap"
+                label={t("settings.wordWrap")}
                 value={editorSettings.wordWrap}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -633,10 +640,10 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "off", label: "Off" },
-                  { value: "on", label: "On" },
-                  { value: "wordWrapColumn", label: "Wrap at Column" },
-                  { value: "bounded", label: "Bounded" },
+                  { value: "off", label: t("settings.off") },
+                  { value: "on", label: t("settings.on") },
+                  { value: "wordWrapColumn", label: t("settings.wrapAtColumn") },
+                  { value: "bounded", label: t("settings.bounded") },
                 ]}
               />
 
@@ -647,7 +654,7 @@ export function LaTeXSettingsDialog({
                       htmlFor="editor-word-wrap-column"
                       className="text-sm font-medium text-foreground-secondary"
                     >
-                      Wrap Column
+                      {t("settings.wrapColumn")}
                     </label>
                     <input
                       id="editor-word-wrap-column"
@@ -667,7 +674,7 @@ export function LaTeXSettingsDialog({
               )}
 
               <SelectField
-                label="Auto-close Brackets"
+                label={t("settings.autoCloseBrackets")}
                 value={editorSettings.autoClosingBrackets}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -675,18 +682,18 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "always", label: "Always" },
-                  { value: "languageDefined", label: "Language Defined" },
+                  { value: "always", label: t("settings.always") },
+                  { value: "languageDefined", label: t("settings.languageDefined") },
                   {
                     value: "beforeWhitespace",
-                    label: "Before Whitespace",
+                    label: t("settings.beforeWhitespace"),
                   },
-                  { value: "never", label: "Never" },
+                  { value: "never", label: t("settings.never") },
                 ]}
               />
 
               <SelectField
-                label="Auto-close Quotes"
+                label={t("settings.autoCloseQuotes")}
                 value={editorSettings.autoClosingQuotes}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -694,13 +701,13 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "always", label: "Always" },
-                  { value: "languageDefined", label: "Language Defined" },
+                  { value: "always", label: t("settings.always") },
+                  { value: "languageDefined", label: t("settings.languageDefined") },
                   {
                     value: "beforeWhitespace",
-                    label: "Before Whitespace",
+                    label: t("settings.beforeWhitespace"),
                   },
-                  { value: "never", label: "Never" },
+                  { value: "never", label: t("settings.never") },
                 ]}
               />
 
@@ -708,36 +715,36 @@ export function LaTeXSettingsDialog({
                 <CheckboxItem
                   checked={editorSettings.insertSpaces}
                   onChange={(v) => onUpdateEditorSettings({ insertSpaces: v })}
-                  label="Insert Spaces"
-                  description="Use spaces instead of tabs for indentation"
+                  label={t("settings.insertSpaces")}
+                  description={t("settings.useSpacesInsteadOfTabsForIndentation")}
                 />
               </div>
 
-              <SectionHeader>Formatting</SectionHeader>
+              <SectionHeader>{t("settings.formatting")}</SectionHeader>
 
               <div className="space-y-3">
                 <CheckboxItem
                   checked={editorSettings.formatOnSave}
                   onChange={(v) => onUpdateEditorSettings({ formatOnSave: v })}
-                  label="Format on Save"
-                  description="Automatically format code when saving"
+                  label={t("settings.formatOnSave")}
+                  description={t("settings.automaticallyFormatCodeWhenSaving")}
                 />
                 <CheckboxItem
                   checked={editorSettings.formatOnPaste}
                   onChange={(v) => onUpdateEditorSettings({ formatOnPaste: v })}
-                  label="Format on Paste"
-                  description="Automatically format pasted code"
+                  label={t("settings.formatOnPaste")}
+                  description={t("settings.automaticallyFormatPastedCode")}
                 />
               </div>
 
-              <SectionHeader>Terminal</SectionHeader>
+              <SectionHeader>{t("settings.terminal")}</SectionHeader>
 
               <div className="flex items-center justify-between py-2 gap-4">
                 <label
                   htmlFor="editor-terminal-font-family"
                   className="text-sm font-medium text-foreground-secondary shrink-0"
                 >
-                  Font Family
+                  {t("settings.fontFamily")}
                 </label>
                 <input
                   id="editor-terminal-font-family"
@@ -748,7 +755,7 @@ export function LaTeXSettingsDialog({
                       terminalFontFamily: e.target.value,
                     })
                   }
-                  placeholder="Default monospace stack"
+                  placeholder={t("settings.defaultMonospaceStack")}
                   className="w-full max-w-sm px-3 py-2 text-sm border border-border hover:border-border-dark focus:outline-none focus:border-foreground font-mono bg-background"
                 />
               </div>
@@ -758,7 +765,7 @@ export function LaTeXSettingsDialog({
                   htmlFor="editor-terminal-font-size"
                   className="text-sm font-medium text-foreground-secondary"
                 >
-                  Font Size
+                  {t("settings.fontSize")}
                 </label>
                 <div className="flex items-center border border-border hover:border-border-dark transition-colors">
                   <button
@@ -769,7 +776,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-r border-border"
-                    aria-label="Decrease terminal font size"
+                    aria-label={t("settings.decreaseTerminalFontSize")}
                   >
                     <MinusIcon className="size-3" />
                   </button>
@@ -797,7 +804,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-l border-border"
-                    aria-label="Increase terminal font size"
+                    aria-label={t("settings.increaseTerminalFontSize")}
                   >
                     <PlusIcon className="size-3" />
                   </button>
@@ -812,7 +819,7 @@ export function LaTeXSettingsDialog({
                   htmlFor="editor-terminal-line-height"
                   className="text-sm font-medium text-foreground-secondary"
                 >
-                  Line Height
+                  {t("settings.lineHeight")}
                 </label>
                 <div className="flex items-center border border-border hover:border-border-dark transition-colors">
                   <button
@@ -826,7 +833,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-r border-border"
-                    aria-label="Decrease terminal line height"
+                    aria-label={t("settings.decreaseTerminalLineHeight")}
                   >
                     <MinusIcon className="size-3" />
                   </button>
@@ -858,7 +865,7 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground hover:bg-accent-hover transition-colors border-l border-border"
-                    aria-label="Increase terminal line height"
+                    aria-label={t("settings.increaseTerminalLineHeight")}
                   >
                     <PlusIcon className="size-3" />
                   </button>
@@ -866,7 +873,7 @@ export function LaTeXSettingsDialog({
               </div>
 
               <SelectField
-                label="Shell Selection"
+                label={t("settings.shellSelection")}
                 value={editorSettings.terminalShellMode}
                 onChange={(v) =>
                   onUpdateEditorSettings({
@@ -874,10 +881,10 @@ export function LaTeXSettingsDialog({
                   })
                 }
                 options={[
-                  { value: "auto", label: "Auto Detect" },
-                  { value: "custom", label: "Custom" },
+                  { value: "auto", label: t("settings.autoDetect") },
+                  { value: "custom", label: t("settings.custom") },
                 ]}
-                description="Auto mode chooses shell per OS fallback rules"
+                description={t("settings.autoModeChoosesShellPerOsFallbackRules")}
               />
 
               {editorSettings.terminalShellMode === "custom" && (
@@ -887,7 +894,7 @@ export function LaTeXSettingsDialog({
                       htmlFor="editor-terminal-shell-path"
                       className="text-sm font-medium text-foreground-secondary shrink-0"
                     >
-                      Shell Command
+                      {t("settings.shellCommand")}
                     </label>
                     <input
                       id="editor-terminal-shell-path"
@@ -903,7 +910,7 @@ export function LaTeXSettingsDialog({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    Leave empty to fall back to auto detection.
+                    {t("settings.leaveEmptyToFallBackToAutoDetection")}
                   </p>
                 </div>
               )}
@@ -913,25 +920,25 @@ export function LaTeXSettingsDialog({
             <Tabs.Content value="build" className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
               {buildSettings ?? (
                 <>
-                  <SectionHeader>Main File</SectionHeader>
+                  <SectionHeader>{t("settings.mainFile")}</SectionHeader>
 
                   <div className="py-2">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-foreground-secondary">
-                        Main .tex File
+                        {t("settings.mainTexFile")}
                       </span>
                     </div>
                     {texFiles.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-2">
-                        No .tex files found in project
+                        {t("settings.noTexFilesFoundInProject")}
                       </p>
                     ) : (
                       <Select
                         value={settings.mainFile || ""}
                         onValueChange={(v) => onUpdateSettings({ mainFile: v || null })}
                       >
-                        <SelectTrigger className="w-full" aria-label="Main .tex file">
-                          <SelectValue placeholder="Select main .tex file..." />
+                        <SelectTrigger className="w-full" aria-label={t("settings.mainTexFile")}>
+                          <SelectValue placeholder={t("settings.selectMainTexFile")} />
                         </SelectTrigger>
                         <SelectContent>
                           {texFiles.map((file) => (
@@ -943,12 +950,12 @@ export function LaTeXSettingsDialog({
                       </Select>
                     )}
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      The entry point for LaTeX compilation
+                      {t("settings.theEntryPointForLatexCompilation")}
                     </p>
                   </div>
                 </>
               )}
-              <SectionHeader>Git</SectionHeader>
+              <SectionHeader>{t("settings.git")}</SectionHeader>
 
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
@@ -987,16 +994,16 @@ export function LaTeXSettingsDialog({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground-secondary">
-                        Auto Fetch
+                        {t("settings.autoFetch")}
                       </span>
                       {editorSettings.gitAutoFetchEnabled && (
                         <span className="text-[10px] px-1.5 py-0.5 border border-emerald-300 text-emerald-600 font-medium uppercase tracking-wider bg-emerald-50">
-                          Active
+                          {t("settings.active")}
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-muted mt-0.5">
-                      Periodically sync remote refs in background
+                      {t("settings.periodicallySyncRemoteRefsInBackground")}
                     </p>
                   </div>
                 </div>
@@ -1009,7 +1016,7 @@ export function LaTeXSettingsDialog({
               {editorSettings.gitAutoFetchEnabled && (
                 <div className="pl-4 border-l-2 border-border ml-1">
                   <SelectField
-                    label="Interval"
+                    label={t("settings.interval")}
                     value={editorSettings.gitAutoFetchIntervalSeconds}
                     onChange={(v) =>
                       onUpdateEditorSettings({
@@ -1020,11 +1027,11 @@ export function LaTeXSettingsDialog({
                       })
                     }
                     options={[
-                      { value: 30, label: "30 seconds" },
-                      { value: 60, label: "1 minute" },
-                      { value: 120, label: "2 minutes" },
-                      { value: 300, label: "5 minutes" },
-                      { value: 600, label: "10 minutes" },
+                      { value: 30, label: t("settings.30Seconds") },
+                      { value: 60, label: t("settings.1Minute") },
+                      { value: 120, label: t("settings.2Minutes") },
+                      { value: 300, label: t("settings.5Minutes") },
+                      { value: 600, label: t("settings.10Minutes") },
                     ]}
                   />
                 </div>
@@ -1049,11 +1056,11 @@ export function LaTeXSettingsDialog({
                 className="text-xs text-muted hover:text-foreground transition-colors flex items-center gap-1.5 group"
               >
                 <ArrowCounterClockwiseIcon className="size-3.5 group-hover:rotate-[-45deg] transition-transform" />
-                Reset to Defaults
+                {t("settings.resetToDefaults")}
               </button>
             )}
             <Dialog.Close className="px-6 py-2 text-sm font-medium bg-background text-foreground border-2 border-foreground shadow-[3px_3px_0_0_var(--foreground)] hover:shadow-[1px_1px_0_0_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-              Done
+              {t("settings.done")}
             </Dialog.Close>
           </div>
         </Dialog.Content>

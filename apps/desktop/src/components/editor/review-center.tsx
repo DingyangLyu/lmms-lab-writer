@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
+import { useI18n } from "@/lib/i18n";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import { sameProject } from "@/lib/project-root";
 
@@ -33,6 +34,7 @@ export function ReviewCenter({
   agentBusy: boolean;
   onOpen: (path: string) => void;
 }) {
+  const { t } = useI18n();
   const annotations = useAnnotations();
   const [open, setOpen] = useState(false),
     [summaries, setSummaries] = useState<Summary[]>([]),
@@ -98,7 +100,9 @@ export function ReviewCenter({
           void run(reload);
         }}
       >
-        修改审阅 {summaries.reduce((n, s) => n + s.pending, 0)}
+        {t("review.changeReviewCount", {
+          count: summaries.reduce((n, s) => n + s.pending, 0),
+        })}
         {error && <span className="ml-1 text-red-600">!</span>}
       </button>
       {open && (
@@ -106,11 +110,11 @@ export function ReviewCenter({
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="AI 修改审阅"
+            aria-label={t("review.reviewAiChanges")}
             className="flex h-[86vh] w-full max-w-6xl flex-col border border-border bg-background shadow-xl"
           >
             <header className="flex items-center justify-between border-b border-border p-3">
-              <strong>修改审阅</strong>
+              <strong>{t("review.changeReview")}</strong>
               <button
                 type="button"
                 disabled={busy}
@@ -119,14 +123,11 @@ export function ReviewCenter({
                   setReview(null);
                 }}
               >
-                关闭
+                {t("review.close")}
               </button>
             </header>
             <p className="border-b border-border p-3 text-xs text-muted">
-              原生 Agent
-              的修改已写入工作区；接受表示保留，拒绝会安全撤回该项，撤销决定可重新核对。任务期间在编辑器和文献库中的人工保存会自动排除；同时运行的其他
-              Agent 或外部程序的修改仍可能计入。图片、PDF 及超过 2 MB 的文本请在 Git
-              版本中核对。运行中暂不接受或撤回。
+              {t("review.theNativeAgentSChangesAreAlreadyInYourFo")}
             </p>
             {error && (
               <p role="alert" className="whitespace-pre-wrap p-3 text-sm text-red-600">
@@ -151,14 +152,17 @@ export function ReviewCenter({
                     <span>{new Date(s.startedAt).toLocaleString()}</span>
                     <span className="block">
                       {s.finishedAt
-                        ? `${s.files} 个文件 · ${s.pending} 项待审阅`
-                        : "任务记录中 / 待恢复"}
+                        ? t("review.filesFilesFileFilesPendingToReview", {
+                            files: s.files,
+                            pending: s.pending,
+                          })
+                        : t("review.recordingToRecover")}
                     </span>
                   </button>
                 ))}
                 {!summaries.length && (
                   <p className="p-3 text-sm text-muted">
-                    下一次 Agent 任务会自动记录修改前后版本。
+                    {t("review.theNextAgentTaskRecordsTheBeforeAndAfter")}
                   </p>
                 )}
               </aside>
@@ -180,12 +184,12 @@ export function ReviewCenter({
                         }
                         className="mb-3 border border-border p-2 text-sm"
                       >
-                        任务已结束：恢复并生成审阅
+                        {t("review.taskFinishedRecoverAndBuildTheReview")}
                       </button>
                     )}
                     {!!review.annotations.length && (
                       <div className="mb-3 flex flex-wrap gap-2 text-xs">
-                        <span>任务开始时待处理的批注：</span>
+                        <span>{t("review.commentsOpenWhenTheTaskStarted")}</span>
                         {review.annotations.map((id) => (
                           <button
                             type="button"
@@ -201,7 +205,7 @@ export function ReviewCenter({
                           </button>
                         ))}
                         <p className="w-full text-muted">
-                          拒绝修改后，可打开相关批注核对并重新标为待处理。
+                          {t("review.afterRejectingAChangeOpenTheRelatedComme")}
                         </p>
                       </div>
                     )}
@@ -217,7 +221,7 @@ export function ReviewCenter({
                               setReview(null);
                             }}
                           >
-                            打开文件
+                            {t("review.openFile")}
                           </button>
                         </header>
                         {c.parts.map(
@@ -235,10 +239,10 @@ export function ReviewCenter({
                                     }
                                   >
                                     {p.status === "accepted"
-                                      ? "✓ 已接受"
+                                      ? t("review.accepted")
                                       : p.status === "rejected"
-                                        ? "已拒绝"
-                                        : "待审阅"}
+                                        ? t("review.rejected")
+                                        : t("review.toReview")}
                                   </span>
                                   <div className="flex gap-3">
                                     <button
@@ -246,14 +250,14 @@ export function ReviewCenter({
                                       disabled={busy || agentBusy || p.status === "accepted"}
                                       onClick={() => void run(() => decide(c.path, i, "accepted"))}
                                     >
-                                      接受
+                                      {t("review.accept")}
                                     </button>
                                     <button
                                       type="button"
                                       disabled={busy || agentBusy || p.status === "rejected"}
                                       onClick={() => void run(() => decide(c.path, i, "rejected"))}
                                     >
-                                      拒绝 / 撤回
+                                      {t("review.rejectTakeBack")}
                                     </button>
                                     {p.status !== "pending" && (
                                       <button
@@ -261,17 +265,17 @@ export function ReviewCenter({
                                         disabled={busy || agentBusy}
                                         onClick={() => void run(() => decide(c.path, i, "pending"))}
                                       >
-                                        撤销决定
+                                        {t("review.undoDecision")}
                                       </button>
                                     )}
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                   <pre className="overflow-auto whitespace-pre-wrap border border-red-200 bg-red-50/50 p-2 text-foreground">
-                                    {p.before || "（新增）"}
+                                    {p.before || t("review.added")}
                                   </pre>
                                   <pre className="overflow-auto whitespace-pre-wrap border border-green-200 bg-green-50/50 p-2 text-foreground">
-                                    {p.after || "（删除）"}
+                                    {p.after || t("review.deleted")}
                                   </pre>
                                 </div>
                               </div>
@@ -280,7 +284,9 @@ export function ReviewCenter({
                       </article>
                     ))}
                     <details className="text-xs">
-                      <summary>审阅决定历史 · {review.decisions.length}</summary>
+                      <summary>
+                        {t("review.decisionHistoryCount", { count: review.decisions.length })}
+                      </summary>
                       {review.decisions.map((d) => (
                         <p key={d.id}>
                           {new Date(d.at).toLocaleString()} · {d.path} · {d.from} → {d.to}

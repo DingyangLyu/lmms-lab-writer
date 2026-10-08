@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
+import { useI18n } from "@/lib/i18n";
 import { sameProject } from "@/lib/project-root";
 export function ConflictCenter({
   project,
@@ -14,6 +15,7 @@ export function ConflictCenter({
   manager: SaveManager;
   onResolved?: (conflict: DocumentConflict) => void;
 }) {
+  const { t } = useI18n();
   const [pending, setPending] = useState<DocumentConflict[]>([]),
     [open, setOpen] = useState(false),
     [selected, setSelected] = useState<DocumentConflict | null>(null),
@@ -63,16 +65,19 @@ export function ConflictCenter({
       const content = selected.parts.map((p, i) => p.text ?? choices[i] ?? "").join("");
       const doc = manager.get(project, selected.path);
       if (doc && doc.content !== originalEditor.current)
-        throw new Error("编辑器草稿又有更新，双方内容仍保留；请重新选择此冲突以核对最新版本。");
+        throw new Error(t("conflict.theEditorDraftChangedAgainBothVersionsAr"));
       if (selected.local) {
-        if (!doc) throw new Error("草稿未载入");
+        if (!doc) throw new Error(t("conflict.theDraftIsNotLoaded"));
         await manager.resolveLocal(doc, content, originalEditor.current ?? "");
-        await invoke("git_create_snapshot", { project, message: "Writer · 解决编辑器合并冲突" });
+        await invoke("git_create_snapshot", {
+          project,
+          message: t("conflict.writerResolveEditorMergeConflict"),
+        });
       } else {
         if (doc?.running) await doc.running;
         if (selected.owner !== "editor" && doc?.dirty) await manager.synchronizeDocument(doc);
         if (doc && doc.content !== originalEditor.current)
-          throw new Error("文稿在准备合并时又有更新，请重新选择最新冲突。");
+          throw new Error(t("conflict.theDocumentChangedWhilePreparingTheMerge"));
         const editorBefore = doc?.content;
         const result = await invoke<SaveResult>("resolve_document_conflict", {
           project,
@@ -82,12 +87,14 @@ export function ConflictCenter({
         });
         if (result.status === "conflict") {
           if (result.conflict) choose(result.conflict);
-          throw new Error("核对期间文件又有重叠修改，已更新冲突，尚未覆盖文稿。");
+          throw new Error(t("conflict.theFileGotAnotherOverlappingChangeWhileY"));
         }
         await manager.acceptResolved(project, selected.path, result.content, editorBefore);
         if (result.versionError) {
           setSelected(null);
-          throw new Error(`${result.versionError}；请使用保存 Git 版本按钮重试。`);
+          throw new Error(
+            t("conflict.errorUseTheSaveGitVersionButtonToRetry", { error: result.versionError }),
+          );
         }
       }
       if (resume) onResolved?.(selected);
@@ -109,20 +116,20 @@ export function ConflictCenter({
           setOpen((v) => !v);
           void refresh();
         }}
-        title="查看并合并双方的文稿修改"
+        title={t("conflict.reviewAndMergeBothSidesChanges")}
       >
-        冲突 {all.length}
+        {t("conflict.conflictsCount", { count: all.length })}
       </button>
       {open && (
         <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/30 p-4">
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="文稿合并冲突"
+            aria-label={t("conflict.mergeConflicts")}
             className="flex max-h-[90vh] w-full max-w-5xl flex-col border border-border bg-background shadow-xl"
           >
             <header className="flex items-center justify-between border-b border-border p-3">
-              <strong>文稿合并 · 双方内容均已保留</strong>
+              <strong>{t("conflict.mergeBothVersionsAreKept")}</strong>
               <button
                 type="button"
                 disabled={busy}
@@ -130,7 +137,7 @@ export function ConflictCenter({
                   setOpen(false);
                   setSelected(null);
                 }}
-                aria-label="关闭冲突面板"
+                aria-label={t("conflict.closeTheConflictPanel")}
               >
                 ×
               </button>
@@ -146,20 +153,31 @@ export function ConflictCenter({
                   >
                     <span className="block truncate">{c.path}</span>
                     <small>
-                      {c.owner === "editor" ? "编辑器与磁盘" : "Agent 修改提案"} ·{" "}
-                      {c.parts.filter((p) => p.text === null).length} 处
+                      {c.owner === "editor"
+                        ? t("conflict.editorAndDisk")
+                        : t("conflict.agentProposal")}{" "}
+                      ·{" "}
+                      {t("conflict.countCountSpotSpots", {
+                        count: c.parts.filter((p) => p.text === null).length,
+                      })}
                     </small>
                   </button>
                 ))}
-                {!all.length && <p className="p-2 text-muted">没有待处理冲突。</p>}
+                {!all.length && (
+                  <p className="p-2 text-muted">{t("conflict.noConflictsToResolve")}</p>
+                )}
               </aside>
               <div className="min-w-0 flex-1 overflow-auto p-3">
                 {!selected ? (
-                  <p className="text-muted">选择一个文件查看差异。无冲突的修改会自动合并。</p>
+                  <p className="text-muted">
+                    {t("conflict.selectAFileToSeeTheDifferencesNonOverlap")}
+                  </p>
                 ) : (
                   <>
                     <p className="mb-3 text-muted">
-                      {selected.path} · 仅选择有重叠的部分，其他修改自动保留。
+                      {t("conflict.pathChooseOnlyWhereChangesOverlapEveryth", {
+                        path: selected.path,
+                      })}
                     </p>
                     {selected.parts.map((part, i) =>
                       part.text !== null ? (
@@ -177,7 +195,7 @@ export function ConflictCenter({
                           className="my-3 border border-orange-400 p-3"
                         >
                           <details className="mb-2">
-                            <summary>共同基准</summary>
+                            <summary>{t("conflict.commonBase")}</summary>
                             <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-xs">
                               {part.base}
                             </pre>
@@ -185,29 +203,31 @@ export function ConflictCenter({
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <strong>
-                                {selected.owner === "editor" ? "你的草稿" : "当前文件"}
+                                {selected.owner === "editor"
+                                  ? t("conflict.yourDraft")
+                                  : t("conflict.currentFile")}
                               </strong>
                               <pre className="my-2 max-h-40 overflow-auto whitespace-pre-wrap border border-border p-2 text-xs">
-                                {part.ours || "（删除）"}
+                                {part.ours || t("conflict.deleted")}
                               </pre>
                               <button
                                 type="button"
                                 className="border border-border px-2 py-1"
                                 onClick={() => setChoices((c) => ({ ...c, [i]: part.ours || "" }))}
                               >
-                                保留这一侧
+                                {t("conflict.keepThisSide")}
                               </button>
                             </div>
                             <div>
                               <strong>
                                 {selected.local
-                                  ? "另一处编辑"
+                                  ? t("conflict.otherEdit")
                                   : selected.owner === "editor"
-                                    ? "磁盘修改（AI／外部）"
-                                    : "Agent 建议"}
+                                    ? t("conflict.diskChangeAiExternal")
+                                    : t("conflict.agentSuggestion")}
                               </strong>
                               <pre className="my-2 max-h-40 overflow-auto whitespace-pre-wrap border border-border p-2 text-xs">
-                                {part.theirs || "（删除）"}
+                                {part.theirs || t("conflict.deleted")}
                               </pre>
                               <button
                                 type="button"
@@ -216,7 +236,7 @@ export function ConflictCenter({
                                   setChoices((c) => ({ ...c, [i]: part.theirs || "" }))
                                 }
                               >
-                                采用这一侧
+                                {t("conflict.useThisSide")}
                               </button>
                             </div>
                           </div>
@@ -230,14 +250,14 @@ export function ConflictCenter({
                               }))
                             }
                           >
-                            保留双方并编辑
+                            {t("conflict.keepBothAndEdit")}
                           </button>
                           <label className="block">
-                            最终文本
+                            {t("conflict.finalText")}
                             <textarea
-                              aria-label={`冲突 ${i + 1} 最终文本`}
+                              aria-label={t("conflict.finalTextOfConflictN", { n: i + 1 })}
                               className="mt-1 min-h-24 w-full border border-border bg-background p-2 font-mono text-xs"
-                              placeholder="先选择一侧，或在这里手动合并…"
+                              placeholder={t("conflict.pickASideFirstOrMergeByHandHere")}
                               value={choices[i] ?? ""}
                               onChange={(e) => setChoices((c) => ({ ...c, [i]: e.target.value }))}
                             />
@@ -261,7 +281,7 @@ export function ConflictCenter({
                   checked={resume}
                   onChange={(e) => setResume(e.target.checked)}
                 />
-                合并后通知已打开的原 Agent 对话继续核验
+                {t("conflict.afterMergingTellTheOriginalAgentConversa")}
               </label>
               <button
                 type="button"
@@ -269,7 +289,7 @@ export function ConflictCenter({
                 onClick={() => void apply()}
                 className="border border-foreground bg-foreground px-3 py-2 text-background disabled:opacity-40"
               >
-                {busy ? "合并与保存中…" : "保存合并结果并记录 Git"}
+                {busy ? t("conflict.mergingAndSaving") : t("conflict.saveTheMergeAndRecordItInGit")}
               </button>
             </footer>
           </section>

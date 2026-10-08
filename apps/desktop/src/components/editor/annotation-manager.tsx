@@ -17,21 +17,23 @@ import {
   isHarnessId,
   STATUS_LABELS,
 } from "@/lib/harness/types";
+import { type MessageKey, useI18n } from "@/lib/i18n";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import type { PdfAnnotation } from "@/lib/pdf/annotations";
 
-const ACTIONS: Record<string, string> = {
-  created: "保存批注",
-  quote_repaired: "恢复选文文字映射",
-  applied: "已合并文稿修改",
-  reanchored: "更新选区定位",
-  edited: "修改批注",
-  submitted: "提交 AI · 修改前版本",
-  resolved: "已解决 · 修改后版本",
-  reopened: "重新打开",
-  baseline: "旧批注基线",
+const ACTIONS: Record<string, MessageKey> = {
+  created: "annot.commentSaved",
+  quote_repaired: "annot.quotedTextRestored",
+  applied: "annot.mergedIntoTheDocument",
+  reanchored: "annot.positionUpdated",
+  edited: "annot.commentEdited",
+  submitted: "annot.sentToAiBeforeVersion",
+  resolved: "annot.resolvedAfterVersion",
+  reopened: "annot.reopen",
+  baseline: "annot.earlierCommentBaseline",
 };
 export function AnnotationManager() {
+  const { t } = useI18n();
   const notes = useAnnotations();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetId, setTargetId] = useState("new:codex");
@@ -148,7 +150,7 @@ export function AnnotationManager() {
   };
   const viewVersion = async (hash: string) => {
     const request = ++previewRequest.current;
-    setPreview({ hash, text: "正在读取版本…" });
+    setPreview({ hash, text: t("annot.readingVersion") });
     setPreviewError(null);
     try {
       const text = await invoke<string>("git_snapshot_diff", { project: notes.project, hash });
@@ -173,17 +175,17 @@ export function AnnotationManager() {
         aria-expanded={notes.open}
         aria-controls="writer-annotation-panel"
         onClick={() => notes.setOpen(!notes.open)}
-        title="批注历史与处理状态"
+        title={t("annot.commentHistoryAndStatus")}
         className={`inline-flex shrink-0 items-center gap-1.5 border px-2 py-1 ${notes.error ? "border-red-500" : "border-border"}`}
       >
-        <span>批注 {pending.length}</span>
+        <span>{t("annot.commentsCount", { count: pending.length })}</span>
         {resolved.length > 0 && (
           <span className="flex items-center gap-1 text-emerald-600">
             <CheckCircleIcon weight="fill" className="size-3.5" />
             {resolved.length}
           </span>
         )}
-        {notes.draft && <span className="text-orange-600">草稿</span>}
+        {notes.draft && <span className="text-orange-600">{t("annot.draft")}</span>}
         <CaretDownIcon
           className={`size-3 transition-transform ${notes.open ? "rotate-180" : ""}`}
         />
@@ -194,19 +196,22 @@ export function AnnotationManager() {
             ref={panelRef}
             id="writer-annotation-panel"
             role="dialog"
-            aria-label="批注历史与处理状态"
+            aria-label={t("annot.commentHistoryAndStatus")}
             style={{ ...position, position: "fixed" }}
             className="z-[160] flex flex-col overflow-hidden border border-border bg-background text-xs text-foreground shadow-xl"
           >
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-              <strong>批注管理</strong>
+              <strong>{t("annot.comments")}</strong>
               <span className="mr-auto text-muted">
-                待处理 {pending.length} · 已解决 {resolved.length}
+                {t("annot.openPendingResolvedResolved", {
+                  pending: pending.length,
+                  resolved: resolved.length,
+                })}
               </span>
               <button
                 type="button"
-                aria-label="收起全部批注面板"
-                title="收起批注面板"
+                aria-label={t("annot.closeAllCommentPanels")}
+                title={t("annot.closeCommentPanel")}
                 onClick={() => notes.setOpen(false)}
                 className="p-1 hover:text-accent"
               >
@@ -229,7 +234,7 @@ export function AnnotationManager() {
                     }}
                     className="border border-border px-2 py-1"
                   >
-                    返回批注
+                    {t("annot.backToComments")}
                   </button>
                   <code>{preview.hash.slice(0, 10)}</code>
                 </div>
@@ -247,9 +252,9 @@ export function AnnotationManager() {
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
                   {(
                     [
-                      ["all", `全部 ${notes.items.length}`],
-                      ["pending", `待处理 ${pending.length}`],
-                      ["resolved", `已解决 ${resolved.length}`],
+                      ["all", t("annot.allCount", { count: notes.items.length })],
+                      ["pending", t("annot.openCount", { count: pending.length })],
+                      ["resolved", t("annot.resolvedCount", { count: resolved.length })],
                     ] as const
                   ).map(([value, label]) => (
                     <button
@@ -268,18 +273,18 @@ export function AnnotationManager() {
                     onClick={() => notes.setExpanded(new Set(filtered.map((note) => note.id)))}
                     className="px-1 py-1"
                   >
-                    全部展开
+                    {t("annot.expandAll")}
                   </button>
                   <button
                     type="button"
                     onClick={() => notes.setExpanded(new Set())}
                     className="px-1 py-1"
                   >
-                    全部折叠
+                    {t("annot.collapseAll")}
                   </button>
                   <input
-                    aria-label="搜索批注"
-                    placeholder="搜索批注或选文…"
+                    aria-label={t("annot.searchComments")}
+                    placeholder={t("annot.searchCommentsOrQuotedText")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="w-40 border border-border bg-background px-2 py-1"
@@ -288,22 +293,27 @@ export function AnnotationManager() {
                 <div className="min-h-0 overflow-y-auto overscroll-contain p-3">
                   {notes.draft && (
                     <section
-                      aria-label="新批注"
+                      aria-label={t("annot.newComment")}
                       className="mb-3 space-y-2 border border-orange-400 p-3"
                     >
                       <div className="flex justify-between gap-2">
                         <strong>
-                          新批注 ·{" "}
-                          {notes.draft.kind === "text"
-                            ? notes.draft.file
-                            : `${notes.draft.pdf} · 第 ${notes.draft.marks[0]?.page} 页`}
+                          {t("annot.newCommentWhere", {
+                            where:
+                              notes.draft.kind === "text"
+                                ? (notes.draft.file ?? "")
+                                : t("annot.pdfPagePage", {
+                                    pdf: notes.draft.pdf,
+                                    page: notes.draft.marks[0]?.page ?? "",
+                                  }),
+                          })}
                         </strong>
                         <button
                           type="button"
                           disabled={notes.busy}
                           onClick={() => notes.setDraft(null)}
                         >
-                          取消草稿
+                          {t("annot.discardDraft")}
                         </button>
                       </div>
                       <blockquote className="max-h-16 overflow-auto border-l-2 border-orange-400 pl-2 text-muted">
@@ -312,10 +322,10 @@ export function AnnotationManager() {
                       {notes.draft.kind !== "text" && (
                         <details>
                           <summary className="cursor-pointer text-xs text-muted">
-                            核对／修正选中文字
+                            {t("annot.checkCorrectTheQuotedText")}
                           </summary>
                           <textarea
-                            aria-label="批注选中文字"
+                            aria-label={t("annot.quotedText")}
                             value={notes.draft.quote}
                             onChange={(event) =>
                               notes.setDraft(
@@ -327,7 +337,7 @@ export function AnnotationManager() {
                         </details>
                       )}
                       <textarea
-                        aria-label="批注修改要求"
+                        aria-label={t("annot.requestedChange")}
                         value={notes.draft.comment}
                         onChange={(e) =>
                           notes.setDraft(
@@ -335,7 +345,7 @@ export function AnnotationManager() {
                           )
                         }
                         rows={3}
-                        placeholder="填写需要修改的内容…"
+                        placeholder={t("annot.describeTheChangeYouWant")}
                         className="w-full resize-y border border-border bg-background p-2"
                       />
                       <button
@@ -344,15 +354,17 @@ export function AnnotationManager() {
                         onClick={() => void notes.saveDraft()}
                         className="border border-foreground bg-foreground px-3 py-1.5 text-background disabled:opacity-40"
                       >
-                        {notes.busy ? "保存批注与 Git 版本…" : "保存批注并记录 Git"}
+                        {notes.busy
+                          ? t("annot.savingCommentAndGitVersion")
+                          : t("annot.saveCommentAndRecordInGit")}
                       </button>
                     </section>
                   )}
                   {!filtered.length && (
                     <p className="py-5 text-center text-muted">
                       {notes.items.length
-                        ? "没有符合条件的批注。"
-                        : "在 PDF 中拖选，或在文本编辑器中选中文字后点击“添加批注”。"}
+                        ? t("annot.noMatchingComments")
+                        : t("annot.dragOverThePdfOrSelectTextInTheEditorAnd")}
                     </p>
                   )}
                   {filtered.map((note) => (
@@ -363,7 +375,7 @@ export function AnnotationManager() {
                       <div className="flex items-start">
                         <input
                           type="checkbox"
-                          aria-label={`选择批注：${note.comment}`}
+                          aria-label={t("annot.selectCommentComment", { comment: note.comment })}
                           disabled={note.resolved}
                           className="ml-3 mt-3 shrink-0"
                           checked={selected.has(note.id)}
@@ -392,15 +404,22 @@ export function AnnotationManager() {
                             <span className="flex flex-wrap items-center gap-2">
                               <strong className={note.resolved ? "text-emerald-700" : ""}>
                                 {note.resolved
-                                  ? "已解决"
+                                  ? t("annot.resolved")
                                   : note.submittedTo
-                                    ? `已提交 ${harnessLabel(note.submittedTo)}`
-                                    : "待处理"}
+                                    ? t("annot.sentToTarget", {
+                                        target: harnessLabel(note.submittedTo),
+                                      })
+                                    : t("annot.open")}
                               </strong>
                               <span className="text-muted">
                                 {note.kind === "text"
-                                  ? `${note.source?.file || note.anchor?.file} · 文本选区`
-                                  : `${note.pdf} · 第 ${note.marks[0]?.page} 页`}
+                                  ? t("annot.fileTextSelection", {
+                                      file: note.source?.file || note.anchor?.file || "",
+                                    })
+                                  : t("annot.pdfPagePage", {
+                                      pdf: note.pdf,
+                                      page: note.marks[0]?.page ?? "",
+                                    })}
                               </span>
                             </span>
                             <span className="mt-1 block truncate">{note.comment}</span>
@@ -415,7 +434,7 @@ export function AnnotationManager() {
                           {editing === note.id ? (
                             <div className="space-y-2">
                               <textarea
-                                aria-label="编辑 PDF 批注"
+                                aria-label={t("annot.editComment")}
                                 rows={3}
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
@@ -431,14 +450,14 @@ export function AnnotationManager() {
                                 }
                                 className="border border-border px-2 py-1"
                               >
-                                保存修改并记录 Git
+                                {t("annot.saveAndRecordInGit")}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEditing(null)}
                                 className="ml-2 px-2"
                               >
-                                取消
+                                {t("annot.cancel")}
                               </button>
                             </div>
                           ) : (
@@ -451,7 +470,7 @@ export function AnnotationManager() {
                                 note.kind === "text" ? notes.showSource(note) : notes.showPdf(note)
                               }
                             >
-                              定位原文
+                              {t("annot.showInSource")}
                             </button>
                             <button
                               type="button"
@@ -461,7 +480,7 @@ export function AnnotationManager() {
                             >
                               {note.source
                                 ? `${note.source.file}:L${note.source.line}–${note.source.endLine}`
-                                : "源码待核对"}
+                                : t("annot.sourceToCheck")}
                             </button>
                             <button
                               type="button"
@@ -471,7 +490,7 @@ export function AnnotationManager() {
                                 setComment(note.comment);
                               }}
                             >
-                              编辑批注
+                              {t("annot.editComment2")}
                             </button>
                             <button
                               type="button"
@@ -481,7 +500,7 @@ export function AnnotationManager() {
                               }
                               className={note.resolved ? "" : "text-emerald-700"}
                             >
-                              {note.resolved ? "重新打开" : "标为已解决"}
+                              {note.resolved ? t("annot.reopen") : t("annot.markResolved")}
                             </button>
                             {!note.resolved && (
                               <button
@@ -489,7 +508,7 @@ export function AnnotationManager() {
                                 disabled={notes.busy || !target()}
                                 onClick={() => dispatch([note.id])}
                               >
-                                交给下方所选对话
+                                {t("annot.sendToTheConversationBelow")}
                               </button>
                             )}
                           </div>
@@ -500,7 +519,9 @@ export function AnnotationManager() {
                           )}
                           <details>
                             <summary className="cursor-pointer text-muted">
-                              版本与处理历史 · {note.events?.length ?? 0}
+                              {t("annot.versionsAndHistoryCount", {
+                                count: note.events?.length ?? 0,
+                              })}
                             </summary>
                             <div className="mt-2 space-y-2">
                               {note.events
@@ -509,7 +530,11 @@ export function AnnotationManager() {
                                 .map((event) => (
                                   <div key={event.id} className="border-t border-border pt-2">
                                     <div className="flex flex-wrap gap-2">
-                                      <span>{ACTIONS[event.action] || event.action}</span>
+                                      <span>
+                                        {ACTIONS[event.action]
+                                          ? t(ACTIONS[event.action] as MessageKey)
+                                          : event.action}
+                                      </span>
                                       <time className="text-muted">
                                         {new Date(event.timestamp).toLocaleString()}
                                       </time>
@@ -522,7 +547,9 @@ export function AnnotationManager() {
                                           Git {event.gitHash.slice(0, 7)}
                                         </button>
                                       ) : (
-                                        <span className="text-red-600">未找到 Git 记录</span>
+                                        <span className="text-red-600">
+                                          {t("annot.noGitRecordFound")}
+                                        </span>
                                       )}
                                     </div>
                                     {event.resolution && (
@@ -547,24 +574,24 @@ export function AnnotationManager() {
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border px-3 py-2">
                   <span className="mr-auto text-muted">
-                    每次保存／解决批注立即记录本地 Git 版本
+                    {t("annot.everySavedOrResolvedCommentIsRecordedAsA")}
                   </span>
                   <label className="flex min-w-0 items-center gap-2">
-                    目标
+                    {t("annot.target")}
                     <select
-                      aria-label="批注处理对话"
+                      aria-label={t("annot.conversationForComments")}
                       value={targetId}
                       onChange={(event) => setTargetId(event.target.value)}
                       className="max-w-72 border border-border bg-background px-2 py-1"
                     >
-                      <optgroup label="新建对话">
+                      <optgroup label={t("annot.newConversation")}>
                         {HARNESSES.map((h) => (
                           <option key={h.id} value={`new:${h.id}`}>
-                            新 {h.label} 对话
+                            {t("annot.newNameConversation", { name: h.label })}
                           </option>
                         ))}
                       </optgroup>
-                      <optgroup label="已打开的对话">
+                      <optgroup label={t("annot.openConversations")}>
                         {notes.conversations.map((tab) => (
                           <option key={tab.id} value={tab.id}>
                             {harnessLabel(tab.backend)} · {tab.title} · {STATUS_LABELS[tab.status]}
@@ -580,14 +607,14 @@ export function AnnotationManager() {
                       setSelected(new Set(filtered.filter((n) => !n.resolved).map((n) => n.id)))
                     }
                   >
-                    选择可见待处理
+                    {t("annot.selectVisibleOpenOnes")}
                   </button>
                   <button
                     type="button"
                     className="px-2 py-1"
                     onClick={() => setSelected(new Set())}
                   >
-                    清空选择
+                    {t("annot.clearSelection")}
                   </button>
                   <button
                     type="button"
@@ -605,8 +632,9 @@ export function AnnotationManager() {
                       )
                     }
                   >
-                    提交所选 {notes.items.filter((n) => !n.resolved && selected.has(n.id)).length}{" "}
-                    条
+                    {t("annot.sendCountSelected", {
+                      count: notes.items.filter((n) => !n.resolved && selected.has(n.id)).length,
+                    })}
                   </button>
                   <button
                     type="button"
@@ -614,7 +642,7 @@ export function AnnotationManager() {
                     disabled={notes.busy || !target() || !pending.length}
                     onClick={() => dispatch(pending.map((n) => n.id))}
                   >
-                    提交全部待处理
+                    {t("annot.sendAllOpen")}
                   </button>
                 </div>
               </>
