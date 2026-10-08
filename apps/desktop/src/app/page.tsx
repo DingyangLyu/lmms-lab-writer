@@ -192,23 +192,34 @@ export default function EditorPage() {
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   /** Drafts are persisted; running or approval-waiting agents need explicit consent. */
-  const confirmAgentsIdle = useCallback(async (action: "switch" | "quit") => {
-    const busy = conversationsRef.current.tabs.filter(
-      (t) => t.status === "running" || t.status === "waiting",
-    );
-    if (!busy.length) return true;
-    const names = `${busy
-      .slice(0, 3)
-      .map((t) => `「${t.title}」`)
-      .join("、")}${busy.length > 3 ? ` 等 ${busy.length} 个对话` : ""}`;
-    const { ask } = await import("@tauri-apps/plugin-dialog");
-    return ask(
-      action === "quit"
-        ? `${names}仍在执行或等待批准。退出 Writer 会中断这些任务，已完成的内容保留在对话历史中。确定退出？`
-        : `${names}仍在执行或等待批准。切换项目后任务会在后台继续，需要批准的操作会等你回到此项目。确定切换？`,
-      { title: action === "quit" ? "退出 Writer" : "切换项目", kind: "warning" },
-    );
-  }, []);
+  const confirmAgentsIdle = useCallback(
+    async (action: "switch" | "quit") => {
+      const busy = conversationsRef.current.tabs.filter(
+        (tab) => tab.status === "running" || tab.status === "waiting",
+      );
+      if (!busy.length) return true;
+      const names =
+        busy
+          .slice(0, 3)
+          .map((tab) => t("page.quotedTitle", { title: tab.title }))
+          .join(t("page.listSeparator")) +
+        (busy.length > 3 ? t("page.andCountMore", { count: busy.length }) : "");
+      const { ask } = await import("@tauri-apps/plugin-dialog");
+      return ask(
+        t(
+          action === "quit"
+            ? "page.namesCountIsAreStillRunningOrWaitingForA"
+            : "page.namesCountIsAreStillRunningOrWaitingForA2",
+          { names, count: busy.length },
+        ),
+        {
+          title: action === "quit" ? t("page.quitWriter") : t("page.switchProject"),
+          kind: "warning",
+        },
+      );
+    },
+    [t],
+  );
   const [agentBackend, setAgentBackend] = useState<"opencode" | "codex" | "claude">(() => {
     if (typeof window === "undefined") return "opencode";
     const stored = localStorage.getItem("lmms-writer-agent-backend");
@@ -240,17 +251,19 @@ export default function EditorPage() {
       await saveManager.flushAll();
       return true;
     } catch (error) {
-      toast(`保存失败，操作已取消：${String(error)}`, "error");
+      toast(t("page.savingFailedTheActionWasCancelledError", { error: String(error) }), "error");
       return false;
     }
-  }, [saveManager, toast]);
+  }, [saveManager, toast, t]);
   useEffect(() => {
     const project = daemon.projectPath;
     if (!project) return;
     void saveManager
       .recoverProject(project, (path) => invoke<string>("read_document", { project, path }))
-      .catch((error) => toast(`恢复草稿读取失败：${String(error)}`, "error"));
-  }, [daemon.projectPath, saveManager, toast]);
+      .catch((error) =>
+        toast(t("page.couldNotReadRecoveredDraftsError", { error: String(error) }), "error"),
+      );
+  }, [daemon.projectPath, saveManager, toast, t]);
   const [showLatexSettings, setShowLatexSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"build" | "editor" | "collab">("build");
   const openSettings = useCallback((tab: "build" | "editor" | "collab" = "build") => {
@@ -317,8 +330,8 @@ export default function EditorPage() {
       if (agentBackend !== "opencode") {
         toast(
           agentBackend === "codex"
-            ? "编译失败，日志已交给 Codex。"
-            : "编译失败，日志已填入 Claude Code 输入框。",
+            ? t("page.compilationFailedTheLogWasSentToCodex")
+            : t("page.compilationFailedTheLogIsInTheClaudeCode"),
           "error",
         );
         return;
@@ -326,12 +339,12 @@ export default function EditorPage() {
       const ready = await opencode.ensure(daemon.projectPath);
       toast(
         ready
-          ? "Compilation failed. Sent the log to Agent."
-          : "Compilation failed. Could not start the Agent automatically.",
+          ? t("page.compilationFailedSentTheLogToAgent")
+          : t("page.compilationFailedCouldNotStartTheAgentAu"),
         "error",
       );
     },
-    [agentBackend, daemon.projectPath, opencode.ensure, toast],
+    [agentBackend, daemon.projectPath, opencode.ensure, toast, t],
   );
   const showBuiltPdf = useCallback(
     ({ relative, absolute }: { relative: string; absolute: string }) => {
@@ -360,7 +373,7 @@ export default function EditorPage() {
       return;
     }
     setShowLatexSettings(true);
-    toast("请在设置中添加或扫描编译目标。", "error");
+    toast(t("page.addOrScanBuildTargetsInSettings"), "error");
   }, [
     daemon.projectPath,
     latexSettings.isDetecting,
@@ -368,6 +381,7 @@ export default function EditorPage() {
     latexSettings.activeTarget,
     targetBuild.build,
     toast,
+    t,
   ]);
 
   const handleToggleRightPanel = useCallback(() => {
@@ -486,7 +500,7 @@ export default function EditorPage() {
           // Handle file not found - remove from tabs and notify user
           if (errorStr.includes("FILE_NOT_FOUND")) {
             const fileName = pathSync.basename(resolvedPath);
-            toast(`File "${fileName}" no longer exists and has been removed from tabs`, "error");
+            toast(t("page.fileNameNoLongerExistsAndHasBeenRemovedF", { name: fileName }), "error");
 
             // Remove the file from open tabs
             setOpenTabs((prev) => {
@@ -517,7 +531,7 @@ export default function EditorPage() {
               return;
             }
             console.error("Failed to read file:", err);
-            toast(`Failed to read file: ${err}`, "error");
+            toast(t("page.failedToReadFileError", { error: String(err) }), "error");
             setFileContent("");
           }
         } finally {
@@ -531,7 +545,7 @@ export default function EditorPage() {
         setFileContent("");
       }
     },
-    [daemon, resolveSelectablePath, toast, saveManager, flushBeforeLeave],
+    [daemon, resolveSelectablePath, toast, saveManager, flushBeforeLeave, t],
   );
 
   const [pendingPdfPage, setPendingPdfPage] = useState<{ path: string; page: number } | null>(null);
@@ -541,14 +555,14 @@ export default function EditorPage() {
       if (target.kind === "external-file") {
         try {
           await revealInFileManager(daemon.projectPath ?? "", target.path);
-          toast(`已在文件管理器中定位 ${pathSync.basename(target.path)}`);
+          toast(t("page.shownNameInTheFileManager", { name: pathSync.basename(target.path) }));
         } catch (cause) {
-          toast(`无法打开文件所在文件夹：${String(cause)}`, "error");
+          toast(t("page.couldNotOpenTheFileSFolderError", { error: String(cause) }), "error");
         }
         return;
       }
       if (target.kind !== "file") {
-        toast("这个链接不属于当前项目。", "error");
+        toast(t("page.thisLinkIsNotPartOfTheCurrentProject"), "error");
         return;
       }
       let filePath = target.path;
@@ -573,7 +587,7 @@ export default function EditorPage() {
       if (target.line) setPendingGoToLine(target.line);
       if (target.page) setPendingPdfPage({ path: filePath, page: target.page });
     },
-    [daemon.projectPath, handleFileSelect, toast, fileIndex, latexSettings.activeTarget],
+    [daemon.projectPath, handleFileSelect, toast, fileIndex, latexSettings.activeTarget, t],
   );
 
   useEffect(() => {
@@ -1015,7 +1029,10 @@ export default function EditorPage() {
           if (splitLoadRequestIdRef.current !== requestId) return;
           const errorStr = String(err);
           if (errorStr.includes("FILE_NOT_FOUND")) {
-            toast(`File "${pathSync.basename(resolvedPath)}" no longer exists`, "error");
+            toast(
+              t("page.fileNameNoLongerExists", { name: pathSync.basename(resolvedPath) }),
+              "error",
+            );
             setSplitPane(null);
             return;
           }
@@ -1083,6 +1100,7 @@ export default function EditorPage() {
       handleFileSelect,
       saveManager,
       flushBeforeLeave,
+      t,
     ],
   );
 
@@ -1390,7 +1408,7 @@ export default function EditorPage() {
           <div className="flex-1 min-h-0">
             {!splitSelectedFile ? (
               <div className="h-full flex items-center justify-center px-6 text-sm text-muted">
-                Drag a tab here to open a second editor group.
+                {t("page.dragATabHereToOpenASecondEditorGroup")}
               </div>
             ) : splitPane.isLoading ? (
               <EditorSkeleton className="h-full" />
@@ -1427,7 +1445,7 @@ export default function EditorPage() {
                       )
                     }
                   >
-                    在文件管理器中显示
+                    {t("page.showInFileManager")}
                   </button>
                 ) : (
                   <button
@@ -1439,7 +1457,7 @@ export default function EditorPage() {
                       )
                     }
                   >
-                    此文件无法预览 · 在文件管理器中显示
+                    {t("page.thisFileCannotBePreviewedShowInFileManag")}
                   </button>
                 )}
               </div>
@@ -1485,6 +1503,7 @@ export default function EditorPage() {
       editorSettings.settings,
       editorSettings.editorTheme,
       toast,
+      t,
     ],
   );
 
@@ -1502,14 +1521,14 @@ export default function EditorPage() {
   // Sidebar tabs configuration
   const sidebarTabs = useMemo(
     (): TabItem[] => [
-      { id: "files", label: "Files" },
+      { id: "files", label: t("page.files") },
       {
         id: "git",
-        label: "Git",
+        label: t("page.git"),
         badge: gitStatus && gitStatus.changes.length > 0 ? gitStatus.changes.length : undefined,
       },
     ],
-    [gitStatus],
+    [gitStatus, t],
   );
 
   const handleContentChange = useCallback(
@@ -1533,7 +1552,7 @@ export default function EditorPage() {
           choose,
           confirm: async () => {
             if (targetBuild.isBuilding() || latexSettings.saving)
-              throw new Error("编译或配置保存仍在进行，请完成后再切换文件夹。");
+              throw new Error(t("page.aBuildOrSettingsSaveIsStillRunningSwitch"));
             return confirmAgentsIdle("switch");
           },
           freeze: setSwitchingProject,
@@ -1568,11 +1587,14 @@ export default function EditorPage() {
           await recentProjects
             .addProject(path)
             .catch((error) =>
-              toast(`文件夹已打开，但最近项目记录未保存：${String(error)}`, "error"),
+              toast(
+                t("page.theFolderIsOpenButTheRecentProjectsListW", { error: String(error) }),
+                "error",
+              ),
             );
       } catch (err) {
         console.error("Failed to open project:", err);
-        toast(`切换文件夹已取消，当前项目和草稿已保留：${String(err)}`, "error");
+        toast(t("page.switchingFoldersWasCancelledTheCurrentPr", { error: String(err) }), "error");
       } finally {
         setChoosingProject(false);
       }
@@ -1586,6 +1608,7 @@ export default function EditorPage() {
       projectTransition,
       latexSettings.saving,
       targetBuild.isBuilding,
+      t,
     ],
   );
   const handleOpenFolder = useCallback(
@@ -1595,12 +1618,12 @@ export default function EditorPage() {
         const selected = await open({
           directory: true,
           multiple: false,
-          title: "打开文件夹",
+          title: t("page.openFolder"),
           defaultPath: daemon.projectPath ? pathSync.dirname(daemon.projectPath) : undefined,
         });
         return typeof selected === "string" ? selected : null;
       }),
-    [changeProject, daemon.projectPath],
+    [changeProject, daemon.projectPath, t],
   );
   const handleOpenRecentProject = useCallback(
     (path: string) => changeProject(async () => path),
@@ -1642,18 +1665,21 @@ export default function EditorPage() {
     };
   }, [handleOpenRecentProject]);
 
-  const validateFileName = useCallback((name: string): string | null => {
-    if (!name.trim()) {
-      return "Name cannot be empty";
-    }
-    if (name.includes("/") || name.includes("\\")) {
-      return "Name cannot contain / or \\";
-    }
-    if (name.startsWith(".")) {
-      return "Name cannot start with .";
-    }
-    return null;
-  }, []);
+  const validateFileName = useCallback(
+    (name: string): string | null => {
+      if (!name.trim()) {
+        return t("page.nameCannotBeEmpty");
+      }
+      if (name.includes("/") || name.includes("\\")) {
+        return t("page.nameCannotContainOr");
+      }
+      if (name.startsWith(".")) {
+        return t("page.nameCannotStartWith");
+      }
+      return null;
+    },
+    [t],
+  );
 
   const handleCreateConfirm = useCallback(
     async (value: string) => {
@@ -1666,10 +1692,10 @@ export default function EditorPage() {
         }
         setCreateDialog(null);
       } catch (error) {
-        toast(`Failed to create: ${error}`, "error");
+        toast(t("page.failedToCreateError", { error: String(error) }), "error");
       }
     },
-    [createDialog, daemon, toast],
+    [createDialog, daemon, toast, t],
   );
 
   useEffect(() => {
@@ -1759,7 +1785,9 @@ export default function EditorPage() {
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{gitDiffPreview.path}</div>
                 <div className="text-xs text-muted flex items-center gap-2">
-                  <span>{gitDiffPreview.staged ? "Staged changes" : "Working tree changes"}</span>
+                  <span>
+                    {gitDiffPreview.staged ? t("page.stagedChanges") : t("page.workingTreeChanges")}
+                  </span>
                   {parsedGitDiff?.hasRenderableHunks && (
                     <span>
                       +{parsedGitDiff.added} / -{parsedGitDiff.removed}
@@ -1775,7 +1803,7 @@ export default function EditorPage() {
                   }
                   className="btn btn-sm btn-secondary"
                 >
-                  Refresh Diff
+                  {t("page.refreshDiff")}
                 </button>
                 <button
                   type="button"
@@ -1784,7 +1812,7 @@ export default function EditorPage() {
                   }}
                   className="btn btn-sm btn-secondary"
                 >
-                  Open File
+                  {t("page.openFile")}
                 </button>
               </div>
             </div>
@@ -1798,11 +1826,11 @@ export default function EditorPage() {
                 </div>
               ) : parsedGitDiff?.isBinary ? (
                 <div className="h-full flex items-center justify-center px-6 text-sm text-muted">
-                  Binary file diff is not previewable in editor.
+                  {t("page.binaryFileDiffIsNotPreviewableInEditor")}
                 </div>
               ) : !gitDiffPreview.content.trim() ? (
                 <div className="h-full flex items-center justify-center px-6 text-sm text-muted">
-                  No textual diff available for this file.
+                  {t("page.noTextualDiffAvailableForThisFile")}
                 </div>
               ) : parsedGitDiff?.hasRenderableHunks ? (
                 <GitMonacoDiffEditor
@@ -1858,13 +1886,13 @@ export default function EditorPage() {
                     )
                   }
                 >
-                  在文件管理器中显示
+                  {t("page.showInFileManager")}
                 </button>
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center overflow-auto p-4">
                 <div className="flex flex-col items-center gap-3 text-sm text-muted">
-                  <p>此文件无法在编辑器中预览。</p>
+                  <p>{t("page.thisFileCannotBePreviewedInTheEditor")}</p>
                   <button
                     type="button"
                     className="border border-border px-3 py-2"
@@ -1874,7 +1902,7 @@ export default function EditorPage() {
                       )
                     }
                   >
-                    在文件管理器中显示
+                    {t("page.showInFileManager")}
                   </button>
                 </div>
               </div>
@@ -1882,7 +1910,7 @@ export default function EditorPage() {
           </div>
         ) : fileLoadError ? (
           <div role="alert" className="p-4 text-accent">
-            文件读取失败，编辑已暂停：{fileLoadError}
+            {t("page.couldNotReadTheFileEditingIsPausedError", { error: fileLoadError })}
           </div>
         ) : isLoadingFile ? (
           <EditorSkeleton className="flex-1 min-h-0" />
@@ -1909,7 +1937,7 @@ export default function EditorPage() {
         )
       ) : (
         <div className="flex-1 min-h-0 flex items-center justify-center px-6 text-sm text-muted bg-accent-hover">
-          Drop a tab here to open this panel.
+          {t("page.dropATabHereToOpenThisPanel")}
         </div>
       )}
     </div>
@@ -1953,7 +1981,7 @@ export default function EditorPage() {
           className="fixed inset-0 z-[250] flex items-center justify-center bg-background/70"
         >
           <p className="border border-border bg-background px-5 py-3 text-sm shadow-md">
-            正在保存当前内容并打开文件夹…
+            {t("page.savingAndOpeningTheFolder")}
           </p>
         </div>
       )}
@@ -1988,13 +2016,13 @@ export default function EditorPage() {
                   type="button"
                   onClick={() => void handleOpenFolder()}
                   disabled={choosingProject || daemon.isOpeningProject}
-                  aria-label="打开文件夹"
-                  title="打开文件夹（⌘/Ctrl+O），先保存当前修改"
+                  aria-label={t("page.openFolder")}
+                  title={t("page.openFolderCtrlOCurrentChangesAreSavedFir")}
                   className="flex h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:bg-accent-hover disabled:opacity-50"
                 >
                   <FolderOpenIcon className="size-4" aria-hidden="true" />
                   <span className="hidden sm:inline">
-                    {choosingProject ? "正在打开…" : "打开文件夹"}
+                    {choosingProject ? t("page.opening") : t("page.openFolder")}
                   </span>
                 </button>
               </div>
@@ -2009,7 +2037,7 @@ export default function EditorPage() {
                         ? "border-foreground"
                         : "hover:bg-accent-hover hover:border-border-dark"
                     }`}
-                    title="Toggle Sidebar"
+                    title={t("page.toggleSidebar")}
                   >
                     <SidebarSimpleIcon className="size-4" weight="bold" />
                   </button>
@@ -2024,7 +2052,7 @@ export default function EditorPage() {
                         ? "border-foreground"
                         : "hover:bg-accent-hover hover:border-border-dark"
                     }`}
-                    title="Toggle Terminal"
+                    title={t("page.toggleTerminal")}
                   >
                     <TerminalIcon className="size-4" weight="bold" />
                   </button>
@@ -2038,7 +2066,7 @@ export default function EditorPage() {
                       ? "border-foreground"
                       : "hover:bg-accent-hover hover:border-border-dark"
                   }`}
-                  title="Toggle Agent Mode"
+                  title={t("page.toggleAgentMode")}
                 >
                   <RobotIcon className="size-4" weight="bold" />
                 </button>
@@ -2048,7 +2076,7 @@ export default function EditorPage() {
                     <span className="text-border text-lg select-none">/</span>
                     <div className="flex items-center gap-2 h-8">
                       <select
-                        aria-label="编译目标"
+                        aria-label={t("page.buildTarget")}
                         value={latexSettings.settings.config.activeTarget ?? ""}
                         disabled={
                           targetBuild.compiling || latexSettings.isDetecting || latexSettings.saving
@@ -2059,7 +2087,7 @@ export default function EditorPage() {
                         className="h-8 max-w-40 truncate border border-border bg-background px-2 text-xs"
                       >
                         {!latexSettings.settings.config.targets.length && (
-                          <option value="">添加编译目标…</option>
+                          <option value="">{t("page.addBuildTarget")}</option>
                         )}
                         {latexSettings.settings.config.targets.map((target) => (
                           <option key={target.id} value={target.id}>
@@ -2071,9 +2099,9 @@ export default function EditorPage() {
                         type="button"
                         onClick={() => setShowTemplateImport(true)}
                         className="h-8 border border-border px-2 text-xs"
-                        title="从 ZIP 或文件夹创建新项目"
+                        title={t("page.createANewProjectFromAZipOrFolder")}
                       >
-                        导入模板
+                        {t("page.importTemplate")}
                       </button>
 
                       <button
@@ -2087,7 +2115,11 @@ export default function EditorPage() {
                             ? "opacity-50 cursor-not-allowed"
                             : "hover:bg-accent-hover hover:border-border-dark"
                         }`}
-                        title={targetBuild.compiling ? "正在编译…" : "编译所选目标 (Ctrl+Shift+B)"}
+                        title={
+                          targetBuild.compiling
+                            ? t("page.compiling")
+                            : t("page.compileTheSelectedTargetCtrlShiftB")
+                        }
                       >
                         <PlayCircleIcon className="size-4" />
                       </button>
@@ -2101,7 +2133,7 @@ export default function EditorPage() {
                           }
                           className="h-8 border border-border px-2 text-xs"
                         >
-                          停止编译
+                          {t("page.stopBuild")}
                         </button>
                       )}
 
@@ -2109,8 +2141,8 @@ export default function EditorPage() {
                         type="button"
                         onClick={() => openSettings()}
                         className="h-8 w-8 border border-border bg-background text-foreground hover:bg-accent-hover hover:border-border-dark transition-colors flex items-center justify-center"
-                        title="Settings"
-                        aria-label="Settings"
+                        title={t("page.settings")}
+                        aria-label={t("page.settings")}
                       >
                         <GearIcon className="size-4" />
                       </button>
@@ -2149,7 +2181,13 @@ export default function EditorPage() {
               if (tab)
                 conversations.dispatch(
                   { backend, tabId: tab.id },
-                  `合并冲突 ${conflict.id} 已由用户处理并保存。请重新读取 ${conflict.path}${conflict.annotationId ? ` 与批注 ${conflict.annotationId}` : ""}，尊重用户的合并结果，不要重放旧提案；核验后继续完成批注。`,
+                  t("page.theUserResolvedAndSavedMergeConflictIdRe", {
+                    id: conflict.id,
+                    path: conflict.path,
+                    comment: conflict.annotationId
+                      ? t("page.andCommentId", { id: conflict.annotationId })
+                      : "",
+                  }),
                 );
             }}
             agentBusy={conversations.tabs.some(
@@ -2198,7 +2236,7 @@ export default function EditorPage() {
         )}
         {latexSettings.error && (
           <p role="alert" className="border-b border-border px-3 py-2 text-xs text-red-600">
-            编译配置：{latexSettings.error}
+            {t("page.buildSettingsError", { error: latexSettings.error })}
           </p>
         )}
         <main className="flex-1 min-h-0 flex relative overflow-hidden">
@@ -2328,14 +2366,14 @@ export default function EditorPage() {
                       className="h-24 w-auto mb-10 hidden dark:block"
                     />
                     <button type="button" onClick={handleOpenFolder} className="btn btn-primary">
-                      Open Folder
+                      {t("page.openFolder")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowTemplateImport(true)}
                       className="mt-3 border border-border px-4 py-2 text-sm"
                     >
-                      导入 LaTeX 模板（ZIP／文件夹）
+                      {t("page.importALatexTemplateZipFolder")}
                     </button>
                     <button
                       type="button"
@@ -2465,7 +2503,7 @@ export default function EditorPage() {
 
         {createDialog && (
           <InputDialog
-            title={createDialog.type === "file" ? "New File" : "New Folder"}
+            title={createDialog.type === "file" ? t("page.newFile") : t("page.newFolder")}
             placeholder={createDialog.type === "file" ? "file.tex" : "folder"}
             onConfirm={handleCreateConfirm}
             onCancel={() => setCreateDialog(null)}

@@ -12,6 +12,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useMemo, useState } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
+import { useI18n } from "@/lib/i18n";
 
 type Source = { path: string; content: string; revision: string };
 type Edit = { path: string; expected: string | null; content: string };
@@ -24,6 +25,7 @@ export function BibliographyPanel({
   manager: SaveManager;
   onOpen: (path: string) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false),
     [files, setFiles] = useState<Source[]>([]),
     [query, setQuery] = useState("");
@@ -83,19 +85,25 @@ export function BibliographyPanel({
     const current = files.find((f) => f.path === target);
     const result = importBibliography(current?.content || "", importText);
     if (!result.added) {
-      setNotice(`没有新增条目，跳过 ${result.skipped.length} 条重复文献。`);
+      setNotice(
+        t("bib.nothingNewSkippedSkippedSkippedDuplicate", { skipped: result.skipped.length }),
+      );
       return;
     }
     setPreview({
       changes: [{ path: target, expected: current?.content ?? null, content: result.content }],
-      label: "导入参考文献",
-      summary: `新增 ${result.added} 条；跳过 ${result.skipped.length} 条重复文献；${Object.keys(result.renamed).length} 个冲突键已重命名。`,
+      label: t("bib.importReferences"),
+      summary: t("bib.addedAddedSkippedSkippedSkippedDuplicate", {
+        added: result.added,
+        skipped: result.skipped.length,
+        renamed: Object.keys(result.renamed).length,
+      }),
     });
   };
   const prepareRename = () => {
     if (!rename) return;
     if (entries.some((e) => e.key === rename.next && e.key !== rename.old))
-      throw new Error("目标引用键已经存在");
+      throw new Error(t("bib.thatCitationKeyAlreadyExists"));
     const changes = files.flatMap((f) => {
       const content = f.path.endsWith(".bib")
         ? renameBibKey(f.content, rename.old, rename.next)
@@ -107,8 +115,12 @@ export function BibliographyPanel({
     if (!changes.length) return;
     setPreview({
       changes,
-      label: "重命名引用键",
-      summary: `${rename.old} → ${rename.next}，同时更新 ${changes.length} 个文件中的引用。`,
+      label: t("bib.renameCitationKey"),
+      summary: t("bib.oldNextUpdatingCitationsInCountCountFile", {
+        old: rename.old,
+        next: rename.next,
+        count: changes.length,
+      }),
     });
   };
   const dedupe = () => {
@@ -123,7 +135,7 @@ export function BibliographyPanel({
         continue;
       }
       if (entries.some((other) => other.key === e.key && bibliographyIdentity(other) !== id))
-        throw new Error(`键 ${e.key} 对应不同文献，需先手动核对`);
+        throw new Error(t("bib.keyKeyBelongsToDifferentReferencesCheckT", { key: e.key }));
       remove.add(`${e.file}:${e.from}`);
       if (e.key !== first.key) replacements.set(e.key, first.key);
     }
@@ -142,13 +154,13 @@ export function BibliographyPanel({
       return content === f.content ? [] : [{ path: f.path, expected: f.content, content }];
     });
     if (!changes.length) {
-      setNotice("没有找到 DOI 或标题/年份相同的重复条目。");
+      setNotice(t("bib.noDuplicatesWithTheSameDoiOrTitleAndYear"));
       return;
     }
     setPreview({
       changes,
-      label: "合并重复文献",
-      summary: `合并 ${remove.size} 个重复条目并更新引用；请核对下面的修改前后内容。`,
+      label: t("bib.mergeDuplicateReferences"),
+      summary: t("bib.mergeCountCountDuplicateDuplicatesAndUpd", { count: remove.size }),
     });
   };
   return (
@@ -161,38 +173,40 @@ export function BibliographyPanel({
         }}
         className="border border-border px-2 py-1 text-xs"
       >
-        文献库
+        {t("bib.references")}
       </button>
       {open && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center bg-black/30 p-5">
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="参考文献管理"
+            aria-label={t("bib.referenceManager")}
             className="flex h-[85vh] w-full max-w-6xl flex-col border border-border bg-background shadow-xl"
           >
             <header className="flex items-center justify-between border-b border-border p-3">
-              <strong>参考文献 · {entries.length} 条</strong>
+              <strong>{t("bib.referencesCount", { count: entries.length })}</strong>
               <button type="button" disabled={busy} onClick={close}>
-                关闭
+                {t("bib.close")}
               </button>
             </header>
             <div className="flex flex-wrap items-center gap-2 border-b border-border p-3 text-xs">
               <input
-                aria-label="搜索文献"
+                aria-label={t("bib.searchReferences")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="标题、作者、DOI 或引用键"
+                placeholder={t("bib.titleAuthorDoiOrCitationKey")}
                 className="min-w-48 flex-1 border border-border bg-background p-2"
               />
               <button type="button" disabled={busy} onClick={() => void run(reload)}>
-                刷新
+                {t("bib.refresh")}
               </button>
               <button type="button" disabled={busy} onClick={() => void run(async () => dedupe())}>
-                检查并合并重复
+                {t("bib.findAndMergeDuplicates")}
               </button>
               <span>
-                {uses.filter((c) => !entries.some((e) => e.key === c.key)).length} 处引用缺少条目
+                {t("bib.countCountCitationHasCitationsHaveNoEntr", {
+                  count: uses.filter((c) => !entries.some((e) => e.key === c.key)).length,
+                })}
               </span>
             </div>
             {error && (
@@ -208,9 +222,9 @@ export function BibliographyPanel({
             <div className="flex min-h-0 flex-1">
               <aside className="w-72 shrink-0 space-y-3 overflow-auto border-r border-border p-3 text-xs">
                 <label className="block">
-                  保存到 .bib 文件
+                  {t("bib.saveToBibFile")}
                   <input
-                    aria-label="目标 BibTeX 文件"
+                    aria-label={t("bib.targetBibtexFile")}
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                     className="mt-1 w-full border border-border bg-background p-2"
@@ -221,7 +235,7 @@ export function BibliographyPanel({
                     aria-label="DOI"
                     value={doi}
                     onChange={(e) => setDoi(e.target.value)}
-                    placeholder="输入 DOI"
+                    placeholder={t("bib.enterADoi")}
                     className="min-w-0 flex-1 border border-border bg-background p-2"
                   />
                   <button
@@ -234,15 +248,15 @@ export function BibliographyPanel({
                             doi: normalizeDoi(doi),
                           }),
                         );
-                        setNotice("已从 Crossref 获取元数据，请核对后导入。");
+                        setNotice(t("bib.metadataFetchedFromCrossrefCheckItThenIm"));
                       })
                     }
                   >
-                    查询
+                    {t("bib.lookUp")}
                   </button>
                 </div>
                 <label className="block border border-border p-2">
-                  导入 BibTeX 文件
+                  {t("bib.importBibtexFile")}
                   <input
                     type="file"
                     accept=".bib,.txt"
@@ -251,7 +265,7 @@ export function BibliographyPanel({
                       const f = e.target.files?.[0];
                       if (f)
                         void run(async () => {
-                          if (f.size > 2_000_000) throw new Error("文件超过 2 MB");
+                          if (f.size > 2_000_000) throw new Error(t("bib.theFileExceeds2Mb"));
                           setImportText(await f.text());
                         });
                       e.target.value = "";
@@ -265,17 +279,17 @@ export function BibliographyPanel({
                   onClick={() =>
                     void run(async () => {
                       setImportText(await invoke<string>("bibliography_zotero_local"));
-                      setNotice("已读取本机 Zotero，核对并导入后可再次同步；重复条目会跳过。");
+                      setNotice(t("bib.readTheLocalZoteroLibraryCheckAndImportY"));
                     })
                   }
                 >
-                  读取 / 同步本机 Zotero
+                  {t("bib.readSyncLocalZotero")}
                 </button>
                 <textarea
-                  aria-label="待导入 BibTeX"
+                  aria-label={t("bib.bibtexToImport")}
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
-                  placeholder="可直接粘贴 BibTeX，也支持 Zotero 导出的 .bib"
+                  placeholder={t("bib.pasteBibtexHereBibExportedFromZoteroWork")}
                   className="h-44 w-full border border-border bg-background p-2 font-mono"
                 />
                 <button
@@ -284,19 +298,16 @@ export function BibliographyPanel({
                   onClick={() => void run(async () => prepareImport())}
                   className="w-full border border-foreground p-2"
                 >
-                  预览导入
+                  {t("bib.previewImport")}
                 </button>
-                <p className="text-muted">
-                  导入与重命名前后创建 Git 版本。来源元数据需要核对，DOI
-                  查询不会自动证明论文支持某一论述。
-                </p>
+                <p className="text-muted">{t("bib.gitVersionsAreCreatedBeforeAndAfterImpor")}</p>
               </aside>
               <div className="min-w-0 flex-1 overflow-auto p-3">
                 {rename && (
                   <div className="mb-3 flex items-center gap-2 border border-border p-2 text-xs">
                     <span>{rename.old} →</span>
                     <input
-                      aria-label="新引用键"
+                      aria-label={t("bib.newCitationKey")}
                       value={rename.next}
                       onChange={(e) => setRename({ ...rename, next: e.target.value })}
                       className="border border-border bg-background p-1"
@@ -306,10 +317,10 @@ export function BibliographyPanel({
                       disabled={busy}
                       onClick={() => void run(async () => prepareRename())}
                     >
-                      预览重命名
+                      {t("bib.previewRename")}
                     </button>
                     <button type="button" onClick={() => setRename(null)}>
-                      取消
+                      {t("bib.cancel")}
                     </button>
                   </div>
                 )}
@@ -333,7 +344,7 @@ export function BibliographyPanel({
                           {d.authors} · {d.year}
                         </p>
                         <p className="break-all text-xs">
-                          {e.key} · {d.doi || "无 DOI"} · {e.file}
+                          {e.key} · {d.doi || t("bib.noDoi")} · {e.file}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-3 text-xs">
                           <button
@@ -350,29 +361,31 @@ export function BibliographyPanel({
                               close();
                             }}
                           >
-                            打开条目
+                            {t("bib.openEntry")}
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               void run(async () => {
                                 await navigator.clipboard.writeText(`\\cite{${e.key}}`);
-                                setNotice("引用命令已复制，可在正文中粘贴。");
+                                setNotice(t("bib.citationCommandCopiedPasteItIntoTheText"));
                               })
                             }
                           >
-                            复制引用
+                            {t("bib.copyCitation")}
                           </button>
                           <button
                             type="button"
                             onClick={() => setRename({ old: e.key, next: e.key })}
                           >
-                            重命名键
+                            {t("bib.renameKey")}
                           </button>
-                          <span>{locations.length} 处引用</span>
+                          <span>
+                            {t("bib.citedCountCountTimeTimes", { count: locations.length })}
+                          </span>
                         </div>
                         <details className="mt-2 text-xs">
-                          <summary>引用位置</summary>
+                          <summary>{t("bib.citedAt")}</summary>
                           {locations.map((c) => (
                             <button
                               key={`${c.file}:${c.from}`}
@@ -401,7 +414,7 @@ export function BibliographyPanel({
                       <summary>{c.path}</summary>
                       <div className="grid grid-cols-2 gap-2">
                         <pre className="overflow-auto whitespace-pre-wrap border border-border p-2 text-xs">
-                          {c.expected || "（新文件）"}
+                          {c.expected || t("bib.newFile")}
                         </pre>
                         <pre className="overflow-auto whitespace-pre-wrap border border-border p-2 text-xs">
                           {c.content}
@@ -426,14 +439,14 @@ export function BibliographyPanel({
                         setRename(null);
                         setImportText("");
                         await reload();
-                        setNotice("已保存文献及相关引用，并创建 Git 版本。");
+                        setNotice(t("bib.referencesAndCitationsSavedWithAGitVersi"));
                       })
                     }
                   >
-                    确认保存
+                    {t("bib.save")}
                   </button>
                   <button type="button" disabled={busy} onClick={() => setPreview(null)}>
-                    取消
+                    {t("bib.cancel")}
                   </button>
                 </div>
               </div>

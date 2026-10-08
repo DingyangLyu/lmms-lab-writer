@@ -176,6 +176,56 @@ export const editorZh = {
   "annot.newCommentWhere": "新批注 · {where}",
   "annot.newNameConversation": "新 {name} 对话",
   "annot.commentsCount": "批注 {count}",
+  "bib.addedAddedSkippedSkippedSkippedDuplicate":
+    "新增 {added} 条；跳过 {skipped} 条重复文献；{renamed} 个冲突键已重命名。",
+  "bib.gitVersionsAreCreatedBeforeAndAfterImpor":
+    "导入与重命名前后创建 Git 版本。来源元数据需要核对，DOI 查询不会自动证明论文支持某一论述。",
+  "bib.oldNextUpdatingCitationsInCountCountFile":
+    "{old} → {next}，同时更新 {count} 个文件中的引用。",
+  "bib.mergeCountCountDuplicateDuplicatesAndUpd":
+    "合并 {count} 个重复条目并更新引用；请核对下面的修改前后内容。",
+  "bib.readTheLocalZoteroLibraryCheckAndImportY":
+    "已读取本机 Zotero，核对并导入后可再次同步；重复条目会跳过。",
+  "bib.pasteBibtexHereBibExportedFromZoteroWork": "可直接粘贴 BibTeX，也支持 Zotero 导出的 .bib",
+  "bib.nothingNewSkippedSkippedSkippedDuplicate": "没有新增条目，跳过 {skipped} 条重复文献。",
+  "bib.metadataFetchedFromCrossrefCheckItThenIm": "已从 Crossref 获取元数据，请核对后导入。",
+  "bib.noDuplicatesWithTheSameDoiOrTitleAndYear": "没有找到 DOI 或标题/年份相同的重复条目。",
+  "bib.referencesAndCitationsSavedWithAGitVersi": "已保存文献及相关引用，并创建 Git 版本。",
+  "bib.keyKeyBelongsToDifferentReferencesCheckT": "键 {key} 对应不同文献，需先手动核对",
+  "bib.readSyncLocalZotero": "读取 / 同步本机 Zotero",
+  "bib.citationCommandCopiedPasteItIntoTheText": "引用命令已复制，可在正文中粘贴。",
+  "bib.titleAuthorDoiOrCitationKey": "标题、作者、DOI 或引用键",
+  "bib.targetBibtexFile": "目标 BibTeX 文件",
+  "bib.importBibtexFile": "导入 BibTeX 文件",
+  "bib.saveToBibFile": "保存到 .bib 文件",
+  "bib.bibtexToImport": "待导入 BibTeX",
+  "bib.thatCitationKeyAlreadyExists": "目标引用键已经存在",
+  "bib.theFileExceeds2Mb": "文件超过 2 MB",
+  "bib.findAndMergeDuplicates": "检查并合并重复",
+  "bib.importReferences": "导入参考文献",
+  "bib.renameCitationKey": "重命名引用键",
+  "bib.mergeDuplicateReferences": "合并重复文献",
+  "bib.referenceManager": "参考文献管理",
+  "bib.enterADoi": "输入 DOI",
+  "bib.previewRename": "预览重命名",
+  "bib.noDoi": "无 DOI",
+  "bib.newFile": "（新文件）",
+  "bib.searchReferences": "搜索文献",
+  "bib.previewImport": "预览导入",
+  "bib.newCitationKey": "新引用键",
+  "bib.openEntry": "打开条目",
+  "bib.copyCitation": "复制引用",
+  "bib.renameKey": "重命名键",
+  "bib.citedAt": "引用位置",
+  "bib.save": "确认保存",
+  "bib.references": "文献库",
+  "bib.close": "关闭",
+  "bib.refresh": "刷新",
+  "bib.lookUp": "查询",
+  "bib.cancel": "取消",
+  "bib.referencesCount": "参考文献 · {count} 条",
+  "bib.countCountCitationHasCitationsHaveNoEntr": "{count} 处引用缺少条目",
+  "bib.citedCountCountTimeTimes": "{count} 处引用",
 };
 export const editorEn: Record<keyof typeof editorZh, string> = {
   "save.eachSaveKeepsThePreviousTextTheLatest30A":
@@ -363,4 +413,61 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "annot.newCommentWhere": "New comment · {where}",
   "annot.newNameConversation": "New {name} conversation",
   "annot.commentsCount": "Comments {count}",
+  "bib.addedAddedSkippedSkippedSkippedDuplicate":
+    "Added {added}; skipped {skipped} {skipped|duplicate|duplicates}; renamed {renamed} conflicting {renamed|key|keys}.",
+  "bib.gitVersionsAreCreatedBeforeAndAfterImpor":
+    "Git versions are created before and after imports and renames. Check the metadata: a DOI lookup does not show that a paper supports a claim.",
+  "bib.oldNextUpdatingCitationsInCountCountFile":
+    "{old} → {next}, updating citations in {count} {count|file|files}.",
+  "bib.mergeCountCountDuplicateDuplicatesAndUpd":
+    "Merge {count} {count|duplicate|duplicates} and update citations; check the before and after below.",
+  "bib.readTheLocalZoteroLibraryCheckAndImportY":
+    "Read the local Zotero library. Check and import; you can sync again later and duplicates are skipped.",
+  "bib.pasteBibtexHereBibExportedFromZoteroWork":
+    "Paste BibTeX here; .bib exported from Zotero works too",
+  "bib.nothingNewSkippedSkippedSkippedDuplicate":
+    "Nothing new; skipped {skipped} {skipped|duplicate|duplicates}.",
+  "bib.metadataFetchedFromCrossrefCheckItThenIm":
+    "Metadata fetched from Crossref; check it, then import.",
+  "bib.noDuplicatesWithTheSameDoiOrTitleAndYear":
+    "No duplicates with the same DOI or title and year.",
+  "bib.referencesAndCitationsSavedWithAGitVersi":
+    "References and citations saved, with a Git version.",
+  "bib.keyKeyBelongsToDifferentReferencesCheckT":
+    "Key {key} belongs to different references; check them by hand first",
+  "bib.readSyncLocalZotero": "Read / sync local Zotero",
+  "bib.citationCommandCopiedPasteItIntoTheText": "Citation command copied; paste it into the text.",
+  "bib.titleAuthorDoiOrCitationKey": "Title, author, DOI or citation key",
+  "bib.targetBibtexFile": "Target BibTeX file",
+  "bib.importBibtexFile": "Import BibTeX file",
+  "bib.saveToBibFile": "Save to .bib file",
+  "bib.bibtexToImport": "BibTeX to import",
+  "bib.thatCitationKeyAlreadyExists": "That citation key already exists",
+  "bib.theFileExceeds2Mb": "The file exceeds 2 MB",
+  "bib.findAndMergeDuplicates": "Find and merge duplicates",
+  "bib.importReferences": "Import references",
+  "bib.renameCitationKey": "Rename citation key",
+  "bib.mergeDuplicateReferences": "Merge duplicate references",
+  "bib.referenceManager": "Reference manager",
+  "bib.enterADoi": "Enter a DOI",
+  "bib.previewRename": "Preview rename",
+  "bib.noDoi": "No DOI",
+  "bib.newFile": "(new file)",
+  "bib.searchReferences": "Search references",
+  "bib.previewImport": "Preview import",
+  "bib.newCitationKey": "New citation key",
+  "bib.openEntry": "Open entry",
+  "bib.copyCitation": "Copy citation",
+  "bib.renameKey": "Rename key",
+  "bib.citedAt": "Cited at",
+  "bib.save": "Save",
+  "bib.references": "References",
+  "bib.close": "Close",
+  "bib.refresh": "Refresh",
+  "bib.lookUp": "Look up",
+  "bib.cancel": "Cancel",
+  "bib.referencesCount": "References · {count}",
+  "bib.countCountCitationHasCitationsHaveNoEntr":
+    "{count} {count|citation has|citations have} no entry",
+  "bib.citedCountCountTimeTimes": "Cited {count} {count|time|times}",
 };
