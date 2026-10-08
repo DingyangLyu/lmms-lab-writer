@@ -6,6 +6,7 @@ import { type CodexItem, imagesForCodexItem, textForCodexItem } from "@/lib/code
 import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
 import { ChatImage } from "./chat-image";
 import { UserFileMessage } from "./user-file-message";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   items: CodexItem[];
@@ -45,6 +46,7 @@ const HistoryItem = memo(function HistoryItem({
   onFileClick,
   onOpenExternal,
 }: { item: CodexItem } & Omit<Props, "items">) {
+  const { t } = useI18n();
   if (item.type === "userMessage")
     return (
       <div className="ml-5 border-l-2 border-foreground bg-accent-hover px-3 py-2 text-sm whitespace-pre-wrap break-words">
@@ -65,7 +67,7 @@ const HistoryItem = memo(function HistoryItem({
   if (item.type === "imageView")
     return (
       <div className="border-l-2 border-accent p-2">
-        <span className="mb-1 block text-xs text-muted">查看图片</span>
+        <span className="mb-1 block text-xs text-muted">{t("chat.viewImage")}</span>
         {imagesForCodexItem(item).map((image) => (
           <ChatImage key={image.url} url={image.url} name={image.name} />
         ))}

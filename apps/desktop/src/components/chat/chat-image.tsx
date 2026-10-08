@@ -3,18 +3,20 @@ import Image from "next/image";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { imageSource } from "@/lib/chat/images";
+import { i18n, useI18n } from "@/lib/i18n";
 
 export const ChatImageDirectory = createContext<string | undefined>(undefined);
 
 export function ChatImage({
   url,
-  name = "图片",
+  name = i18n.t("chat.image"),
   directory,
 }: {
   url: string;
   name?: string;
   directory?: string;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -33,17 +35,22 @@ export function ChatImage({
       if (prior instanceof HTMLElement) prior.focus();
     };
   }, [expanded]);
-  if (!src) return <span className="text-xs text-muted">图片路径不可用：{name}</span>;
+  if (!src)
+    return (
+      <span className="text-xs text-muted">{t("chat.imagePathUnavailableName", { name })}</span>
+    );
   return (
     <>
       <button
         type="button"
         className="inline-flex max-w-full cursor-zoom-in border border-border bg-background p-1 hover:border-accent"
-        title={`查看图片：${name}`}
+        title={t("chat.viewImageName", { name })}
         onClick={() => setExpanded(true)}
       >
         {failedUrl === src ? (
-          <span className="p-2 text-xs text-muted">图片无法加载：{name}</span>
+          <span className="p-2 text-xs text-muted">
+            {t("chat.theImageCouldNotBeLoadedName", { name })}
+          </span>
         ) : (
           <Image
             unoptimized
@@ -71,7 +78,7 @@ export function ChatImage({
               onClick={() => setExpanded(false)}
               className="absolute right-5 top-5 border border-white/50 bg-black px-3 py-2 text-white"
             >
-              关闭 · Esc
+              {t("chat.closeEsc")}
             </button>
             <Image
               unoptimized

@@ -2,6 +2,7 @@
 
 import { CheckIcon, PencilSimpleIcon, XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 export function RenameChat({
   name,
@@ -10,6 +11,7 @@ export function RenameChat({
   name: string;
   onRename: (name: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [busy, setBusy] = useState(false);
@@ -31,8 +33,8 @@ export function RenameChat({
     return (
       <button
         type="button"
-        aria-label={`重命名对话：${name}`}
-        title="重命名对话"
+        aria-label={t("chat.renameConversationName", { name })}
+        title={t("chat.renameConversation")}
         className="shrink-0 p-2 text-muted hover:text-accent"
         onClick={() => {
           setDraft(name);
@@ -47,7 +49,7 @@ export function RenameChat({
     <div className="min-w-0 flex-1 p-1.5">
       <div className="flex items-center gap-1">
         <input
-          aria-label="对话新名称"
+          aria-label={t("chat.newConversationName")}
           value={draft}
           maxLength={120}
           disabled={busy}
@@ -66,8 +68,8 @@ export function RenameChat({
         />
         <button
           type="button"
-          aria-label="保存对话名称"
-          title="保存名称"
+          aria-label={t("chat.saveConversationName")}
+          title={t("chat.saveName")}
           disabled={busy || !draft.trim()}
           onClick={() => void save()}
           className="p-1 text-accent disabled:opacity-40"
@@ -76,8 +78,8 @@ export function RenameChat({
         </button>
         <button
           type="button"
-          aria-label="取消重命名"
-          title="取消"
+          aria-label={t("chat.cancelRenaming")}
+          title={t("chat.cancel")}
           disabled={busy}
           onClick={() => setEditing(false)}
           className="p-1 text-muted"

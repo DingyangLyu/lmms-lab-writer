@@ -594,7 +594,8 @@ export function AnnotationManager() {
                       <optgroup label={t("annot.openConversations")}>
                         {notes.conversations.map((tab) => (
                           <option key={tab.id} value={tab.id}>
-                            {harnessLabel(tab.backend)} · {tab.title} · {STATUS_LABELS[tab.status]}
+                            {harnessLabel(tab.backend)} · {tab.title} ·{" "}
+                            {t(STATUS_LABELS[tab.status])}
                           </option>
                         ))}
                       </optgroup>

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useI18n } from "@/lib/i18n";
 export function clampPanelHeight(height: number, parentHeight: number, minimum: number) {
   const max = Math.max(0, parentHeight / 2);
   return Math.min(max, Math.max(Math.min(minimum, max), height));
@@ -102,6 +103,7 @@ export function PanelHeightHandle({
   control: ReturnType<typeof usePanelHeight>;
   label: string;
 }) {
+  const { t } = useI18n();
   return (
     // biome-ignore lint/a11y/useSemanticElements: A focusable drag handle needs pointer capture and a visible child grip.
     <div
@@ -112,7 +114,7 @@ export function PanelHeightHandle({
       aria-valuemin={0}
       aria-valuemax={50}
       aria-valuenow={Math.round((control.ratio ?? 0.2) * 100)}
-      title={`${label} · 最多半屏 · 双击恢复默认高度`}
+      title={t("chat.labelUpToHalfTheScreenDoubleClickForTheD", { label })}
       onPointerDown={control.onPointerDown}
       onPointerMove={control.onPointerMove}
       onPointerUp={control.onPointerUp}
@@ -133,6 +135,7 @@ export function ResizableComposer({
   children: React.ReactNode;
   backend: string;
 }) {
+  const { t } = useI18n();
   const height = usePanelHeight(`writer-composer-height:${backend}`);
   return (
     <div
@@ -142,7 +145,7 @@ export function ResizableComposer({
       data-chat-composer={backend}
       className="writer-composer"
     >
-      <PanelHeightHandle control={height} label="拖动调整输入区高度" />
+      <PanelHeightHandle control={height} label={t("chat.dragToResizeTheInputArea")} />
       {children}
     </div>
   );

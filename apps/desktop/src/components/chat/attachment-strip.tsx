@@ -3,6 +3,7 @@ import { FileIcon } from "@phosphor-icons/react";
 import { isDocument } from "@/lib/chat/files";
 import type { ChatImageFile } from "@/lib/chat/images";
 import { ChatImage } from "./chat-image";
+import { useI18n } from "@/lib/i18n";
 export function AttachmentStrip({
   files,
   onRemove,
@@ -12,6 +13,7 @@ export function AttachmentStrip({
   onRemove: (index: number) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   if (!files.length) return null;
   return (
     <div className="flex gap-2 overflow-x-auto p-2">
@@ -26,7 +28,9 @@ export function AttachmentStrip({
               <div className="min-w-0 text-xs">
                 <span className="block truncate">{file.filename}</span>
                 <span className="text-muted">
-                  {Math.max(1, Math.ceil(file.size / 1024))} KB · 文件附件
+                  {t("chat.sizeKbFileAttachment", {
+                    size: Math.max(1, Math.ceil(file.size / 1024)),
+                  })}
                 </span>
               </div>
             </div>
@@ -35,12 +39,12 @@ export function AttachmentStrip({
           )}
           <button
             type="button"
-            aria-label={`移除附件 ${file.filename}`}
+            aria-label={t("chat.removeAttachmentName", { name: file.filename })}
             disabled={disabled}
             onClick={() => onRemove(index)}
             className="text-xs text-muted hover:text-accent disabled:opacity-40"
           >
-            移除附件
+            {t("chat.removeAttachment")}
           </button>
         </div>
       ))}

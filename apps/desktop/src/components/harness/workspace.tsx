@@ -13,6 +13,7 @@ import type { useHarnessWorkspace } from "@/lib/harness/use-workspace";
 import { canClose } from "@/lib/harness/workspace";
 import { HarnessErrorBoundary } from "./error-boundary";
 import { HistoryDialog } from "./history-dialog";
+import { useI18n } from "@/lib/i18n";
 
 const PANELS = {
   opencode: dynamic(
@@ -34,9 +35,10 @@ export function HarnessButtons({
   workspace: Workspace;
   onChoose: (backend: HarnessId) => void;
 }) {
+  const { t } = useI18n();
   const active = workspace.tabs.find((t) => t.id === workspace.activeId)?.backend;
   return (
-    <fieldset className="flex shrink-0 gap-1" aria-label="AI 后端入口">
+    <fieldset className="flex shrink-0 gap-1" aria-label={t("harness.aiBackends")}>
       {HARNESSES.map((h) => {
         const count = workspace.tabs.filter(
           (t) => t.backend === h.id && ["running", "waiting"].includes(t.status),
@@ -48,7 +50,7 @@ export function HarnessButtons({
             className={`border px-2 py-1 text-xs ${active === h.id ? "border-foreground bg-foreground text-background" : "border-border hover:bg-accent-hover"}`}
             disabled={!workspace.ready}
             onClick={() => onChoose(h.id)}
-            title={`返回上次的 ${h.label} 对话；用右侧＋新建对话`}
+            title={t("harness.returnToTheLastNameConversationUseOnTheR", { name: h.label })}
           >
             {h.label}
             {count > 0 && <span className="ml-1 text-accent">{count} ●</span>}
@@ -76,6 +78,7 @@ export function HarnessWorkspace({
   >;
   onBackendChange: (backend: HarnessId) => void;
 }) {
+  const { t } = useI18n();
   const [historyBackend, setHistoryBackend] = useState<HarnessId | null>(null);
   const [renamedConversation, setRenamedConversation] = useState<
     { backend: HarnessId; id: string; title: string } | undefined
@@ -104,7 +107,7 @@ export function HarnessWorkspace({
         <div
           ref={strip}
           role="tablist"
-          aria-label="并发对话"
+          aria-label={t("harness.conversations")}
           className="writer-conversation-tabs flex min-w-0 flex-1 overflow-x-auto"
           onWheel={(event) => {
             if (strip.current && Math.abs(event.deltaY) > Math.abs(event.deltaX))
@@ -113,7 +116,13 @@ export function HarnessWorkspace({
         >
           {(workspace.ready ? workspace.tabs : []).map((tab) => {
             const pending = workspace.incoming[tab.id]?.length || 0;
-            const title = `${tab.title}\n${harnessLabel(tab.backend)} · ${STATUS_LABELS[tab.status]}${tab.queued ? ` · 队列 ${tab.queued}` : ""}${tab.hasDraft ? " · 有草稿" : ""}${pending ? ` · 待派发 ${pending}` : ""}\n${tab.sessionId || "尚未开始新会话"}`;
+            const details = [
+              `${harnessLabel(tab.backend)} · ${t(STATUS_LABELS[tab.status])}`,
+              tab.queued ? t("harness.queueCount", { count: tab.queued }) : "",
+              tab.hasDraft ? t("harness.draft") : "",
+              pending ? t("harness.toDeliverCount", { count: pending }) : "",
+            ].filter(Boolean);
+            const title = `${tab.title}\n${details.join(" · ")}\n${tab.sessionId || t("harness.noSessionStartedYet")}`;
             return (
               <div
                 key={tab.id}
@@ -136,18 +145,18 @@ export function HarnessWorkspace({
                   <span className="min-w-0 truncate">
                     <span className="block truncate font-medium">{tab.title}</span>
                     <span className="text-[10px] text-muted">
-                      {harnessLabel(tab.backend)} · {STATUS_LABELS[tab.status]}
+                      {harnessLabel(tab.backend)} · {t(STATUS_LABELS[tab.status])}
                     </span>
                   </span>
                 </button>
                 <button
                   type="button"
-                  aria-label={`关闭 ${tab.title}`}
+                  aria-label={t("harness.closeTitle", { title: tab.title })}
                   disabled={!canClose(tab) || pending > 0}
                   title={
                     !canClose(tab) || pending
-                      ? "执行中、草稿或队列尚未处理，暂时不能关闭"
-                      : "关闭标签（历史保留）"
+                      ? t("harness.cannotCloseWhileRunningOrWithADraftOrQue")
+                      : t("harness.closeTabHistoryIsKept")
                   }
                   className="mr-1 px-1 text-muted disabled:opacity-20"
                   onClick={() => workspace.close(tab.id)}
@@ -160,18 +169,20 @@ export function HarnessWorkspace({
         </div>
         <button
           type="button"
-          aria-label="打开历史对话"
-          title="打开或重命名历史对话"
+          aria-label={t("harness.openAPastConversation")}
+          title={t("harness.openOrRenamePastConversations")}
           disabled={!workspace.ready}
           className="shrink-0 border-l border-border px-2 text-xs hover:bg-accent-hover"
           onClick={() => setHistoryBackend(activeTab?.backend || preferredBackend)}
         >
-          历史对话
+          {t("harness.history")}
         </button>
         <button
           type="button"
-          title={`新建 ${harnessLabel(activeTab?.backend || preferredBackend)} 对话`}
-          aria-label="新建并发对话"
+          title={t("harness.newNameConversation", {
+            name: harnessLabel(activeTab?.backend || preferredBackend),
+          })}
+          aria-label={t("harness.newConversation")}
           className="shrink-0 border-l border-border px-3 text-xl hover:bg-accent-hover"
           onClick={() => workspace.open(activeTab?.backend || preferredBackend)}
         >
@@ -199,12 +210,12 @@ export function HarnessWorkspace({
                 <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1 text-xs">
                   <span className="min-w-0 flex-1 truncate" title={incoming.text}>
                     {incoming.state === "sending"
-                      ? "正在派发"
+                      ? t("harness.delivering")
                       : incoming.state === "paused"
-                        ? "重启后已暂停，请核对历史后重试"
+                        ? t("harness.pausedAfterARestartCheckTheHistoryThenRe")
                         : incoming.state === "failed"
-                          ? "派发失败，请核对历史后重试"
-                          : "等待连接后派发"}
+                          ? t("harness.deliveryFailedCheckTheHistoryThenRetry")
+                          : t("harness.deliversOnceConnected")}
                     ：{incoming.text}
                   </span>
                   <button
@@ -212,14 +223,14 @@ export function HarnessWorkspace({
                     disabled={incoming.state === "sending" || incoming.state === "pending"}
                     onClick={() => workspace.retry(tab.id)}
                   >
-                    重试
+                    {t("harness.retry")}
                   </button>
                   <button
                     type="button"
                     disabled={incoming.state === "sending"}
                     onClick={() => workspace.accept(tab.id, incoming.id)}
                   >
-                    取消
+                    {t("harness.cancel")}
                   </button>
                 </div>
               )}
@@ -252,7 +263,9 @@ export function HarnessWorkspace({
           );
         })}
         {!workspace.tabs.length && (
-          <p className="p-4 text-sm text-muted">从上方选择一个 AI 后端，开始新对话。</p>
+          <p className="p-4 text-sm text-muted">
+            {t("harness.chooseAnAiBackendAboveToStartAConversati")}
+          </p>
         )}
       </div>
       {historyBackend && shared.directory && (

@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { ChatImage } from "@/components/chat/chat-image";
 import { ChatLink } from "@/components/chat/chat-link";
 import { chatUrlTransform } from "@/lib/chat/links";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   text: string;
@@ -21,13 +22,18 @@ export const CodexMarkdown = memo(function CodexMarkdown({
   onOpenExternal,
   onFileClick,
 }: Props) {
+  const { t } = useI18n();
   const components = useMemo<Components>(
     () => ({
       img: ({ src, alt }) =>
-        typeof src === "string" ? <ChatImage url={src} name={alt || "图片"} /> : null,
+        typeof src === "string" ? <ChatImage url={src} name={alt || t("chat.image")} /> : null,
       table: ({ children }) => (
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard focus lets readers scroll a wide table inside the narrow sidebar.
-        <section aria-label="回答表格，可横向滚动" className="codex-markdown-table" tabIndex={0}>
+        <section
+          aria-label={t("chat.tableInTheAnswerScrollSideways")}
+          className="codex-markdown-table"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard focus lets readers scroll a wide table inside the narrow sidebar.
+          tabIndex={0}
+        >
           <table>{children}</table>
         </section>
       ),
@@ -37,7 +43,7 @@ export const CodexMarkdown = memo(function CodexMarkdown({
         </ChatLink>
       ),
     }),
-    [onOpenExternal, onFileClick],
+    [onOpenExternal, onFileClick, t],
   );
 
   return (

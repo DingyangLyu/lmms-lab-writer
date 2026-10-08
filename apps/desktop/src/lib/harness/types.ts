@@ -1,4 +1,5 @@
 import type { EditorSelectionContext } from "@/lib/editor/selection-context";
+import type { MessageKey } from "@/lib/i18n";
 
 export const HARNESSES = [
   { id: "opencode", label: "OpenCode" },
@@ -13,12 +14,13 @@ export function harnessLabel(id: string) {
   return HARNESSES.find((h) => h.id === id)?.label || id;
 }
 export type ConversationStatus = "connecting" | "idle" | "running" | "waiting" | "error";
-export const STATUS_LABELS: Record<ConversationStatus, string> = {
-  connecting: "连接中",
-  idle: "就绪",
-  running: "执行中",
-  waiting: "等待批准或回复",
-  error: "需要处理",
+/** Message keys; translate with t() where shown. */
+export const STATUS_LABELS: Record<ConversationStatus, MessageKey> = {
+  connecting: "status.connecting",
+  idle: "status.ready",
+  running: "status.running",
+  waiting: "status.waitingForApprovalOrAReply",
+  error: "status.needsAttention",
 };
 export type ConversationInfo = {
   sessionId: string | null;

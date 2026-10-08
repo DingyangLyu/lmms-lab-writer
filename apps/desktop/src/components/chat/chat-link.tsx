@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { type ReactNode, useContext, useState } from "react";
 import { parseChatLink } from "@/lib/chat/links";
 import { ChatImageDirectory } from "./chat-image";
+import { useI18n } from "@/lib/i18n";
 export function ChatLink({
   href,
   children,
@@ -14,6 +15,7 @@ export function ChatLink({
   onFileClick?: (path: string) => void;
   onOpenExternal?: (url: string) => void;
 }) {
+  const { t } = useI18n();
   const directory = useContext(ChatImageDirectory);
   const target = parseChatLink(href || "", directory);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function ChatLink({
     }
   };
   if (target.kind === "blocked")
-    return <span title="无效的文件路径或不支持的链接协议">{children}</span>;
+    return <span title={t("chat.invalidFilePathOrUnsupportedLink")}>{children}</span>;
   return (
     <>
       <a
@@ -45,9 +47,9 @@ export function ChatLink({
         }}
         title={
           target.kind === "file"
-            ? `打开 ${target.path}（可预览文件在编辑区打开，其他文件在文件管理器中定位）`
+            ? t("chat.openPathPreviewableFilesOpenInTheEditorO", { path: target.path })
             : target.kind === "external-file"
-              ? `在文件管理器中定位 ${target.path}`
+              ? t("chat.showPathInTheFileManager", { path: target.path })
               : undefined
         }
         className="cursor-pointer underline decoration-current underline-offset-2"

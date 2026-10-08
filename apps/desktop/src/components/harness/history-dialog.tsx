@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { RenameChat } from "@/components/chat/rename-chat";
 import { HISTORY_ADAPTERS, type HistoryEntry } from "@/lib/harness/history";
 import { HARNESSES, type HarnessId, harnessLabel } from "@/lib/harness/types";
+import { useI18n } from "@/lib/i18n";
 export function HistoryDialog({
   backend,
   project,
@@ -23,6 +24,7 @@ export function HistoryDialog({
   onClose: () => void;
   onRename: (id: string, title: string) => void;
 }) {
+  const { t } = useI18n();
   const [entries, setEntries] = useState<HistoryEntry[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(false),
@@ -83,12 +85,12 @@ export function HistoryDialog({
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="历史对话"
+        aria-label={t("harness.conversationHistory")}
         className="flex max-h-[80vh] w-full max-w-xl flex-col border border-border bg-background shadow-xl"
       >
         <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-          <strong className="text-sm">历史对话</strong>
-          <button type="button" aria-label="关闭历史对话" onClick={onClose}>
+          <strong className="text-sm">{t("harness.conversationHistory")}</strong>
+          <button type="button" aria-label={t("harness.closeHistory")} onClick={onClose}>
             ×
           </button>
         </header>
@@ -107,8 +109,8 @@ export function HistoryDialog({
         </div>
         <div className="flex shrink-0 gap-2 p-3">
           <input
-            aria-label="搜索历史对话"
-            placeholder="搜索名称或会话 ID…"
+            aria-label={t("harness.searchConversations")}
+            placeholder={t("harness.searchNamesOrSessionIds")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="min-w-0 flex-1 border border-border bg-background px-2 py-1 text-sm"
@@ -119,7 +121,7 @@ export function HistoryDialog({
             className="border border-border px-2 py-1 text-xs"
             onClick={() => void load()}
           >
-            刷新
+            {t("harness.refresh")}
           </button>
         </div>
         {error && (
@@ -129,12 +131,18 @@ export function HistoryDialog({
         )}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {backend === "opencode" && !openCodeReady ? (
-            <p className="p-5 text-sm text-muted">正在连接 OpenCode；连接完成后显示历史。</p>
+            <p className="p-5 text-sm text-muted">
+              {t("harness.connectingToOpencodeTheHistoryAppearsOnc")}
+            </p>
           ) : loading && !entries.length ? (
-            <p className="p-5 text-sm text-muted">正在读取 {harnessLabel(backend)} 历史…</p>
+            <p className="p-5 text-sm text-muted">
+              {t("harness.loadingNameHistory", { name: harnessLabel(backend) })}
+            </p>
           ) : !filtered.length ? (
             <p className="p-5 text-sm text-muted">
-              {query ? "没有匹配的对话。" : "还没有已发送消息的对话。空白临时对话不会记录到历史。"}
+              {query
+                ? t("harness.noMatchingConversations")
+                : t("harness.noConversationsWithSentMessagesYetEmptyO")}
             </p>
           ) : (
             filtered.map((entry) => (
@@ -168,7 +176,7 @@ export function HistoryDialog({
           )}
         </div>
         <footer className="flex shrink-0 items-center justify-between border-t border-border p-3 text-xs text-muted">
-          <span>只读取当前项目的对话；打开历史不会中断其他任务。</span>
+          <span>{t("harness.onlyThisProjectSConversationsAreShownOpe")}</span>
           {cursor && (
             <button
               type="button"
@@ -176,7 +184,7 @@ export function HistoryDialog({
               onClick={() => void load(cursor)}
               className="border border-border px-2 py-1"
             >
-              {loading ? "读取中…" : "更多历史"}
+              {loading ? t("harness.loading") : t("harness.more")}
             </button>
           )}
         </footer>
