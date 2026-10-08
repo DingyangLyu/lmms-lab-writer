@@ -34,6 +34,20 @@ describe("TeX log", () => {
       { level: "warning", file: null, line: null, message: "There were undefined references." },
     ]);
   });
+  it("maps Windows build paths, whichever slashes TeX writes", () => {
+    const log = [
+      "D:/writer/build/sections/intro.tex:7: Undefined control sequence.",
+      "l.7 \\bad",
+      "d:\\writer\\build\\main.tex:3: Missing $ inserted.",
+      "l.3 x",
+      "C:/texlive/2026/texmf-dist/tex/latex/base/article.cls:12: Fake class error.",
+    ].join("\n");
+    expect(parseLog(log, "D:\\writer\\build").map((i) => [i.file, i.line])).toEqual([
+      ["sections/intro.tex", 7],
+      ["main.tex", 3],
+      [null, 12],
+    ]);
+  });
 });
 
 let dir = "";

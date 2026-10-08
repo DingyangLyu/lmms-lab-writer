@@ -9,7 +9,7 @@ import { basename, dirname, join } from "node:path";
 import { sql } from "./db";
 import type { Store } from "./store";
 import { OUTPUT_DIR, parseSyncTex, type SyncTex } from "./synctex";
-import { decodeText, fail, safePath, uid } from "./util";
+import { decodeText, fail, safePath, slashes, uid } from "./util";
 
 export const engines = ["pdflatex", "xelatex", "lualatex"] as const;
 export type Engine = (typeof engines)[number];
@@ -52,15 +52,20 @@ const flags: Record<Engine, string> = {
 export function parseLog(log: string, buildDir: string): Issue[] {
   const issues: Issue[] = [];
   // Files outside the build directory (TeX's own classes and packages) are not editable.
-  const relative = (file: string) => {
-    if (file.startsWith(`${buildDir}/`)) return file.slice(buildDir.length + 1);
-    if (file.startsWith("/")) return null;
+  // Windows: Node gives D:\build, TeX may write D:/build or d:\build.
+  const root = slashes(buildDir).replace(/\/+$/, "");
+  const relative = (raw: string) => {
+    const file = slashes(raw);
+    if (file.startsWith(`${root}/`)) return file.slice(root.length + 1);
+    if (file.startsWith("/") || /^[A-Z]:\//.test(file)) return null;
     return file.replace(/^(\.\/)+/, "");
   };
   const lines = log.split("\n");
   for (let i = 0; i < lines.length && issues.length < 100; i++) {
     const line = lines[i] ?? "";
-    const error = /^(\.?\.?\/?[^:\n]*\.(?:tex|sty|cls|bib|bbl)):(\d+): (.+)$/.exec(line);
+    const error = /^((?:[A-Za-z]:)?\.?\.?\/?[^:\n]*\.(?:tex|sty|cls|bib|bbl)):(\d+): (.+)$/.exec(
+      line,
+    );
     if (error?.[1] && error[2] && error[3]) {
       // TeX wraps long messages; the next line continues it unless it is a context line.
       const next = lines[i + 1] ?? "";

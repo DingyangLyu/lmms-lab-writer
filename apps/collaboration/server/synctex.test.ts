@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { forwardSearch, inverseSearch, parseSyncTex } from "./synctex";
 
@@ -12,6 +13,14 @@ const load = async () =>
   );
 
 describe("SyncTeX", () => {
+  it("maps project sources of a build on Windows", async () => {
+    const raw = gunzipSync(await readFile(join(import.meta.dirname, "fixtures/sample-synctex.gz")));
+    const windows = raw
+      .toString("latin1")
+      .replaceAll("/tmp/writer-build-fixture", "D:/writer/build");
+    const sync = parseSyncTex(gzipSync(Buffer.from(windows, "latin1")), "D:\\writer\\build");
+    expect([...sync.inputs.values()].sort()).toEqual(["main.tex", "sections/chapter.tex"]);
+  });
   it("maps only project sources", async () => {
     const sync = await load();
     expect([...sync.inputs.values()].sort()).toEqual(["main.tex", "sections/chapter.tex"]);

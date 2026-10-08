@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
-import { extname, join, resolve } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import type { Locale } from "@lmms-lab/i18n";
 import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
@@ -66,7 +66,7 @@ async function serveStatic(ctx: Context, root: string) {
       fail(400, "无效路径");
     }
   const file = resolve(root, requested);
-  if (!file.startsWith(`${root}/`)) fail(403, "无效路径");
+  if (!file.startsWith(`${root}${sep}`)) fail(403, "无效路径");
   const content = await readFile(file).catch(() => fail(404, "资源不存在，请先运行 pnpm build"));
   ctx.res.writeHead(200, {
     "Content-Type": STATIC_TYPES[extname(file)] ?? "application/octet-stream",

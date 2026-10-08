@@ -36,6 +36,9 @@ export function checked<T>(action: () => T): T {
   }
 }
 export const uid = () => randomUUID();
+/** A filesystem path with forward slashes and an upper-case drive letter, as TeX may write it. */
+export const slashes = (path: string) =>
+  path.replace(/\\/g, "/").replace(/^([a-z]):/, (_, drive: string) => `${drive.toUpperCase()}:`);
 export const digest = (input: string | Uint8Array) =>
   createHash("sha256").update(input).digest("hex");
 export function safePath(value: string) {

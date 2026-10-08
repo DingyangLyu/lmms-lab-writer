@@ -4,6 +4,7 @@
  * which is how PDF.js lays out a page viewport at scale 1.
  */
 import { gunzipSync } from "node:zlib";
+import { slashes } from "./util";
 
 /** latexmk -outdir inside the build directory; its .aux files are not sources. */
 export const OUTPUT_DIR = "build-output";
@@ -29,13 +30,14 @@ export function parseSyncTex(gzipped: Uint8Array, buildDir: string): SyncTex {
     xOffset = 0,
     yOffset = 0,
     page = 0;
-  const root = buildDir.replace(/\/+$/, "");
+  // Windows: Node gives D:\build, TeX may write D:/build or d:\build.
+  const root = slashes(buildDir).replace(/\/+$/, "");
   for (const line of text.split("\n")) {
     if (line.startsWith("Input:")) {
       const match = /^Input:(\d+):(.*)$/.exec(line);
       if (!match?.[1] || match[2] === undefined) continue;
       // Only files inside the build directory belong to the project.
-      let path = match[2];
+      let path = slashes(match[2]);
       if (!path.startsWith(`${root}/`)) continue;
       path = path
         .slice(root.length + 1)
