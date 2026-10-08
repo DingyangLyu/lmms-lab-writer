@@ -6,6 +6,7 @@ import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
 import { sql } from "./db";
+import type { SharedRunner } from "./http";
 import { type Authed, type Context, context, dispatch, type InProject, json } from "./http";
 import { requestLocale, say } from "./messages";
 import { adminRoutes, passwordRoute } from "./routes/accounts";
@@ -33,6 +34,8 @@ export type Options = {
   trustProxy?: boolean;
   staticDirectory?: string;
   compile?: CompileOptions;
+  /** A runner the server operator shares with every project (see routes/jobs.ts). */
+  sharedRunner?: SharedRunner;
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -103,6 +106,7 @@ export async function createWriterServer(options: Options) {
     compiler: new Compiler(store, options.compile),
     origin: () => origin,
     trustProxy: options.trustProxy ?? false,
+    sharedRunner: options.sharedRunner,
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();

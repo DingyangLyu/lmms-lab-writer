@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Account, IssuedPassword } from "../shared/api";
 import { api, errorText } from "./api";
+import { copyText } from "./clipboard";
 import { useI18n } from "./i18n";
 
 export function ChangePassword({
@@ -154,7 +155,7 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
         <div className="banner" role="status">
           {t("admin.issued", { name: issued.username })} <code>{issued.password}</code>
           {t("admin.issuedNote")}
-          <button type="button" onClick={() => void navigator.clipboard.writeText(issued.password)}>
+          <button type="button" onClick={() => void copyText(issued.password)}>
             {t("admin.copy")}
           </button>
           <button type="button" onClick={() => setIssued(null)}>

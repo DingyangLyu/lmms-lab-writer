@@ -1,5 +1,5 @@
 /** Shared AI and compile tasks: the project queue and the runner protocol. */
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { reviewHunks } from "@lmms-lab/writing";
 import * as Y from "yjs";
 import type { RunnerInfo, SharedJob } from "../../shared/api";
@@ -20,7 +20,15 @@ type Job = {
   created: number;
   base: string;
 };
-type Runner = { id: string; project: string; token: string; name: string; capabilities: string };
+/** `project` is null for the shared runner, which serves every project. */
+type Runner = {
+  id: string;
+  project: string | null;
+  token: string;
+  name: string;
+  capabilities: string;
+};
+const SHARED = "shared";
 type Snapshot = {
   files: {
     id: string;
@@ -42,21 +50,48 @@ export const runnerRoute = route<Context>(
   /^\/api\/runner\/(lease|heartbeat|result)$/,
   async (ctx, [action = ""]) => runnerRequest(ctx, action, await ctx.body()),
 );
-async function runnerRequest({ store, collab, req }: Context, action: string, body: Body) {
-  const token = req.headers.authorization?.replace(/^Bearer /, "") || "";
-  const runner =
+/** The server's shared runner, or the project runner the token belongs to. */
+async function runnerFor({ store, sharedRunner }: Context, token: string): Promise<Runner> {
+  if (
+    sharedRunner &&
+    token &&
+    timingSafeEqual(Buffer.from(digest(token)), Buffer.from(digest(sharedRunner.token)))
+  )
+    return {
+      id: SHARED,
+      project: null,
+      token: "",
+      name: sharedRunner.name,
+      capabilities: JSON.stringify(sharedRunner.capabilities),
+    };
+  return (
     (await store.db.row<Runner>(sql`SELECT * FROM runners WHERE token=${digest(token)}`)) ??
-    fail(401, "Runner 凭据无效");
+    fail(401, "Runner 凭据无效")
+  );
+}
+async function runnerRequest(ctx: Context, action: string, body: Body) {
+  const { store, collab, req } = ctx;
+  const token = req.headers.authorization?.replace(/^Bearer /, "") || "";
+  const runner = await runnerFor(ctx, token);
   if (action === "lease") {
     const caps = JSON.parse(runner.capabilities) as string[];
-    await store.db.run(
-      sql`UPDATE jobs SET status='failed', result='执行器失联，可重新提交任务'
-          WHERE project=${runner.project} AND status='running' AND lease<${Date.now()}`,
+    const changed = new Set<string>();
+    // A project runner reclaims its project's stalled tasks; the shared runner, its own.
+    const stalled = await store.db.rows<{ project: string }>(
+      runner.project
+        ? sql`UPDATE jobs SET status='failed', result='执行器失联，可重新提交任务'
+              WHERE project=${runner.project} AND status='running' AND lease<${Date.now()}
+              RETURNING project`
+        : sql`UPDATE jobs SET status='failed', result='执行器失联，可重新提交任务'
+              WHERE runner=${SHARED} AND status='running' AND lease<${Date.now()}
+              RETURNING project`,
     );
-    let changed = false;
+    for (const { project } of stalled) changed.add(project);
     const leased = await store.db.transaction(async (tx) => {
       const jobs = await tx.rows<Job>(
-        sql`SELECT * FROM jobs WHERE project=${runner.project} AND status='queued' ORDER BY created LIMIT 50`,
+        runner.project
+          ? sql`SELECT * FROM jobs WHERE project=${runner.project} AND status='queued' ORDER BY created LIMIT 50`
+          : sql`SELECT * FROM jobs WHERE status='queued' ORDER BY created LIMIT 50`,
       );
       for (const job of jobs) {
         if (!caps.includes(job.harness.startsWith("compile:") ? "compile" : job.harness)) continue;
@@ -73,7 +108,7 @@ async function runnerRequest({ store, collab, req }: Context, action: string, bo
           await tx.run(
             sql`UPDATE jobs SET status='failed', result=${blocked} WHERE id=${job.id} AND status='queued'`,
           );
-          changed = true;
+          changed.add(job.project);
           continue;
         }
         // Another runner may have claimed it since the SELECT; only one update can win.
@@ -92,19 +127,19 @@ async function runnerRequest({ store, collab, req }: Context, action: string, bo
               ? { base64: f.state }
               : { content: decodeText(Buffer.from(f.state, "base64")) }),
           }));
-        changed = true;
+        changed.add(job.project);
         return { job: { ...job, status: "running", files } };
       }
       return { job: null };
     });
-    if (changed) collab.changed(runner.project);
+    for (const project of changed) collab.changed(project);
     return leased;
   }
+  // A runner only ever leases its own project's tasks, or any for the shared runner.
   const id = text(body, "id", 80),
     job =
-      (await store.db.row<Job>(
-        sql`SELECT * FROM jobs WHERE id=${id} AND project=${runner.project} AND runner=${runner.id}`,
-      )) ?? fail(404, "任务不存在");
+      (await store.db.row<Job>(sql`SELECT * FROM jobs WHERE id=${id} AND runner=${runner.id}`)) ??
+      fail(404, "任务不存在");
   if (job.status !== "running") fail(409, "任务已结束或取消");
   if (!(await store.can(job.project, job.author, "edit"))) {
     await store.db.run(
@@ -268,6 +303,11 @@ export const jobRoutes = [
     await ctx.store.db.run(sql`DELETE FROM runners WHERE project=${ctx.project} AND id=${id}`);
     return { ok: true };
   }),
+  route<InProject>("GET", /^shared-runner$/, async (ctx) => ({
+    runner: ctx.sharedRunner
+      ? { name: ctx.sharedRunner.name, capabilities: ctx.sharedRunner.capabilities }
+      : null,
+  })),
   route<InProject>("GET", /^jobs$/, (ctx) =>
     ctx.store.db.rows<SharedJob>(
       sql`SELECT id, author, prompt, harness, status, result, created FROM jobs

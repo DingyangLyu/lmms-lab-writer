@@ -114,6 +114,8 @@ export type PdfRegion = {
 };
 export type SourceLocation = { file: string; line: number };
 
+/** The server's shared runner, available to every project when the operator configures one. */
+export type SharedRunnerInfo = { name: string; capabilities: string[] };
 export type SharedJob = {
   id: string;
   author: string;

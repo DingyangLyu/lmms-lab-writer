@@ -1,6 +1,7 @@
-import { useState } from "react";
-import type { Role, SharedJob } from "../shared/api";
+import { useEffect, useState } from "react";
+import type { Role, SharedJob, SharedRunnerInfo } from "../shared/api";
 import { api, errorText } from "./api";
+import { copyText } from "./clipboard";
 import { type MessageKey, useI18n } from "./i18n";
 
 const STATUS: Record<string, MessageKey> = {
@@ -9,6 +10,12 @@ const STATUS: Record<string, MessageKey> = {
   completed: "tasks.status.completed",
   failed: "tasks.status.failed",
   cancelled: "tasks.status.cancelled",
+};
+const HARNESS_NAMES: Record<string, string> = {
+  codex: "Codex",
+  claude: "Claude Code",
+  opencode: "OpenCode",
+  compile: "LaTeX",
 };
 export function TasksPanel({
   project,
@@ -29,7 +36,19 @@ export function TasksPanel({
   const [harness, setHarness] = useState("codex"),
     [prompt, setPrompt] = useState(""),
     [busy, setBusy] = useState(false),
-    [token, setToken] = useState("");
+    [token, setToken] = useState(""),
+    [shared, setShared] = useState<SharedRunnerInfo | null>(null);
+  useEffect(() => {
+    let current = true;
+    api<{ runner: SharedRunnerInfo | null }>(`/projects/${project}/shared-runner`)
+      .then((result) => {
+        if (current) setShared(result.runner);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [project]);
   const canEdit = ["owner", "editor"].includes(role),
     prefix = `/projects/${project}`;
   const run = async (action: () => Promise<void>) => {
@@ -46,6 +65,16 @@ export function TasksPanel({
     <>
       <h2>{t("tasks.title")}</h2>
       <p className="muted">{t("tasks.lead")}</p>
+      {shared && (
+        <p className="muted">
+          {t("tasks.sharedRunner", {
+            name: shared.name,
+            harnesses: shared.capabilities
+              .map((c) => HARNESS_NAMES[c] ?? c)
+              .join(t("tasks.listSeparator")),
+          })}
+        </p>
+      )}
       <select
         aria-label={t("tasks.harness")}
         value={harness}
@@ -111,7 +140,7 @@ export function TasksPanel({
                 {t("tasks.token")}
                 <input aria-label={t("tasks.tokenLabel")} type="password" readOnly value={token} />
               </label>
-              <button type="button" onClick={() => void navigator.clipboard.writeText(token)}>
+              <button type="button" onClick={() => void copyText(token)}>
                 {t("tasks.copyToken")}
               </button>
               <p className="muted">{t("tasks.tokenHint")}</p>

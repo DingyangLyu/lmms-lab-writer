@@ -1,5 +1,7 @@
 export const tasksZh = {
   "tasks.title": "共享任务",
+  "tasks.sharedRunner": "这台服务器的共享执行器“{name}”会执行所有项目的 {harnesses} 任务。",
+  "tasks.listSeparator": "、",
   "tasks.lead":
     "任务使用提交时的项目快照，AI 输出进入“审阅”；编译 PDF 作为新产物保存。执行器断线会报告失败，不会覆盖正文。",
   "tasks.harness": "任务执行环境",
@@ -30,6 +32,9 @@ export const tasksZh = {
 };
 export const tasksEn: Record<keyof typeof tasksZh, string> = {
   "tasks.title": "Shared tasks",
+  "tasks.sharedRunner":
+    "This server's shared runner “{name}” runs {harnesses} tasks for every project.",
+  "tasks.listSeparator": ", ",
   "tasks.lead":
     "Tasks run on the project as it was when submitted. AI output goes to Review; a compiled PDF is saved as a new artifact. If a runner disconnects the task fails; the manuscript is never overwritten.",
   "tasks.harness": "Runs with",

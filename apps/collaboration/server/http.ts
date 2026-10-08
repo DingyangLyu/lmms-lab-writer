@@ -45,6 +45,11 @@ export function json(res: ServerResponse, data: unknown, status = 200) {
   res.end(JSON.stringify(data));
 }
 
+/**
+ * A runner the server operator shares with every project, e.g. a lab machine running Codex or
+ * OpenCode with the lab's account. Its token is configured on the server, never stored.
+ */
+export type SharedRunner = { token: string; name: string; capabilities: string[] };
 export type Services = {
   store: Store;
   collab: Collaboration;
@@ -52,6 +57,7 @@ export type Services = {
   origin: () => string;
   /** Behind a reverse proxy: take the client address from its X-Forwarded-For. */
   trustProxy: boolean;
+  sharedRunner?: SharedRunner;
 };
 export type Context = Services & {
   req: IncomingMessage;

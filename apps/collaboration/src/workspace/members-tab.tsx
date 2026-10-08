@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Invite, Member, Role } from "../../shared/api";
 import { api } from "../api";
+import { copyText } from "../clipboard";
 import { useI18n } from "../i18n";
 import { roleKey } from "../labels";
 import type { WorkspaceContext } from "./context";
@@ -48,7 +49,7 @@ export function MembersTab({
             <label>
               {t("members.inviteLink")}
               <input readOnly aria-label={t("members.inviteLink")} value={inviteLink} />
-              <button type="button" onClick={() => void navigator.clipboard.writeText(inviteLink)}>
+              <button type="button" onClick={() => void copyText(inviteLink)}>
                 {t("members.copyLink")}
               </button>
             </label>

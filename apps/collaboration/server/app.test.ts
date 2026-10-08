@@ -98,6 +98,51 @@ describe("real collaboration service", () => {
     await f.call(`/projects/${f.project}/jobs/${second}`, {}, f.owner, "DELETE");
     expect((await runner("heartbeat", { id: second })).status).toBe(409);
   });
+  it("lets the server's shared runner take tasks from every project, within its harnesses", async () => {
+    const token = "a".repeat(64);
+    const f = await fixture({
+      sharedRunner: { token, name: "Lab machine", capabilities: ["codex"] },
+    });
+    const other = (await f.call("/projects", { name: "second-paper" }, f.owner)).data.id;
+    const lease = async (bearer: string) => {
+      const response = await fetch(`${f.app.origin}/api/runner/lease`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
+        body: "{}",
+      });
+      return { status: response.status, data: await response.json() };
+    };
+    expect((await f.call(`/projects/${f.project}/shared-runner`, undefined, f.owner)).data).toEqual(
+      { runner: { name: "Lab machine", capabilities: ["codex"] } },
+    );
+    const skipped = (
+      await f.call(`/projects/${f.project}/jobs`, { harness: "opencode", prompt: "a" }, f.owner)
+    ).data.id;
+    const first = (
+      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "b" }, f.owner)
+    ).data.id;
+    const second = (
+      await f.call(`/projects/${other}/jobs`, { harness: "codex", prompt: "c" }, f.owner)
+    ).data.id;
+    expect((await lease("b".repeat(64))).status).toBe(401);
+    expect((await lease(token)).data.job.id).toBe(first);
+    expect((await lease(token)).data.job.id).toBe(second);
+    // OpenCode is not among its harnesses, so that task stays queued for another runner.
+    expect((await lease(token)).data.job).toBeNull();
+    const queued = (await f.call(`/projects/${f.project}/jobs`, undefined, f.owner)).data;
+    expect(queued.find((j: { id: string }) => j.id === skipped).status).toBe("queued");
+    const done = await fetch(`${f.app.origin}/api/runner/result`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: second, result: "done", files: [] }),
+    });
+    expect(done.status).toBe(200);
+    const without = await fixture();
+    expect(
+      (await without.call(`/projects/${without.project}/shared-runner`, undefined, without.owner))
+        .data,
+    ).toEqual({ runner: null });
+  });
   it("skips tasks that can no longer run and follows renamed files", async () => {
     const f = await fixture(),
       editor = await f.invite("editor", "temporary");
