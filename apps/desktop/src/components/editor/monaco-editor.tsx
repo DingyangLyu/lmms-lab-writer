@@ -12,6 +12,7 @@ import type { EditorSettings, EditorTheme } from "@/lib/editor/types";
 import { registerLaTeXLanguage } from "@/lib/monaco/latex";
 import { defineEditorThemes } from "@/lib/monaco/themes";
 import { LatexSourceEditor } from "./latex-source-editor";
+import { i18n, useI18n } from "@/lib/i18n";
 
 type Props = {
   project?: string;
@@ -57,6 +58,7 @@ function detectLanguage(lang: string): string {
 }
 
 export const MonacoEditor = memo(function SourceEditor(props: Props) {
+  const { t } = useI18n();
   const { marks, annotationContent, notes } = useSourceAnnotations(
     props.project,
     props.path,
@@ -103,22 +105,22 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
           }}
           className="border border-border px-2 py-1 disabled:opacity-40"
         >
-          添加批注
+          {t("monaco.addComment")}
         </button>
         <select
-          aria-label="文本批注标记方式"
+          aria-label={t("monaco.howToMarkComments")}
           value={style}
           onChange={(e) => setStyle(e.target.value as typeof style)}
           className="border border-border bg-background px-1 py-1"
         >
-          <option value="highlight">高亮</option>
-          <option value="underline">下划线</option>
+          <option value="highlight">{t("monaco.highlight")}</option>
+          <option value="underline">{t("monaco.underline")}</option>
         </select>
         <span
           className="min-w-0 truncate text-muted"
-          title="选中文字后添加批注；⌘/Ctrl+点击标记查看；批注与修改记录到 Git"
+          title={t("monaco.selectTextToAddACommentCtrlClickAMarkToO")}
         >
-          批注 {marks.length} · ⌘/Ctrl+点击标记查看
+          {t("monaco.countCountCommentCommentsCtrlClickAMarkT", { count: marks.length })}
         </span>
       </div>
       <div className="min-h-0 flex-1">{engine}</div>
@@ -192,7 +194,7 @@ const MonacoTextEditor = memo(function MonacoTextEditor({
               options: {
                 inlineClassName: `writer-note-${note.style} ${note.resolved ? "writer-note-resolved" : ""}`,
                 hoverMessage: {
-                  value: `${note.resolved ? "已解决 · " : ""}${note.comment.replace(/[\\`*_{}[\]()#+.!|>-]/g, "\\$&")}\n\n⌘/Ctrl+点击查看批注`,
+                  value: `${note.resolved ? i18n.t("monaco.resolved") : ""}${note.comment.replace(/[\\`*_{}[\]()#+.!|>-]/g, "\\$&")}\n\n${i18n.t("monaco.ctrlClickToOpenTheComment")}`,
                 },
                 stickiness: 1,
               },
@@ -239,7 +241,7 @@ const MonacoTextEditor = memo(function MonacoTextEditor({
     editor.focus();
     editor.addAction({
       id: "writer-add-annotation",
-      label: "添加文稿批注",
+      label: i18n.t("monaco.addComment2"),
       contextMenuGroupId: "navigation",
       precondition: "editorHasSelection",
       run: (ed) => {

@@ -22,6 +22,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
+import { i18n, useI18n } from "@/lib/i18n";
 
 type SelectedChange = {
   path: string;
@@ -55,12 +56,12 @@ function formatRelativeDate(dateStr: string): string {
   const diffWeek = Math.floor(diffDay / 7);
   const diffMonth = Math.floor(diffDay / 30);
 
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHour < 24) return `${diffHour}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  if (diffWeek < 5) return `${diffWeek}w ago`;
-  if (diffMonth < 12) return `${diffMonth}mo ago`;
+  if (diffSec < 60) return i18n.t("git.justNow");
+  if (diffMin < 60) return i18n.t("git.nMAgo", { n: diffMin });
+  if (diffHour < 24) return i18n.t("git.nHAgo", { n: diffHour });
+  if (diffDay < 7) return i18n.t("git.nDAgo", { n: diffDay });
+  if (diffWeek < 5) return i18n.t("git.nWAgo", { n: diffWeek });
+  if (diffMonth < 12) return i18n.t("git.nMoAgo", { n: diffMonth });
   return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -198,6 +199,7 @@ export function GitSidebarPanel({
   isPulling,
   isAuthenticatingGh = false,
 }: GitSidebarPanelProps) {
+  const { t } = useI18n();
   const [selectedChange, setSelectedChange] = useState<SelectedChange | null>(null);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [showAllCommits, setShowAllCommits] = useState(false);
@@ -264,7 +266,7 @@ export function GitSidebarPanel({
                 }}
                 className="w-7 flex items-center justify-center hover:bg-surface-tertiary"
                 aria-label={`Discard ${change.path}`}
-                title="Discard changes"
+                title={t("git.discardChanges")}
               >
                 <ArrowCounterClockwiseIcon className="w-3 h-3" />
               </button>
@@ -275,7 +277,7 @@ export function GitSidebarPanel({
                 onClick={() => onUnstageFile(change.path)}
                 className="w-7 flex items-center justify-center hover:bg-surface-tertiary"
                 aria-label={`Unstage ${change.path}`}
-                title="Unstage file"
+                title={t("git.unstageFile")}
               >
                 <MinusIcon className="w-3.5 h-3.5" />
               </button>
@@ -285,7 +287,7 @@ export function GitSidebarPanel({
                 onClick={() => onStageFile(change.path)}
                 className="w-7 flex items-center justify-center hover:bg-surface-tertiary"
                 aria-label={`Stage ${change.path}`}
-                title="Stage file"
+                title={t("git.stageFile")}
               >
                 <PlusIcon className="w-3.5 h-3.5" />
               </button>
@@ -294,7 +296,7 @@ export function GitSidebarPanel({
         </div>
       );
     },
-    [handleSelectChange, onStageFile, onUnstageFile, onDiscardFile, selectedChange],
+    [handleSelectChange, onStageFile, onUnstageFile, onDiscardFile, selectedChange, t],
   );
 
   if (!projectPath) {
@@ -303,7 +305,7 @@ export function GitSidebarPanel({
         <div className="w-12 h-12 border-2 border-border flex items-center justify-center mb-3">
           <GitBranchIcon className="w-6 h-6 opacity-30" />
         </div>
-        <p className="text-xs font-mono uppercase tracking-wider">No folder open</p>
+        <p className="text-xs font-mono uppercase tracking-wider">{t("git.noFolderOpen")}</p>
       </div>
     );
   }
@@ -314,14 +316,16 @@ export function GitSidebarPanel({
         <div className="w-12 h-12 border-2 border-border flex items-center justify-center mb-3">
           <GitBranchIcon className="w-6 h-6 opacity-30" />
         </div>
-        <p className="text-xs font-mono uppercase tracking-wider mb-4">Not a git repository</p>
+        <p className="text-xs font-mono uppercase tracking-wider mb-4">
+          {t("git.notAGitRepository")}
+        </p>
         <button
           type="button"
           onClick={onInitGit}
           disabled={isInitializingGit}
           className="btn btn-sm btn-primary"
         >
-          {isInitializingGit ? "Initializing..." : "Init Git"}
+          {isInitializingGit ? t("git.initializing") : t("git.initGit")}
         </button>
       </div>
     );
@@ -333,24 +337,26 @@ export function GitSidebarPanel({
   const canPush = gitStatus.hasUpstream ? gitStatus.ahead > 0 : gitStatus.hasCommits;
   const canPull = gitStatus.hasUpstream ? gitStatus.behind > 0 : true;
   const pushTitle = !canPush
-    ? "Nothing to push"
+    ? t("git.nothingToPush")
     : gitStatus.hasUpstream
-      ? `Push ${gitStatus.ahead} commit${gitStatus.ahead > 1 ? "s" : ""}`
-      : "Push current branch to origin";
+      ? t("git.pushCountCountCommitCommits", { count: gitStatus.ahead })
+      : t("git.pushCurrentBranchToOrigin");
   const pullTitle = !canPull
-    ? "Nothing to pull"
+    ? t("git.nothingToPull")
     : gitStatus.hasUpstream
-      ? `Pull ${gitStatus.behind} commit${gitStatus.behind > 1 ? "s" : ""}`
-      : "Pull and set upstream from origin";
+      ? t("git.pullCountCountCommitCommits", { count: gitStatus.behind })
+      : t("git.pullAndSetUpstreamFromOrigin");
 
   return (
     <>
       {/* Discard all confirm dialog */}
       {showDiscardAllConfirm && (
         <ConfirmDialog
-          title="Discard all changes"
-          message={`This will discard all ${unstagedChanges.length} unstaged change${unstagedChanges.length > 1 ? "s" : ""}. A Writer version is saved first (see Git 历史); Writer annotations, attachments and backups are never discarded.`}
-          confirmLabel="Discard All"
+          title={t("git.discardAllChanges")}
+          message={t("git.thisWillDiscardAllCountUnstagedCountChan", {
+            count: unstagedChanges.length,
+          })}
+          confirmLabel={t("git.discardAll")}
           cancelLabel="Cancel"
           onConfirm={() => {
             void onDiscardAll();
@@ -371,7 +377,7 @@ export function GitSidebarPanel({
             type="button"
             onClick={onRefreshStatus}
             className="p-1 text-muted hover:text-foreground hover:bg-foreground/5 transition-colors"
-            aria-label="Refresh git status"
+            aria-label={t("git.refreshGitStatus")}
           >
             <ArrowClockwiseIcon className="w-3.5 h-3.5" />
           </button>
@@ -405,7 +411,9 @@ export function GitSidebarPanel({
                     className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-[11px] font-mono bg-foreground text-background hover:bg-foreground/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
                     <GithubLogoIcon className="w-3.5 h-3.5" />
-                    <span>{isAuthenticatingGh ? "Authenticating..." : "Publish to GitHub"}</span>
+                    <span>
+                      {isAuthenticatingGh ? t("git.authenticating") : t("git.publishToGithub")}
+                    </span>
                   </button>
                 )}
                 <button
@@ -414,7 +422,7 @@ export function GitSidebarPanel({
                   className="flex items-center gap-1.5 text-[11px] font-mono text-muted hover:text-foreground transition-colors"
                 >
                   <GlobeIcon className="w-3 h-3" />
-                  <span>or add remote URL manually</span>
+                  <span>{t("git.orAddRemoteUrlManually")}</span>
                 </button>
               </>
             )}
@@ -428,7 +436,7 @@ export function GitSidebarPanel({
           <textarea
             value={commitMessage}
             onChange={(e) => onCommitMessageChange(e.target.value)}
-            placeholder="Message (Ctrl+Enter to commit)"
+            placeholder={t("git.messageCtrlEnterToCommit")}
             className="w-full px-2.5 py-2 text-xs font-mono border border-border resize-none focus:outline-none focus:border-foreground bg-background placeholder:text-muted-foreground transition-colors"
             rows={2}
             onKeyDown={(e) => {
@@ -446,7 +454,7 @@ export function GitSidebarPanel({
             className="flex-1 text-[11px] font-mono py-1.5 bg-foreground text-background border border-foreground hover:bg-foreground/90 disabled:opacity-30 disabled:hover:bg-foreground transition-colors flex items-center justify-center gap-1.5"
           >
             <CheckIcon className="w-3 h-3" />
-            Commit
+            {t("git.commit")}
             {stagedChanges.length > 0 && (
               <span className="opacity-60">({stagedChanges.length})</span>
             )}
@@ -458,7 +466,7 @@ export function GitSidebarPanel({
             }}
             disabled={isGeneratingCommitMessageAI || stagedChanges.length === 0}
             className="text-[11px] font-mono px-2.5 py-1.5 border border-border hover:border-foreground hover:bg-accent-hover disabled:opacity-30 disabled:hover:border-border disabled:hover:bg-background transition-colors flex items-center gap-1"
-            title="AI Draft"
+            title={t("git.aiDraft")}
           >
             <SparkleIcon className="w-3 h-3" />
             {isGeneratingCommitMessageAI ? "..." : "AI"}
@@ -515,7 +523,7 @@ export function GitSidebarPanel({
               <div className="px-3 py-1.5 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-muted">
                 <span className="flex items-center gap-1.5">
                   <CheckIcon className="w-3 h-3" />
-                  Staged
+                  {t("git.staged")}
                   <span className="inline-flex items-center justify-center w-4 h-4 bg-foreground text-background text-[9px] font-bold">
                     {stagedChanges.length}
                   </span>
@@ -524,7 +532,7 @@ export function GitSidebarPanel({
                   type="button"
                   onClick={onUnstageAll}
                   className="normal-case tracking-normal text-muted hover:text-foreground transition-colors p-0.5"
-                  title="Unstage all"
+                  title={t("git.unstageAll")}
                 >
                   <MinusIcon className="w-3.5 h-3.5" />
                 </button>
@@ -540,7 +548,7 @@ export function GitSidebarPanel({
             <div className="border-b border-border">
               <div className="px-3 py-1.5 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-muted">
                 <span className="flex items-center gap-1.5">
-                  Changes
+                  {t("git.changes")}
                   <span className="inline-flex items-center justify-center w-4 h-4 bg-foreground text-background text-[9px] font-bold">
                     {unstagedChanges.length}
                   </span>
@@ -550,7 +558,7 @@ export function GitSidebarPanel({
                     type="button"
                     onClick={() => setShowDiscardAllConfirm(true)}
                     className="normal-case tracking-normal text-muted hover:text-foreground transition-colors p-0.5"
-                    title="Discard all changes"
+                    title={t("git.discardAllChanges")}
                   >
                     <ArrowCounterClockwiseIcon className="w-3.5 h-3.5" />
                   </button>
@@ -558,7 +566,7 @@ export function GitSidebarPanel({
                     type="button"
                     onClick={onStageAll}
                     className="normal-case tracking-normal text-muted hover:text-foreground transition-colors p-0.5"
-                    title="Stage all changes"
+                    title={t("git.stageAllChanges")}
                   >
                     <PlusIcon className="w-3.5 h-3.5" />
                   </button>
@@ -575,7 +583,7 @@ export function GitSidebarPanel({
             <div className="px-3 py-8 text-center border-b border-border">
               <CheckIcon className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
               <p className="text-[11px] font-mono text-muted uppercase tracking-wider">
-                Working tree clean
+                {t("git.workingTreeClean")}
               </p>
             </div>
           )}
@@ -589,7 +597,7 @@ export function GitSidebarPanel({
             >
               <span className="flex items-center gap-1.5">
                 <ClockCounterClockwiseIcon className="w-3 h-3" />
-                History
+                {t("git.history")}
                 {gitLogEntries.length > 0 && (
                   <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-0.5 bg-surface-tertiary text-muted text-[9px] font-bold">
                     {gitLogEntries.length}
@@ -621,8 +629,8 @@ export function GitSidebarPanel({
                       </div>
                       <span>
                         {showAllCommits
-                          ? "Show less"
-                          : `${gitLogEntries.length - 5} more commits...`}
+                          ? t("git.showLess")
+                          : t("git.countMoreCommits", { count: gitLogEntries.length - 5 })}
                       </span>
                     </button>
                   )}
@@ -635,7 +643,7 @@ export function GitSidebarPanel({
                 </div>
               ) : (
                 <div className="px-3 py-4 text-center">
-                  <p className="text-[11px] font-mono text-muted">No commits yet</p>
+                  <p className="text-[11px] font-mono text-muted">{t("git.noCommitsYet")}</p>
                 </div>
               ))}
           </div>
@@ -649,7 +657,9 @@ export function GitSidebarPanel({
                 <FileIcon className="w-3 h-3 flex-shrink-0" />
                 {selectedChange.path}
               </div>
-              <div className="text-[10px] font-mono text-muted mt-0.5">Diff shown in editor</div>
+              <div className="text-[10px] font-mono text-muted mt-0.5">
+                {t("git.diffShownInEditor")}
+              </div>
             </div>
             {onOpenFile && (
               <button
@@ -657,7 +667,7 @@ export function GitSidebarPanel({
                 onClick={handleOpenSelectedFile}
                 className="text-[11px] font-mono px-2 py-1 border border-foreground hover:bg-foreground hover:text-background transition-colors"
               >
-                Open
+                {t("git.open")}
               </button>
             )}
           </div>

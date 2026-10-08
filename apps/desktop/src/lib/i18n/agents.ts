@@ -1,8 +1,12 @@
 export const agentsZh = {
-  "codex.readTheRelevantPassagesOfTheCurrentPaper": "请阅读当前论文相关段落，检索能直接支持具体论断的原始或权威文献。逐篇核对题名、作者、年份、DOI 或出版社／arXiv 原文链接，不要编造或重复已有条目。检查项目的 .bib 文件后，把核实的文献补充进去，并在对应 .tex 论断处插入 \\cite{key}，优先复用已有键。确认每个新增引用键都能在 .bib 中找到；如果本机有 LaTeX 编译器，请编译并检查未定义引用。最后说明新增引用的位置和来源链接。",
-  "codex.codexCanSearchTheLiteratureCheckSourcesA": "可以搜索文献、检查来源、修改 LaTeX 与参考文献。选中编辑器文字后发送修改要求，Codex 会收到所选段落和位置。",
-  "codex.couldNotRestoreThisCodexConversationClic": "无法恢复这个 Codex 对话，可点击重新连接重试：{error}",
-  "codex.theCurrentTurnHasEndedOrIsNotReadySendNo": "当前轮次已结束或尚未就绪，请正常发送或加入队列。",
+  "codex.readTheRelevantPassagesOfTheCurrentPaper":
+    "请阅读当前论文相关段落，检索能直接支持具体论断的原始或权威文献。逐篇核对题名、作者、年份、DOI 或出版社／arXiv 原文链接，不要编造或重复已有条目。检查项目的 .bib 文件后，把核实的文献补充进去，并在对应 .tex 论断处插入 \\cite{key}，优先复用已有键。确认每个新增引用键都能在 .bib 中找到；如果本机有 LaTeX 编译器，请编译并检查未定义引用。最后说明新增引用的位置和来源链接。",
+  "codex.codexCanSearchTheLiteratureCheckSourcesA":
+    "可以搜索文献、检查来源、修改 LaTeX 与参考文献。选中编辑器文字后发送修改要求，Codex 会收到所选段落和位置。",
+  "codex.couldNotRestoreThisCodexConversationClic":
+    "无法恢复这个 Codex 对话，可点击重新连接重试：{error}",
+  "codex.theCurrentTurnHasEndedOrIsNotReadySendNo":
+    "当前轮次已结束或尚未就绪，请正常发送或加入队列。",
   "codex.codexNeedsThisHandledInATerminalMethod": "Codex 请求需要在终端处理：{method}",
   "codex.codexDisconnectedClickReconnect": "Codex 连接已断开。点击重新连接即可重连。",
   "codex.askCodexToFindReferencesOrEditTheSelecti": "让 Codex 查找文献或修改选中内容…",
@@ -65,9 +69,12 @@ export const agentsZh = {
   "codex.send": "发送",
   "agentsCommon.quotingPathRanges": "已引用 {path} · {ranges}",
   "agentsCommon.listSeparator": "、",
-  "claude.usesYourLocalSignInAndModelSettingsItCan": "沿用本机登录与模型配置，可检索资料、修改论文、读取图片；选中的正文会随消息附上。",
-  "claude.commandsAndFileEditsNeedNoApprovalClaude": "命令和文件修改无需逐次审批；Claude 的强制规则和用户问题仍保留",
-  "claude.couldNotRestoreThisClaudeCodeConversatio": "无法恢复这个 Claude Code 对话，可重试：{error}",
+  "claude.usesYourLocalSignInAndModelSettingsItCan":
+    "沿用本机登录与模型配置，可检索资料、修改论文、读取图片；选中的正文会随消息附上。",
+  "claude.commandsAndFileEditsNeedNoApprovalClaude":
+    "命令和文件修改无需逐次审批；Claude 的强制规则和用户问题仍保留",
+  "claude.couldNotRestoreThisClaudeCodeConversatio":
+    "无法恢复这个 Claude Code 对话，可重试：{error}",
   "claude.askClaudeCodeToFindReferencesOrEditTheSe": "让 Claude Code 查找文献或修改选中内容…",
   "claude.noClaudeCodeConversationsYet": "还没有 Claude Code 对话。",
   "claude.messageToClaudeCode": "发送给 Claude Code 的消息",
@@ -133,7 +140,8 @@ export const agentsZh = {
   "opencode.steerNow": "立即指导",
   "opencode.stop": "停止",
   "opencode.send": "发送",
-  "opencode.thisConversationIsOpenInATabFinishItsTas": "该对话已在标签中打开，请先结束任务并关闭标签，再删除历史。",
+  "opencode.thisConversationIsOpenInATabFinishItsTas":
+    "该对话已在标签中打开，请先结束任务并关闭标签，再删除历史。",
   "opencode.opencodeDidNotConfirmTheMessageCheckTheC": "OpenCode 未确认消息，请核对连接状态。",
   "opencode.loadingTheConnectionOrHistorySendAgainIn": "正在载入连接或历史，请稍后发送。",
   "opencode.couldNotStartAConversationYourTextIsKept": "无法建立对话，输入内容已保留。",
@@ -185,8 +193,10 @@ export const agentsZh = {
   "opencode.restartOpencode": "重启 OpenCode",
   "opencode.closeDialog": "关闭对话框",
   "opencode.dismiss": "关闭",
-  "opencode.wouldYouLikeToAutomaticallyKillTheProces": "要自动结束占用端口 {port} 的进程并重启 OpenCode 吗？",
-  "opencode.copyThisErrorAndPasteItToYourLocalOpenco": "复制这条错误，粘贴给本机的 OpenCode 或 Claude 帮你排查。",
+  "opencode.wouldYouLikeToAutomaticallyKillTheProces":
+    "要自动结束占用端口 {port} 的进程并重启 OpenCode 吗？",
+  "opencode.copyThisErrorAndPasteItToYourLocalOpenco":
+    "复制这条错误，粘贴给本机的 OpenCode 或 Claude 帮你排查。",
   "opencode.portPortIsAlreadyInUseByAnotherProcess": "端口 {port} 已被其他进程占用。",
   "opencode.opencodeIsNotInstalledOnYourSystem": "这台电脑上没有安装 OpenCode。",
   "opencode.killPortPortRestart": "结束端口 {port} 的进程并重启",
@@ -215,21 +225,31 @@ export const agentsZh = {
   "opencode.quotedPathShowTheText": "已引用 {path}（展开原文）",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
-  "codex.readTheRelevantPassagesOfTheCurrentPaper": "Read the relevant passages of the current paper and find original or authoritative sources that directly support specific claims. Check each one's title, authors, year, DOI or publisher / arXiv link; do not invent sources or duplicate existing entries. After checking the project's .bib files, add the verified references and insert \\cite{key} at the matching claims in the .tex files, reusing existing keys where possible. Make sure every new key exists in the .bib; if a LaTeX compiler is installed, compile and check for undefined citations. Finally, list where you added citations and their source links.",
-  "codex.codexCanSearchTheLiteratureCheckSourcesA": "Codex can search the literature, check sources, and edit LaTeX and references. Select text in the editor before sending a request and Codex receives the passage and its position.",
-  "codex.couldNotRestoreThisCodexConversationClic": "Could not restore this Codex conversation; click Reconnect to retry: {error}",
-  "codex.theCurrentTurnHasEndedOrIsNotReadySendNo": "The current turn has ended or is not ready; send normally or add to the queue.",
-  "codex.codexNeedsThisHandledInATerminalMethod": "Codex needs this handled in a terminal: {method}",
+  "codex.readTheRelevantPassagesOfTheCurrentPaper":
+    "Read the relevant passages of the current paper and find original or authoritative sources that directly support specific claims. Check each one's title, authors, year, DOI or publisher / arXiv link; do not invent sources or duplicate existing entries. After checking the project's .bib files, add the verified references and insert \\cite{key} at the matching claims in the .tex files, reusing existing keys where possible. Make sure every new key exists in the .bib; if a LaTeX compiler is installed, compile and check for undefined citations. Finally, list where you added citations and their source links.",
+  "codex.codexCanSearchTheLiteratureCheckSourcesA":
+    "Codex can search the literature, check sources, and edit LaTeX and references. Select text in the editor before sending a request and Codex receives the passage and its position.",
+  "codex.couldNotRestoreThisCodexConversationClic":
+    "Could not restore this Codex conversation; click Reconnect to retry: {error}",
+  "codex.theCurrentTurnHasEndedOrIsNotReadySendNo":
+    "The current turn has ended or is not ready; send normally or add to the queue.",
+  "codex.codexNeedsThisHandledInATerminalMethod":
+    "Codex needs this handled in a terminal: {method}",
   "codex.codexDisconnectedClickReconnect": "Codex disconnected. Click Reconnect.",
-  "codex.askCodexToFindReferencesOrEditTheSelecti": "Ask Codex to find references or edit the selection…",
+  "codex.askCodexToFindReferencesOrEditTheSelecti":
+    "Ask Codex to find references or edit the selection…",
   "codex.openAProjectToUseCodex": "Open a project to use Codex.",
   "codex.noCodexConversationsInThisProjectYet": "No Codex conversations in this project yet.",
   "codex.codexReviewsActionsThatNeedApproval": "Codex reviews actions that need approval",
-  "codex.editsThisProjectAsksBeforeGoingOutsideIt": "Edits this project; asks before going outside it",
-  "codex.theLastTurnDidNotFinishTheQueueIsPaused": "The last turn did not finish; the queue is paused.",
-  "codex.addFilesOrImagesYouCanAlsoPasteOrDropThe": "Add files or images; you can also paste or drop them",
+  "codex.editsThisProjectAsksBeforeGoingOutsideIt":
+    "Edits this project; asks before going outside it",
+  "codex.theLastTurnDidNotFinishTheQueueIsPaused":
+    "The last turn did not finish; the queue is paused.",
+  "codex.addFilesOrImagesYouCanAlsoPasteOrDropThe":
+    "Add files or images; you can also paste or drop them",
   "codex.couldNotAnswerTheApprovalError": "Could not answer the approval: {error}",
-  "codex.theConversationChangedTheMessageWasNotSe": "The conversation changed; the message was not sent.",
+  "codex.theConversationChangedTheMessageWasNotSe":
+    "The conversation changed; the message was not sent.",
   "codex.connectingToCodexOnThisComputer": "Connecting to Codex on this computer…",
   "codex.usesYourLocalCodexSignIn": "Uses your local Codex sign-in",
   "codex.messageToCodex": "Message to Codex",
@@ -281,14 +301,19 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "codex.send": "Send",
   "agentsCommon.quotingPathRanges": "Quoting {path} · {ranges}",
   "agentsCommon.listSeparator": ", ",
-  "claude.usesYourLocalSignInAndModelSettingsItCan": "Uses your local sign-in and model settings. It can research, edit the paper and read images; selected text is attached to your message.",
-  "claude.commandsAndFileEditsNeedNoApprovalClaude": "Commands and file edits need no approval; Claude's enforced rules and questions to you still apply",
-  "claude.couldNotRestoreThisClaudeCodeConversatio": "Could not restore this Claude Code conversation; retry: {error}",
-  "claude.askClaudeCodeToFindReferencesOrEditTheSe": "Ask Claude Code to find references or edit the selection…",
+  "claude.usesYourLocalSignInAndModelSettingsItCan":
+    "Uses your local sign-in and model settings. It can research, edit the paper and read images; selected text is attached to your message.",
+  "claude.commandsAndFileEditsNeedNoApprovalClaude":
+    "Commands and file edits need no approval; Claude's enforced rules and questions to you still apply",
+  "claude.couldNotRestoreThisClaudeCodeConversatio":
+    "Could not restore this Claude Code conversation; retry: {error}",
+  "claude.askClaudeCodeToFindReferencesOrEditTheSe":
+    "Ask Claude Code to find references or edit the selection…",
   "claude.noClaudeCodeConversationsYet": "No Claude Code conversations yet.",
   "claude.messageToClaudeCode": "Message to Claude Code",
   "claude.claudeCodeNeedsMoreFromYou": "Claude Code needs more from you",
-  "claude.approvesFileEditsAutomaticallySomeComman": "Approves file edits automatically; some commands still need approval",
+  "claude.approvesFileEditsAutomaticallySomeComman":
+    "Approves file edits automatically; some commands still need approval",
   "claude.connectingToClaudeCode": "Connecting to Claude Code…",
   "claude.claudeCodeIsWorking": "Claude Code is working…",
   "claude.addToTheClaudeCodeQueue": "Add to the Claude Code queue",
@@ -301,8 +326,10 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "claude.claudeCodePermissions": "Claude Code permissions",
   "claude.claudeCodeModel": "Claude Code model",
   "claude.stopClaudeCode": "Stop Claude Code",
-  "claude.analysesAndPlansFirstEditsStillNeedAppro": "Analyses and plans first; edits still need approval",
-  "claude.theConversationChangedTheMessageWasNotSe": "The conversation changed; the message was not sent.",
+  "claude.analysesAndPlansFirstEditsStillNeedAppro":
+    "Analyses and plans first; edits still need approval",
+  "claude.theConversationChangedTheMessageWasNotSe":
+    "The conversation changed; the message was not sent.",
   "claude.newClaudeConversation": "New Claude conversation",
   "claude.taskStoppedTheQueueIsPaused": "Task stopped; the queue is paused.",
   "claude.theRunFailedTheQueueIsPaused": "The run failed; the queue is paused.",
@@ -329,12 +356,15 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "claude.submit": "Submit",
   "claude.deny": "Deny",
   "claude.remove": "Remove",
-  "opencode.askOpencodeToFindReferencesOrEditTheSele": "Ask OpenCode to find references or edit the selection…",
+  "opencode.askOpencodeToFindReferencesOrEditTheSele":
+    "Ask OpenCode to find references or edit the selection…",
   "opencode.quotingPathRanges": "Quoting: {path} · {ranges}",
-  "opencode.showTheQuotedTextCountCountCharacterChar": "Show the quoted text ({count} {count|character|characters})",
+  "opencode.showTheQuotedTextCountCountCharacterChar":
+    "Show the quoted text ({count} {count|character|characters})",
   "opencode.effortVariant": "Effort: {variant}",
   "opencode.messageToOpencode": "Message to OpenCode",
-  "opencode.addFilesOrImagesYouCanAlsoPasteOrDropThe": "Add files or images; you can also paste or drop them",
+  "opencode.addFilesOrImagesYouCanAlsoPasteOrDropThe":
+    "Add files or images; you can also paste or drop them",
   "opencode.addToTheOpencodeQueue": "Add to the OpenCode queue",
   "opencode.steerOpencodeNow": "Steer OpenCode now",
   "opencode.describeHowToChangeTheSelection": "Describe how to change the selection…",
@@ -349,13 +379,18 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.steerNow": "Steer now",
   "opencode.stop": "Stop",
   "opencode.send": "Send",
-  "opencode.thisConversationIsOpenInATabFinishItsTas": "This conversation is open in a tab; finish its task and close the tab before deleting it.",
-  "opencode.opencodeDidNotConfirmTheMessageCheckTheC": "OpenCode did not confirm the message; check the connection.",
-  "opencode.loadingTheConnectionOrHistorySendAgainIn": "Loading the connection or history; send again in a moment.",
-  "opencode.couldNotStartAConversationYourTextIsKept": "Could not start a conversation; your text is kept.",
+  "opencode.thisConversationIsOpenInATabFinishItsTas":
+    "This conversation is open in a tab; finish its task and close the tab before deleting it.",
+  "opencode.opencodeDidNotConfirmTheMessageCheckTheC":
+    "OpenCode did not confirm the message; check the connection.",
+  "opencode.loadingTheConnectionOrHistorySendAgainIn":
+    "Loading the connection or history; send again in a moment.",
+  "opencode.couldNotStartAConversationYourTextIsKept":
+    "Could not start a conversation; your text is kept.",
   "opencode.newOpencodeConversation": "New OpenCode conversation",
   "opencode.opencodeConversations": "OpenCode conversations",
-  "opencode.sendingWasCancelledOrTheConversationChan": "Sending was cancelled or the conversation changed.",
+  "opencode.sendingWasCancelledOrTheConversationChan":
+    "Sending was cancelled or the conversation changed.",
   "opencode.taskStoppedTheQueueIsPaused": "Task stopped; the queue is paused.",
   "opencode.sendingFailedTheMessageIsKept": "Sending failed; the message is kept.",
   "opencode.thePreviousMessageIsStillSending": "The previous message is still sending.",
@@ -382,7 +417,8 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.output": "Output",
   "opencode.input": "Input",
   "opencode.toolImage": "Tool image",
-  "opencode.openALatexProjectFolderToUseAiFeatures": "Open a LaTeX project folder to use AI features",
+  "opencode.openALatexProjectFolderToUseAiFeatures":
+    "Open a LaTeX project folder to use AI features",
   "opencode.connectToOpencodeToUseAiFeatures": "Connect to OpenCode to use AI features",
   "opencode.chooseAnInstallationMethod": "Choose an installation method:",
   "opencode.iVeInstalledOpencode": "I've installed OpenCode",
@@ -395,15 +431,20 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.connecting": "Connecting...",
   "opencode.connect": "Connect",
   "opencode.copied": "Copied!",
-  "opencode.theConnectionToOpencodeHasBeenLostAndCou": "The connection to OpenCode has been lost and could not be re-established.",
-  "opencode.pleaseRestartOpencodeToContinueUsingAiFe": "Please restart OpenCode to continue using AI features.",
+  "opencode.theConnectionToOpencodeHasBeenLostAndCou":
+    "The connection to OpenCode has been lost and could not be re-established.",
+  "opencode.pleaseRestartOpencodeToContinueUsingAiFe":
+    "Please restart OpenCode to continue using AI features.",
   "opencode.opencodeDisconnected": "OpenCode Disconnected",
   "opencode.restartOpencode": "Restart OpenCode",
   "opencode.closeDialog": "Close dialog",
   "opencode.dismiss": "Dismiss",
-  "opencode.wouldYouLikeToAutomaticallyKillTheProces": "Would you like to automatically kill the process using port {port} and restart OpenCode?",
-  "opencode.copyThisErrorAndPasteItToYourLocalOpenco": "Copy this error and paste it to your local OpenCode or Claude for debugging assistance.",
-  "opencode.portPortIsAlreadyInUseByAnotherProcess": "Port {port} is already in use by another process.",
+  "opencode.wouldYouLikeToAutomaticallyKillTheProces":
+    "Would you like to automatically kill the process using port {port} and restart OpenCode?",
+  "opencode.copyThisErrorAndPasteItToYourLocalOpenco":
+    "Copy this error and paste it to your local OpenCode or Claude for debugging assistance.",
+  "opencode.portPortIsAlreadyInUseByAnotherProcess":
+    "Port {port} is already in use by another process.",
   "opencode.opencodeIsNotInstalledOnYourSystem": "OpenCode is not installed on your system.",
   "opencode.killPortPortRestart": "Kill Port {port} & Restart",
   "opencode.failedToStartOpencode": "Failed to start OpenCode.",

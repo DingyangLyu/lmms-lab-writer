@@ -3,6 +3,7 @@ import { CaretRightIcon, FileTextIcon, ListIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { PanelHeightHandle, usePanelHeight } from "@/components/ui/panel-height";
 import { latexOutline, type OutlineEntry } from "@/lib/latex/outline";
+import { useI18n } from "@/lib/i18n";
 
 export function DocumentOutline({
   path,
@@ -15,6 +16,7 @@ export function DocumentOutline({
   error?: string;
   onNavigate: (line: number) => void;
 }) {
+  const { t } = useI18n();
   const height = usePanelHeight("writer-outline-height", 0.35, 96);
   const deferredSource = useDeferredValue(source);
   const entries = useMemo(() => latexOutline(deferredSource), [deferredSource]);
@@ -45,7 +47,9 @@ export function DocumentOutline({
           {entry.children.length ? (
             <button
               type="button"
-              aria-label={`${folded.has(entry.id) ? "展开" : "折叠"} ${entry.title}`}
+              aria-label={t(folded.has(entry.id) ? "outline.unfoldTitle" : "outline.foldTitle", {
+                title: entry.title,
+              })}
               aria-expanded={!folded.has(entry.id)}
               onClick={() =>
                 setFolded((current) => {
@@ -90,11 +94,11 @@ export function DocumentOutline({
   return (
     <section
       ref={height.ref}
-      aria-label="文档大纲"
+      aria-label={t("outline.documentOutline")}
       style={open ? height.style : undefined}
       className="flex min-h-0 shrink-0 flex-col border-t border-border"
     >
-      {open && <PanelHeightHandle control={height} label="拖动调整大纲高度" />}
+      {open && <PanelHeightHandle control={height} label={t("outline.dragToResizeTheOutline")} />}
       <div className="flex shrink-0 items-center border-b border-border">
         <button
           type="button"
@@ -104,17 +108,18 @@ export function DocumentOutline({
         >
           <CaretRightIcon className={`size-3 transition-transform ${open ? "rotate-90" : ""}`} />
           <ListIcon className="size-3.5" />
-          大纲 <span className="truncate font-normal text-muted">{path?.split("/").pop()}</span>
+          {t("outline.outline")}{" "}
+          <span className="truncate font-normal text-muted">{path?.split("/").pop()}</span>
         </button>
         {open && (
           <button
             type="button"
-            title={folded.size ? "展开全部章节" : "折叠全部章节"}
-            aria-label={folded.size ? "展开全部章节" : "折叠全部章节"}
+            title={folded.size ? t("outline.unfoldAllSections") : t("outline.foldAllSections")}
+            aria-label={folded.size ? t("outline.unfoldAllSections") : t("outline.foldAllSections")}
             onClick={() => setFolded(folded.size ? new Set() : new Set(allParentIds(entries)))}
             className="shrink-0 px-2 py-2 text-[10px] text-muted hover:text-accent"
           >
-            {folded.size ? "展开" : "折叠"}
+            {folded.size ? t("outline.unfold") : t("outline.fold")}
           </button>
         )}
       </div>
@@ -128,7 +133,9 @@ export function DocumentOutline({
             render(entries)
           ) : (
             <p className="p-3 text-xs text-muted">
-              {path ? "此文档还没有章节或图表。" : "打开 TeX 文档查看章节与图表。"}
+              {path
+                ? t("outline.thisDocumentHasNoSectionsOrFiguresYet")
+                : t("outline.openATexDocumentToSeeItsSectionsAndFigur")}
             </p>
           )}
         </div>

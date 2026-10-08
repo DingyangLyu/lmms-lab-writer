@@ -13,6 +13,7 @@ import { EditorErrorBoundary } from "@/components/editor/editor-error-boundary";
 import { type FileOperations, FileTree } from "@/components/editor/file-tree";
 import { pathSync } from "@/lib/path";
 import { DocumentOutline } from "./document-outline";
+import { useI18n } from "@/lib/i18n";
 
 type FileSidebarPanelProps = {
   projectPath: string | null;
@@ -45,6 +46,7 @@ export function FileSidebarPanel({
   readSource,
   onOutlineNavigate,
 }: FileSidebarPanelProps) {
+  const { t } = useI18n();
   const [filesOpen, setFilesOpen] = useState(true);
   const [loaded, setLoaded] = useState({ path: "", source: "", error: "" });
   useEffect(() => {
@@ -69,7 +71,7 @@ export function FileSidebarPanel({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-muted">
         <FolderIcon className="w-8 h-8 mb-2 opacity-30" />
-        <p className="text-xs">No folder open</p>
+        <p className="text-xs">{t("files.noFolderOpen")}</p>
       </div>
     );
   }
@@ -106,8 +108,8 @@ export function FileSidebarPanel({
               type="button"
               onClick={onCreateFile}
               className="p-1 text-muted hover:text-foreground hover:bg-foreground/5 transition-colors"
-              title="New File"
-              aria-label="New File"
+              title={t("files.newFile")}
+              aria-label={t("files.newFile")}
             >
               <FilePlusIcon className="w-4 h-4" />
             </button>
@@ -115,8 +117,8 @@ export function FileSidebarPanel({
               type="button"
               onClick={onCreateDirectory}
               className="p-1 text-muted hover:text-foreground hover:bg-foreground/5 transition-colors"
-              title="New Folder"
-              aria-label="New Folder"
+              title={t("files.newFolder")}
+              aria-label={t("files.newFolder")}
             >
               <FolderPlusIcon className="w-4 h-4" />
             </button>
@@ -124,8 +126,8 @@ export function FileSidebarPanel({
               type="button"
               onClick={onRefreshFiles}
               className="p-1 text-muted hover:text-foreground hover:bg-foreground/5 transition-colors"
-              title="Refresh Files"
-              aria-label="Refresh Files"
+              title={t("files.refreshFiles")}
+              aria-label={t("files.refreshFiles")}
             >
               <ArrowClockwiseIcon className="w-4 h-4" />
             </button>

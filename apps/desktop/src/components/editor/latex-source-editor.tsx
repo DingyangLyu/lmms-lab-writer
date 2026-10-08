@@ -65,6 +65,7 @@ import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
 import type { EditorTextRange } from "@/lib/editor/selection-context";
 import type { SourceMark } from "@/lib/editor/source-annotations";
 import type { EditorSettings, EditorTheme } from "@/lib/editor/types";
+import { i18n, useI18n } from "@/lib/i18n";
 
 export type LatexSourceEditorProps = {
   annotationMarks?: SourceMark[];
@@ -231,6 +232,7 @@ function configurable(
 
 /** Native contenteditable input keeps IME pre-edit text in its wrapped LaTeX line. */
 export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSourceEditorProps) {
+  const { t } = useI18n();
   const container = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialProps = useRef(props);
@@ -279,12 +281,14 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           latexLanguage,
           annotationDecorations,
           latexFolding,
-          codeFolding({ placeholderText: " … 展开 " }),
+          codeFolding({ placeholderText: i18n.t("editor.expand") }),
           foldGutter({
             markerDOM: (expanded) => {
               const marker = document.createElement("span");
               marker.textContent = expanded ? "⌄" : "›";
-              marker.title = expanded ? "折叠此注释、章节或环境" : "展开内容";
+              marker.title = expanded
+                ? i18n.t("editor.foldThisCommentSectionOrEnvironment")
+                : i18n.t("editor.unfold");
               marker.setAttribute("aria-label", marker.title);
               return marker;
             },
@@ -329,7 +333,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
             ),
           ),
           EditorView.contentAttributes.of({
-            "aria-label": "LaTeX 文稿编辑器",
+            "aria-label": i18n.t("editor.latexEditor"),
             spellcheck: "false",
             autocapitalize: "off",
             autocorrect: "off",
@@ -410,7 +414,9 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
                 class: `writer-note-${note.style} ${note.resolved ? "writer-note-resolved" : ""}`,
                 attributes: {
                   "data-writer-annotation": note.id,
-                  title: `${note.resolved ? "已解决 · " : ""}${note.comment} · ⌘/Ctrl+点击查看`,
+                  title:
+                    (note.resolved ? i18n.t("editor.resolved") : "") +
+                    i18n.t("editor.commentCtrlClickToOpen", { comment: note.comment }),
                 },
               }).range(from, to)
             : null;
@@ -474,7 +480,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
   return (
     <div className={`flex min-h-0 flex-col ${props.className ?? ""}`}>
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-3 py-1 text-[11px] text-muted">
-        <span>折叠</span>
+        <span>{t("editor.fold")}</span>
         <button
           type="button"
           onClick={() => {
@@ -495,17 +501,17 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
             view.focus();
           }}
           className="hover:text-foreground"
-          title="折叠光标所在章节或环境（⌘⌥[）"
+          title={t("editor.foldTheSectionOrEnvironmentAtTheCursor")}
         >
-          当前块
+          {t("editor.currentBlock")}
         </button>
         <button
           type="button"
           onClick={foldComments}
           className="hover:text-foreground"
-          title="包括多行注释和单条长注释；不修改文件内容"
+          title={t("editor.multiLineAndLongSingleLineCommentsTheFil")}
         >
-          注释
+          {t("editor.comments")}
         </button>
         <button
           type="button"
@@ -513,9 +519,9 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
             if (viewRef.current) unfoldCode(viewRef.current);
           }}
           className="hover:text-foreground"
-          title="展开光标所在块（⌘⌥]）"
+          title={t("editor.unfoldTheBlockAtTheCursor")}
         >
-          展开当前
+          {t("editor.unfoldCurrent")}
         </button>
         <button
           type="button"
@@ -524,7 +530,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           }}
           className="hover:text-foreground"
         >
-          全部展开
+          {t("editor.unfoldAll")}
         </button>
       </div>
       <div ref={container} className="min-h-0 flex-1 overflow-hidden" />

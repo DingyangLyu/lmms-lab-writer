@@ -7,6 +7,7 @@ import { collectSelection, type PdfAnnotation, visibleTextMarks } from "@/lib/pd
 import { fitPageWidth, pageScale, viewportAnchor } from "@/lib/pdf/viewport";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { useI18n } from "@/lib/i18n";
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url,
@@ -23,6 +24,7 @@ export function PdfViewer(props: Props) {
   return <PdfPreview key={`${props.src}:${props.refreshKey ?? 0}`} {...props} />;
 }
 function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) {
+  const { t } = useI18n();
   const notes = useAnnotations();
   const [previewSource, setPreviewSource] = useState<string | null>(null);
   const [mappingInfo, setMappingInfo] = useState<{ repairedFonts: string[]; warnings: string[] }>({
@@ -53,7 +55,10 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
       .catch((cause) => {
         if (!cancelled) {
           setPreviewSource(src);
-          setMappingInfo({ repairedFonts: [], warnings: [`文字映射检查失败：${String(cause)}`] });
+          setMappingInfo({
+            repairedFonts: [],
+            warnings: [t("pdf.checkingThePdfTextMappingFailedError", { error: String(cause) })],
+          });
         }
       });
     return () => {
@@ -216,19 +221,23 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-secondary px-2 py-1.5 text-xs">
         <span className="text-muted">
-          {loadError ? "PDF 预览失败" : numPages ? `${numPages} 页` : "加载 PDF…"}
+          {loadError
+            ? t("pdf.pdfPreviewFailed")
+            : numPages
+              ? t("pdf.countCountPagePages", { count: numPages })
+              : t("pdf.loadingPdf2")}
         </span>
         <div className="flex flex-wrap items-center gap-1">
           {notes && (
             <select
-              aria-label="PDF 批注方式"
+              aria-label={t("pdf.howToCommentOnThePdf")}
               value={mode}
               onChange={(event) => setMode(event.target.value as typeof mode)}
               className="border border-border bg-background px-2 py-1"
             >
-              <option value="read">阅读／选择文字</option>
-              <option value="highlight">高亮批注</option>
-              <option value="underline">下划线批注</option>
+              <option value="read">{t("pdf.readSelectText")}</option>
+              <option value="highlight">{t("pdf.highlight")}</option>
+              <option value="underline">{t("pdf.underline")}</option>
             </select>
           )}
           <button
@@ -239,16 +248,21 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
               setZoomMode("fit");
             }}
             className={`border px-2 py-1 ${zoomMode === "fit" ? "border-foreground bg-background" : "border-border text-muted"}`}
-            title="随窗口、屏幕和侧栏宽度自动调整"
+            title={t("pdf.adjustsToTheWindowScreenAndSidebarWidth")}
           >
-            适应宽度
+            {t("pdf.fitWidth")}
           </button>
-          <button type="button" aria-label="缩小 PDF" onClick={() => zoom(-0.25)} className="px-2">
+          <button
+            type="button"
+            aria-label={t("pdf.zoomOut")}
+            onClick={() => zoom(-0.25)}
+            className="px-2"
+          >
             −
           </button>
           <button
             type="button"
-            title="切换为 100% 手动缩放"
+            title={t("pdf.switchTo100ManualZoom")}
             onClick={() => {
               rememberAnchor();
               setManualScale(1);
@@ -257,14 +271,19 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
           >
             {Math.round(effectiveScale * 100)}%
           </button>
-          <button type="button" aria-label="放大 PDF" onClick={() => zoom(0.25)} className="px-2">
+          <button
+            type="button"
+            aria-label={t("pdf.zoomIn")}
+            onClick={() => zoom(0.25)}
+            className="px-2"
+          >
             +
           </button>
         </div>
       </div>
       {notes && (
         <p className="shrink-0 border-b border-border px-2 py-1 text-[11px] text-muted">
-          拖选文字添加批注 · 顶部“批注”管理历史 · ⌘/Ctrl + 点击定位源码
+          {t("pdf.dragOverTextToCommentManageThemUnderComm")}
         </p>
       )}
       {mappingInfo.warnings.length > 0 && (
@@ -273,7 +292,7 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
           className="shrink-0 border-b border-border px-2 py-1 text-xs text-accent"
           title={mappingInfo.warnings.join("\n")}
         >
-          部分 PDF 字体缺少可靠文字映射；添加批注前请核对或修正选文。
+          {t("pdf.somePdfFontsLackAReliableTextMappingChec")}
         </p>
       )}
       {mappingInfo.repairedFonts.length > 0 && (
@@ -281,19 +300,21 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
           className="shrink-0 border-b border-border px-2 py-1 text-[11px] text-muted"
           title={mappingInfo.repairedFonts.join("、")}
         >
-          已恢复 {mappingInfo.repairedFonts.length} 种字体的文字映射
+          {t("pdf.restoredTheTextMappingOfCountCountFontFo", {
+            count: mappingInfo.repairedFonts.length,
+          })}
         </p>
       )}
       <section
         ref={containerRef}
         onMouseUp={capture}
         onKeyUp={capture}
-        aria-label="PDF 文稿，可选择文字批注"
+        aria-label={t("pdf.pdfDocumentSelectTextToComment")}
         className="min-h-0 min-w-0 flex-1 overflow-auto bg-accent-hover p-4"
         style={{ overflowAnchor: "none" }}
       >
         {!previewSource ? (
-          <p className="p-8 text-sm text-muted">正在检查 PDF 文字映射…</p>
+          <p className="p-8 text-sm text-muted">{t("pdf.checkingThePdfTextMapping")}</p>
         ) : (
           <Document
             key={retry}
@@ -314,10 +335,10 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
               setNumPages(0);
             }}
             onSourceError={(error) => setLoadError(error.message)}
-            loading={<p className="p-8 text-sm text-muted">正在加载 PDF…</p>}
+            loading={<p className="p-8 text-sm text-muted">{t("pdf.loadingPdf")}</p>}
             error={
               <div role="alert" className="space-y-3 p-8 text-sm">
-                <p>PDF 加载失败：{loadError}</p>
+                <p>{t("pdf.thePdfFailedToLoadError", { error: loadError ?? "" })}</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -326,7 +347,7 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
                   }}
                   className="border px-2 py-1"
                 >
-                  重试
+                  {t("pdf.retry")}
                 </button>
               </div>
             }
@@ -431,6 +452,7 @@ function VirtualPdfPage({
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
   onSynctexClick?: (page: number, x: number, y: number) => void;
 }) {
+  const { t } = useI18n();
   const pageRef = useRef<HTMLElement>(null);
   const [render, setRender] = useState(page <= 2);
   const [natural, setNatural] = useState(pagesRef.current.get(page));
@@ -470,7 +492,7 @@ function VirtualPdfPage({
       data-pdf-page={page}
       data-pdf-width={natural?.width}
       data-pdf-height={natural?.height}
-      aria-label={`PDF 第 ${page} 页`}
+      aria-label={t("pdf.pdfPagePage", { page })}
       onClick={(event) => {
         if (!onSynctexClick || (!event.metaKey && !event.ctrlKey)) return;
         const rect = event.currentTarget.getBoundingClientRect();
