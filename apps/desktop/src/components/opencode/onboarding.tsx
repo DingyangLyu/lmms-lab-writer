@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/lib/i18n";
 import { CheckIcon, FolderIcon, TerminalIcon } from "./icons";
 import type { OpenCodeDaemonStatus } from "./types";
 
@@ -20,6 +21,7 @@ export function OnboardingState({
   onRestartOpenCode?: () => void;
   hasProject?: boolean;
 }) {
+  const { t } = useI18n();
   const [copiedNpm, setCopiedNpm] = useState(false);
   const [copiedBrew, setCopiedBrew] = useState(false);
 
@@ -46,8 +48,10 @@ export function OnboardingState({
             <div className="size-12 mx-auto mb-3 border border-border flex items-center justify-center">
               <FolderIcon className="size-6 text-muted" />
             </div>
-            <h3 className="text-sm mb-1">Open a Project</h3>
-            <p className="text-xs text-muted">Open a LaTeX project folder to use AI features</p>
+            <h3 className="text-sm mb-1">{t("opencode.openAProject")}</h3>
+            <p className="text-xs text-muted">
+              {t("opencode.openALatexProjectFolderToUseAiFeatures")}
+            </p>
           </div>
         </div>
       </div>
@@ -57,12 +61,12 @@ export function OnboardingState({
   const steps = [
     {
       id: "install",
-      label: "Install OpenCode",
+      label: t("opencode.installOpencode"),
       status: daemonStatus === "unavailable" ? "current" : daemonStatus ? "complete" : "pending",
     },
     {
       id: "start",
-      label: "Start OpenCode",
+      label: t("opencode.startOpencode"),
       status:
         daemonStatus === "unavailable"
           ? "pending"
@@ -76,7 +80,7 @@ export function OnboardingState({
     },
     {
       id: "connect",
-      label: "Connect",
+      label: t("opencode.connect"),
       status: daemonStatus === "running" ? (connecting ? "loading" : "current") : "pending",
     },
   ];
@@ -88,8 +92,8 @@ export function OnboardingState({
           <div className="size-12 mx-auto mb-3 border border-border flex items-center justify-center">
             <TerminalIcon className="size-6 text-muted" />
           </div>
-          <h3 className="text-sm mb-1">Setup Agent Mode</h3>
-          <p className="text-xs text-muted">Connect to OpenCode to use AI features</p>
+          <h3 className="text-sm mb-1">{t("opencode.setupAgentMode")}</h3>
+          <p className="text-xs text-muted">{t("opencode.connectToOpencodeToUseAiFeatures")}</p>
         </div>
 
         <div className="space-y-2">
@@ -121,7 +125,7 @@ export function OnboardingState({
 
         {daemonStatus === "unavailable" && (
           <div className="space-y-3">
-            <p className="text-xs text-muted">Choose an installation method:</p>
+            <p className="text-xs text-muted">{t("opencode.chooseAnInstallationMethod")}</p>
             <div className="space-y-2">
               <div className="border border-border p-2">
                 <div className="flex items-center justify-between mb-1">
@@ -131,7 +135,7 @@ export function OnboardingState({
                     onClick={() => copyToClipboard("npm i -g opencode-ai@latest", "npm")}
                     className="text-xs text-muted hover:text-foreground"
                   >
-                    {copiedNpm ? "Copied!" : "Copy"}
+                    {copiedNpm ? t("opencode.copied") : "Copy"}
                   </button>
                 </div>
                 <code className="text-xs block font-mono">npm i -g opencode-ai@latest</code>
@@ -144,7 +148,7 @@ export function OnboardingState({
                     onClick={() => copyToClipboard("brew install sst/tap/opencode", "brew")}
                     className="text-xs text-muted hover:text-foreground"
                   >
-                    {copiedBrew ? "Copied!" : "Copy"}
+                    {copiedBrew ? t("opencode.copied") : "Copy"}
                   </button>
                 </div>
                 <code className="text-xs block font-mono">brew install sst/tap/opencode</code>
@@ -152,7 +156,7 @@ export function OnboardingState({
             </div>
             {onRestartOpenCode && (
               <button type="button" onClick={onRestartOpenCode} className="btn-brutalist w-full">
-                I've installed OpenCode
+                {t("opencode.iVeInstalledOpencode")}
               </button>
             )}
           </div>
@@ -160,14 +164,14 @@ export function OnboardingState({
 
         {daemonStatus === "stopped" && onRestartOpenCode && (
           <button type="button" onClick={onRestartOpenCode} className="btn-brutalist w-full">
-            Start OpenCode
+            {t("opencode.startOpencode")}
           </button>
         )}
 
         {daemonStatus === "starting" && (
           <div className="flex items-center justify-center gap-2 text-xs text-muted py-2">
             <Spinner className="size-4" />
-            <span>Starting OpenCode...</span>
+            <span>{t("opencode.startingOpencode")}</span>
           </div>
         )}
 
@@ -180,10 +184,10 @@ export function OnboardingState({
           >
             {connecting ? (
               <>
-                <Spinner className="size-4" /> Connecting...
+                <Spinner className="size-4" /> {t("opencode.connecting")}
               </>
             ) : (
-              "Connect to OpenCode"
+              t("opencode.connectToOpencode")
             )}
           </button>
         )}

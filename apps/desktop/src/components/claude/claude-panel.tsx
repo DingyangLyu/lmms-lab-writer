@@ -28,18 +28,31 @@ import {
 } from "@/lib/editor/selection-context";
 import type { HarnessLifecycle } from "@/lib/harness/types";
 import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
+import { useI18n } from "@/lib/i18n";
 
 type Session = { id: string; name: string; directory: string; updatedAt: number };
 type Model = { value: string; displayName: string; supportedEffortLevels?: string[] };
 const PERMISSIONS = [
-  { value: "default", label: "请求批准", description: "需要权限时逐次询问" },
-  { value: "acceptEdits", label: "自动编辑", description: "自动批准文件编辑；部分命令仍需审批" },
+  {
+    value: "default",
+    label: "claude.askForApproval",
+    description: "claude.asksEachTimeAPermissionIsNeeded",
+  },
+  {
+    value: "acceptEdits",
+    label: "claude.autoEdit",
+    description: "claude.approvesFileEditsAutomaticallySomeComman",
+  },
   {
     value: "bypassPermissions",
-    label: "无需审批",
-    description: "命令和文件修改无需逐次审批；Claude 的强制规则和用户问题仍保留",
+    label: "claude.noApprovals",
+    description: "claude.commandsAndFileEditsNeedNoApprovalClaude",
   },
-  { value: "plan", label: "仅规划", description: "先分析和规划，修改仍需审批" },
+  {
+    value: "plan",
+    label: "claude.planOnly",
+    description: "claude.analysesAndPlansFirstEditsStillNeedAppro",
+  },
 ] as const;
 type PermissionMode = (typeof PERMISSIONS)[number]["value"];
 const isPermissionMode = (value: string | null): value is PermissionMode =>
@@ -69,6 +82,7 @@ export function ClaudePanel({
   onPendingMessageSent,
   ...lifecycle
 }: Props) {
+  const { t } = useI18n();
   const initialSession = useRef(lifecycle.initialSessionId);
   const [ready, setReady] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -187,14 +201,14 @@ export function ClaudePanel({
           if (event.type === "control_cancel_request")
             setApprovals((current) => current.filter((a) => a.request_id !== event.request_id));
           if (event.type === "writer_error") {
-            setError(event.error || "Claude Code 执行失败");
+            setError(event.error || t("claude.claudeCodeFailed"));
             if (outboxRef.current?.state.items.length)
-              void outboxRef.current.pause("执行失败，队列已暂停。");
+              void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
           }
           if (event.type === "result" && event.is_error) {
-            setError(event.errors?.join("\n") || event.result || "Claude Code 执行失败");
+            setError(event.errors?.join("\n") || event.result || t("claude.claudeCodeFailed"));
             if (outboxRef.current?.state.items.length)
-              void outboxRef.current.pause("执行失败，队列已暂停。");
+              void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
           }
           if (event.type === "writer_started") setBusy(true);
           if (event.type === "writer_done") {
@@ -229,7 +243,10 @@ export function ClaudePanel({
           await openSession(previous);
         } catch (cause) {
           // Stay bound to the saved session instead of silently becoming a blank tab.
-          if (!disposed) setError(`无法恢复这个 Claude Code 对话，可重试：${String(cause)}`);
+          if (!disposed)
+            setError(
+              t("claude.couldNotRestoreThisClaudeCodeConversatio", { error: String(cause) }),
+            );
           return;
         }
       }
@@ -265,8 +282,9 @@ export function ClaudePanel({
   );
   const transmit = useCallback(
     async (draft: ChatDraft, steer = false) => {
-      if (!ready || sending.current || !directory) throw new Error("连接或发送尚未就绪。");
-      if (!steer && (busy || bridgeWorking)) throw new Error("当前任务仍在执行。");
+      if (!ready || sending.current || !directory)
+        throw new Error(t("claude.notConnectedOrNotReadyToSendYet"));
+      if (!steer && (busy || bridgeWorking)) throw new Error(t("claude.aTaskIsStillRunning"));
       const expectedSession = sessionRef.current;
       sending.current = true;
       setPreparing(true);
@@ -274,10 +292,11 @@ export function ClaudePanel({
       try {
         await onBeforeSend(draft.selection);
         const payload = await prepareChatFiles(directory, draft.raw, draft.files);
-        if (sessionRef.current !== expectedSession) throw new Error("对话已切换，消息没有发送。");
+        if (sessionRef.current !== expectedSession)
+          throw new Error(t("claude.theConversationChangedTheMessageWasNotSe"));
         let id = expectedSession;
         if (!id) {
-          if (steer) throw new Error("没有正在执行的对话。");
+          if (steer) throw new Error(t("claude.noConversationIsRunning"));
           const session = await invoke<Session>("claude_create_session", { cwd: directory });
           id = session.id;
           remember(id);
@@ -323,6 +342,7 @@ export function ClaudePanel({
       effort,
       permission,
       refresh,
+      t,
     ],
   );
   const outbox = useChatOutbox({
@@ -392,7 +412,8 @@ export function ClaudePanel({
     lifecycle,
     {
       sessionId,
-      title: sessions.find((s) => s.id === sessionId)?.name || "新 Claude Code 对话",
+      title:
+        sessions.find((s) => s.id === sessionId)?.name || t("claude.newClaudeCodeConversation"),
       status: approvals.length
         ? "waiting"
         : busy || bridgeWorking || preparing
@@ -459,12 +480,12 @@ export function ClaudePanel({
             }}
             className="border border-border px-2 py-1 text-xs"
           >
-            历史
+            {t("claude.history")}
           </button>
           <button
             type="button"
-            title="新对话"
-            aria-label="新建 Claude 对话"
+            title={t("claude.newConversation")}
+            aria-label={t("claude.newClaudeConversation")}
             disabled={!lifecycle.onNewConversation && (busy || preparing)}
             onClick={() => {
               if (lifecycle.onNewConversation) {
@@ -514,7 +535,9 @@ export function ClaudePanel({
               />
             </div>
           ))}
-          {!sessions.length && <p className="p-2 text-xs text-muted">还没有 Claude Code 对话。</p>}
+          {!sessions.length && (
+            <p className="p-2 text-xs text-muted">{t("claude.noClaudeCodeConversationsYet")}</p>
+          )}
         </div>
       )}
       <div
@@ -528,10 +551,10 @@ export function ClaudePanel({
       >
         {idleHistory.sleeping && (
           <p role="status">
-            {idleHistory.error || "正在恢复对话历史…"}
+            {idleHistory.error || t("claude.restoringTheConversation")}
             {idleHistory.error && (
               <button type="button" onClick={idleHistory.retry}>
-                重试
+                {t("claude.retry")}
               </button>
             )}
           </p>
@@ -539,16 +562,18 @@ export function ClaudePanel({
         {!idleHistory.sleeping && !messages.items.length && (
           <div className="space-y-2 py-6 text-sm text-muted">
             <p className="font-medium text-foreground">
-              {ready ? "使用本机 Claude Code" : "正在连接 Claude Code…"}
+              {ready
+                ? t("claude.usesClaudeCodeOnThisComputer")
+                : t("claude.connectingToClaudeCode")}
             </p>
-            <p>沿用本机登录与模型配置，可检索资料、修改论文、读取图片；选中的正文会随消息附上。</p>
+            <p>{t("claude.usesYourLocalSignInAndModelSettingsItCan")}</p>
           </div>
         )}
         <ChatHistoryItems items={messages.items} onFileClick={onFileClick} directory={directory} />
         {busy && (
           <p role="status" className="flex items-center gap-2 text-xs text-muted">
             <span className="size-2 bg-accent motion-safe:animate-pulse" />
-            {approval ? "等待你的回复" : "Claude Code 正在执行…"}
+            {approval ? t("claude.waitingForYourReply") : t("claude.claudeCodeIsWorking")}
           </p>
         )}
       </div>
@@ -556,8 +581,10 @@ export function ClaudePanel({
         <div className="max-h-[30%] shrink-0 overflow-y-auto border-t border-border bg-accent-hover p-3 text-xs">
           <p className="font-medium">
             {questions.length
-              ? "Claude Code 需要你的补充"
-              : `请求批准：${approval.request?.tool_name || "工具"}`}
+              ? t("claude.claudeCodeNeedsMoreFromYou")
+              : t("claude.approvalRequestedTool", {
+                  tool: approval.request?.tool_name || t("claude.tool"),
+                })}
           </p>
           {questions.length ? (
             questions.map((q) => (
@@ -595,14 +622,14 @@ export function ClaudePanel({
               onClick={() => void respond(true)}
               className="border border-foreground bg-foreground px-2 py-1 text-background"
             >
-              {questions.length ? "提交" : "仅允许这次"}
+              {questions.length ? t("claude.submit") : t("claude.allowOnce")}
             </button>
             <button
               type="button"
               onClick={() => void respond(false)}
               className="border border-border px-2 py-1"
             >
-              拒绝
+              {t("claude.deny")}
             </button>
           </div>
         </div>
@@ -619,7 +646,7 @@ export function ClaudePanel({
               onClick={() => setRetry((value) => value + 1)}
               className="ml-2 underline"
             >
-              重新连接
+              {t("claude.reconnect")}
             </button>
           )}
         </div>
@@ -627,7 +654,7 @@ export function ClaudePanel({
       <ResizableComposer backend="claude">
         <fieldset
           ref={attachments.areaRef}
-          aria-label="聊天输入与附件"
+          aria-label={t("claude.messageAndAttachments")}
           onDragOver={(e) => e.preventDefault()}
           onDrop={attachments.onDrop}
           className="writer-composer-card"
@@ -641,11 +668,15 @@ export function ClaudePanel({
           {editorSelection && (
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs">
               <span className="min-w-0 flex-1 truncate">
-                已引用 {editorSelection.path} ·{" "}
-                {editorSelection.ranges.map(selectionRangeLabel).join("、")}
+                {t("agentsCommon.quotingPathRanges", {
+                  path: editorSelection.path,
+                  ranges: editorSelection.ranges
+                    .map(selectionRangeLabel)
+                    .join(t("agentsCommon.listSeparator")),
+                })}
               </span>
               <button type="button" onClick={onClearSelection}>
-                移除
+                {t("claude.remove")}
               </button>
             </div>
           )}
@@ -689,16 +720,19 @@ export function ClaudePanel({
               }
             }}
             rows={3}
-            aria-label="发送给 Claude Code 的消息"
-            placeholder="让 Claude Code 查找文献或修改选中内容…"
+            aria-label={t("claude.messageToClaudeCode")}
+            placeholder={t("claude.askClaudeCodeToFindReferencesOrEditTheSe")}
             className="writer-composer-input"
           />
           <div className="writer-composer-toolbar">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs">
               <select
-                aria-label="Claude Code 权限"
+                aria-label={t("claude.claudeCodePermissions")}
                 value={permission}
-                title={PERMISSIONS.find((option) => option.value === permission)?.description}
+                title={t(
+                  PERMISSIONS.find((option) => option.value === permission)?.description ??
+                    "claude.asksEachTimeAPermissionIsNeeded",
+                )}
                 disabled={!ready || busy || preparing || bridgeWorking}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -711,12 +745,12 @@ export function ClaudePanel({
               >
                 {PERMISSIONS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.label)}
                   </option>
                 ))}
               </select>
               <select
-                aria-label="Claude Code 模型"
+                aria-label={t("claude.claudeCodeModel")}
                 value={model}
                 disabled={busy}
                 onChange={(e) => {
@@ -728,15 +762,17 @@ export function ClaudePanel({
                 }}
                 className="min-w-20 max-w-40 flex-1 truncate border border-border bg-background px-1.5 py-1"
               >
-                {!models.length && <option value="default">本机默认</option>}
+                {!models.length && <option value="default">{t("claude.localDefault")}</option>}
                 {models.map((m) => (
                   <option key={m.value} value={m.value}>
-                    {m.value === "default" ? "本机默认" : `${m.value} · ${m.displayName}`}
+                    {m.value === "default"
+                      ? t("claude.localDefault")
+                      : `${m.value} · ${m.displayName}`}
                   </option>
                 ))}
               </select>
               <select
-                aria-label="Claude Code 推理强度"
+                aria-label={t("claude.claudeCodeEffort")}
                 value={effort}
                 disabled={busy}
                 onChange={(e) => setEffort(e.target.value)}
@@ -760,8 +796,8 @@ export function ClaudePanel({
             />
             <button
               type="button"
-              aria-label="添加附件"
-              title="添加附件"
+              aria-label={t("claude.addAttachment")}
+              title={t("claude.addAttachment")}
               disabled={preparing || attachments.loading}
               onClick={() => void attachments.choose()}
               className="flex size-8 shrink-0 items-center justify-center border border-border"
@@ -771,10 +807,10 @@ export function ClaudePanel({
             {busy && (
               <button
                 type="button"
-                aria-label="停止 Claude Code"
+                aria-label={t("claude.stopClaudeCode")}
                 onClick={() =>
                   void outbox
-                    .pause("已停止任务，队列已暂停。")
+                    .pause(t("claude.taskStoppedTheQueueIsPaused"))
                     .catch(() => {})
                     .then(() => invoke("claude_stop", { sessionId }))
                     .catch((cause) => setError(String(cause)))
@@ -789,9 +825,9 @@ export function ClaudePanel({
               aria-label={
                 busy
                   ? deliveryMode === "queue"
-                    ? "加入 Claude Code 队列"
-                    : "立即指导 Claude Code"
-                  : "发送给 Claude Code"
+                    ? t("claude.addToTheClaudeCodeQueue")
+                    : t("claude.steerClaudeCodeNow")
+                  : t("claude.sendToClaudeCode")
               }
               disabled={
                 !ready || preparing || attachments.loading || (!input.trim() && !files.length)

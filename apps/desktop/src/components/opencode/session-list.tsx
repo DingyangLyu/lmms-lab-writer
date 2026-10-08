@@ -3,6 +3,7 @@
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useMemo, useState } from "react";
 import { RenameChat } from "@/components/chat/rename-chat";
+import { useI18n } from "@/lib/i18n";
 import type { SessionInfo } from "@/lib/opencode/types";
 import { TrashIcon } from "./icons";
 import { formatRelativeTime } from "./utils";
@@ -22,6 +23,7 @@ export function SessionList({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [listParent] = useAutoAnimate({ duration: 200 });
   const sortedSessions = useMemo(
@@ -33,9 +35,9 @@ export function SessionList({
     return (
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="text-center space-y-3">
-          <p className="text-sm text-muted">No sessions yet</p>
+          <p className="text-sm text-muted">{t("opencode.noSessionsYet")}</p>
           <button type="button" onClick={onNewSession} className="btn-brutalist">
-            Create First Session
+            {t("opencode.createFirstSession")}
           </button>
         </div>
       </div>
@@ -72,7 +74,7 @@ export function SessionList({
               </div>
             </button>
             <RenameChat
-              name={session.title || "未命名对话"}
+              name={session.title || t("opencode.untitledConversation")}
               onRename={(title) => onRename(session.id, title)}
             />
             <button
@@ -82,7 +84,7 @@ export function SessionList({
                 setDeleteConfirmId(session.id);
               }}
               className="px-3 py-2 text-muted hover:text-red-600 transition-colors"
-              title="Delete session"
+              title={t("opencode.deleteSession")}
             >
               <TrashIcon className="size-4" />
             </button>
@@ -105,9 +107,10 @@ export function SessionList({
 }
 
 export function EmptyState() {
+  const { t } = useI18n();
   return (
     <div className="flex-1 flex items-center justify-center p-4">
-      <p className="text-sm text-muted">Send a message to get started</p>
+      <p className="text-sm text-muted">{t("opencode.sendAMessageToGetStarted")}</p>
     </div>
   );
 }
@@ -121,6 +124,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
       <div className="bg-background border border-border p-4 max-w-xs w-full mx-4 shadow-[4px_4px_0_0_var(--foreground)]">
@@ -131,10 +135,10 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="px-3 py-1.5 text-sm border border-border hover:bg-surface-secondary transition-colors"
           >
-            Cancel
+            {t("opencode.cancel")}
           </button>
           <button type="button" onClick={onConfirm} className="btn-brutalist text-sm">
-            Delete
+            {t("opencode.delete")}
           </button>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { AttachmentStrip } from "@/components/chat/attachment-strip";
 import { GrowingTextarea } from "@/components/chat/growing-textarea";
 import { useChatAttachments } from "@/lib/chat/use-chat-attachments";
 import { type EditorSelectionContext, selectionRangeLabel } from "@/lib/editor/selection-context";
+import { i18n, useI18n } from "@/lib/i18n";
 import { findSelectedModel } from "@/lib/opencode/model-selection";
 import { ChevronIcon, StopIcon } from "./icons";
 import type { AttachedFile } from "./types";
@@ -86,10 +87,10 @@ function getVariantOptions(variants: VariantMap | undefined): SelectOption[] {
   if (available.length === 0) return [];
 
   return [
-    { value: "", label: "Effort: Auto" },
+    { value: "", label: i18n.t("opencode.effortAuto") },
     ...available.map((variant) => ({
       value: variant,
-      label: `Effort: ${formatVariantLabel(variant)}`,
+      label: i18n.t("opencode.effortVariant", { variant: formatVariantLabel(variant) }),
     })),
   ];
 }
@@ -395,6 +396,7 @@ export function InputArea({
   editorSelection?: EditorSelectionContext | null;
   onClearSelection?: () => void;
 }) {
+  const { t } = useI18n();
   const attachments = useChatAttachments(
     attachedFiles,
     setAttachedFiles,
@@ -462,7 +464,7 @@ export function InputArea({
 
   return (
     <fieldset
-      aria-label="聊天输入与附件"
+      aria-label={t("opencode.messageAndAttachments")}
       ref={attachments.areaRef}
       onDragOver={(event) => event.preventDefault()}
       onDrop={attachments.onDrop}
@@ -470,30 +472,37 @@ export function InputArea({
     >
       {deliveryControls}
       {editorSelection && (
-        <section className="border-b border-border px-3 py-2 text-xs" aria-label="已引用编辑器选区">
+        <section
+          className="border-b border-border px-3 py-2 text-xs"
+          aria-label={t("opencode.quotedEditorSelection")}
+        >
           <div className="flex items-start gap-2">
             <span className="min-w-0 flex-1 break-words">
-              自动引用：{editorSelection.path} ·{" "}
-              {editorSelection.ranges.map(selectionRangeLabel).join("、")}
+              {t("opencode.quotingPathRanges", {
+                path: editorSelection.path,
+                ranges: editorSelection.ranges
+                  .map(selectionRangeLabel)
+                  .join(t("agentsCommon.listSeparator")),
+              })}
             </span>
             <button
               type="button"
               onClick={onClearSelection}
               className="shrink-0 px-1 hover:text-accent"
-              aria-label="取消选区引用"
-              title="取消选区引用"
+              aria-label={t("opencode.stopQuotingTheSelection")}
+              title={t("opencode.stopQuotingTheSelection")}
             >
               <XIcon className="size-3" />
             </button>
           </div>
           <details className="mt-1">
             <summary className="cursor-pointer text-muted">
-              查看选中原文（
-              {editorSelection.ranges.reduce(
-                (count, range) => count + Array.from(range.text).length,
-                0,
-              )}{" "}
-              字符）
+              {t("opencode.showTheQuotedTextCountCountCharacterChar", {
+                count: editorSelection.ranges.reduce(
+                  (count, range) => count + Array.from(range.text).length,
+                  0,
+                ),
+              })}
             </summary>
             <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs">
               {editorSelection.ranges.map((range) => range.text).join("\n\n")}
@@ -513,12 +522,12 @@ export function InputArea({
       )}
       {attachments.loading && (
         <p role="status" className="px-3 text-xs text-muted">
-          正在添加附件…
+          {t("opencode.addingAttachments")}
         </p>
       )}
 
       <GrowingTextarea
-        aria-label="发送给 OpenCode 的消息"
+        aria-label={t("opencode.messageToOpencode")}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -526,7 +535,9 @@ export function InputArea({
         onCompositionEnd={handleCompositionEnd}
         onPaste={attachments.onPaste}
         placeholder={
-          editorSelection ? "说明如何修改选中的内容…" : "让 OpenCode 查找文献或修改选中内容…"
+          editorSelection
+            ? t("opencode.describeHowToChangeTheSelection")
+            : t("opencode.askOpencodeToFindReferencesOrEditTheSele")
         }
         className="writer-composer-input"
         rows={3}
@@ -608,8 +619,8 @@ export function InputArea({
           className={`flex size-8 items-center justify-center border border-border transition-colors flex-shrink-0 ${
             attachedFiles.length > 0 ? "text-accent" : "text-muted-foreground hover:text-muted"
           } ${isSending ? "opacity-50 cursor-not-allowed" : ""}`}
-          title="添加文件或图片，也可粘贴或拖入"
-          aria-label="添加附件"
+          title={t("opencode.addFilesOrImagesYouCanAlsoPasteOrDropThe")}
+          aria-label={t("opencode.addAttachment")}
         >
           <PaperclipIcon className="size-4" />
           {attachedFiles.length > 0 && (
@@ -622,7 +633,7 @@ export function InputArea({
             type="button"
             onClick={onAbort}
             className="flex size-8 shrink-0 items-center justify-center border border-border text-muted hover:text-foreground transition-colors"
-            title="Stop"
+            title={t("opencode.stop")}
           >
             <StopIcon className="size-5" />
           </button>
@@ -634,13 +645,19 @@ export function InputArea({
             isSending || attachments.loading || (!input.trim() && attachedFiles.length === 0)
           }
           className="flex size-8 shrink-0 items-center justify-center bg-foreground text-background disabled:opacity-40"
-          title={isWorking ? (deliveryMode === "queue" ? "加入队列" : "立即指导") : "发送"}
+          title={
+            isWorking
+              ? deliveryMode === "queue"
+                ? t("opencode.queue")
+                : t("opencode.steerNow")
+              : t("opencode.send")
+          }
           aria-label={
             isWorking
               ? deliveryMode === "queue"
-                ? "加入 OpenCode 队列"
-                : "立即指导 OpenCode"
-              : "发送给 OpenCode"
+                ? t("opencode.addToTheOpencodeQueue")
+                : t("opencode.steerOpencodeNow")
+              : t("opencode.sendToOpencode")
           }
         >
           <ArrowUpIcon className="size-4" />

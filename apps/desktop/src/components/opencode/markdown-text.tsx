@@ -8,6 +8,7 @@ import { ChatLink } from "@/components/chat/chat-link";
 import { chatUrlTransform } from "@/lib/chat/links";
 import "katex/dist/katex.min.css";
 import { useMemo } from "react";
+import { useI18n } from "@/lib/i18n";
 
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
@@ -19,13 +20,14 @@ export function MarkdownText({
   text: string;
   onFileClick?: (path: string) => void;
 }) {
+  const { t } = useI18n();
   const components = useMemo<Components>(() => {
     const filePattern =
       /\.(tex|bib|cls|sty|txt|md|json|yaml|yml|py|js|ts|tsx|css|html|pdf|png|jpg|jpeg|svg|pptx?|docx?|xlsx?)$/i;
 
     return {
       img: ({ src, alt }) =>
-        typeof src === "string" ? <ChatImage url={src} name={alt || "图片"} /> : null,
+        typeof src === "string" ? <ChatImage url={src} name={alt || t("opencode.image")} /> : null,
       pre({ children }) {
         return (
           <pre className="bg-accent-hover border border-border p-3 overflow-x-auto text-[11px] my-3 font-mono leading-relaxed">
@@ -115,7 +117,7 @@ export function MarkdownText({
         return <td className="border border-border px-2 py-1 text-muted">{children}</td>;
       },
     };
-  }, [onFileClick]);
+  }, [onFileClick, t]);
 
   return (
     <ReactMarkdown

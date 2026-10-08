@@ -3,6 +3,7 @@
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useMemo, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/lib/i18n";
 import { CheckIcon, DisclosureTriangle } from "./icons";
 import type { TaskItem } from "./types";
 
@@ -32,6 +33,7 @@ function getTaskKey(task: TaskItem, index: number): string {
 }
 
 export function CollapsibleTasksBar({ tasks }: { tasks: TaskItem[] }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [tasksParent] = useAutoAnimate({ duration: 150 });
 
@@ -56,7 +58,7 @@ export function CollapsibleTasksBar({ tasks }: { tasks: TaskItem[] }) {
       >
         <DisclosureTriangle open={expanded} />
         <span className="text-[10px] font-mono font-medium text-muted uppercase tracking-wider">
-          Tasks
+          {t("opencode.tasks")}
         </span>
         <span className="text-[10px] font-mono text-muted">
           {completed}/{total}
@@ -116,13 +118,14 @@ export function CollapsibleTasksBar({ tasks }: { tasks: TaskItem[] }) {
 }
 
 export function TasksDisplay({ tasks }: { tasks: TaskItem[] }) {
+  const { t } = useI18n();
   const [tasksListParent] = useAutoAnimate({ duration: 150 });
 
   return (
     <div className="border-2 border-border bg-background my-2 overflow-hidden">
       <div className="bg-accent-hover px-3 py-1.5 border-b border-border flex justify-between items-center">
         <span className="text-[10px] font-mono font-medium text-muted uppercase tracking-wider">
-          Tasks
+          {t("opencode.tasks")}
         </span>
         <span className="text-[10px] font-mono text-muted">{tasks.length}</span>
       </div>

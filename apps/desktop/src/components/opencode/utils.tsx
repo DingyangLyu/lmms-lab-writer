@@ -1,3 +1,4 @@
+import { i18n, useI18n } from "@/lib/i18n";
 export function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -5,11 +6,14 @@ export function formatRelativeTime(date: Date): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "now";
-  if (diffMins < 60) return `${diffMins}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diffMins < 1) return i18n.t("opencode.now");
+  if (diffMins < 60) return i18n.t("opencode.nM", { n: diffMins });
+  if (diffHours < 24) return i18n.t("opencode.nH", { n: diffHours });
+  if (diffDays < 7) return i18n.t("opencode.nD", { n: diffDays });
+  return date.toLocaleDateString(i18n.getLocale() === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function formatValue(value: unknown): string {
@@ -24,6 +28,7 @@ export function formatValue(value: unknown): string {
 }
 
 export function ErrorMessage({ message }: { message: string }) {
+  const { t } = useI18n();
   const urlMatch = message.match(/(https?:\/\/[^\s]+)/);
   const url = urlMatch?.[1];
 
@@ -44,7 +49,7 @@ export function ErrorMessage({ message }: { message: string }) {
           onClick={handleClick}
           className="underline hover:text-red-900 font-medium"
         >
-          {url.includes("billing") ? "Add payment method" : url}
+          {url.includes("billing") ? t("opencode.addPaymentMethod") : url}
         </button>
         {parts[1]}
       </>

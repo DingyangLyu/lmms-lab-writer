@@ -36,6 +36,7 @@ import {
 } from "@/lib/editor/selection-context";
 import type { HarnessLifecycle } from "@/lib/harness/types";
 import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
+import { i18n, type MessageKey, useI18n } from "@/lib/i18n";
 
 type Model = {
   id: string;
@@ -52,13 +53,25 @@ type CodexPermissionMode = "readOnly" | "askForApproval" | "autoReview" | "fullA
 
 const PERMISSION_OPTIONS: Array<{
   value: CodexPermissionMode;
-  label: string;
-  description: string;
+  label: MessageKey;
+  description: MessageKey;
 }> = [
-  { value: "readOnly", label: "只读", description: "读取文件；修改须另行批准" },
-  { value: "askForApproval", label: "请求批准", description: "可修改当前项目；越界操作先询问" },
-  { value: "autoReview", label: "自动审查批准", description: "Codex 自动审查需审批的操作" },
-  { value: "fullAccess", label: "完全访问", description: "不使用沙盒，也不弹出审批" },
+  { value: "readOnly", label: "codex.readOnly", description: "codex.readsFilesEditsNeedApproval" },
+  {
+    value: "askForApproval",
+    label: "codex.askForApproval",
+    description: "codex.editsThisProjectAsksBeforeGoingOutsideIt",
+  },
+  {
+    value: "autoReview",
+    label: "codex.autoReviewApprovals",
+    description: "codex.codexReviewsActionsThatNeedApproval",
+  },
+  {
+    value: "fullAccess",
+    label: "codex.fullAccess",
+    description: "codex.noSandboxAndNoApprovalPrompts",
+  },
 ];
 
 function isPermissionMode(value: string | null): value is CodexPermissionMode {
@@ -78,7 +91,10 @@ type Props = HarnessLifecycle & {
   onPendingMessageSent?: () => void;
 };
 
-function threadLabel(thread: ThreadSummary, fallback = "未命名对话"): string {
+function threadLabel(
+  thread: ThreadSummary,
+  fallback = i18n.t("codex.untitledConversation"),
+): string {
   return thread.name?.trim() || conversationTitle(thread.preview) || fallback;
 }
 
@@ -95,6 +111,7 @@ export function CodexPanel({
   onPendingMessageSent,
   ...lifecycle
 }: Props) {
+  const { t } = useI18n();
   const permissionSelectId = useId();
   const initialSession = useRef(lifecycle.initialSessionId);
   const [ready, setReady] = useState(false);
@@ -252,7 +269,7 @@ export function CodexPanel({
           if (payload.method === "codex/connectionClosed") {
             setReady(false);
             setBusy(false);
-            setError("Codex 连接已断开。点击重新连接即可重连。");
+            setError(t("codex.codexDisconnectedClickReconnect"));
             return;
           }
           const params = payload.params;
@@ -277,7 +294,8 @@ export function CodexPanel({
               params?.turn?.status === "failed"
             ) {
               const queue = outboxRef.current;
-              if (queue?.state.items.length) void queue.pause("上一轮未正常完成，队列已暂停。");
+              if (queue?.state.items.length)
+                void queue.pause(t("codex.theLastTurnDidNotFinishTheQueueIsPaused"));
             }
             setBusy(false);
             setTurnId(null);
@@ -286,9 +304,9 @@ export function CodexPanel({
           } else if (payload.method === "error") {
             // willRetry errors are transient stream retries within the same turn.
             if (!params?.willRetry && outboxRef.current?.state.items.length)
-              void outboxRef.current.pause("执行出错，队列已暂停。");
+              void outboxRef.current.pause(t("codex.anErrorOccurredTheQueueIsPaused"));
             setError(
-              `${params?.error?.message ?? "Codex 执行失败"}${params?.willRetry ? "（正在自动重试）" : ""}`,
+              `${params?.error?.message ?? t("codex.codexFailed")}${params?.willRetry ? t("codex.retryingAutomatically") : ""}`,
             );
           } else if (payload.method === "warning" && params?.message) {
             setError(params.message);
@@ -321,7 +339,9 @@ export function CodexPanel({
             // Keep the tab bound to its conversation; a transient failure must not turn it
             // into a disposable blank tab (its queue and history would disappear from view).
             if (!cancelled)
-              setError(`无法恢复这个 Codex 对话，可点击重新连接重试：${String(cause)}`);
+              setError(
+                t("codex.couldNotRestoreThisCodexConversationClic", { error: String(cause) }),
+              );
             return;
           }
         }
@@ -368,10 +388,11 @@ export function CodexPanel({
 
   const transmit = useCallback(
     async (draft: ChatDraft, steer = false): Promise<void> => {
-      if (!ready || !directory || sendingRef.current) throw new Error("连接或发送尚未就绪。");
-      if (!steer && (busy || bridgeWorking)) throw new Error("当前任务仍在执行。");
+      if (!ready || !directory || sendingRef.current)
+        throw new Error(t("codex.notConnectedOrNotReadyToSendYet"));
+      if (!steer && (busy || bridgeWorking)) throw new Error(t("codex.aTaskIsStillRunning"));
       if (steer && (!threadIdRef.current || !turnId))
-        throw new Error("当前轮次已结束或尚未就绪，请正常发送或加入队列。");
+        throw new Error(t("codex.theCurrentTurnHasEndedOrIsNotReadySendNo"));
       const expectedThread = threadIdRef.current;
       sendingRef.current = true;
       setPreparing(true);
@@ -380,7 +401,8 @@ export function CodexPanel({
       try {
         await onBeforeSend?.(draft.selection);
         const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files);
-        if (threadIdRef.current !== expectedThread) throw new Error("对话已切换，消息没有发送。");
+        if (threadIdRef.current !== expectedThread)
+          throw new Error(t("codex.theConversationChangedTheMessageWasNotSe"));
         let id = expectedThread;
         if (!id) {
           const result = await invoke<{ thread: { id: string } }>("codex_start_thread", {
@@ -430,7 +452,7 @@ export function CodexPanel({
       } catch (cause) {
         if (localId) setItems((current) => current.filter((item) => item.id !== localId));
         if (!steer) setBusy(false);
-        setError(`发送失败：${String(cause)}`);
+        setError(t("codex.sendingFailedError", { error: String(cause) }));
         throw cause;
       } finally {
         sendingRef.current = false;
@@ -450,6 +472,7 @@ export function CodexPanel({
       rememberThread,
       refreshThreads,
       bridge.register,
+      t,
     ],
   );
   const outbox = useChatOutbox({
@@ -527,7 +550,9 @@ export function CodexPanel({
     lifecycle,
     {
       sessionId: threadId,
-      title: currentThread ? threadLabel(currentThread, "新 Codex 对话") : "新 Codex 对话",
+      title: currentThread
+        ? threadLabel(currentThread, t("codex.newCodexConversation"))
+        : t("codex.newCodexConversation"),
       status: approval
         ? "waiting"
         : busy || bridgeWorking || preparing
@@ -579,24 +604,25 @@ export function CodexPanel({
         } else if (approval.method === "mcpServer/elicitation/request") {
           response = { action: "decline", content: null };
         } else {
-          setError(`Codex 请求需要在终端处理：${approval.method}`);
+          setError(t("codex.codexNeedsThisHandledInATerminalMethod", { method: approval.method }));
           return;
         }
         await invoke("codex_respond_to_request", { requestId: approval.id, response });
         setApproval(null);
       } catch (cause) {
-        setError(`审批回复失败：${String(cause)}`);
+        setError(t("codex.couldNotAnswerTheApprovalError", { error: String(cause) }));
       }
     },
-    [approval, answers],
+    [approval, answers, t],
   );
 
   const selectedModel = models.find((candidate) => (candidate.model ?? candidate.id) === model);
   const efforts =
     selectedModel?.supportedReasoningEfforts?.map((option) => option.reasoningEffort) ?? [];
-  const permissionDescription = PERMISSION_OPTIONS.find(
+  const permissionKey = PERMISSION_OPTIONS.find(
     (option) => option.value === permissionMode,
   )?.description;
+  const permissionDescription = permissionKey ? t(permissionKey) : undefined;
 
   const handlePermissionModeChange = (value: string) => {
     if (!isPermissionMode(value)) return;
@@ -646,9 +672,9 @@ export function CodexPanel({
               }
             }}
             className="border border-border px-2 py-1 text-xs hover:bg-accent-hover"
-            title="对话历史"
+            title={t("codex.conversationHistory")}
           >
-            历史
+            {t("codex.history")}
           </button>
           <button
             type="button"
@@ -665,8 +691,8 @@ export function CodexPanel({
             }}
             className="flex size-7 items-center justify-center border border-border hover:bg-accent-hover"
             disabled={!lifecycle.onNewConversation && (busy || preparing)}
-            title="新对话"
-            aria-label="新对话"
+            title={t("codex.newConversation")}
+            aria-label={t("codex.newConversation")}
           >
             <PlusIcon className="size-4" />
           </button>
@@ -677,7 +703,9 @@ export function CodexPanel({
       {showHistory && (
         <div className="max-h-48 shrink-0 overflow-y-auto border-b border-border p-2">
           {threads.length === 0 && (
-            <p className="p-2 text-xs text-muted">这个项目还没有 Codex 对话。</p>
+            <p className="p-2 text-xs text-muted">
+              {t("codex.noCodexConversationsInThisProjectYet")}
+            </p>
           )}
           {threads.map((thread) => (
             <div
@@ -723,34 +751,27 @@ export function CodexPanel({
       >
         {idleHistory.sleeping ? (
           <p role="status">
-            {idleHistory.error || "正在恢复对话历史…"}
+            {idleHistory.error || t("codex.restoringTheConversation")}
             {idleHistory.error && (
               <button type="button" onClick={idleHistory.retry}>
-                重试
+                {t("codex.retry")}
               </button>
             )}
           </p>
         ) : !directory ? (
-          <p className="text-sm text-muted">先打开一个项目，再使用 Codex。</p>
+          <p className="text-sm text-muted">{t("codex.openAProjectToUseCodex")}</p>
         ) : !ready && !error ? (
-          <p className="text-sm text-muted">正在连接本机 Codex…</p>
+          <p className="text-sm text-muted">{t("codex.connectingToCodexOnThisComputer")}</p>
         ) : items.length === 0 ? (
           <div className="space-y-3 py-6 text-sm text-muted">
-            <p className="font-medium text-foreground">使用本机 Codex 登录</p>
-            <p>
-              可以搜索文献、检查来源、修改 LaTeX 与参考文献。选中编辑器文字后发送修改要求，Codex
-              会收到所选段落和位置。
-            </p>
+            <p className="font-medium text-foreground">{t("codex.usesYourLocalCodexSignIn")}</p>
+            <p>{t("codex.codexCanSearchTheLiteratureCheckSourcesA")}</p>
             <button
               type="button"
-              onClick={() =>
-                setInput(
-                  "请阅读当前论文相关段落，检索能直接支持具体论断的原始或权威文献。逐篇核对题名、作者、年份、DOI 或出版社／arXiv 原文链接，不要编造或重复已有条目。检查项目的 .bib 文件后，把核实的文献补充进去，并在对应 .tex 论断处插入 \\cite{key}，优先复用已有键。确认每个新增引用键都能在 .bib 中找到；如果本机有 LaTeX 编译器，请编译并检查未定义引用。最后说明新增引用的位置和来源链接。",
-                )
-              }
+              onClick={() => setInput(t("codex.readTheRelevantPassagesOfTheCurrentPaper"))}
               className="border border-border px-2 py-1 text-xs text-foreground hover:bg-accent-hover"
             >
-              填入文献检索任务
+              {t("codex.fillInALiteratureSearchTask")}
             </button>
           </div>
         ) : null}
@@ -771,7 +792,7 @@ export function CodexPanel({
                 <span />
                 <span />
               </span>
-              Codex 正在处理
+              {t("codex.codexIsWorking")}
             </div>
           )}
           <div ref={bottomRef} />
@@ -780,7 +801,7 @@ export function CodexPanel({
 
       {approval && (
         <div className="border-t border-border bg-accent-hover p-3 text-xs">
-          <p className="font-medium text-foreground">Codex 请求确认</p>
+          <p className="font-medium text-foreground">{t("codex.codexAsksForConfirmation")}</p>
           <p className="mt-1 break-all text-muted">
             {approval.params?.reason ?? approval.params?.command ?? approval.method}
           </p>
@@ -817,14 +838,16 @@ export function CodexPanel({
               disabled={approval.method === "mcpServer/elicitation/request"}
               className="border border-foreground bg-foreground px-2 py-1 text-background"
             >
-              {approval.method === "item/tool/requestUserInput" ? "提交" : "允许"}
+              {approval.method === "item/tool/requestUserInput"
+                ? t("codex.submit")
+                : t("codex.allow")}
             </button>
             <button
               type="button"
               onClick={() => void answerApproval("decline")}
               className="border border-border px-2 py-1"
             >
-              {approval.method === "item/tool/requestUserInput" ? "跳过" : "拒绝"}
+              {approval.method === "item/tool/requestUserInput" ? t("codex.skip") : t("codex.deny")}
             </button>
           </div>
         </div>
@@ -838,7 +861,7 @@ export function CodexPanel({
               className="ml-2 border border-border px-2 py-1"
               onClick={() => setConnectionAttempt((value) => value + 1)}
             >
-              重新连接
+              {t("codex.reconnect")}
             </button>
           )}
         </div>
@@ -846,21 +869,25 @@ export function CodexPanel({
       {editorSelection && (
         <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs">
           <span className="min-w-0 truncate">
-            已引用 {editorSelection.path} ·{" "}
-            {editorSelection.ranges.map(selectionRangeLabel).join("、")}
+            {t("agentsCommon.quotingPathRanges", {
+              path: editorSelection.path,
+              ranges: editorSelection.ranges
+                .map(selectionRangeLabel)
+                .join(t("agentsCommon.listSeparator")),
+            })}
           </span>
           <button
             type="button"
             onClick={onClearSelection}
             className="flex-shrink-0 text-muted hover:text-foreground"
           >
-            移除
+            {t("codex.remove")}
           </button>
         </div>
       )}
       <ResizableComposer backend="codex">
         <fieldset
-          aria-label="聊天输入与附件"
+          aria-label={t("codex.messageAndAttachments")}
           ref={attachments.areaRef}
           onDragOver={(event) => event.preventDefault()}
           onDrop={attachments.onDrop}
@@ -886,7 +913,7 @@ export function CodexPanel({
           )}
           {attachments.loading && (
             <p role="status" className="text-xs text-muted">
-              正在添加附件…
+              {t("codex.addingAttachments")}
             </p>
           )}
           <GrowingTextarea
@@ -911,19 +938,19 @@ export function CodexPanel({
                 void send(input);
               }
             }}
-            placeholder="让 Codex 查找文献或修改选中内容…"
+            placeholder={t("codex.askCodexToFindReferencesOrEditTheSelecti")}
             rows={3}
             className="writer-composer-input"
-            aria-label="发送给 Codex 的消息"
+            aria-label={t("codex.messageToCodex")}
           />
           <div className="writer-composer-toolbar">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs text-muted">
               <label htmlFor={permissionSelectId} className="shrink-0">
-                权限
+                {t("codex.permissions")}
               </label>
               <select
                 id={permissionSelectId}
-                aria-label="Codex 权限"
+                aria-label={t("codex.codexPermissions")}
                 title={permissionDescription}
                 value={permissionMode}
                 onChange={(event) => handlePermissionModeChange(event.target.value)}
@@ -932,7 +959,7 @@ export function CodexPanel({
               >
                 {PERMISSION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.label)}
                   </option>
                 ))}
               </select>
@@ -947,10 +974,10 @@ export function CodexPanel({
                   );
                   setEffort(entry?.defaultReasoningEffort ?? "");
                 }}
-                aria-label="Codex 模型"
+                aria-label={t("codex.codexModel")}
                 className="min-w-24 max-w-36 flex-1 truncate border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
               >
-                <option value="">默认模型</option>
+                <option value="">{t("codex.defaultModel")}</option>
                 {models.map((entry) => (
                   <option key={entry.id} value={entry.model ?? entry.id}>
                     {entry.displayName ?? entry.model ?? entry.id}
@@ -961,10 +988,10 @@ export function CodexPanel({
                 <select
                   value={effort}
                   onChange={(event) => setEffort(event.target.value)}
-                  aria-label="推理强度"
+                  aria-label={t("codex.reasoningEffort")}
                   className="w-20 shrink-0 border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
                 >
-                  <option value="">默认强度</option>
+                  <option value="">{t("codex.defaultEffort")}</option>
                   {efforts.map((option) => (
                     <option key={option} value={option}>
                       {option}
@@ -988,8 +1015,8 @@ export function CodexPanel({
               type="button"
               onClick={() => void attachments.choose()}
               disabled={preparing || attachments.loading}
-              title="添加文件或图片，也可粘贴或拖入"
-              aria-label="添加附件"
+              title={t("codex.addFilesOrImagesYouCanAlsoPasteOrDropThe")}
+              aria-label={t("codex.addAttachment")}
               className="flex size-8 shrink-0 items-center justify-center border border-border hover:text-accent disabled:opacity-40"
             >
               <PaperclipIcon className="size-4" />
@@ -999,13 +1026,13 @@ export function CodexPanel({
                 type="button"
                 onClick={() =>
                   void outbox
-                    .pause("已停止任务，队列已暂停。")
+                    .pause(t("codex.taskStoppedTheQueueIsPaused"))
                     .catch(() => {})
                     .then(() => invoke("codex_interrupt_turn", { threadId, turnId }))
                     .catch((cause) => setError(String(cause)))
                 }
-                title="停止"
-                aria-label="停止 Codex"
+                title={t("codex.stop")}
+                aria-label={t("codex.stopCodex")}
                 className="flex size-8 items-center justify-center border border-border"
               >
                 <StopIcon className="size-4" />
@@ -1020,13 +1047,19 @@ export function CodexPanel({
                 attachments.loading ||
                 (!input.trim() && !attachedFiles.length)
               }
-              title={busy ? (deliveryMode === "queue" ? "加入队列" : "立即指导") : "发送"}
+              title={
+                busy
+                  ? deliveryMode === "queue"
+                    ? t("codex.queue")
+                    : t("codex.steerNow")
+                  : t("codex.send")
+              }
               aria-label={
                 busy
                   ? deliveryMode === "queue"
-                    ? "加入 Codex 队列"
-                    : "立即指导 Codex"
-                  : "发送给 Codex"
+                    ? t("codex.addToTheCodexQueue")
+                    : t("codex.steerCodexNow")
+                  : t("codex.sendToCodex")
               }
               className="flex size-8 items-center justify-center bg-foreground text-background disabled:opacity-40"
             >

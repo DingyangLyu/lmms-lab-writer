@@ -2,6 +2,7 @@
 
 import { WarningIcon, XIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef } from "react";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   open: boolean;
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export function OpenCodeDisconnectedDialog({ open, onClose, onRestart }: Props) {
+  const { t } = useI18n();
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,13 +76,13 @@ export function OpenCodeDisconnectedDialog({ open, onClose, onRestart }: Props) 
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 id="dialog-title" className="text-sm font-medium">
-            OpenCode Disconnected
+            {t("opencode.opencodeDisconnected")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="p-1 text-muted hover:text-foreground transition-colors"
-            aria-label="Close dialog"
+            aria-label={t("opencode.closeDialog")}
           >
             <XIcon className="size-4" />
           </button>
@@ -93,10 +95,10 @@ export function OpenCodeDisconnectedDialog({ open, onClose, onRestart }: Props) 
             </div>
             <div className="flex-1">
               <p className="text-sm text-foreground">
-                The connection to OpenCode has been lost and could not be re-established.
+                {t("opencode.theConnectionToOpencodeHasBeenLostAndCou")}
               </p>
               <p className="text-xs text-muted mt-2">
-                Please restart OpenCode to continue using AI features.
+                {t("opencode.pleaseRestartOpencodeToContinueUsingAiFe")}
               </p>
             </div>
           </div>
@@ -108,14 +110,14 @@ export function OpenCodeDisconnectedDialog({ open, onClose, onRestart }: Props) 
             onClick={onClose}
             className="px-3 py-1.5 text-xs border border-border hover:border-foreground transition-colors"
           >
-            Dismiss
+            {t("opencode.dismiss")}
           </button>
           <button
             type="button"
             onClick={handleRestart}
             className="px-3 py-1.5 text-xs bg-background text-foreground border border-foreground shadow-[2px_2px_0px_0px_var(--foreground)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
           >
-            Restart OpenCode
+            {t("opencode.restartOpencode")}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChatImage } from "@/components/chat/chat-image";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/lib/i18n";
 import type { ToolPart } from "@/lib/opencode/types";
 import { getToolInfo } from "@/lib/opencode/types";
 import { ChevronIcon, ToolIcon } from "./icons";
@@ -16,6 +17,7 @@ export function ToolDisplay({
   part: ToolPart;
   onFileClick?: (path: string) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const info = getToolInfo(part.tool, part.state.input);
   const isRunning = part.state.status === "running";
@@ -118,7 +120,9 @@ export function ToolDisplay({
             type="button"
             onClick={toggleExpanded}
             className="flex-shrink-0 text-muted-foreground"
-            aria-label={expanded ? "Collapse tool details" : "Expand tool details"}
+            aria-label={
+              expanded ? t("opencode.collapseToolDetails") : t("opencode.expandToolDetails")
+            }
             aria-expanded={expanded}
           >
             <ChevronIcon
@@ -136,7 +140,7 @@ export function ToolDisplay({
                 <ChatImage
                   key={image.id || image.url}
                   url={image.url}
-                  name={image.filename || "工具图片"}
+                  name={image.filename || t("opencode.toolImage")}
                 />
               ))}
             </div>
@@ -152,7 +156,7 @@ export function ToolDisplay({
           {!tasksToDisplay && Object.keys(part.state.input).length > 0 && (
             <div className="px-3 py-2 space-y-1">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                Input
+                {t("opencode.input")}
               </div>
               {Object.entries(part.state.input).map(([key, value]) => (
                 <div key={key} className="font-mono text-xs">
@@ -169,7 +173,7 @@ export function ToolDisplay({
           {!tasksToDisplay && output && (
             <div className="px-3 py-2 border-t border-border">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-                Output
+                {t("opencode.output")}
               </div>
               <pre className="text-xs text-muted whitespace-pre-wrap break-all font-mono max-h-48 overflow-auto">
                 {output.length > 2000 ? `${output.slice(0, 2000)}...` : output}

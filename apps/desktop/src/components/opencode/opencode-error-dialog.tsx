@@ -3,6 +3,7 @@
 import { WarningIcon, XIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/lib/i18n";
 
 type ErrorType = "port_in_use" | "not_installed" | "generic";
 
@@ -26,6 +27,7 @@ function parseErrorType(error: string): { type: ErrorType; port?: number } {
 }
 
 export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort }: Props) {
+  const { t } = useI18n();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [killing, setKilling] = useState(false);
@@ -110,13 +112,13 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 id="error-dialog-title" className="text-sm font-medium">
-            OpenCode Error
+            {t("opencode.opencodeError")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="p-1 text-muted hover:text-foreground transition-colors"
-            aria-label="Close dialog"
+            aria-label={t("opencode.closeDialog")}
           >
             <XIcon className="size-4" />
           </button>
@@ -130,16 +132,18 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
             <div className="flex-1 min-w-0">
               {errorType === "port_in_use" && (
                 <p className="text-sm text-foreground mb-2">
-                  Port {port} is already in use by another process.
+                  {t("opencode.portPortIsAlreadyInUseByAnotherProcess", { port: port ?? "" })}
                 </p>
               )}
               {errorType === "not_installed" && (
                 <p className="text-sm text-foreground mb-2">
-                  OpenCode is not installed on your system.
+                  {t("opencode.opencodeIsNotInstalledOnYourSystem")}
                 </p>
               )}
               {errorType === "generic" && (
-                <p className="text-sm text-foreground mb-2">Failed to start OpenCode.</p>
+                <p className="text-sm text-foreground mb-2">
+                  {t("opencode.failedToStartOpencode")}
+                </p>
               )}
             </div>
           </div>
@@ -153,15 +157,14 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
               onClick={handleCopy}
               className="absolute top-2 right-2 px-2 py-1 text-xs bg-background border border-border hover:border-foreground transition-colors"
             >
-              {copied ? "Copied!" : "Copy"}
+              {copied ? t("opencode.copied") : t("opencode.copy")}
             </button>
           </div>
 
           {errorType === "port_in_use" && onKillPort && (
             <div className="mt-4 p-3 border border-border bg-accent-hover">
               <p className="text-xs text-muted mb-2">
-                Would you like to automatically kill the process using port {port} and restart
-                OpenCode?
+                {t("opencode.wouldYouLikeToAutomaticallyKillTheProces", { port: port ?? "" })}
               </p>
               <button
                 type="button"
@@ -172,10 +175,10 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
                 {killing ? (
                   <span className="flex items-center justify-center gap-2">
                     <Spinner className="size-3" />
-                    Killing process...
+                    {t("opencode.killingProcess")}
                   </span>
                 ) : (
-                  `Kill Port ${port} & Restart`
+                  t("opencode.killPortPortRestart", { port: port ?? "" })
                 )}
               </button>
             </div>
@@ -183,7 +186,7 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
 
           {errorType === "not_installed" && (
             <div className="mt-4 p-3 border border-border bg-accent-hover">
-              <p className="text-xs text-muted mb-2">Install OpenCode:</p>
+              <p className="text-xs text-muted mb-2">{t("opencode.installOpencode2")}</p>
               <div className="space-y-2">
                 <code className="block text-xs font-mono bg-background p-2 border border-border">
                   npm i -g opencode-ai@latest
@@ -196,7 +199,7 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
           )}
 
           <p className="mt-4 text-xs text-muted">
-            Copy this error and paste it to your local OpenCode or Claude for debugging assistance.
+            {t("opencode.copyThisErrorAndPasteItToYourLocalOpenco")}
           </p>
         </div>
 
@@ -206,7 +209,7 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
             onClick={onClose}
             className="px-3 py-1.5 text-xs border border-border hover:border-foreground transition-colors"
           >
-            Dismiss
+            {t("opencode.dismiss")}
           </button>
           {errorType !== "port_in_use" && (
             <button
@@ -214,7 +217,7 @@ export function OpenCodeErrorDialog({ open, error, onClose, onRetry, onKillPort 
               onClick={onRetry}
               className="px-3 py-1.5 text-xs bg-background text-foreground border border-foreground shadow-[2px_2px_0px_0px_var(--foreground)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
             >
-              Retry
+              {t("opencode.retry")}
             </button>
           )}
         </div>

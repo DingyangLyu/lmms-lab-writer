@@ -14,6 +14,7 @@ import { useChatOutbox } from "@/lib/chat/use-chat-outbox";
 import { useIdleTranscript } from "@/lib/chat/use-idle-transcript";
 import { withEditorSelection } from "@/lib/editor/selection-context";
 import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
+import { useI18n } from "@/lib/i18n";
 import { getOpenCodeErrorMessage } from "@/lib/opencode/client";
 import type { ToolPart } from "@/lib/opencode/types";
 import { useOpenCode } from "@/lib/opencode/use-opencode";
@@ -44,6 +45,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   onBeforeSend,
   ...lifecycle
 }: Props) {
+  const { t } = useI18n();
   const opencode = useOpenCode({
     baseUrl,
     directory,
@@ -258,8 +260,8 @@ export const OpenCodePanel = memo(function OpenCodePanel({
 
   const transmit = useCallback(
     async (draft: ChatDraft, steer = false) => {
-      if (!opencode.ready) throw new Error("正在载入连接或历史，请稍后发送。");
-      if (sendingRef.current) throw new Error("上一条消息仍在发送。");
+      if (!opencode.ready) throw new Error(t("opencode.loadingTheConnectionOrHistorySendAgainIn"));
+      if (sendingRef.current) throw new Error(t("opencode.thePreviousMessageIsStillSending"));
       const expectedSession = opencode.currentSessionId;
       sendingRef.current = true;
       cancelSendRef.current = false;
@@ -269,10 +271,10 @@ export const OpenCodePanel = memo(function OpenCodePanel({
         await onBeforeSend?.(draft.selection);
         const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files);
         if (cancelSendRef.current || expectedSession !== sessionRef.current)
-          throw new Error("发送已取消或对话已切换。");
+          throw new Error(t("opencode.sendingWasCancelledOrTheConversationChan"));
         if (!expectedSession) {
           const created = await opencode.createSession();
-          if (!created) throw new Error("无法建立对话，输入内容已保留。");
+          if (!created) throw new Error(t("opencode.couldNotStartAConversationYourTextIsKept"));
           await registerRef.current?.(created.id);
         }
         shouldAutoScrollRef.current = true;
@@ -281,14 +283,14 @@ export const OpenCodePanel = memo(function OpenCodePanel({
           payload.images,
           steer,
         );
-        if (!sent) throw new Error("OpenCode 未确认消息，请核对连接状态。");
+        if (!sent) throw new Error(t("opencode.opencodeDidNotConfirmTheMessageCheckTheC"));
         scrollToBottom("auto");
       } finally {
         sendingRef.current = false;
         setPreparing(false);
       }
     },
-    [opencode, onBeforeSend, scrollToBottom, directory],
+    [opencode, onBeforeSend, scrollToBottom, directory, t],
   );
 
   const handleAnswer = useCallback(
@@ -307,9 +309,9 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   const handleAbort = useCallback(async () => {
     cancelSendRef.current = true;
     if (outboxRef.current?.state.items.length)
-      await outboxRef.current.pause("已停止任务，队列已暂停。").catch(() => {});
+      await outboxRef.current.pause(t("opencode.taskStoppedTheQueueIsPaused")).catch(() => {});
     await opencode.abort();
-  }, [opencode]);
+  }, [opencode, t]);
 
   const isWorking =
     opencode.status.type === "running" ||
@@ -377,7 +379,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
       if (draft.selection) onSelectionSent?.(draft.selection);
     } catch (cause) {
-      setSendError(getOpenCodeErrorMessage(cause, "发送失败，消息已保留。"));
+      setSendError(getOpenCodeErrorMessage(cause, t("opencode.sendingFailedTheMessageIsKept")));
     }
   }, [
     input,
@@ -389,6 +391,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     outbox,
     transmit,
     onSelectionSent,
+    t,
   ]);
   useEffect(() => {
     onWorkingChange?.(isWorking || preparing || bridgeWorking);
@@ -413,7 +416,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     lifecycle,
     {
       sessionId: opencode.currentSessionId,
-      title: opencode.currentSession?.title || "新 OpenCode 对话",
+      title: opencode.currentSession?.title || t("opencode.newOpencodeConversation"),
       status: opencode.currentQuestion
         ? "waiting"
         : isWorking || bridgeWorking || preparing
@@ -456,14 +459,16 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     return (
       <div className={`flex h-full flex-col ${className}`}>
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-          <h2 className="text-xs font-mono font-medium uppercase tracking-wider">Chats</h2>
+          <h2 className="text-xs font-mono font-medium uppercase tracking-wider">
+            {t("opencode.chats")}
+          </h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleNewSession}
               className="text-[10px] font-mono px-2 py-1 border border-border hover:border-accent transition-colors"
             >
-              + New
+              {t("opencode.new")}
             </button>
             {opencode.currentSessionId && (
               <button
@@ -471,7 +476,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
                 onClick={() => setShowSessionList(false)}
                 className="text-[10px] font-mono text-muted hover:text-foreground transition-colors"
               >
-                Back
+                {t("opencode.back")}
               </button>
             )}
           </div>
@@ -493,7 +498,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
             }}
             onDelete={async (id) => {
               if (lifecycle.openSessionIds?.includes(id)) {
-                setSendError("该对话已在标签中打开，请先结束任务并关闭标签，再删除历史。");
+                setSendError(t("opencode.thisConversationIsOpenInATabFinishItsTas"));
                 return;
               }
               await opencode.deleteSession(id);
@@ -524,13 +529,15 @@ export const OpenCodePanel = memo(function OpenCodePanel({
               else setShowSessionList(true);
             }}
             className="flex-shrink-0 border border-border px-2 py-1 text-muted hover:text-foreground transition-colors"
-            title="打开历史对话"
-            aria-label="OpenCode 历史对话"
+            title={t("opencode.openAPastConversation")}
+            aria-label={t("opencode.opencodeConversations")}
           >
-            <span className="text-xs">历史</span>
+            <span className="text-xs">{t("opencode.history")}</span>
           </button>
           <div className="flex flex-col min-w-0">
-            <h2 className="text-xs font-medium truncate">{currentSession?.title || "New Chat"}</h2>
+            <h2 className="text-xs font-medium truncate">
+              {currentSession?.title || t("opencode.newChat")}
+            </h2>
             <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono">
               <span
                 className={`inline-block size-1.5 rounded-full transition-colors ${isWorking ? "bg-accent animate-pulse" : "bg-border"}`}
@@ -560,7 +567,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
             type="button"
             onClick={handleNewSession}
             className="flex-shrink-0 text-muted-foreground hover:text-muted transition-colors"
-            title="New Chat"
+            title={t("opencode.newChat")}
           >
             <PlusIcon className="size-5" />
           </button>
@@ -580,10 +587,10 @@ export const OpenCodePanel = memo(function OpenCodePanel({
         <div ref={scrollContentRef}>
           {idleHistory.sleeping ? (
             <p role="status">
-              {idleHistory.error || "正在恢复对话历史…"}
+              {idleHistory.error || t("opencode.restoringTheConversation")}
               {idleHistory.error && (
                 <button type="button" onClick={idleHistory.retry}>
-                  重试
+                  {t("opencode.retry")}
                 </button>
               )}
             </p>

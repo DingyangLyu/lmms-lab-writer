@@ -6,6 +6,7 @@ import { ChatImage } from "@/components/chat/chat-image";
 import { UserFileMessage } from "@/components/chat/user-file-message";
 import { stripWriterContext } from "@/lib/bridge/context";
 import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
+import { useI18n } from "@/lib/i18n";
 import { stripSearchFallbackHint } from "@/lib/opencode/search-fallback";
 import type {
   AssistantMessage,
@@ -32,6 +33,7 @@ export const MessageList = memo(function MessageList({
   onFileClick?: (path: string) => void;
   onAnswer?: (questionID: string, answers: string[][]) => void;
 }) {
+  const { t } = useI18n();
   const turns = useMemo(() => {
     const result: { user: Message; assistantMessages: Message[]; assistantParts: Part[] }[] = [];
     let currentTurn: {
@@ -59,7 +61,7 @@ export const MessageList = memo(function MessageList({
   if (messages.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-muted text-xs">
-        <p>Send a message to get started</p>
+        <p>{t("opencode.sendAMessageToGetStarted")}</p>
       </div>
     );
   }
@@ -120,6 +122,7 @@ function MessageTurn({
   endTime?: number;
   onAnswer?: (questionID: string, answers: string[][]) => void;
 }) {
+  const { t } = useI18n();
   const [stepsParent] = useAutoAnimate({ duration: 150 });
   const selectionMessage = useMemo(
     () => splitEditorSelectionMessage(stripWriterContext(userText)),
@@ -183,7 +186,11 @@ function MessageTurn({
         {userImages && userImages.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
             {userImages.map((img) => (
-              <ChatImage key={img.id} url={img.url} name={img.filename || "图片附件"} />
+              <ChatImage
+                key={img.id}
+                url={img.url}
+                name={img.filename || t("opencode.imageAttachment")}
+              />
             ))}
           </div>
         )}
@@ -195,7 +202,7 @@ function MessageTurn({
         {selectionMessage && (
           <details className="mt-2 text-xs text-muted">
             <summary className="cursor-pointer break-words">
-              已引用 {selectionMessage.path}（展开原文）
+              {t("opencode.quotedPathShowTheText", { path: selectionMessage.path })}
             </summary>
             <div className="mt-2 max-h-64 overflow-auto">
               <MarkdownText text={selectionMessage.reference} />
@@ -237,7 +244,7 @@ function MessageTurn({
             }
 
             if (p.type === "file" && "mime" in p && p.mime?.startsWith("image/"))
-              return <ChatImage key={p.id} url={p.url} name={p.filename || "图片"} />;
+              return <ChatImage key={p.id} url={p.url} name={p.filename || t("opencode.image")} />;
 
             // Text Part — rendered as markdown
             if (p.type === "text") {
@@ -257,6 +264,7 @@ function MessageTurn({
 }
 
 function ReasoningDisplay({ parts }: { parts: ReasoningPart[] }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const combinedText = parts.map((p) => p.text).join("\n\n");
   const preview = combinedText.slice(0, 100);
@@ -272,7 +280,7 @@ function ReasoningDisplay({ parts }: { parts: ReasoningPart[] }) {
         <ChevronRightIcon
           className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
         />
-        <span className="font-medium">Thinking</span>
+        <span className="font-medium">{t("opencode.thinking")}</span>
         {!expanded && needsExpand && (
           <span className="text-muted-foreground truncate flex-1">{preview}...</span>
         )}

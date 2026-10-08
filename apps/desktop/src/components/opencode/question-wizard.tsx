@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import type { ToolPart } from "@/lib/opencode/types";
 import { CheckIcon } from "./icons";
 import type { AskUserQuestion } from "./types";
@@ -32,6 +33,7 @@ export function AskUserQuestionDisplay({
   part: ToolPart;
   onAnswer?: (questionID: string, answers: string[][]) => void;
 }) {
+  const { t } = useI18n();
   const questions = useMemo(() => parseAskUserQuestions(part.state.input), [part.state.input]);
   const [selectedOptions, setSelectedOptions] = useState<Record<number, string[]>>({});
   const [customInputs, setCustomInputs] = useState<Record<number, string>>({});
@@ -133,7 +135,9 @@ export function AskUserQuestionDisplay({
   if (isCompleted) {
     return (
       <div className="border border-accent bg-background p-3 space-y-1 rounded-sm">
-        <div className="text-[10px] font-medium text-muted uppercase tracking-wider">Answered</div>
+        <div className="text-[10px] font-medium text-muted uppercase tracking-wider">
+          {t("opencode.answered")}
+        </div>
         {questions.map((q, qIndex) => {
           const answer = getAnswerText(qIndex);
           return answer ? (
@@ -177,7 +181,7 @@ export function AskUserQuestionDisplay({
           ))}
         </div>
         <span className="text-[9px] font-mono text-muted uppercase tracking-wider">
-          {isSummaryStep ? "Review" : `${currentStep + 1} / ${questions.length}`}
+          {isSummaryStep ? t("opencode.review") : `${currentStep + 1} / ${questions.length}`}
         </span>
       </div>
 
@@ -197,7 +201,9 @@ export function AskUserQuestionDisplay({
                   <span className="text-[10px] font-bold px-1.5 py-0.5 bg-accent text-background rounded-sm uppercase tracking-wide">
                     {q.header}
                   </span>
-                  {q.multiSelect && <span className="text-[10px] text-muted">(Multi-select)</span>}
+                  {q.multiSelect && (
+                    <span className="text-[10px] text-muted">{t("opencode.multiSelect")}</span>
+                  )}
                 </div>
                 <p className="text-xs font-medium text-foreground-secondary leading-relaxed">
                   {q.question}
@@ -258,7 +264,9 @@ export function AskUserQuestionDisplay({
                               <CheckIcon className="size-2.5 text-background" />
                             )}
                           </div>
-                          <div className="text-xs font-medium text-foreground-secondary">Other</div>
+                          <div className="text-xs font-medium text-foreground-secondary">
+                            {t("opencode.other")}
+                          </div>
                         </div>
                       </button>
 
@@ -269,7 +277,7 @@ export function AskUserQuestionDisplay({
                           onChange={(e) =>
                             setCustomInputs((prev) => ({ ...prev, [qIndex]: e.target.value }))
                           }
-                          placeholder="Enter custom answer..."
+                          placeholder={t("opencode.enterCustomAnswer")}
                           className="w-full px-2 py-1.5 text-xs border border-border focus:border-accent focus:outline-none rounded"
                         />
                       )}
@@ -284,7 +292,7 @@ export function AskUserQuestionDisplay({
         {isSummaryStep && (
           <div key="step-summary" className="wizard-step-enter space-y-2">
             <div className="text-[10px] font-medium uppercase tracking-wider text-muted mb-1">
-              Review Answers
+              {t("opencode.reviewAnswers")}
             </div>
             {questions.map((q, qIndex) => {
               const answer = getAnswerText(qIndex);
@@ -304,11 +312,11 @@ export function AskUserQuestionDisplay({
                         {q.header}
                       </div>
                       <div className="text-xs mt-0.5 truncate text-foreground-secondary">
-                        {hasAnswer ? answer : "Not answered"}
+                        {hasAnswer ? answer : t("opencode.notAnswered")}
                       </div>
                     </div>
                     <span className="text-[9px] text-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      Edit
+                      {t("opencode.edit")}
                     </span>
                   </div>
                 </button>
@@ -328,7 +336,7 @@ export function AskUserQuestionDisplay({
               currentStep === 0 ? "opacity-0 pointer-events-none" : ""
             }`}
           >
-            Back
+            {t("opencode.back")}
           </button>
 
           {isSummaryStep ? (
@@ -338,7 +346,7 @@ export function AskUserQuestionDisplay({
               disabled={!hasAnySelection || submitting}
               className="px-3 py-1 bg-foreground text-background text-[10px] font-medium uppercase tracking-wider hover:bg-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? "Submitting..." : "Submit"}
+              {submitting ? t("opencode.submitting") : t("opencode.submit")}
             </button>
           ) : (
             <button
@@ -347,7 +355,7 @@ export function AskUserQuestionDisplay({
               disabled={!currentStepHasSelection}
               className="px-3 py-1 bg-foreground text-background text-[10px] font-medium uppercase tracking-wider hover:bg-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {currentStep === questions.length - 1 ? "Review" : "Next"}
+              {currentStep === questions.length - 1 ? t("opencode.review") : t("opencode.next")}
             </button>
           )}
         </div>
