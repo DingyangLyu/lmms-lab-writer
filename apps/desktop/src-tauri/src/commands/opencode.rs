@@ -22,17 +22,21 @@ pub struct OpenCodeState {
 /// launcher is killed. Own a separate process group for this Writer instance.
 struct ManagedOpenCode {
     child: TokioChild,
+    #[cfg(unix)]
     group_id: Option<u32>,
 }
 
 impl ManagedOpenCode {
     fn new(child: TokioChild) -> Self {
-        let group_id = child.id();
-        Self { child, group_id }
+        Self {
+            #[cfg(unix)]
+            group_id: child.id(),
+            child,
+        }
     }
 
+    #[cfg(unix)]
     fn kill_group(&self, signal: i32) {
-        #[cfg(unix)]
         if let Some(id) = self.group_id.filter(|id| *id > 1) {
             // SAFETY: this is the group created for our own child with
             // process_group(0), never a port lookup or the parent's group.
@@ -40,8 +44,6 @@ impl ManagedOpenCode {
                 libc::kill(-(id as i32), signal);
             }
         }
-        #[cfg(not(unix))]
-        let _ = signal;
     }
 
     async fn terminate(mut self) {

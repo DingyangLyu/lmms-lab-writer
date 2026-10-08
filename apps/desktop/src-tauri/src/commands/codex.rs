@@ -824,9 +824,9 @@ pub async fn bridge_turn(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        default_model, find_node_runtime_directory, validate_server_response, CodexPermissionMode,
-    };
+    #[cfg(unix)]
+    use super::find_node_runtime_directory;
+    use super::{default_model, validate_server_response, CodexPermissionMode};
     use serde_json::json;
 
     #[test]

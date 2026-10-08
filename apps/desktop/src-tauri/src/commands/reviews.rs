@@ -611,9 +611,12 @@ mod tests {
         fs::write(dir.path().join("data.txt"), "x".repeat(2_100_000))
             .await
             .unwrap();
-        let alias = dir.path().join("alias");
         #[cfg(unix)]
-        std::os::unix::fs::symlink(dir.path(), &alias).unwrap();
+        let alias = {
+            let alias = dir.path().join("alias");
+            std::os::unix::fs::symlink(dir.path(), &alias).unwrap();
+            alias
+        };
         #[cfg(not(unix))]
         let alias = dir.path().to_path_buf();
         let actor = format!("claude:{}", uuid::Uuid::new_v4());

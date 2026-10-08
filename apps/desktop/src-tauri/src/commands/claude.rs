@@ -42,6 +42,8 @@ struct Run {
     pending: Mutex<HashMap<String, Value>>,
     cancel: Notify,
     busy: AtomicBool,
+    /// Process group to signal when stopping; only Unix starts the CLI in its own group.
+    #[cfg(unix)]
     pid: u32,
     delivery: Mutex<DeliveryState>,
 }
@@ -584,6 +586,7 @@ pub async fn claude_start_turn(
         pending: Mutex::new(HashMap::new()),
         cancel: Notify::new(),
         busy: AtomicBool::new(true),
+        #[cfg(unix)]
         pid: child.id().unwrap_or(0),
         delivery: Mutex::new(DeliveryState {
             accepting: true,
