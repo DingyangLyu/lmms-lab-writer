@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State, Window};
 
 #[cfg(target_os = "windows")]
 fn build_env_path(original: String) -> String {
@@ -50,6 +50,8 @@ fn build_env_path(original: String) -> String {
 }
 
 pub struct PtyInstance {
+    /// Label of the window the terminal belongs to.
+    pub window: String,
     pub master: Box<dyn MasterPty + Send>,
     pub writer: Box<dyn Write + Send>,
     pub child: Box<dyn portable_pty::Child + Send + Sync>,
@@ -214,6 +216,7 @@ fn resolve_shell(preferred_shell: Option<String>) -> String {
 #[tauri::command]
 pub async fn spawn_pty(
     app: AppHandle,
+    window: Window,
     state: State<'_, PtyState>,
     cwd: String,
     cols: u16,
@@ -248,6 +251,8 @@ pub async fn spawn_pty(
     let id = uuid::Uuid::new_v4().to_string();
     let id_for_reader = id.clone();
     let id_for_result = id.clone();
+    let label = window.label().to_string();
+    let target = label.clone();
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -260,7 +265,7 @@ pub async fn spawn_pty(
                         id: id_for_reader.clone(),
                         data,
                     };
-                    app.emit("pty-output", event).ok();
+                    app.emit_to(target.as_str(), "pty-output", event).ok();
                 }
                 Err(_) => break,
             }
@@ -269,10 +274,11 @@ pub async fn spawn_pty(
             id: id_for_reader.clone(),
             code: 0,
         };
-        app.emit("pty-exit", exit_event).ok();
+        app.emit_to(target.as_str(), "pty-exit", exit_event).ok();
     });
 
     let instance = PtyInstance {
+        window: label,
         master: pair.master,
         writer,
         child,
@@ -338,6 +344,21 @@ pub async fn kill_pty(state: State<'_, PtyState>, id: String) -> Result<(), Stri
     } else {
         Err(format!("PTY instance not found: {}", id))
     }
+}
+
+/// Ends the terminals of a closed window.
+pub fn kill_window(app: &AppHandle, window: &str) {
+    let state = app.state::<PtyState>();
+    let Ok(mut instances) = state.instances.lock() else {
+        return;
+    };
+    instances.retain(|_, instance| {
+        if instance.window != window {
+            return true;
+        }
+        instance.child.kill().ok();
+        false
+    });
 }
 
 #[cfg(test)]

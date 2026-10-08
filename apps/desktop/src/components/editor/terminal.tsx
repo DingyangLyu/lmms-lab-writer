@@ -1,13 +1,14 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { useTheme } from "next-themes";
 import { memo, useEffect, useRef, useState } from "react";
 import { resolveTerminalFontFamily } from "@/lib/editor/font-stacks";
 import { useI18n } from "@/lib/i18n";
+import { listenHere } from "@/lib/tauri/window-events";
 
 // GitHub Light terminal colors
 const LIGHT_TERMINAL_THEME = {
@@ -168,7 +169,7 @@ export const Terminal = memo(function Terminal({
         // Check if already cleaned up before spawning
         if (isCleanedUp) return;
 
-        unlistenOutput = await listen<{ id: string; data: string }>("pty-output", (event) => {
+        unlistenOutput = await listenHere<{ id: string; data: string }>("pty-output", (event) => {
           if (isCleanedUp) {
             return;
           }
@@ -193,7 +194,7 @@ export const Terminal = memo(function Terminal({
           return;
         }
 
-        unlistenExit = await listen<{ id: string; code: number }>("pty-exit", (event) => {
+        unlistenExit = await listenHere<{ id: string; code: number }>("pty-exit", (event) => {
           if (isCleanedUp) {
             return;
           }

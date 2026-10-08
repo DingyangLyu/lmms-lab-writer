@@ -1,4 +1,11 @@
 export const pageZh = {
+  "page.newWindowShortcut": "新建窗口（⌘/Ctrl+Shift+N），每个窗口打开一个项目",
+  "page.couldNotOpenAWindowError": "无法打开新窗口：{error}",
+  "page.agentsBusyCloseWindow":
+    "{names}仍在执行或等待批准。关闭窗口后任务会在后台继续，需要批准的操作会等你重新打开此项目。确定关闭？",
+  "page.closeWindow": "关闭窗口",
+  "page.newWindow": "新建窗口",
+  "page.projectOpenInAnotherWindow": "这个项目已在另一个窗口中打开，已切换到那个窗口。",
   "page.theUserResolvedAndSavedMergeConflictIdRe":
     "合并冲突 {id} 已由用户处理并保存。请重新读取 {path}{comment}，尊重用户的合并结果，不要重放旧提案；核验后继续完成批注。",
   "page.fileNameNoLongerExistsAndHasBeenRemovedF": "文件“{name}”已不存在，已从标签页移除",
@@ -69,6 +76,14 @@ export const pageZh = {
   "page.couldNotLoadTheDiffError": "差异加载失败：{error}",
 };
 export const pageEn: Record<keyof typeof pageZh, string> = {
+  "page.newWindowShortcut": "New window (\u2318/Ctrl+Shift+N); each window opens one project",
+  "page.couldNotOpenAWindowError": "Could not open a new window: {error}",
+  "page.agentsBusyCloseWindow":
+    "{names} {count|is|are} still running or waiting for approval. They continue in the background after closing; approvals wait until you open this project again. Close?",
+  "page.closeWindow": "Close window",
+  "page.newWindow": "New window",
+  "page.projectOpenInAnotherWindow":
+    "This project is already open in another window, so Writer switched to it.",
   "page.theUserResolvedAndSavedMergeConflictIdRe":
     "The user resolved and saved merge conflict {id}. Read {path}{comment} again, keep the user's merge and do not replay the old proposal; verify it, then finish the comment.",
   "page.fileNameNoLongerExistsAndHasBeenRemovedF":

@@ -109,6 +109,20 @@ export function useEditorSettings() {
     return DEFAULT_EDITOR_SETTINGS;
   });
 
+  // Another window changed the settings.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      try {
+        setSettings(migrateSettings(JSON.parse(event.newValue)));
+      } catch {
+        // Ignore parse errors
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // Derive editor theme from app theme
   const editorTheme: EditorTheme = resolvedTheme === "dark" ? "one-dark" : "one-light";
 

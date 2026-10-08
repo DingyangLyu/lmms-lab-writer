@@ -37,6 +37,19 @@ describe("createI18n", () => {
     expect(store.get("test-locale")).toBe("zh");
     expect(i18n.t("hello", { name: "Ada" })).toBe("你好，Ada");
   });
+  it("follows a language chosen in another window", () => {
+    const events = new EventTarget();
+    vi.stubGlobal("window", events);
+    vi.stubGlobal("localStorage", { getItem: () => "zh", setItem: () => {} });
+    const i18n = createI18n({
+      messages: { zh: { hello: "你好" }, en: { hello: "Hello" } },
+      storageKey: "test-locale",
+    });
+    expect(i18n.getLocale()).toBe("zh");
+    const storage = Object.assign(new Event("storage"), { key: "test-locale", newValue: "en" });
+    events.dispatchEvent(storage);
+    expect(i18n.t("hello")).toBe("Hello");
+  });
 });
 
 describe("dictionaryProblems", () => {

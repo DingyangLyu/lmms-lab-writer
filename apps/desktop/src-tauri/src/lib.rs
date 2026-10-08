@@ -1,17 +1,18 @@
 #[macro_use]
 mod l10n;
 mod commands;
+#[cfg(target_os = "macos")]
+mod dock;
 
 use commands::codex::CodexState;
 use commands::fs::{ProjectState, WatcherState};
 use commands::latex::LaTeXCompilationState;
 use commands::opencode::OpenCodeState;
 use commands::terminal::PtyState;
+#[cfg(target_os = "macos")]
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use tauri::webview::WebviewWindowBuilder;
-use tauri::{Emitter, Manager, WebviewUrl};
-use tauri_plugin_opener::OpenerExt;
+use tauri::{Emitter, Manager};
 
 fn is_external_url(url: &url::Url, dev_port: u16) -> bool {
     let scheme = url.scheme();
@@ -70,6 +71,7 @@ pub fn run() {
         .manage(commands::runner::RunnerState::default())
         .manage(Mutex::new(WatcherState::default()))
         .manage(Mutex::new(ProjectState::default()))
+        .manage(commands::windows::WindowState::default())
         .invoke_handler(tauri::generate_handler![
             commands::annotations::pdf_list_annotations,
             commands::annotations::pdf_add_annotation,
@@ -128,6 +130,9 @@ pub fn run() {
             commands::reviews::review_decide,
             commands::reviews::review_finalize,
             commands::fs::set_project_path,
+            commands::windows::open_window,
+            commands::windows::focus_project_window,
+            commands::windows::window_is_primary,
             commands::local_files::resolve_local_file,
             commands::local_files::reveal_local_file,
             commands::fs::read_file,
@@ -212,100 +217,124 @@ pub fn run() {
             commands::latex::latex_open_download_page,
         ])
         .setup(|app| {
-            let app_handle = app.handle().clone();
-
-            // The macOS predefined Quit item calls NSApplication.terminate directly,
-            // bypassing ExitRequested. Route Cmd+Q through Tauri's guarded exit instead.
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{Menu, MenuItem, MenuItemKind};
                 let menu = Menu::default(app.handle())?;
-                if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.first() {
-                    if let Some(quit) = app_menu.items()?.last() {
-                        app_menu.remove(quit)?;
+                let items = menu.items()?;
+                // The macOS predefined Quit item calls NSApplication.terminate directly,
+                // bypassing ExitRequested. Route Cmd+Q through Tauri's guarded exit instead.
+                let quit = MenuItem::with_id(
+                    app.handle(),
+                    "writer-safe-quit",
+                    tr!("退出 LMMs-Lab Writer", "Quit LMMs-Lab Writer"),
+                    true,
+                    Some("CmdOrCtrl+Q"),
+                )?;
+                if let Some(MenuItemKind::Submenu(app_menu)) = items.first() {
+                    if let Some(predefined) = app_menu.items()?.last() {
+                        app_menu.remove(predefined)?;
                     }
-                    app_menu.append(&MenuItem::with_id(
-                        app.handle(),
-                        "writer-safe-quit",
-                        "Quit LMMs-Lab Writer",
-                        true,
-                        Some("CmdOrCtrl+Q"),
-                    )?)?;
+                    app_menu.append(&quit)?;
+                }
+                let new_window = MenuItem::with_id(
+                    app.handle(),
+                    "writer-new-window",
+                    tr!("新建窗口", "New Window"),
+                    true,
+                    Some("CmdOrCtrl+Shift+N"),
+                )?;
+                if let Some(MenuItemKind::Submenu(file)) = items.get(1) {
+                    file.insert(&new_window, 0)?;
                 }
                 app.set_menu(menu)?;
+                app.manage(commands::windows::NativeMenu { new_window, quit });
+                dock::install(app.handle());
             }
 
-            let webview_url = if cfg!(debug_assertions) {
-                WebviewUrl::External("http://localhost:3000".parse().unwrap())
-            } else {
-                WebviewUrl::App("index.html".into())
-            };
+            commands::windows::create(app.handle(), false)?;
 
-            let mut builder = WebviewWindowBuilder::new(app, "main", webview_url)
-                .title("LMMs-Lab Writer")
-                .inner_size(1400.0, 900.0)
-                .min_inner_size(960.0, 640.0)
-                .resizable(true)
-                .center();
-
-            let opener_handle = app_handle.clone();
-            builder = builder.on_navigation(move |url| {
-                if is_external_url(url, 3000) {
-                    let url_str = url.to_string();
-                    let handle = opener_handle.clone();
-                    std::thread::spawn(move || {
-                        let _ = handle.opener().open_url(&url_str, None::<&str>);
-                    });
-                    return false;
+            // A link that arrives while no window is open gets a window to handle it.
+            use tauri_plugin_deep_link::DeepLinkExt;
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |_| {
+                if handle.webview_windows().is_empty() {
+                    let _ = commands::windows::create(&handle, true);
                 }
-                if is_writer_page(url) {
-                    return true;
-                }
-                // A document link must never replace the application document.
-                let _ = opener_handle.emit(
-                    "writer://open-link",
-                    serde_json::json!({"href":url.as_str()}),
-                );
-                false
             });
-
-            let _window = builder.build()?;
-
-            #[cfg(debug_assertions)]
-            _window.open_devtools();
-
             Ok(())
         })
-        .on_menu_event(|app, event| {
-            if event.id().as_ref() == "writer-safe-quit" {
-                app.exit(0);
-            }
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let guard = window.state::<commands::saving::SaveGuard>();
-                if guard.ready.load(Ordering::SeqCst) && !guard.approved.load(Ordering::SeqCst) {
-                    api.prevent_close();
-                    let _ = window.emit("writer-close-requested", ());
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "writer-safe-quit" => app.exit(0),
+            "writer-new-window" => {
+                if let Err(error) = commands::windows::create(app, false) {
+                    eprintln!("[windows] could not open a window: {error}");
                 }
             }
+            _ => {}
+        })
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                let guard = window.state::<commands::saving::SaveGuard>();
+                if guard.must_flush(window.label()) {
+                    api.prevent_close();
+                    let _ = window.emit_to(
+                        window.label(),
+                        "writer-close-requested",
+                        serde_json::json!({"quit":false}),
+                    );
+                }
+            }
+            tauri::WindowEvent::Focused(true) => commands::windows::on_focused(window),
+            tauri::WindowEvent::Destroyed => commands::windows::on_destroyed(window),
+            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
+        .run(|app, event| match event {
             // Application exit can bypass Drop for managed Tauri state. Release
             // the OpenCode process group explicitly after the save guard passes.
-            if matches!(event, tauri::RunEvent::Exit) {
+            tauri::RunEvent::Exit => {
                 app.state::<OpenCodeState>().shutdown_now();
                 app.state::<commands::claude::ClaudeState>().shutdown_now();
             }
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                let guard = app.state::<commands::saving::SaveGuard>();
-                if guard.ready.load(Ordering::SeqCst) && !guard.approved.load(Ordering::SeqCst) {
+            // Closing the last window: macOS apps stay in the Dock; elsewhere the app exits, as
+            // every window has already flushed through its own close.
+            tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } => {
+                if cfg!(target_os = "macos") {
                     api.prevent_exit();
-                    let _ = app.emit("writer-close-requested", ());
                 }
             }
+            // Quit: every window flushes its editors first, then finish_close exits.
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                let windows = app.state::<commands::saving::SaveGuard>().begin_quit();
+                if windows.is_empty() {
+                    #[cfg(target_os = "macos")]
+                    dock::EXITING.store(true, Ordering::SeqCst);
+                    return;
+                }
+                api.prevent_exit();
+                for label in windows {
+                    let _ = app.emit_to(
+                        label.as_str(),
+                        "writer-close-requested",
+                        serde_json::json!({"quit":true}),
+                    );
+                }
+            }
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } => match commands::windows::primary(app) {
+                Some(window) => commands::windows::focus(&window),
+                None => {
+                    let _ = commands::windows::create(app, false);
+                }
+            },
+            _ => {}
         });
 }
 

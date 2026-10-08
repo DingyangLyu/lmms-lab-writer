@@ -69,6 +69,18 @@ export function createI18n<M extends Record<string, string>>(options: {
       document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
     for (const listener of listeners) listener();
   };
+  // A choice made in another window (same storage) applies here too.
+  if (typeof window !== "undefined")
+    window.addEventListener("storage", (event) => {
+      if (event.key !== options.storageKey) return;
+      const locale = event.newValue;
+      if ((locale === "zh" || locale === "en") && locale !== current) {
+        current = locale;
+        if (typeof document !== "undefined")
+          document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+        for (const listener of listeners) listener();
+      }
+    });
   const subscribe = (listener: () => void) => {
     listeners.add(listener);
     return () => {

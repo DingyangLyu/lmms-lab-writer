@@ -1,7 +1,8 @@
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, Window};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
@@ -9,21 +10,87 @@ use tokio::sync::Mutex;
 pub(crate) static SAVE_LOCK: Mutex<()> = Mutex::const_new(());
 const HISTORY_LIMIT: usize = 30;
 
+/// Windows whose editors flush before closing, and those that have flushed for the close or
+/// quit in progress.
 #[derive(Default)]
 pub struct SaveGuard {
-    pub ready: AtomicBool,
-    pub approved: AtomicBool,
+    guarded: std::sync::Mutex<HashSet<String>>,
+    approved: std::sync::Mutex<HashSet<String>>,
+    /// Every window has flushed for a quit, so the app may exit.
+    exit_approved: AtomicBool,
+}
+
+impl SaveGuard {
+    /// Whether closing this window has to wait for its editors to flush.
+    pub fn must_flush(&self, window: &str) -> bool {
+        let guarded = self.guarded.lock().is_ok_and(|g| g.contains(window));
+        guarded && !self.approved.lock().is_ok_and(|a| a.contains(window))
+    }
+
+    /// Starts a quit and returns the windows that must flush first; none means exit now.
+    pub fn begin_quit(&self) -> Vec<String> {
+        if self.exit_approved.load(Ordering::SeqCst) {
+            return vec![];
+        }
+        if let Ok(mut approved) = self.approved.lock() {
+            approved.clear();
+        }
+        let windows: Vec<String> = self
+            .guarded
+            .lock()
+            .map(|g| g.iter().cloned().collect())
+            .unwrap_or_default();
+        if windows.is_empty() {
+            self.exit_approved.store(true, Ordering::SeqCst);
+        }
+        windows
+    }
+
+    pub fn forget(&self, window: &str) {
+        if let Ok(mut guarded) = self.guarded.lock() {
+            guarded.remove(window);
+        }
+        if let Ok(mut approved) = self.approved.lock() {
+            approved.remove(window);
+        }
+    }
+
+    fn approve(&self, window: &str) -> bool {
+        if let Ok(mut approved) = self.approved.lock() {
+            approved.insert(window.to_string());
+        }
+        let all = match (self.guarded.lock(), self.approved.lock()) {
+            (Ok(guarded), Ok(approved)) => guarded.is_subset(&approved),
+            _ => false,
+        };
+        all
+    }
 }
 
 #[tauri::command]
-pub fn register_save_guard(state: State<'_, SaveGuard>) {
-    state.ready.store(true, Ordering::SeqCst);
+pub fn register_save_guard(window: Window, state: State<'_, SaveGuard>) {
+    if let Ok(mut guarded) = state.guarded.lock() {
+        guarded.insert(window.label().to_string());
+    }
 }
 
+/// The window's editors have flushed: close it, or exit once every window has flushed for a quit.
 #[tauri::command]
-pub fn finish_close(app: AppHandle, state: State<'_, SaveGuard>) {
-    state.approved.store(true, Ordering::SeqCst);
-    app.exit(0);
+pub fn finish_close(
+    app: AppHandle,
+    window: Window,
+    state: State<'_, SaveGuard>,
+    quit: bool,
+) -> Result<(), String> {
+    let all = state.approve(window.label());
+    if !quit {
+        return window.destroy().map_err(|e| e.to_string());
+    }
+    if all {
+        state.exit_approved.store(true, Ordering::SeqCst);
+        app.exit(0);
+    }
+    Ok(())
 }
 
 pub(crate) async fn target_path(
@@ -288,6 +355,30 @@ pub async fn read_document(project: String, path: String) -> Result<String, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn closing_waits_for_its_own_window_and_quitting_for_all() {
+        let guard = SaveGuard::default();
+        for window in ["main", "writer-1"] {
+            guard.guarded.lock().unwrap().insert(window.into());
+        }
+        assert!(guard.must_flush("main"));
+        assert!(!guard.must_flush("start-screen"));
+        // Closing one window approves only that one.
+        assert!(!guard.approve("main"));
+        assert!(!guard.must_flush("main"));
+        assert!(guard.must_flush("writer-1"));
+        // A quit asks every window again, and exits after the last one flushed.
+        let mut asked = guard.begin_quit();
+        asked.sort();
+        assert_eq!(asked, ["main", "writer-1"]);
+        assert!(!guard.approve("writer-1"));
+        assert!(guard.approve("main"));
+        guard.forget("main");
+        guard.forget("writer-1");
+        assert!(guard.begin_quit().is_empty());
+        assert!(guard.exit_approved.load(Ordering::SeqCst));
+    }
     /// Editor saves go through the merging save; these checks cover its file safety.
     async fn save_document(
         project: String,

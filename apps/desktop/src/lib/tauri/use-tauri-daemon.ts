@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { prepareProject } from "@/lib/editor/project-transition";
 import { pathSync } from "@/lib/path";
 import { rememberProjectRoot } from "@/lib/project-root";
+import { listenHere } from "./window-events";
 
 function debounce<T extends (...args: Parameters<T>) => void>(
   fn: T,
@@ -748,7 +749,6 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
 
     let isCleanedUp = false;
     let watcherStarted = false;
-    let unlistenFiles: (() => void) | null = null;
     let unlistenFileChanged: (() => void) | null = null;
 
     const debouncedRefreshFileTree = debounce(async (dir: string) => {
@@ -775,29 +775,8 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
     const setupListeners = async () => {
       if (isCleanedUp) return;
 
-      let listen: typeof import("@tauri-apps/api/event").listen;
-      try {
-        const eventModule = await import("@tauri-apps/api/event");
-        listen = eventModule.listen;
-      } catch (error) {
-        console.error("Failed to import Tauri event API:", error);
-        return;
-      }
-
-      if (isCleanedUp) return;
-
-      unlistenFiles = await listen<FileNode[]>("files-changed", (event) => {
-        if (!isCleanedUp && projectPathRef.current === projectState.projectPath) {
-          setProjectState((s) => ({ ...s, files: event.payload }));
-        }
-      });
-
-      if (isCleanedUp) {
-        unlistenFiles?.();
-        return;
-      }
-
-      unlistenFileChanged = await listen<FileChangeEvent>("file-changed", (event) => {
+      // The watcher reports to the window that opened the project.
+      unlistenFileChanged = await listenHere<FileChangeEvent>("file-changed", (event) => {
         if (isCleanedUp || projectPathRef.current !== projectState.projectPath) return;
 
         const { kind } = event.payload;
@@ -820,7 +799,6 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       });
 
       if (isCleanedUp) {
-        unlistenFiles?.();
         unlistenFileChanged?.();
       }
     };
@@ -847,7 +825,6 @@ export function useTauriDaemon(options?: TauriDaemonOptions) {
       isCleanedUp = true;
       debouncedRefreshFileTree.cancel();
       debouncedRefreshGit.cancel();
-      unlistenFiles?.();
       unlistenFileChanged?.();
       if (watcherStarted) {
         invoke("stop_watch").catch((error) => console.error("Failed to stop watch:", error));

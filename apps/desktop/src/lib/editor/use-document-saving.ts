@@ -2,13 +2,16 @@
 
 import type { SaveResult } from "@lmms-lab/writing";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { i18n } from "@/lib/i18n";
+import { listenHere } from "@/lib/tauri/window-events";
 import { SaveManager } from "./save-manager";
 
-/** `beforeClose` may veto quitting (e.g. agents still running); editor drafts are flushed after. */
-export function useDocumentSaving(beforeClose?: () => Promise<boolean>) {
+/**
+ * `beforeClose` may veto closing this window or quitting (e.g. agents still running); editor
+ * drafts are flushed after.
+ */
+export function useDocumentSaving(beforeClose?: (quit: boolean) => Promise<boolean>) {
   const beforeCloseRef = useRef(beforeClose);
   beforeCloseRef.current = beforeClose;
   const [manager] = useState(
@@ -41,13 +44,13 @@ export function useDocumentSaving(beforeClose?: () => Promise<boolean>) {
     let disposed = false;
     let closing = false;
     let unlisten: (() => void) | undefined;
-    void listen("writer-close-requested", async () => {
+    void listenHere<{ quit: boolean }>("writer-close-requested", async ({ payload }) => {
       if (closing) return;
       closing = true;
       try {
-        if (beforeCloseRef.current && !(await beforeCloseRef.current())) return;
+        if (beforeCloseRef.current && !(await beforeCloseRef.current(payload.quit))) return;
         await manager.flushAll();
-        await invoke("finish_close");
+        await invoke("finish_close", { quit: payload.quit });
       } catch (error) {
         setCloseError(
           i18n.t("msg.closingWasCancelledBecauseSomeFilesAreNo", { error: String(error) }),

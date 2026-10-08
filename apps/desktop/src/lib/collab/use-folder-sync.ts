@@ -1,9 +1,9 @@
 "use client";
 import { FolderSync, type SyncNotice, type SyncStatus } from "@lmms-lab/sync";
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { useI18n } from "@/lib/i18n";
+import { listenHere } from "@/lib/tauri/window-events";
 import { getLink, rememberFolder, type SyncLink, serverRequest, setLink } from "./accounts";
 import { desktopFolder, desktopStateStore, desktopTransport } from "./transport";
 
@@ -75,7 +75,7 @@ export function useFolderSync(projectPath: string | null) {
     let stopListening: (() => void) | undefined,
       disposed = false;
     // Saves and agent edits show up as file events; a full rescan covers creations and moves.
-    void listen<{ path: string; kind: string }>("file-changed", ({ payload }) =>
+    void listenHere<{ path: string; kind: string }>("file-changed", ({ payload }) =>
       sync.notifyLocal(payload.kind === "modify" ? [payload.path] : undefined),
     ).then((stop) => {
       if (disposed) stop();

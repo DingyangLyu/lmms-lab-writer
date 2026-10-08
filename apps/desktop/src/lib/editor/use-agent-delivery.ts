@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { i18n } from "@/lib/i18n";
 import { openedProjectPath } from "@/lib/project-root";
+import { listenHere } from "@/lib/tauri/window-events";
 import type { SaveManager } from "./save-manager";
 import { type EditorSelectionContext, selectionMatchesDocument } from "./selection-context";
 
@@ -37,40 +38,37 @@ export function useAgentDelivery(saveManager: SaveManager, projectPath: string |
   useEffect(() => {
     let disposed = false;
     let stop: (() => void) | undefined;
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<{ id: string; project: string; files?: string[]; checkpoint?: boolean }>(
-          "writer://prepare-delivery",
-          async ({ payload }) => {
-            let error: string | null = null;
-            // Buffers are keyed by the opened path; the bridge sends the canonical root.
-            const project = openedProjectPath(payload.project);
-            try {
-              await saveManager.synchronize(project, payload.files);
-              for (const doc of saveManager.documents.values()) {
-                if (
-                  payload.checkpoint !== false &&
-                  doc.project === project &&
-                  (!payload.files || payload.files.includes(doc.path)) &&
-                  /\.(tex|bib)$/i.test(doc.path)
-                )
-                  await invoke("checkpoint_document", {
-                    project: doc.project,
-                    path: doc.path,
-                    expected: doc.content,
-                  });
-              }
-            } catch (cause) {
-              error = i18n.t("msg.savingBeforeDelegationFailedError", { error: String(cause) });
-            }
-            await invoke("writer_delivery_prepared", { id: payload.id, error });
-          },
-        ),
-      )
-      .then((unlisten) => {
-        if (disposed) unlisten();
-        else stop = unlisten;
-      });
+    // Only the window that has the project open receives this.
+    void listenHere<{ id: string; project: string; files?: string[]; checkpoint?: boolean }>(
+      "writer://prepare-delivery",
+      async ({ payload }) => {
+        let error: string | null = null;
+        // Buffers are keyed by the opened path; the bridge sends the canonical root.
+        const project = openedProjectPath(payload.project);
+        try {
+          await saveManager.synchronize(project, payload.files);
+          for (const doc of saveManager.documents.values()) {
+            if (
+              payload.checkpoint !== false &&
+              doc.project === project &&
+              (!payload.files || payload.files.includes(doc.path)) &&
+              /\.(tex|bib)$/i.test(doc.path)
+            )
+              await invoke("checkpoint_document", {
+                project: doc.project,
+                path: doc.path,
+                expected: doc.content,
+              });
+          }
+        } catch (cause) {
+          error = i18n.t("msg.savingBeforeDelegationFailedError", { error: String(cause) });
+        }
+        await invoke("writer_delivery_prepared", { id: payload.id, error });
+      },
+    ).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
     return () => {
       disposed = true;
       stop?.();

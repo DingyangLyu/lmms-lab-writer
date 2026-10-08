@@ -1,8 +1,9 @@
 use super::util::command;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, Window};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::Mutex;
@@ -54,16 +55,43 @@ pub struct CompileOutputEvent {
     pub is_warning: bool,
 }
 
+/// One build at a time per window; windows build their projects independently.
+#[derive(Default)]
 pub struct LaTeXCompilationState {
+    slots: std::sync::Mutex<HashMap<String, Arc<BuildSlot>>>,
+}
+
+pub struct BuildSlot {
     pub build_lock: Mutex<()>,
     pub current_process: Arc<Mutex<Option<Child>>>,
 }
 
-impl Default for LaTeXCompilationState {
+impl Default for BuildSlot {
     fn default() -> Self {
         Self {
             current_process: Arc::new(Mutex::new(None)),
             build_lock: Mutex::new(()),
+        }
+    }
+}
+
+impl LaTeXCompilationState {
+    pub fn slot(&self, window: &str) -> Arc<BuildSlot> {
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        slots.entry(window.to_string()).or_default().clone()
+    }
+
+    /// Stops the build of a closed window.
+    pub fn close(&self, window: &str) {
+        let slot = self
+            .slots
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(window);
+        if let Some(slot) = slot {
+            tauri::async_runtime::spawn(async move {
+                let _ = stop(&slot).await;
+            });
         }
     }
 }
@@ -345,8 +373,15 @@ async fn is_compiler_detectable_after_install() -> bool {
 }
 
 #[tauri::command]
-pub async fn latex_stop_compilation(state: State<'_, LaTeXCompilationState>) -> Result<(), String> {
-    let mut process_guard = state.current_process.lock().await;
+pub async fn latex_stop_compilation(
+    window: Window,
+    state: State<'_, LaTeXCompilationState>,
+) -> Result<(), String> {
+    stop(&state.slot(window.label())).await
+}
+
+async fn stop(slot: &BuildSlot) -> Result<(), String> {
+    let mut process_guard = slot.current_process.lock().await;
     if let Some(mut child) = process_guard.take() {
         #[cfg(unix)]
         if let Some(id) = child.id() {

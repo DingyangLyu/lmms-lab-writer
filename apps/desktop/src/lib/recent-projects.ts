@@ -16,15 +16,22 @@ export function useRecentProjects() {
   const [projects, setProjects] = useState<RecentProject[]>([]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as RecentProject[];
+    const load = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const parsed = saved ? (JSON.parse(saved) as RecentProject[]) : [];
         setProjects(parsed.sort((a, b) => b.lastOpened - a.lastOpened));
+      } catch {
+        // Ignore parse errors
       }
-    } catch {
-      // Ignore parse errors
-    }
+    };
+    load();
+    // Other windows open projects too.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY || event.key === null) load();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const saveProjects = useCallback((newProjects: RecentProject[]) => {

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Window};
 use tokio::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,25 +26,53 @@ pub struct FileChangeEvent {
     pub kind: String,
 }
 
+/// One project folder watcher per window, by window label.
 pub struct WatcherState {
-    watcher: Option<RecommendedWatcher>,
-    watched_path: Option<String>,
+    watchers: HashMap<String, RecommendedWatcher>,
     last_events: Arc<Mutex<HashMap<String, Instant>>>,
+}
+
+impl WatcherState {
+    pub fn stop(&mut self, window: &str) {
+        self.watchers.remove(window);
+        if self.watchers.is_empty() {
+            if let Ok(mut events) = self.last_events.lock() {
+                events.clear();
+            }
+        }
+    }
 }
 
 impl Default for WatcherState {
     fn default() -> Self {
         Self {
-            watcher: None,
-            watched_path: None,
+            watchers: HashMap::new(),
             last_events: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
 
 #[derive(Default)]
+/// The canonical project root open in each window, by window label.
 pub struct ProjectState {
-    pub project_path: Option<String>,
+    windows: HashMap<String, String>,
+}
+
+impl ProjectState {
+    pub fn project(&self, window: &str) -> Option<String> {
+        self.windows.get(window).cloned()
+    }
+
+    pub fn window_with(&self, project: &str) -> Option<String> {
+        self.windows
+            .iter()
+            .find(|(_, open)| open.as_str() == project)
+            .map(|(window, _)| window.clone())
+    }
+
+    pub fn close(&mut self, window: &str) {
+        self.windows.remove(window);
+    }
 }
 
 fn validate_path_within_project(path: &str, project_path: &str) -> Result<(), String> {
@@ -106,6 +134,8 @@ async fn write_utf8_file(path: &str, content: &str) -> Result<(), String> {
 #[tauri::command]
 /// Returns the canonical root; backend events identify the project by this path.
 pub async fn set_project_path(
+    app: AppHandle,
+    window: Window,
     state: tauri::State<'_, Mutex<ProjectState>>,
     path: String,
 ) -> Result<String, String> {
@@ -118,20 +148,39 @@ pub async fn set_project_path(
 
     let canonical = canonical.to_string_lossy().to_string();
     let mut state_guard = state.lock().map_err(|e| e.to_string())?;
-    state_guard.project_path = Some(canonical.clone());
+    if let Some(other) = state_guard.window_with(&canonical) {
+        if other != window.label() {
+            drop(state_guard);
+            if let Some(other) = tauri::Manager::get_webview_window(&app, &other) {
+                super::windows::focus(&other);
+            }
+            return Err(tr!(
+                "这个项目已在另一个窗口中打开",
+                "This project is already open in another window"
+            )
+            .into());
+        }
+    }
+    state_guard
+        .windows
+        .insert(window.label().to_string(), canonical.clone());
+    // The title names the project in the Dock, the taskbar and the Window menu.
+    if let Some(name) = Path::new(&canonical).file_name() {
+        let _ = window.set_title(&format!("{} — LMMs-Lab Writer", name.to_string_lossy()));
+    }
     Ok(canonical)
 }
 
 #[tauri::command]
 pub async fn read_file(
+    window: Window,
     state: tauri::State<'_, Mutex<ProjectState>>,
     path: String,
 ) -> Result<String, String> {
     let project_path = {
         let state_guard = state.lock().map_err(|e| e.to_string())?;
         state_guard
-            .project_path
-            .clone()
+            .project(window.label())
             .ok_or_else(|| "No project open".to_string())?
     };
 
@@ -146,6 +195,7 @@ pub async fn read_file(
 
 #[tauri::command]
 pub async fn write_file(
+    window: Window,
     state: tauri::State<'_, Mutex<ProjectState>>,
     path: String,
     content: String,
@@ -154,8 +204,7 @@ pub async fn write_file(
     let project_path = {
         let state_guard = state.lock().map_err(|e| e.to_string())?;
         state_guard
-            .project_path
-            .clone()
+            .project(window.label())
             .ok_or_else(|| "No project open".to_string())?
     };
 
@@ -346,12 +395,13 @@ fn event_kind_to_string(kind: &EventKind) -> &'static str {
 #[tauri::command]
 pub fn watch_directory(
     app: AppHandle,
+    window: Window,
     state: tauri::State<'_, Mutex<WatcherState>>,
     path: String,
 ) -> Result<(), String> {
     let mut state_guard = state.lock().map_err(|e| e.to_string())?;
-    state_guard.watcher = None;
-    state_guard.watched_path = None;
+    let label = window.label().to_string();
+    state_guard.watchers.remove(&label);
 
     let watch_path = Path::new(&path);
     if !watch_path.exists() {
@@ -360,6 +410,7 @@ pub fn watch_directory(
 
     let last_events = state_guard.last_events.clone();
     let app_handle = app.clone();
+    let target = label.clone();
 
     // Canonicalize base_path for reliable path comparison on Windows
     let base_path: PathBuf =
@@ -416,7 +467,9 @@ pub fn watch_directory(
                         kind: event_kind_to_string(&event.kind).to_string(),
                     };
 
-                    app_handle.emit("file-changed", change_event).ok();
+                    app_handle
+                        .emit_to(target.as_str(), "file-changed", change_event)
+                        .ok();
                 }
             }
         },
@@ -429,23 +482,20 @@ pub fn watch_directory(
         .watch(watch_path, RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to watch directory: {}", e))?;
 
-    state_guard.watcher = Some(watcher);
-    state_guard.watched_path = Some(path);
+    state_guard.watchers.insert(label, watcher);
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn stop_watch(state: tauri::State<'_, Mutex<WatcherState>>) -> Result<(), String> {
-    let mut state_guard = state.lock().map_err(|e| e.to_string())?;
-    state_guard.watcher = None;
-    state_guard.watched_path = None;
-
-    // Clear debounce cache to free memory
-    if let Ok(mut events) = state_guard.last_events.lock() {
-        events.clear();
-    }
-
+pub fn stop_watch(
+    window: Window,
+    state: tauri::State<'_, Mutex<WatcherState>>,
+) -> Result<(), String> {
+    state
+        .lock()
+        .map_err(|e| e.to_string())?
+        .stop(window.label());
     Ok(())
 }
 
@@ -454,6 +504,18 @@ mod tests {
     use super::*;
     use notify::event::{CreateKind, RemoveKind};
     use notify::EventKind;
+
+    #[test]
+    fn each_window_has_its_own_project() {
+        let mut projects = ProjectState::default();
+        projects.windows.insert("main".into(), "/a".into());
+        projects.windows.insert("writer-1".into(), "/b".into());
+        assert_eq!(projects.project("writer-1").as_deref(), Some("/b"));
+        assert_eq!(projects.window_with("/a").as_deref(), Some("main"));
+        projects.close("main");
+        assert_eq!(projects.window_with("/a"), None);
+        assert_eq!(projects.project("main"), None);
+    }
     use std::fs;
     use std::path::PathBuf;
     use tempfile::TempDir;

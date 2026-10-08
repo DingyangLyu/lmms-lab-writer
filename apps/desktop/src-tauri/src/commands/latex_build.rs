@@ -1,10 +1,10 @@
 use super::{
-    latex::{CompileOutputEvent, CompilerInfo, LaTeXCompilationState},
+    latex::{BuildSlot, CompileOutputEvent, CompilerInfo, LaTeXCompilationState},
     latex_project::{BuildTarget, ProjectConfig},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path, process::Stdio, sync::Arc};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, Window};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     sync::Mutex,
@@ -246,7 +246,7 @@ async fn plan(
 }
 async fn run_program(
     app: Option<&AppHandle>,
-    state: &LaTeXCompilationState,
+    state: &BuildSlot,
     program: &str,
     args: &[String],
     cwd: &Path,
@@ -359,16 +359,18 @@ async fn run_program(
 #[tauri::command]
 pub async fn latex_build_target(
     app: AppHandle,
+    window: Window,
     state: State<'_, LaTeXCompilationState>,
     directory: String,
     target: BuildTarget,
     compiler_overrides: Option<HashMap<String, String>>,
 ) -> Result<BuildResult, String> {
-    build(Some(&app), &state, directory, target, compiler_overrides).await
+    let slot = state.slot(window.label());
+    build(Some(&app), &slot, directory, target, compiler_overrides).await
 }
 async fn build(
     app: Option<&AppHandle>,
-    state: &LaTeXCompilationState,
+    state: &BuildSlot,
     directory: String,
     target: BuildTarget,
     compiler_overrides: Option<HashMap<String, String>>,
@@ -625,7 +627,7 @@ mod integration_tests {
         .await
         .unwrap();
         tokio::fs::write(temp.path().join("zh/main.tex"),"\\documentclass[fontset=fandol]{ctexart}\n\\begin{document}中文版本测试。\\end{document}\n").await.unwrap();
-        let state = LaTeXCompilationState::default();
+        let state = BuildSlot::default();
         for entry in ["en/main.tex", "zh/main.tex"] {
             let mut target = super::super::latex_project::make_target(entry);
             target.engine = "tectonic".into();
@@ -681,7 +683,7 @@ mod bibliography_integration {
         target.output_dir = "build/paper".into();
         let result = build(
             None,
-            &LaTeXCompilationState::default(),
+            &BuildSlot::default(),
             temp.path().to_string_lossy().into(),
             target,
             None,

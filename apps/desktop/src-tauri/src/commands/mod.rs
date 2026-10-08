@@ -11,6 +11,7 @@ pub mod opencode;
 pub mod saving;
 pub mod terminal;
 pub mod util;
+pub mod windows;
 
 pub mod annotations;
 pub mod writer_bridge;

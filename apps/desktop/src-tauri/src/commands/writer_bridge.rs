@@ -987,6 +987,10 @@ async fn prepare_files(
     files: Option<Vec<String>>,
     checkpoint: bool,
 ) -> Result<(), String> {
+    // Only the window with this project open holds its unsaved buffers; with none, there are none.
+    let Some(window) = super::windows::project_window(app, project) else {
+        return Ok(());
+    };
     let id = uuid::Uuid::new_v4().to_string();
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.state::<BridgeState>()
@@ -994,7 +998,8 @@ async fn prepare_files(
         .lock()
         .await
         .insert(id.clone(), tx);
-    app.emit(
+    app.emit_to(
+        window.label(),
         "writer://prepare-delivery",
         json!({"id":id,"project":project,"files":files,"checkpoint":checkpoint}),
     )

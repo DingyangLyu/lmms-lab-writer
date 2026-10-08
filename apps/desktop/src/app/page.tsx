@@ -78,6 +78,7 @@ const PdfViewer = dynamic(
 );
 
 import {
+  AppWindowIcon,
   FolderOpenIcon,
   GearIcon,
   PlayCircleIcon,
@@ -85,6 +86,7 @@ import {
   SidebarSimpleIcon,
   TerminalIcon,
 } from "@phosphor-icons/react";
+import { listenHere } from "@/lib/tauri/window-events";
 
 type EditorViewMode = "file" | "git-diff";
 type GitDiffPreviewState = {
@@ -193,7 +195,7 @@ export default function EditorPage() {
   conversationsRef.current = conversations;
   /** Drafts are persisted; running or approval-waiting agents need explicit consent. */
   const confirmAgentsIdle = useCallback(
-    async (action: "switch" | "quit") => {
+    async (action: "switch" | "close" | "quit") => {
       const busy = conversationsRef.current.tabs.filter(
         (tab) => tab.status === "running" || tab.status === "waiting",
       );
@@ -205,18 +207,13 @@ export default function EditorPage() {
           .join(t("page.listSeparator")) +
         (busy.length > 3 ? t("page.andCountMore", { count: busy.length }) : "");
       const { ask } = await import("@tauri-apps/plugin-dialog");
-      return ask(
-        t(
-          action === "quit"
-            ? "page.namesCountIsAreStillRunningOrWaitingForA"
-            : "page.namesCountIsAreStillRunningOrWaitingForA2",
-          { names, count: busy.length },
-        ),
-        {
-          title: action === "quit" ? t("page.quitWriter") : t("page.switchProject"),
-          kind: "warning",
-        },
-      );
+      const text = {
+        quit: ["page.namesCountIsAreStillRunningOrWaitingForA", "page.quitWriter"],
+        switch: ["page.namesCountIsAreStillRunningOrWaitingForA2", "page.switchProject"],
+        close: ["page.agentsBusyCloseWindow", "page.closeWindow"],
+      } as const;
+      const [message, title] = text[action];
+      return ask(t(message, { names, count: busy.length }), { title: t(title), kind: "warning" });
     },
     [t],
   );
@@ -240,7 +237,7 @@ export default function EditorPage() {
   const [createDialog, setCreateDialog] = useState<{
     type: "file" | "directory";
   } | null>(null);
-  const saving = useDocumentSaving(() => confirmAgentsIdle("quit"));
+  const saving = useDocumentSaving((quit) => confirmAgentsIdle(quit ? "quit" : "close"));
   const saveManager = saving.manager;
   const { prepareEditorMessage } = useAgentDelivery(saveManager, daemon.projectPath);
 
@@ -593,17 +590,13 @@ export default function EditorPage() {
   useEffect(() => {
     let disposed = false;
     let stop: (() => void) | undefined;
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<{ href: string }>(
-          "writer://open-link",
-          ({ payload }) => void handleChatFileClick(payload.href),
-        ),
-      )
-      .then((unlisten) => {
-        if (disposed) unlisten();
-        else stop = unlisten;
-      });
+    void listenHere<{ href: string }>(
+      "writer://open-link",
+      ({ payload }) => void handleChatFileClick(payload.href),
+    ).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
     return () => {
       disposed = true;
       stop?.();
@@ -1549,7 +1542,19 @@ export default function EditorPage() {
       try {
         const path = await projectTransition.run({
           current: daemon.projectPath,
-          choose,
+          // A project is open in one window at a time; bring that window forward instead.
+          choose: async () => {
+            const path = await choose();
+            if (
+              path &&
+              path !== daemon.projectPath &&
+              (await invoke<boolean>("focus_project_window", { path }))
+            ) {
+              toast(t("page.projectOpenInAnotherWindow"), "info");
+              return null;
+            }
+            return path;
+          },
           confirm: async () => {
             if (targetBuild.isBuilding() || latexSettings.saving)
               throw new Error(t("page.aBuildOrSettingsSaveIsStillRunningSwitch"));
@@ -1625,6 +1630,11 @@ export default function EditorPage() {
       }),
     [changeProject, daemon.projectPath, t],
   );
+  const openWindow = useCallback(() => {
+    void invoke("open_window").catch((error) =>
+      toast(t("page.couldNotOpenAWindowError", { error: String(error) }), "error"),
+    );
+  }, [toast, t]);
   const handleOpenRecentProject = useCallback(
     (path: string) => changeProject(async () => path),
     [changeProject],
@@ -1652,9 +1662,17 @@ export default function EditorPage() {
     };
     void import("@tauri-apps/plugin-deep-link")
       .then(async ({ getCurrent, onOpenUrl }) => {
-        const initial = await getCurrent();
+        // The link that launched Writer belongs to its first window (or one opened for a link).
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const launchWindow =
+          getCurrentWindow().label === "main" ||
+          (window as { __WRITER_OPEN_LINK__?: boolean }).__WRITER_OPEN_LINK__ === true;
+        const initial = launchWindow ? await getCurrent() : null;
         if (initial && !disposed) handle(initial);
-        const unlisten = await onOpenUrl(handle);
+        // Every window hears later links; the one in front opens them.
+        const unlisten = await onOpenUrl(async (urls) => {
+          if (await invoke<boolean>("window_is_primary")) handle(urls);
+        });
         if (disposed) unlisten();
         else stop = unlisten;
       })
@@ -1720,6 +1738,13 @@ export default function EditorPage() {
         return;
       }
 
+      // macOS opens windows from the File menu (⌘⇧N); elsewhere there is no menu bar.
+      if (isMod && e.shiftKey && key === "n" && !/Mac/i.test(navigator.platform)) {
+        e.preventDefault();
+        openWindow();
+        return;
+      }
+
       if (isMod && key === "w" && !e.shiftKey) {
         e.preventDefault();
         if (selectedFile) {
@@ -1748,6 +1773,7 @@ export default function EditorPage() {
     handleCompileWithDetection,
     flushBeforeLeave,
     projectTransition,
+    openWindow,
   ]);
 
   const isShowingGitDiff =
@@ -2024,6 +2050,15 @@ export default function EditorPage() {
                   <span className="hidden sm:inline">
                     {choosingProject ? t("page.opening") : t("page.openFolder")}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openWindow}
+                  aria-label={t("page.newWindow")}
+                  title={t("page.newWindowShortcut")}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center border border-border hover:bg-accent-hover"
+                >
+                  <AppWindowIcon className="size-4" aria-hidden="true" />
                 </button>
               </div>
 
