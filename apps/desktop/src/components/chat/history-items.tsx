@@ -4,9 +4,9 @@ import { CodexActivityCard } from "@/components/codex/codex-activity-card";
 import { CodexMarkdown } from "@/components/codex/codex-markdown";
 import { type CodexItem, imagesForCodexItem, textForCodexItem } from "@/lib/codex/events";
 import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
+import { useI18n } from "@/lib/i18n";
 import { ChatImage } from "./chat-image";
 import { UserFileMessage } from "./user-file-message";
-import { useI18n } from "@/lib/i18n";
 
 type Props = {
   items: CodexItem[];

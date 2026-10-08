@@ -4,6 +4,7 @@ import { CheckIcon, InfoIcon, XIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import type React from "react";
 import { createContext, useCallback, useContext, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 type ToastType = "success" | "error" | "info";
 
@@ -54,6 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  const { t } = useI18n();
   const Icon = getIcon(toast.type);
 
   return (
@@ -74,7 +76,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
           type="button"
           onClick={() => onDismiss(toast.id)}
           className="flex-shrink-0 text-foreground hover:opacity-60 transition-opacity"
-          aria-label="Dismiss"
+          aria-label={t("ui.dismiss")}
         >
           <XIcon className="w-3.5 h-3.5" />
         </button>

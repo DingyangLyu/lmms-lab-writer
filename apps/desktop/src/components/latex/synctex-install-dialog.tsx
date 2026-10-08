@@ -6,8 +6,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { useLatexInstaller } from "@/lib/latex";
 import { useI18n } from "@/lib/i18n";
+import { useLatexInstaller } from "@/lib/latex";
 
 type QuickInstallStatus = "idle" | "checking" | "installing" | "success" | "error" | "no_texdist";
 

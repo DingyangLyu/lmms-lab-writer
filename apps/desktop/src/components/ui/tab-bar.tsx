@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "@/lib/i18n";
 import { ContextMenu, type ContextMenuItem } from "./context-menu";
 
 export interface TabItem {
@@ -92,6 +93,7 @@ export function TabBar<T extends TabItem>({
   variant = "editor",
   className = "",
 }: TabBarProps<T>) {
+  const { t } = useI18n();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -139,12 +141,12 @@ export function TabBar<T extends TabItem>({
 
   const getContextMenuItems = useCallback(
     (tabId: string): ContextMenuItem[] => {
-      const tabIndex = tabs.findIndex((t) => t.id === tabId);
+      const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
       const items: ContextMenuItem[] = [];
 
       if (onTabClose) {
         items.push({
-          label: "Close",
+          label: t("common.close"),
           onClick: () => onTabClose(tabId),
           icon: <XIcon className="w-4 h-4" />,
         });
@@ -152,7 +154,7 @@ export function TabBar<T extends TabItem>({
 
       if (onCloseOthers) {
         items.push({
-          label: "Close Others",
+          label: t("ui.closeOthers"),
           onClick: () => onCloseOthers(tabId),
           disabled: tabs.length <= 1,
           icon: <XCircleIcon className="w-4 h-4" />,
@@ -161,7 +163,7 @@ export function TabBar<T extends TabItem>({
 
       if (onCloseToLeft) {
         items.push({
-          label: "Close to the Left",
+          label: t("ui.closeToTheLeft"),
           onClick: () => onCloseToLeft(tabId),
           disabled: tabIndex === 0,
           icon: <CaretLineLeftIcon className="w-4 h-4" />,
@@ -170,7 +172,7 @@ export function TabBar<T extends TabItem>({
 
       if (onCloseToRight) {
         items.push({
-          label: "Close to the Right",
+          label: t("ui.closeToTheRight"),
           onClick: () => onCloseToRight(tabId),
           disabled: tabIndex === tabs.length - 1,
           icon: <CaretLineRightIcon className="w-4 h-4" />,
@@ -179,7 +181,7 @@ export function TabBar<T extends TabItem>({
 
       if (onCloseAll) {
         items.push({
-          label: "Close All",
+          label: t("ui.closeAll"),
           onClick: onCloseAll,
           danger: true,
           icon: <TrashIcon className="w-4 h-4" />,
@@ -188,7 +190,7 @@ export function TabBar<T extends TabItem>({
 
       return items;
     },
-    [tabs, onTabClose, onCloseOthers, onCloseToLeft, onCloseToRight, onCloseAll],
+    [tabs, onTabClose, onCloseOthers, onCloseToLeft, onCloseToRight, onCloseAll, t],
   );
 
   const clearDocumentDragListeners = useCallback(() => {
@@ -473,7 +475,7 @@ export function TabBar<T extends TabItem>({
                   className={`w-6 h-full flex items-center justify-center hover:bg-surface-tertiary ${
                     isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   }`}
-                  aria-label="Close tab"
+                  aria-label={t("ui.closeTab")}
                 >
                   <XIcon className="w-3 h-3" />
                 </button>

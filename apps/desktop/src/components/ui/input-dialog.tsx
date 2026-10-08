@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "@/lib/i18n";
 
 interface InputDialogProps {
   title: string;
@@ -21,6 +22,7 @@ export function InputDialog({
   onCancel,
   validator,
 }: InputDialogProps) {
+  const { t } = useI18n();
   const [value, setValue] = useState(defaultValue);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -126,10 +128,10 @@ export function InputDialog({
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
             <button type="button" onClick={onCancel} className="btn btn-sm btn-secondary">
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="button" onClick={handleConfirm} className="btn btn-sm btn-primary">
-              Confirm
+              {t("ui.confirm")}
             </button>
           </div>
         </motion.div>

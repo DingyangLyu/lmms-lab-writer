@@ -6,6 +6,7 @@ import { editorEn, editorZh } from "./editor";
 import { latexEn, latexZh } from "./latex";
 import { pageEn, pageZh } from "./page";
 import { settingsEn, settingsZh } from "./settings";
+import { uiEn, uiZh } from "./ui";
 
 const zh = {
   ...agentsZh,
@@ -15,6 +16,7 @@ const zh = {
   ...latexZh,
   ...pageZh,
   ...settingsZh,
+  ...uiZh,
 };
 const en: Record<keyof typeof zh, string> = {
   ...agentsEn,
@@ -24,6 +26,7 @@ const en: Record<keyof typeof zh, string> = {
   ...latexEn,
   ...pageEn,
   ...settingsEn,
+  ...uiEn,
 };
 
 export const i18n = createI18n({ messages: { zh, en }, storageKey: "writer-locale" });

@@ -2,8 +2,8 @@
 import { open } from "@tauri-apps/plugin-shell";
 import { type ReactNode, useContext, useState } from "react";
 import { parseChatLink } from "@/lib/chat/links";
-import { ChatImageDirectory } from "./chat-image";
 import { useI18n } from "@/lib/i18n";
+import { ChatImageDirectory } from "./chat-image";
 export function ChatLink({
   href,
   children,

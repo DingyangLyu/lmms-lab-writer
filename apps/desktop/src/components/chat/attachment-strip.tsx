@@ -2,8 +2,8 @@
 import { FileIcon } from "@phosphor-icons/react";
 import { isDocument } from "@/lib/chat/files";
 import type { ChatImageFile } from "@/lib/chat/images";
-import { ChatImage } from "./chat-image";
 import { useI18n } from "@/lib/i18n";
+import { ChatImage } from "./chat-image";
 export function AttachmentStrip({
   files,
   onRemove,

@@ -4,8 +4,8 @@ import { ArrowClockwiseIcon, WarningIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { useLatexInstaller } from "@/lib/latex";
 import { useI18n } from "@/lib/i18n";
+import { useLatexInstaller } from "@/lib/latex";
 
 interface LaTeXInstallPromptProps {
   onRefreshCompilers?: () => void;

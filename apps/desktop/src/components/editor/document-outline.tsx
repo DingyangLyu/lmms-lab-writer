@@ -2,8 +2,8 @@
 import { CaretRightIcon, FileTextIcon, ListIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { PanelHeightHandle, usePanelHeight } from "@/components/ui/panel-height";
-import { latexOutline, type OutlineEntry } from "@/lib/latex/outline";
 import { useI18n } from "@/lib/i18n";
+import { latexOutline, type OutlineEntry } from "@/lib/latex/outline";
 
 export function DocumentOutline({
   path,

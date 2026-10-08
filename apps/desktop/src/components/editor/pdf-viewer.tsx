@@ -8,6 +8,7 @@ import { fitPageWidth, pageScale, viewportAnchor } from "@/lib/pdf/viewport";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { useI18n } from "@/lib/i18n";
+
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url,

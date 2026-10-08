@@ -9,10 +9,10 @@ import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
 import type { EditorTextRange } from "@/lib/editor/selection-context";
 import { type SourceMark, useSourceAnnotations } from "@/lib/editor/source-annotations";
 import type { EditorSettings, EditorTheme } from "@/lib/editor/types";
+import { i18n, useI18n } from "@/lib/i18n";
 import { registerLaTeXLanguage } from "@/lib/monaco/latex";
 import { defineEditorThemes } from "@/lib/monaco/themes";
 import { LatexSourceEditor } from "./latex-source-editor";
-import { i18n, useI18n } from "@/lib/i18n";
 
 type Props = {
   project?: string;

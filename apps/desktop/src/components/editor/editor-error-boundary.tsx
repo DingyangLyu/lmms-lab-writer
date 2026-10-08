@@ -2,6 +2,7 @@
 
 import { WarningIcon } from "@phosphor-icons/react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { i18n } from "@/lib/i18n";
 
 type Props = {
   children: ReactNode;
@@ -39,7 +40,9 @@ export class EditorErrorBoundary extends Component<Props, State> {
           <div className="size-12 border border-border flex items-center justify-center mb-4">
             <WarningIcon className="size-6 text-muted-foreground" />
           </div>
-          <h3 className="text-sm font-medium text-foreground mb-1">Editor Component Error</h3>
+          <h3 className="text-sm font-medium text-foreground mb-1">
+            {i18n.t("ui.editorComponentError")}
+          </h3>
           <p className="text-xs text-muted mb-4 max-w-[200px]">
             {this.state.error?.message || "An unexpected error occurred"}
           </p>
@@ -49,7 +52,7 @@ export class EditorErrorBoundary extends Component<Props, State> {
             className="px-3 py-1.5 text-xs border border-foreground bg-background hover:bg-accent-hover transition-colors"
             style={{ boxShadow: "2px 2px 0 0 var(--foreground)" }}
           >
-            Try Again
+            {i18n.t("ui.tryAgain")}
           </button>
         </div>
       );

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/lib/i18n";
 
 interface GitHubPublishDialogProps {
   defaultRepoName: string;
@@ -20,6 +21,7 @@ export function GitHubPublishDialog({
   isCreating,
   error,
 }: GitHubPublishDialogProps) {
+  const { t } = useI18n();
   const [repoName, setRepoName] = useState(defaultRepoName);
   const [isPrivate, setIsPrivate] = useState(true);
   const [description, setDescription] = useState("");
@@ -64,7 +66,7 @@ export function GitHubPublishDialog({
           {/* Header */}
           <div className="px-5 py-4 border-b border-border">
             <h3 id={titleId} className="text-sm font-medium">
-              Publish to GitHub
+              {t("ui.publishToGithub")}
             </h3>
           </div>
 
@@ -76,7 +78,7 @@ export function GitHubPublishDialog({
                 htmlFor="github-repo-name"
                 className="block text-xs font-mono text-muted mb-1.5"
               >
-                Repository name
+                {t("ui.repositoryName")}
               </label>
               <input
                 id="github-repo-name"
@@ -102,7 +104,9 @@ export function GitHubPublishDialog({
 
             {/* Visibility toggle */}
             <div>
-              <span className="block text-xs font-mono text-muted mb-1.5">Visibility</span>
+              <span className="block text-xs font-mono text-muted mb-1.5">
+                {t("ui.visibility")}
+              </span>
               <div className="flex border border-border">
                 <button
                   type="button"
@@ -114,7 +118,7 @@ export function GitHubPublishDialog({
                       : "bg-background text-foreground hover:bg-accent-hover"
                   } disabled:opacity-50`}
                 >
-                  Public
+                  {t("ui.public")}
                 </button>
                 <button
                   type="button"
@@ -126,7 +130,7 @@ export function GitHubPublishDialog({
                       : "bg-background text-foreground hover:bg-accent-hover"
                   } disabled:opacity-50`}
                 >
-                  Private
+                  {t("ui.private")}
                 </button>
               </div>
             </div>
@@ -137,14 +141,14 @@ export function GitHubPublishDialog({
                 htmlFor="github-repo-description"
                 className="block text-xs font-mono text-muted mb-1.5"
               >
-                Description (optional)
+                {t("ui.descriptionOptional")}
               </label>
               <input
                 id="github-repo-description"
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="A short description..."
+                placeholder={t("ui.aShortDescription")}
                 disabled={isCreating}
                 className="w-full px-3 py-2 text-sm border border-border outline-none focus:border-foreground transition-colors disabled:opacity-50"
                 onKeyDown={(e) => {
@@ -180,7 +184,7 @@ export function GitHubPublishDialog({
               disabled={isCreating}
               className="btn btn-sm btn-secondary disabled:opacity-50"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -191,10 +195,10 @@ export function GitHubPublishDialog({
               {isCreating ? (
                 <>
                   <Spinner className="size-3" />
-                  Creating...
+                  {t("ui.creating")}
                 </>
               ) : (
-                "Create & Push"
+                t("ui.createPush")
               )}
             </button>
           </div>

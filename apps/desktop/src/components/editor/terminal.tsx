@@ -7,6 +7,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { useTheme } from "next-themes";
 import { memo, useEffect, useRef, useState } from "react";
 import { resolveTerminalFontFamily } from "@/lib/editor/font-stacks";
+import { useI18n } from "@/lib/i18n";
 
 // GitHub Light terminal colors
 const LIGHT_TERMINAL_THEME = {
@@ -81,6 +82,7 @@ export const Terminal = memo(function Terminal({
   lineHeight = 1.4,
   className = "",
 }: Props) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -318,7 +320,7 @@ export const Terminal = memo(function Terminal({
   if (!mounted) {
     return (
       <div className={`bg-background ${className}`}>
-        <div className="p-4 text-sm text-muted">Loading terminal...</div>
+        <div className="p-4 text-sm text-muted">{t("ui.loadingTerminal")}</div>
       </div>
     );
   }
@@ -326,7 +328,7 @@ export const Terminal = memo(function Terminal({
   if (!projectPath) {
     return (
       <div className={`bg-background flex items-center justify-center ${className}`}>
-        <span className="text-sm text-muted">Open a project to use terminal</span>
+        <span className="text-sm text-muted">{t("ui.openAProjectToUseTerminal")}</span>
       </div>
     );
   }

@@ -124,10 +124,10 @@ import {
   TrashIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
+import { useI18n } from "@/lib/i18n";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 import { ContextMenu, type ContextMenuItem } from "../ui/context-menu";
 import { InputDialog } from "../ui/input-dialog";
-import { useI18n } from "@/lib/i18n";
 
 export interface FileOperations {
   createFile: (path: string) => Promise<void>;

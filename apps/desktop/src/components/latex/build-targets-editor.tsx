@@ -1,10 +1,10 @@
 "use client";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { readCompilerOverrides, writeCompilerOverrides } from "@/lib/latex/compiler-overrides";
 import type { BuildTarget, LaTeXCompilersStatus, ProjectBuildConfig } from "@/lib/latex/types";
 import { makeBuildTarget } from "@/lib/latex/use-latex-settings";
-import { useI18n } from "@/lib/i18n";
 export function BuildTargetsEditor({
   project,
   config,

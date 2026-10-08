@@ -11,9 +11,9 @@ import {
 } from "@/lib/harness/types";
 import type { useHarnessWorkspace } from "@/lib/harness/use-workspace";
 import { canClose } from "@/lib/harness/workspace";
+import { useI18n } from "@/lib/i18n";
 import { HarnessErrorBoundary } from "./error-boundary";
 import { HistoryDialog } from "./history-dialog";
-import { useI18n } from "@/lib/i18n";
 
 const PANELS = {
   opencode: dynamic(

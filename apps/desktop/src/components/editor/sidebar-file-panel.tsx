@@ -11,9 +11,9 @@ import {
 import { useEffect, useState } from "react";
 import { EditorErrorBoundary } from "@/components/editor/editor-error-boundary";
 import { type FileOperations, FileTree } from "@/components/editor/file-tree";
+import { useI18n } from "@/lib/i18n";
 import { pathSync } from "@/lib/path";
 import { DocumentOutline } from "./document-outline";
-import { useI18n } from "@/lib/i18n";
 
 type FileSidebarPanelProps = {
   projectPath: string | null;

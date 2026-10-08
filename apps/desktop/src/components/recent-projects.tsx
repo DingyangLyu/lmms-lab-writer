@@ -2,6 +2,7 @@
 
 import { FolderIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import type { RecentProject } from "@/lib/recent-projects";
 import { formatRelativeTime } from "./opencode/utils";
 
@@ -16,6 +17,7 @@ export function RecentProjects({
   onRemove: (path: string) => void;
   onClearAll: () => void;
 }) {
+  const { t } = useI18n();
   const [deleteConfirmPath, setDeleteConfirmPath] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -26,13 +28,13 @@ export function RecentProjects({
   return (
     <div className="mt-8 w-full max-w-md">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-muted">Recent Projects</h3>
+        <h3 className="text-sm font-medium text-muted">{t("ui.recentProjects")}</h3>
         <button
           type="button"
           onClick={() => setShowClearConfirm(true)}
           className="text-xs text-muted hover:text-foreground transition-colors"
         >
-          Clear All
+          {t("ui.clearAll")}
         </button>
       </div>
       <div className="border border-border bg-background">
@@ -62,7 +64,7 @@ export function RecentProjects({
                   setDeleteConfirmPath(project.path);
                 }}
                 className="px-3 py-2 text-muted hover:text-red-600 transition-colors"
-                title="Remove from history"
+                title={t("ui.removeFromHistory")}
               >
                 <TrashIcon className="size-4" />
               </button>
@@ -105,6 +107,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
       <div className="bg-background border border-border p-4 max-w-xs w-full mx-4 shadow-[4px_4px_0_0_var(--foreground)]">
@@ -115,10 +118,10 @@ function ConfirmDialog({
             onClick={onCancel}
             className="px-3 py-1.5 text-sm border border-border hover:bg-surface-secondary transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" onClick={onConfirm} className="btn-brutalist text-sm">
-            Confirm
+            {t("ui.confirm")}
           </button>
         </div>
       </div>
