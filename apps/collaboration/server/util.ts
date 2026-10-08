@@ -1,5 +1,6 @@
 /** Pure helpers shared by the server and the local runner; no database access here. */
 import { createHash, randomUUID } from "node:crypto";
+import { format, type Params } from "@lmms-lab/i18n";
 import { isTextPath, textExtensions, validPath } from "@lmms-lab/sync";
 import * as Y from "yjs";
 
@@ -12,16 +13,18 @@ export const allows = (role: Role, minimum: Access) =>
   (minimum === "owner" && role === "owner");
 export const roles: Role[] = ["owner", "editor", "commenter", "viewer"];
 
+/** `message` is Chinese; `template` and `params` let a client get it in English (messages.ts). */
 export class HttpError extends Error {
   constructor(
     public status: number,
-    message: string,
+    readonly template: string,
+    readonly params?: Params,
   ) {
-    super(message);
+    super(format(template, params));
   }
 }
-export function fail(status: number, message: string): never {
-  throw new HttpError(status, message);
+export function fail(status: number, template: string, params?: Params): never {
+  throw new HttpError(status, template, params);
 }
 /** Parser and validation errors from shared writing helpers are user input errors, not 500s. */
 export function checked<T>(action: () => T): T {

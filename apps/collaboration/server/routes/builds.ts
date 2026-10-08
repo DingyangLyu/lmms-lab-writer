@@ -7,7 +7,7 @@ import { fail } from "../util";
 
 const query = (ctx: InProject, name: string) => {
   const value = Number(ctx.url.searchParams.get(name));
-  return Number.isFinite(value) ? value : fail(400, `无效参数 ${name}`);
+  return Number.isFinite(value) ? value : fail(400, "无效参数 {name}", { name });
 };
 const missing = () => fail(404, "在编译结果中找不到对应位置，请重新编译");
 

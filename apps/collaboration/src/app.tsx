@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary, PublicUser } from "../shared/api";
 import { AdminPanel, ChangePassword } from "./account";
 import { api } from "./api";
-import { roleName } from "./labels";
+import { useI18n } from "./i18n";
+import { roleKey } from "./labels";
+import { LanguageSwitch } from "./language-switch";
 import { useAction } from "./use-action";
 import { Workspace } from "./workspace/workspace";
 
@@ -13,14 +15,18 @@ function SignIn({
   invite: string | null;
   onSignedIn: (user: PublicUser) => void;
 }) {
+  const { t } = useI18n();
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState("");
   const { busy, error, run } = useAction();
   return (
     <div className="auth">
-      <span className="eyebrow">WRITER / COLLABORATION</span>
-      <h1>{invite ? "加入写作项目" : "共同写作"}</h1>
-      <p>与合作者编辑同一份文稿，保留每次讨论和修改。</p>
+      <div className="row spread">
+        <span className="eyebrow">WRITER / COLLABORATION</span>
+        <LanguageSwitch />
+      </div>
+      <h1>{invite ? t("signIn.titleJoin") : t("signIn.title")}</h1>
+      <p>{t("signIn.lead")}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -39,7 +45,7 @@ function SignIn({
         }}
       >
         <label>
-          用户名
+          {t("signIn.username")}
           <input
             autoComplete="username"
             value={username}
@@ -48,7 +54,7 @@ function SignIn({
           />
         </label>
         <label>
-          密码
+          {t("signIn.password")}
           <input
             type="password"
             autoComplete={invite ? "new-password" : "current-password"}
@@ -64,10 +70,10 @@ function SignIn({
           </p>
         )}
         <button className="primary" type="submit" disabled={busy}>
-          {busy ? "处理中…" : invite ? "加入项目" : "登录"}
+          {busy ? t("common.working") : invite ? t("signIn.join") : t("signIn.submit")}
         </button>
       </form>
-      <p className="muted">账号和文件保存在你部署的 Writer 服务中。</p>
+      <p className="muted">{t("signIn.storage")}</p>
     </div>
   );
 }
@@ -83,6 +89,7 @@ function Projects({
   onView: (view: "admin" | "password") => void;
   onSignedOut: () => void;
 }) {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[]>([]),
     [name, setName] = useState("");
   const { busy, error, setError, run } = useAction();
@@ -96,17 +103,18 @@ function Projects({
       <header>
         <div>
           <span className="eyebrow">WRITER / WORKSPACE</span>
-          <h1>我的论文</h1>
+          <h1>{t("projects.title")}</h1>
         </div>
         <div className="row">
+          <LanguageSwitch />
           <span>{user.name}</span>
           {user.admin && (
             <button type="button" onClick={() => onView("admin")}>
-              用户管理
+              {t("projects.admin")}
             </button>
           )}
           <button type="button" onClick={() => onView("password")}>
-            修改密码
+            {t("projects.changePassword")}
           </button>
           <button
             type="button"
@@ -117,7 +125,7 @@ function Projects({
               })
             }
           >
-            退出登录
+            {t("projects.signOut")}
           </button>
         </div>
       </header>
@@ -132,14 +140,14 @@ function Projects({
         }}
       >
         <input
-          aria-label="新项目名称"
-          placeholder="新项目名称"
+          aria-label={t("projects.newName")}
+          placeholder={t("projects.newName")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
         />
         <button className="primary" disabled={busy} type="submit">
-          创建项目
+          {t("projects.create")}
         </button>
       </form>
       {error && (
@@ -150,18 +158,19 @@ function Projects({
       <div className="projects">
         {projects.map((p) => (
           <button className="project-card" key={p.id} type="button" onClick={() => onOpen(p)}>
-            <span className="eyebrow">{roleName[p.role]}</span>
+            <span className="eyebrow">{t(roleKey[p.role])}</span>
             <h2>{p.name}</h2>
-            <span className="muted">打开文稿 →</span>
+            <span className="muted">{t("projects.open")}</span>
           </button>
         ))}
       </div>
-      {!projects.length && <p className="muted">创建项目，或打开合作者发来的邀请链接。</p>}
+      {!projects.length && <p className="muted">{t("projects.empty")}</p>}
     </main>
   );
 }
 
 export function App() {
+  const { t } = useI18n();
   const [user, setUser] = useState<PublicUser | null>(null),
     [ready, setReady] = useState(false),
     [project, setProject] = useState<ProjectSummary | null>(null),
@@ -193,7 +202,7 @@ export function App() {
     return (
       <div className="auth">
         <h1>Writer</h1>
-        <p>正在载入…</p>
+        <p>{t("common.loading")}</p>
       </div>
     );
   if (!user || invite) return <SignIn invite={invite} onSignedIn={setUser} />;

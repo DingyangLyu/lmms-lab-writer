@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { download } from "../api";
 import { Editor, type EditorHandle, type Selection } from "../editor";
-import { roleName, statusName } from "../labels";
+import { type MessageKey, useI18n } from "../i18n";
+import { roleKey, statusKey } from "../labels";
+import { LanguageSwitch } from "../language-switch";
 import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
 import { TasksPanel } from "../tasks";
@@ -20,17 +22,18 @@ import { ReviewTab } from "./review-tab";
 import { useProject } from "./use-project";
 
 const TABS = [
-  ["comments", "批注"],
-  ["bibliography", "文献"],
-  ["review", "审阅"],
-  ["history", "版本"],
-  ["members", "成员"],
-  ["tasks", "任务"],
-] as const;
+  ["comments", "tab.comments"],
+  ["bibliography", "tab.bibliography"],
+  ["review", "tab.review"],
+  ["history", "tab.history"],
+  ["members", "tab.members"],
+  ["tasks", "tab.tasks"],
+] as const satisfies readonly (readonly [string, MessageKey])[];
 type Tab = (typeof TABS)[number][0];
 
 /** The comment being written survives reloads (stored per user and project). */
 function useCommentDraft(key: string, report: (message: string) => void) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(""),
     [selection, setSelection] = useState<Selection | null>(null);
   useEffect(() => {
@@ -46,9 +49,9 @@ function useCommentDraft(key: string, report: (message: string) => void) {
     try {
       localStorage.setItem(key, JSON.stringify({ body: draft, selection }));
     } catch {
-      report("批注草稿未能保存到本机，请提交后再关闭。");
+      report(t("workspace.draftNotSaved"));
     }
-  }, [draft, selection, key, report]);
+  }, [draft, selection, key, report, t]);
   return { draft, setDraft, selection, setSelection };
 }
 
@@ -61,6 +64,7 @@ export function Workspace({
   user: PublicUser;
   onBack: () => void;
 }) {
+  const { t } = useI18n();
   const prefix = `/projects/${project.id}`;
   const [role, setRole] = useState<Role>(project.role),
     [status, setStatus] = useState<SyncStatus>("connecting"),
@@ -109,23 +113,24 @@ export function Workspace({
       <header className="workspace-header">
         <div className="row">
           <button type="button" onClick={onBack}>
-            ← 项目
+            {t("workspace.back")}
           </button>
           <strong>{project.name}</strong>
-          <span className="badge">{roleName[role]}</span>
+          <span className="badge">{t(roleKey[role])}</span>
         </div>
         <div className="row">
           <span className={`save-state ${status}`}>
-            {file && !file.binary ? statusName[status] : "文件预览"}
+            {file && !file.binary ? t(statusKey[status]) : t("workspace.filePreview")}
           </span>
+          <LanguageSwitch />
           <span className="username">{user.name}</span>
           <a
             href={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
-            title="用已安装的 Writer 桌面端打开，并与本地文件夹保持同步"
+            title={t("workspace.openDesktopTitle")}
           >
-            在桌面端打开
+            {t("workspace.openDesktop")}
           </a>
-          <a href={`/api${prefix}/export`}>导出项目</a>
+          <a href={`/api${prefix}/export`}>{t("workspace.export")}</a>
         </div>
       </header>
       {(error || notice) && (
@@ -146,7 +151,7 @@ export function Workspace({
         <FileSidebar ws={ws} memberCount={data.members.length} />
         <main className="document">
           <div className="document-toolbar">
-            <strong>{file?.path || "导入或创建第一份文稿"}</strong>
+            <strong>{file?.path || t("workspace.firstFile")}</strong>
             <BuildControls ws={ws} b={b} />
             {file && !file.binary && (
               <div className="row">
@@ -156,14 +161,14 @@ export function Workspace({
                   onClick={() => {
                     const s = editor.current?.selection();
                     if (!s) {
-                      setError("请先在正文中选中文字。");
+                      setError(t("workspace.selectFirst"));
                       return;
                     }
                     comment.setSelection(s);
                     setTab("comments");
                   }}
                 >
-                  批注所选文字
+                  {t("workspace.commentSelection")}
                 </button>
                 <button
                   type="button"
@@ -176,7 +181,7 @@ export function Workspace({
                     )
                   }
                 >
-                  导出当前文字
+                  {t("workspace.exportText")}
                 </button>
               </div>
             )}
@@ -205,8 +210,8 @@ export function Workspace({
                 )
               ) : (
                 <div className="empty">
-                  <h2>开始一起写作</h2>
-                  <p>导入完整 LaTeX 文件夹，或创建 main.tex。</p>
+                  <h2>{t("workspace.emptyTitle")}</h2>
+                  <p>{t("workspace.emptyLead")}</p>
                 </div>
               )}
             </div>
@@ -222,7 +227,7 @@ export function Workspace({
                 className={tab === id ? "selected" : ""}
                 onClick={() => setTab(id)}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </nav>

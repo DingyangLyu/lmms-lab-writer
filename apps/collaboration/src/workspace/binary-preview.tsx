@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FileContent, FileInfo } from "../../shared/api";
 import { api, unbase64 } from "../api";
+import { useI18n } from "../i18n";
 
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 export function BinaryPreview({ prefix, file }: { prefix: string; file: FileInfo }) {
+  const { t } = useI18n();
   const [url, setUrl] = useState(""),
     [error, setError] = useState("");
   const ext = file.path.split(".").pop()?.toLowerCase() ?? "";
@@ -38,14 +40,14 @@ export function BinaryPreview({ prefix, file }: { prefix: string; file: FileInfo
       {url && (
         <>
           <a href={url} download={file.path.split("/").pop()}>
-            下载 {file.path}
+            {t("preview.download", { path: file.path })}
           </a>
           {ext === "pdf" ? (
             <iframe title={file.path} src={url} />
           ) : image ? (
             <img alt={file.path} src={url} />
           ) : (
-            <p>此文件可下载后用本机应用打开。</p>
+            <p>{t("preview.external")}</p>
           )}
         </>
       )}

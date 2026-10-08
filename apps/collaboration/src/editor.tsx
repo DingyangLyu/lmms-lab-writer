@@ -22,6 +22,7 @@ import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next"
 import * as Y from "yjs";
 import type { Comment, Role } from "../shared/api";
 import { base64, unbase64 } from "./api";
+import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
 export type Selection = { quote: string; start: string; end: string };
@@ -105,9 +106,7 @@ export function Editor({
               transaction.newDoc.length * 3 > LIMIT &&
               new TextEncoder().encode(transaction.newDoc.toString()).length > LIMIT
             ) {
-              queueMicrotask(() =>
-                callbacks.current.onError("文稿超过 2 MB，请拆分文件；本次输入未覆盖原文。"),
-              );
+              queueMicrotask(() => callbacks.current.onError(i18n.t("editor.tooLarge")));
               return [];
             }
             return transaction;
@@ -138,7 +137,7 @@ export function Editor({
           ),
           commentMarks,
           EditorView.contentAttributes.of({
-            "aria-label": "多人 LaTeX 编辑器",
+            "aria-label": i18n.t("editor.label"),
             spellcheck: "false",
           }),
           EditorView.theme({
@@ -197,7 +196,7 @@ export function Editor({
               Y.decodeRelativePosition(unbase64(c.end)),
               p.doc,
             );
-          if (!a || !z || a.index >= z.index) throw new Error("批注原文已删除，需要重新定位");
+          if (!a || !z || a.index >= z.index) throw new Error(i18n.t("editor.anchorLost"));
           v.dispatch({ selection: { anchor: a.index, head: z.index }, scrollIntoView: true });
           v.focus();
         } catch (e) {

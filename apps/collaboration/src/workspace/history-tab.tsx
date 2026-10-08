@@ -2,9 +2,22 @@ import { useState } from "react";
 import type { Snapshot } from "../../shared/api";
 import { api } from "../api";
 import { SnapshotCompare } from "../history";
+import { type MessageKey, useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
+/** Labels the server gives automatic versions, shown in the interface language. */
+export function useSnapshotLabel() {
+  const { t } = useI18n();
+  return (label: string) => {
+    const key = `snapshot.${label}` as MessageKey;
+    const translated = t(key);
+    return translated === key ? label : translated;
+  };
+}
+
 export function HistoryTab({ ws, snapshots }: { ws: WorkspaceContext; snapshots: Snapshot[] }) {
+  const { t, locale } = useI18n();
+  const snapshotLabel = useSnapshotLabel();
   const [label, setLabel] = useState(""),
     [comparing, setComparing] = useState<Snapshot | null>(null);
   const { prefix, file, busy, run, reload } = ws;
@@ -14,50 +27,44 @@ export function HistoryTab({ ws, snapshots }: { ws: WorkspaceContext; snapshots:
     );
   return (
     <>
-      <h2>版本与恢复</h2>
+      <h2>{t("history.title")}</h2>
       <div className="row">
         <input
-          aria-label="版本名称"
+          aria-label={t("history.name")}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="例如：投稿前核对"
+          placeholder={t("history.placeholder")}
         />
         <button
           type="button"
           disabled={!ws.canEdit || busy || (!!file && !file.binary && ws.status !== "saved")}
           onClick={() =>
             run(async () => {
-              await api(`${prefix}/snapshots`, { label: label || "手动版本" });
+              await api(`${prefix}/snapshots`, { label: label || t("history.manual") });
               setLabel("");
               await reload();
             })
           }
         >
-          保存版本
+          {t("history.save")}
         </button>
       </div>
-      <p className="muted">
-        恢复当前文件会作为一次新的共同编辑同步，恢复前再保存快照。其他文件不会被覆盖。
-      </p>
+      <p className="muted">{t("history.lead")}</p>
       {snapshots.map((s) => (
         <article className="snapshot" key={s.id}>
           <strong>
-            {s.label}
-            {!s.manual && <span className="muted"> · 自动</span>}
+            {snapshotLabel(s.label)}
+            {!s.manual && <span className="muted">{t("history.automatic")}</span>}
           </strong>
-          <p>{new Date(s.created).toLocaleString()}</p>
+          <p>{new Date(s.created).toLocaleString(locale === "zh" ? "zh-CN" : "en")}</p>
           <button type="button" onClick={() => setComparing(s)}>
-            对比
+            {t("history.compare")}
           </button>{" "}
           <button
             type="button"
             disabled={busy || ws.role !== "owner" || !file || file.binary || ws.status !== "saved"}
             onClick={() => {
-              if (
-                !file ||
-                !confirm(`把 ${file.path} 恢复到这个版本？其他人的当前编辑也会看到恢复结果。`)
-              )
-                return;
+              if (!file || !confirm(t("history.restoreConfirm", { path: file.path }))) return;
               run(async () => {
                 await api(`${prefix}/snapshots/${s.id}/restore`, {
                   file: file.id,
@@ -67,7 +74,7 @@ export function HistoryTab({ ws, snapshots }: { ws: WorkspaceContext; snapshots:
               });
             }}
           >
-            恢复当前文件
+            {t("history.restore")}
           </button>
         </article>
       ))}

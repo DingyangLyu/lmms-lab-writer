@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import type { Locale } from "@lmms-lab/i18n";
 import { diffChars } from "diff";
 import * as decoding from "lib0/decoding";
 import { WebSocket, WebSocketServer } from "ws";
@@ -13,6 +14,7 @@ import {
 import * as Y from "yjs";
 import { allowedOrigin, bearer, userFor } from "./auth";
 import { type Sql, sql } from "./db";
+import { requestLocale, say } from "./messages";
 import type { Store, User } from "./store";
 import { fail, HttpError } from "./util";
 
@@ -26,6 +28,8 @@ type Peer = {
   sync: boolean;
   rooms: Map<string, Room>;
   clients: Set<number>;
+  /** Wording of errors and close reasons for this client (`?locale=en`). */
+  locale: Locale;
   authenticate: () => Promise<void>;
 };
 /** The project file limit, so one sync socket can follow every document. */
@@ -68,6 +72,14 @@ const send = (socket: WebSocket, message: unknown) => {
 };
 const roomKey = (project: string, file: string) => `${project}:${file}`;
 const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
+/** Close reasons are limited to 123 bytes. */
+const closeWith = (peer: Pick<Peer, "socket" | "locale">, code: number, reason: string) => {
+  let text = say(peer.locale, reason);
+  while (Buffer.byteLength(text) > 123) text = text.slice(0, -1);
+  peer.socket.close(code, text);
+};
+const wording = (locale: Locale, error: unknown, fallback: string) =>
+  error instanceof HttpError ? say(locale, error.template, error.params) : say(locale, fallback);
 const logFailure = (what: string) => (error: unknown) =>
   console.error(`Writer ${what} failed:`, error instanceof Error ? error.message : error);
 
@@ -89,7 +101,7 @@ export class Collaboration {
   ) {
     this.sweep = setInterval(() => {
       for (const peer of this.peers)
-        void peer.authenticate().catch(() => peer.socket.close(1008, "登录或项目权限已失效"));
+        void peer.authenticate().catch(() => closeWith(peer, 1008, "登录或项目权限已失效"));
     }, 30000);
     this.sweep.unref();
   }
@@ -217,7 +229,8 @@ export class Collaboration {
     if (user.mustChange) fail(403, "请先修改临时密码");
     const role = await this.store.require(project, user.id);
     const file = url.searchParams.get("file"),
-      sync = url.searchParams.get("sync") === "1";
+      sync = url.searchParams.get("sync") === "1",
+      locale: Locale = url.searchParams.get("locale") === "en" ? "en" : requestLocale(req.headers);
     if (sync && file) fail(400, "同步连接不指定文件");
     if (this.peers.size >= 128 || [...this.peers].filter((p) => p.user.id === user.id).length >= 16)
       fail(429, "同时连接数量达到上限");
@@ -234,6 +247,7 @@ export class Collaboration {
       sync,
       rooms: new Map(),
       clients: new Set(),
+      locale,
       authenticate: async () => {
         const live = await userFor(this.store, req);
         await this.store.require(project, live.id);
@@ -253,7 +267,7 @@ export class Collaboration {
       void ready
         .then(() => this.message(peer, req, raw.toString()))
         .catch((e) => {
-          send(ws, { type: "error", message: e instanceof Error ? e.message : "同步失败" });
+          send(ws, { type: "error", message: wording(locale, e, "同步失败") });
           ws.close(1008);
         });
     });
@@ -292,7 +306,7 @@ export class Collaboration {
           sync,
         });
     } catch (e) {
-      ws.close(1008, e instanceof Error ? e.message : "文档不可用");
+      closeWith(peer, 1008, e instanceof HttpError ? e.template : "文档不可用");
       return;
     }
     this.peers.add(peer);
@@ -383,7 +397,7 @@ export class Collaboration {
         file,
         id: typeof msg.id === "string" ? msg.id : undefined,
         status: error.status,
-        message: error.message,
+        message: wording(peer.locale, error, "同步失败"),
       });
     }
   }
@@ -431,16 +445,16 @@ export class Collaboration {
   }
   revoke(project: string, user: string) {
     for (const p of this.peers)
-      if (p.project === project && p.user.id === user) p.socket.close(1008, "项目权限已变更");
+      if (p.project === project && p.user.id === user) closeWith(p, 1008, "项目权限已变更");
   }
   /** Close code 4001 asks clients to reconnect, picking up a changed role. */
   refreshMember(project: string, user: string) {
     for (const p of this.peers)
-      if (p.project === project && p.user.id === user) p.socket.close(4001, "权限已更新");
+      if (p.project === project && p.user.id === user) closeWith(p, 4001, "权限已更新");
   }
   /** Close all editors of a project and wait until their rooms are released. */
   async closeProject(project: string, reason: string) {
-    for (const p of this.peers) if (p.project === project) p.socket.close(1008, reason);
+    for (const p of this.peers) if (p.project === project) closeWith(p, 1008, reason);
     for (const room of [...this.rooms.values()].filter((r) => r.project === project)) {
       for (const peer of room.peers) peer.socket.terminate();
       room.peers.clear();
@@ -449,14 +463,14 @@ export class Collaboration {
   }
   /** Close every connection of an account (logout, password change, removal). */
   disconnectUser(user: string, reason: string) {
-    for (const p of this.peers) if (p.user.id === user) p.socket.close(1008, reason);
+    for (const p of this.peers) if (p.user.id === user) closeWith(p, 1008, reason);
   }
   closeFile(file: string, reason: string) {
     for (const p of this.peers) {
       const room = p.rooms.get(file);
-      if (p.file === file) p.socket.close(1008, reason);
+      if (p.file === file) closeWith(p, 1008, reason);
       else if (p.sync && room) {
-        send(p.socket, { type: "closed", file, reason });
+        send(p.socket, { type: "closed", file, reason: say(p.locale, reason) });
         this.leave(p, room);
       }
     }

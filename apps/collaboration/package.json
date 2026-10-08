@@ -21,6 +21,7 @@
     "@codemirror/view": "^6.43.0",
     "@electric-sql/pglite": "^0.5.8",
     "@lezer/highlight": "^1.2.3",
+    "@lmms-lab/i18n": "workspace:*",
     "@lmms-lab/latex-editor": "workspace:*",
     "@lmms-lab/sync": "workspace:*",
     "@lmms-lab/writing": "workspace:*",

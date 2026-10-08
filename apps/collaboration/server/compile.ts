@@ -114,7 +114,8 @@ export class Compiler {
     this.running.add(project);
     try {
       const files = await this.store.projectFiles(project);
-      if (!files.some((f) => f.path === main && !f.binary)) fail(404, `项目中没有 ${main}`);
+      if (!files.some((f) => f.path === main && !f.binary))
+        fail(404, "项目中没有 {main}", { main });
       await this.slot();
       try {
         return await this.build(project, author, main, engine, files);

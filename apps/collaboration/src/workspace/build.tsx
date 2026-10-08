@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Build, Engine, PdfRegion, SourceFile, SourceLocation } from "../../shared/api";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import { PdfViewer } from "../pdf-viewer";
 import type { WorkspaceContext } from "./context";
 
@@ -13,6 +14,7 @@ const needsXeLaTeX = (sources: SourceFile[]) =>
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
 export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: SourceFile[]) {
+  const { t } = useI18n();
   const [build, setBuild] = useState<Build | null>(null),
     [compiling, setCompiling] = useState(false),
     [open, setOpen] = useState(true),
@@ -36,7 +38,7 @@ export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: So
   const openLocation = (path: string, line: number) => {
     const target = files.find((f) => f.path === path);
     if (!target) {
-      ws.report(`项目中没有 ${path}`);
+      ws.report(t("build.missingFile", { path }));
       return;
     }
     if (file?.id === target.id) editor.current?.reveal(line);
@@ -53,7 +55,7 @@ export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: So
   }, [reveal, file, status, editor]);
   const compile = () =>
     ws.run(async () => {
-      if (!chosenMain) throw new Error("项目里还没有 .tex 文件");
+      if (!chosenMain) throw new Error(t("build.noTex"));
       setCompiling(true);
       try {
         setBuild(
@@ -105,10 +107,11 @@ export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: So
 export type BuildState = ReturnType<typeof useBuild>;
 
 export function BuildControls({ ws, b }: { ws: WorkspaceContext; b: BuildState }) {
+  const { t } = useI18n();
   return (
     <div className="row compile-controls">
       <select
-        aria-label="编译主文件"
+        aria-label={t("build.main")}
         value={b.chosenMain}
         onChange={(e) => b.setMain(e.target.value)}
       >
@@ -119,7 +122,7 @@ export function BuildControls({ ws, b }: { ws: WorkspaceContext; b: BuildState }
         ))}
       </select>
       <select
-        aria-label="编译器"
+        aria-label={t("build.engine")}
         value={b.chosenEngine}
         onChange={(e) => b.setEngine(e.target.value as Engine)}
       >
@@ -131,17 +134,17 @@ export function BuildControls({ ws, b }: { ws: WorkspaceContext; b: BuildState }
         type="button"
         className="primary"
         disabled={!ws.canComment || b.compiling || !b.texFiles.length || ws.status === "saving"}
-        title={ws.status === "saving" ? "等待正文同步完成" : "在服务器上编译"}
+        title={ws.status === "saving" ? t("build.waitSync") : t("build.onServer")}
         onClick={b.compile}
       >
-        {b.compiling ? "编译中…" : "编译"}
+        {b.compiling ? t("build.compiling") : t("build.compile")}
       </button>
       <button type="button" onClick={() => b.setOpen(!b.open)}>
-        {b.open ? "隐藏 PDF" : "显示 PDF"}
+        {b.open ? t("build.hidePdf") : t("build.showPdf")}
       </button>
       {b.build?.pdf && ws.file && !ws.file.binary && (
-        <button type="button" title="跳到光标所在行在 PDF 中的位置" onClick={b.showCursorInPdf}>
-          定位到 PDF
+        <button type="button" title={t("build.forwardTitle")} onClick={b.showCursorInPdf}>
+          {t("build.forward")}
         </button>
       )}
     </div>
@@ -149,32 +152,34 @@ export function BuildControls({ ws, b }: { ws: WorkspaceContext; b: BuildState }
 }
 
 export function BuildPane({ prefix, b }: { prefix: string; b: BuildState }) {
+  const { t, locale } = useI18n();
   const { build } = b;
   const errors = build?.issues.filter((i) => i.level === "error") ?? [],
     warnings = build?.issues.filter((i) => i.level === "warning") ?? [];
   return (
-    <aside className="pdf-pane" aria-label="PDF 预览">
+    <aside className="pdf-pane" aria-label={t("build.preview")}>
       <div className="build-status">
         {b.compiling ? (
-          <span>正在服务器上编译…</span>
+          <span>{t("build.running")}</span>
         ) : build ? (
           <span className={build.status === "success" ? "ok" : "failed"}>
-            {build.status === "success" ? "编译成功" : "编译有错误"} · {build.main} ·{" "}
-            {(build.duration / 1000).toFixed(1)} 秒 · {new Date(build.created).toLocaleTimeString()}
+            {build.status === "success" ? t("build.success") : t("build.failed")} · {build.main} ·{" "}
+            {t("build.seconds", { seconds: (build.duration / 1000).toFixed(1) })} ·{" "}
+            {new Date(build.created).toLocaleTimeString(locale === "zh" ? "zh-CN" : "en")}
           </span>
         ) : (
-          <span className="muted">还没有编译结果，点击“编译”。</span>
+          <span className="muted">{t("build.none")}</span>
         )}
         {build?.pdf && (
           <a href={`/api${prefix}/builds/${build.id}/pdf`} download="output.pdf">
-            下载 PDF
+            {t("build.download")}
           </a>
         )}
       </div>
       {!!build?.issues.length && (
         <details className="build-issues" open={!!errors.length}>
           <summary>
-            {errors.length} 个错误 · {warnings.length} 个警告
+            {t("build.issues", { errors: errors.length, warnings: warnings.length })}
           </summary>
           {[...errors, ...warnings].map((issue, i) => (
             <button
@@ -198,11 +203,11 @@ export function BuildPane({ prefix, b }: { prefix: string; b: BuildState }) {
           onInverse={b.showPdfInSource}
         />
       ) : (
-        build && <p className="muted pdf-empty">这次编译没有生成 PDF，请根据错误或日志修改。</p>
+        build && <p className="muted pdf-empty">{t("build.noPdf")}</p>
       )}
       {build && (
         <details className="build-log">
-          <summary>完整日志</summary>
+          <summary>{t("build.log")}</summary>
           <pre>{build.log}</pre>
         </details>
       )}

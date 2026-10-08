@@ -720,3 +720,11 @@ button.danger:hover:not(:disabled) {
   color: #71818d;
   background: #f6f8fa;
 }
+.row.spread {
+  justify-content: space-between;
+}
+.language-switch {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}

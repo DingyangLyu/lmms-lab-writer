@@ -1,6 +1,15 @@
 import { useState } from "react";
 import type { Role, SharedJob } from "../shared/api";
 import { api } from "./api";
+import { type MessageKey, useI18n } from "./i18n";
+
+const STATUS: Record<string, MessageKey> = {
+  queued: "tasks.status.queued",
+  running: "tasks.status.running",
+  completed: "tasks.status.completed",
+  failed: "tasks.status.failed",
+  cancelled: "tasks.status.cancelled",
+};
 export function TasksPanel({
   project,
   role,
@@ -16,6 +25,7 @@ export function TasksPanel({
   reload: () => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const [harness, setHarness] = useState("codex"),
     [prompt, setPrompt] = useState(""),
     [busy, setBusy] = useState(false),
@@ -34,13 +44,10 @@ export function TasksPanel({
   };
   return (
     <>
-      <h2>共享任务</h2>
-      <p className="muted">
-        任务使用提交时的项目快照，AI 输出进入“审阅”；编译 PDF
-        作为新产物保存。执行器断线会报告失败，不会覆盖正文。
-      </p>
+      <h2>{t("tasks.title")}</h2>
+      <p className="muted">{t("tasks.lead")}</p>
       <select
-        aria-label="任务执行环境"
+        aria-label={t("tasks.harness")}
         value={harness}
         onChange={(e) => {
           setHarness(e.target.value);
@@ -51,16 +58,18 @@ export function TasksPanel({
         <option value="codex">Codex</option>
         <option value="claude">Claude Code</option>
         <option value="opencode">OpenCode</option>
-        <option value="compile:xelatex">编译 · XeLaTeX</option>
-        <option value="compile:pdflatex">编译 · pdfLaTeX</option>
-        <option value="compile:lualatex">编译 · LuaLaTeX</option>
+        <option value="compile:xelatex">{t("tasks.compile", { engine: "XeLaTeX" })}</option>
+        <option value="compile:pdflatex">{t("tasks.compile", { engine: "pdfLaTeX" })}</option>
+        <option value="compile:lualatex">{t("tasks.compile", { engine: "LuaLaTeX" })}</option>
       </select>
       <textarea
-        aria-label="共享任务要求"
+        aria-label={t("tasks.prompt")}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         placeholder={
-          harness.startsWith("compile:") ? "主文件相对路径，例如 main.tex" : "描述需要修改的内容…"
+          harness.startsWith("compile:")
+            ? t("tasks.compilePlaceholder")
+            : t("tasks.promptPlaceholder")
         }
       />
       <button
@@ -74,42 +83,38 @@ export function TasksPanel({
           })
         }
       >
-        加入共享任务队列
+        {t("tasks.submit")}
       </button>
       {role === "owner" && (
         <details className="runner">
-          <summary>连接本机执行器</summary>
-          <p className="muted">
-            为此项目创建能力受限的令牌。编译使用隔离 Docker 容器；AI 由你自己的本机 CLI
-            执行，仅为可信合作者启用。登录凭据不上传到服务端。
-          </p>
+          <summary>{t("tasks.runner")}</summary>
+          <p className="muted">{t("tasks.runnerLead")}</p>
+          <p className="muted">{t("tasks.runnerDesktop")}</p>
           <button
             type="button"
             disabled={busy}
             onClick={() =>
               void run(async () => {
                 const result = await api<{ token: string }>(`${prefix}/runners`, {
-                  name: "本机执行器",
+                  name: t("tasks.runnerName"),
                   capabilities: [harness.startsWith("compile:") ? "compile" : harness],
                 });
                 setToken(result.token);
               })
             }
           >
-            创建当前能力的执行器令牌
+            {t("tasks.createToken")}
           </button>
           {token && (
             <>
               <label>
-                令牌（仅显示本次）
-                <input aria-label="执行器令牌" type="password" readOnly value={token} />
+                {t("tasks.token")}
+                <input aria-label={t("tasks.tokenLabel")} type="password" readOnly value={token} />
               </label>
               <button type="button" onClick={() => void navigator.clipboard.writeText(token)}>
-                复制令牌
+                {t("tasks.copyToken")}
               </button>
-              <p className="muted">
-                按部署说明设置 WRITER_RUNNER_TOKEN，然后启动 runner。不要把此令牌发给其他人。
-              </p>
+              <p className="muted">{t("tasks.tokenHint")}</p>
             </>
           )}
         </details>
@@ -117,20 +122,15 @@ export function TasksPanel({
       {jobs.map((j) => (
         <article className="snapshot" key={j.id}>
           <strong>
-            {j.harness} ·{" "}
-            {{
-              queued: "排队中",
-              running: "执行中",
-              completed: "已完成",
-              failed: "失败",
-              cancelled: "已取消",
-            }[j.status] || j.status}
+            {j.harness} · {STATUS[j.status] ? t(STATUS[j.status] as MessageKey) : j.status}
           </strong>
           <p>{j.prompt}</p>
-          <p className="muted">{new Date(j.created).toLocaleString()}</p>
+          <p className="muted">
+            {new Date(j.created).toLocaleString(locale === "zh" ? "zh-CN" : "en")}
+          </p>
           {j.result && (
             <details>
-              <summary>结果 / 日志</summary>
+              <summary>{t("tasks.result")}</summary>
               <pre>{j.result}</pre>
             </details>
           )}
@@ -145,7 +145,7 @@ export function TasksPanel({
                 })
               }
             >
-              取消任务
+              {t("tasks.cancel")}
             </button>
           )}
         </article>

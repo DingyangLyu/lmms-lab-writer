@@ -1,11 +1,13 @@
+import { isTextPath } from "@lmms-lab/sync";
 import { type ChangeEvent, useEffect, useRef } from "react";
 import { api, base64 } from "../api";
+import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
-const TEXT = ["tex", "bib", "md", "txt", "sty", "cls", "bst", "csv", "json", "py", "yaml", "yml"];
 const SKIPPED = ["node_modules", "target", "build", "dist"];
 
 export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberCount: number }) {
+  const { t } = useI18n();
   const imports = useRef<HTMLInputElement>(null),
     folder = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -20,9 +22,9 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
         let path = input.webkitRelativePath || input.name;
         if (input.webkitRelativePath) path = path.split("/").slice(1).join("/");
         if (path.split("/").some((p) => p.startsWith(".") || SKIPPED.includes(p))) continue;
-        const text = TEXT.includes(path.split(".").pop()?.toLowerCase() || "");
+        const text = isTextPath(path);
         if (input.size > (text ? 2_000_000 : 10_000_000))
-          throw new Error(`${path} 太大，已导入 ${count} 个文件。`);
+          throw new Error(t("files.tooLarge", { path, count }));
         await api(`${prefix}/files`, {
           path,
           ...(text
@@ -32,7 +34,7 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
         count++;
       }
       await reload();
-      ws.notify(`已导入 ${count} 个文件。`);
+      ws.notify(t("files.imported", { count }));
     });
   const picked = (e: ChangeEvent<HTMLInputElement>) => {
     upload(e.target.files);
@@ -40,19 +42,19 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
   };
   return (
     <aside className="file-sidebar">
-      <div className="pane-heading">项目文件</div>
+      <div className="pane-heading">{t("files.title")}</div>
       <div className="file-actions">
         <button type="button" disabled={!canEdit || busy} onClick={() => imports.current?.click()}>
-          上传文件
+          {t("files.upload")}
         </button>
         <button type="button" disabled={!canEdit || busy} onClick={() => folder.current?.click()}>
-          导入文件夹
+          {t("files.importFolder")}
         </button>
         <button
           type="button"
           disabled={!canEdit || busy}
           onClick={() => {
-            const path = prompt("新文件相对路径，例如 main.tex");
+            const path = prompt(t("files.newPrompt"));
             if (path)
               run(async () => {
                 await api(`${prefix}/files`, { path, content: "" });
@@ -60,7 +62,7 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
               });
           }}
         >
-          新建
+          {t("files.new")}
         </button>
       </div>
       <input ref={imports} type="file" multiple hidden onChange={picked} />
@@ -75,14 +77,11 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
               <span className="file-actions-inline">
                 <button
                   type="button"
-                  title="重命名或移动"
-                  aria-label={`重命名 ${f.path}`}
+                  title={t("files.renameTitle")}
+                  aria-label={t("files.renameLabel", { path: f.path })}
                   disabled={busy}
                   onClick={() => {
-                    const next = prompt(
-                      "新的相对路径（可含文件夹，例如 sections/intro.tex）",
-                      f.path,
-                    );
+                    const next = prompt(t("files.renamePrompt"), f.path);
                     if (next && next !== f.path)
                       run(async () => {
                         await api(`${prefix}/files/${f.id}`, { path: next.trim() }, "PATCH");
@@ -94,11 +93,11 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
                 </button>
                 <button
                   type="button"
-                  title="删除"
-                  aria-label={`删除 ${f.path}`}
+                  title={t("files.deleteTitle")}
+                  aria-label={t("files.deleteLabel", { path: f.path })}
                   disabled={busy}
                   onClick={() => {
-                    if (confirm(`删除 ${f.path}？删除前会自动保存一个项目版本。`))
+                    if (confirm(t("files.deleteConfirm", { path: f.path })))
                       run(async () => {
                         await api(`${prefix}/files/${f.id}`, {}, "DELETE");
                         await reload();
@@ -113,7 +112,7 @@ export function FileSidebar({ ws, memberCount }: { ws: WorkspaceContext; memberC
         ))}
       </nav>
       <p className="muted sidebar-foot">
-        {files.length} 个文件 · {memberCount} 位成员
+        {t("files.footer", { files: files.length, members: memberCount })}
       </p>
     </aside>
   );

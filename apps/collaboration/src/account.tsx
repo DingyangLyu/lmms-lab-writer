@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Account, IssuedPassword } from "../shared/api";
 import { api } from "./api";
+import { useI18n } from "./i18n";
 
 export function ChangePassword({
   forced,
@@ -11,6 +12,7 @@ export function ChangePassword({
   onDone: () => void;
   onCancel?: () => void;
 }) {
+  const { t } = useI18n();
   const [current, setCurrent] = useState(""),
     [next, setNext] = useState(""),
     [again, setAgain] = useState(""),
@@ -22,7 +24,7 @@ export function ChangePassword({
       onSubmit={(e) => {
         e.preventDefault();
         if (next !== again) {
-          setError("两次输入的新密码不一致");
+          setError(t("account.mismatch"));
           return;
         }
         setBusy(true);
@@ -33,10 +35,10 @@ export function ChangePassword({
           .finally(() => setBusy(false));
       }}
     >
-      <h2>{forced ? "请先设置自己的密码" : "修改密码"}</h2>
-      {forced && <p className="muted">管理员给你的是临时密码，设置新密码后才能继续使用。</p>}
+      <h2>{forced ? t("account.forcedTitle") : t("account.title")}</h2>
+      {forced && <p className="muted">{t("account.forcedLead")}</p>}
       <label>
-        {forced ? "临时密码" : "当前密码"}
+        {forced ? t("account.temporary") : t("account.current")}
         <input
           type="password"
           autoComplete="current-password"
@@ -46,7 +48,7 @@ export function ChangePassword({
         />
       </label>
       <label>
-        新密码（至少 12 位）
+        {t("account.new")}
         <input
           type="password"
           autoComplete="new-password"
@@ -57,7 +59,7 @@ export function ChangePassword({
         />
       </label>
       <label>
-        再次输入新密码
+        {t("account.repeat")}
         <input
           type="password"
           autoComplete="new-password"
@@ -74,20 +76,21 @@ export function ChangePassword({
       )}
       <div className="row">
         <button className="primary" type="submit" disabled={busy}>
-          {busy ? "保存中…" : "保存新密码"}
+          {busy ? t("account.saving") : t("account.save")}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel}>
-            取消
+            {t("common.cancel")}
           </button>
         )}
       </div>
-      <p className="muted">修改后，你在其他设备上的登录会退出。</p>
+      <p className="muted">{t("account.signOutOthers")}</p>
     </form>
   );
 }
 
 export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
+  const { t } = useI18n();
   const [users, setUsers] = useState<Account[]>([]),
     [name, setName] = useState(""),
     [admin, setAdmin] = useState(false),
@@ -111,10 +114,10 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
       <header>
         <div>
           <span className="eyebrow">WRITER / ADMIN</span>
-          <h1>用户管理</h1>
+          <h1>{t("admin.title")}</h1>
         </div>
         <button type="button" onClick={onBack}>
-          ← 返回项目
+          {t("admin.back")}
         </button>
       </header>
       <form
@@ -133,26 +136,26 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
         }}
       >
         <input
-          aria-label="新用户名"
-          placeholder="新用户名"
+          aria-label={t("admin.newUser")}
+          placeholder={t("admin.newUser")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
         />
         <label className="row">
           <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
-          管理员
+          {t("admin.isAdmin")}
         </label>
         <button className="primary" type="submit" disabled={busy}>
-          创建账号
+          {t("admin.create")}
         </button>
       </form>
       {issued && (
         <div className="banner" role="status">
-          {issued.username} 的临时密码：<code>{issued.password}</code>
-          （只显示这一次，首次登录后需修改）
+          {t("admin.issued", { name: issued.username })} <code>{issued.password}</code>
+          {t("admin.issuedNote")}
           <button type="button" onClick={() => void navigator.clipboard.writeText(issued.password)}>
-            复制
+            {t("admin.copy")}
           </button>
           <button type="button" onClick={() => setIssued(null)}>
             ×
@@ -167,33 +170,39 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
       <table className="admin-users">
         <thead>
           <tr>
-            <th>用户名</th>
-            <th>身份</th>
-            <th>状态</th>
-            <th>项目</th>
-            <th>操作</th>
+            <th>{t("admin.col.username")}</th>
+            <th>{t("admin.col.kind")}</th>
+            <th>{t("admin.col.state")}</th>
+            <th>{t("admin.col.projects")}</th>
+            <th>{t("admin.col.actions")}</th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id} className={u.disabled ? "muted" : ""}>
               <td>{u.username}</td>
-              <td>{u.admin ? "管理员" : "成员"}</td>
-              <td>{u.disabled ? "已停用" : u.mustChange ? "待改临时密码" : "正常"}</td>
+              <td>{u.admin ? t("admin.kind.admin") : t("admin.kind.member")}</td>
+              <td>
+                {u.disabled
+                  ? t("admin.state.disabled")
+                  : u.mustChange
+                    ? t("admin.state.mustChange")
+                    : t("admin.state.active")}
+              </td>
               <td>{u.projects}</td>
               <td className="row">
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => {
-                    if (confirm(`重置 ${u.username} 的密码？对方会被强制退出登录。`))
+                    if (confirm(t("admin.resetConfirm", { name: u.username })))
                       run(async () => {
                         const r = await api<{ password: string }>(`/admin/users/${u.id}/reset`, {});
                         setIssued({ username: u.username, password: r.password });
                       });
                   }}
                 >
-                  重置密码
+                  {t("admin.reset")}
                 </button>
                 {u.id !== me && (
                   <>
@@ -206,19 +215,19 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
                         })
                       }
                     >
-                      {u.admin ? "取消管理员" : "设为管理员"}
+                      {u.admin ? t("admin.revokeAdmin") : t("admin.makeAdmin")}
                     </button>
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => {
-                        if (u.disabled || confirm(`停用 ${u.username}？对方将无法登录。`))
+                        if (u.disabled || confirm(t("admin.disableConfirm", { name: u.username })))
                           run(async () => {
                             await api(`/admin/users/${u.id}`, { disabled: !u.disabled }, "PATCH");
                           });
                       }}
                     >
-                      {u.disabled ? "启用" : "停用"}
+                      {u.disabled ? t("admin.enable") : t("admin.disable")}
                     </button>
                   </>
                 )}

@@ -11,6 +11,7 @@ import type {
   SourceFile,
 } from "../../shared/api";
 import { api } from "../api";
+import { i18n } from "../i18n";
 
 /**
  * Everything the workspace shows about a project, reloaded whenever the server reports a
@@ -92,7 +93,7 @@ export function useProject(
         if (!stopped && e.code !== 1008) retry = setTimeout(connect, 1500);
         else if (!stopped) {
           onRole("viewer");
-          onError("项目权限已变更，请返回项目列表重新进入。");
+          onError(i18n.t("project.roleChanged"));
         }
       };
     };

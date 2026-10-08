@@ -2,6 +2,7 @@ import { citations, displayBib, normalizeDoi, parseBib } from "@lmms-lab/writing
 import { useEffect, useState } from "react";
 import type { BibliographyImport, FileContent, SourceFile } from "../../shared/api";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
 export function BibliographyTab({
@@ -13,6 +14,7 @@ export function BibliographyTab({
   sources: SourceFile[];
   refreshSources: () => Promise<SourceFile[]>;
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState(""),
     [doi, setDoi] = useState(""),
     [bib, setBib] = useState(""),
@@ -29,16 +31,16 @@ export function BibliographyTab({
     .flatMap((f) => parseBib(f.content).entries.map((e) => ({ ...e, file: f.id })));
   return (
     <>
-      <h2>项目文献库</h2>
+      <h2>{t("bib.title")}</h2>
       <input
-        aria-label="搜索文献"
+        aria-label={t("bib.search")}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="标题、作者、引用键"
+        placeholder={t("bib.searchPlaceholder")}
       />
       <div className="row">
         <input
-          aria-label="查询 DOI"
+          aria-label={t("bib.doi")}
           value={doi}
           onChange={(e) => setDoi(e.target.value)}
           placeholder="DOI"
@@ -55,11 +57,15 @@ export function BibliographyTab({
             })
           }
         >
-          查询
+          {t("bib.lookup")}
         </button>
       </div>
-      <select aria-label="目标文献库" value={bibFile} onChange={(e) => setBibFile(e.target.value)}>
-        <option value="">选择 .bib 文件</option>
+      <select
+        aria-label={t("bib.target")}
+        value={bibFile}
+        onChange={(e) => setBibFile(e.target.value)}
+      >
+        <option value="">{t("bib.choose")}</option>
         {sources
           .filter((f) => f.path.endsWith(".bib"))
           .map((f) => (
@@ -69,10 +75,10 @@ export function BibliographyTab({
           ))}
       </select>
       <textarea
-        aria-label="导入 BibTeX"
+        aria-label={t("bib.import")}
         value={bib}
         onChange={(e) => setBib(e.target.value)}
-        placeholder="粘贴 BibTeX（也可由 Zotero 导出）"
+        placeholder={t("bib.importPlaceholder")}
       />
       <button
         type="button"
@@ -87,18 +93,17 @@ export function BibliographyTab({
             });
             const renamed = Object.entries(result.renamed ?? {})
               .map(([from, to]) => `${from}→${to}`)
-              .join("，");
+              .join(t("bib.listSeparator"));
             ws.notify(
-              `导入 ${result.added} 条，跳过 ${result.skipped.length} 条重复文献${
-                renamed ? `；引用键冲突已改名：${renamed}` : ""
-              }`,
+              t("bib.imported", { added: result.added, skipped: result.skipped.length }) +
+                (renamed ? t("bib.renamedKeys", { list: renamed }) : ""),
             );
             setBib("");
             await refreshSources();
           })
         }
       >
-        导入并去重
+        {t("bib.importButton")}
       </button>
       {entries
         .filter((e) => JSON.stringify(e).toLowerCase().includes(search.toLowerCase()))
@@ -118,20 +123,20 @@ export function BibliographyTab({
                 {d.authors} · {d.year}
               </p>
               <code>{e.key}</code>
-              <p>{locations.length} 处引用</p>
+              <p>{t("bib.citedTimes", { count: locations.length })}</p>
               <div className="row">
                 <button
                   type="button"
                   disabled={!canEdit || !!ws.file?.binary}
                   onClick={() => ws.editor.current?.insert(`\\cite{${e.key}}`)}
                 >
-                  插入引用
+                  {t("bib.insert")}
                 </button>
                 <button
                   type="button"
                   disabled={!canEdit || busy}
                   onClick={() => {
-                    const to = prompt("新引用键", e.key);
+                    const to = prompt(t("bib.renamePrompt"), e.key);
                     if (to && to !== e.key)
                       run(async () => {
                         await api(`${prefix}/bibliography/rename`, { from: e.key, to });
@@ -139,11 +144,11 @@ export function BibliographyTab({
                       });
                   }}
                 >
-                  重命名键
+                  {t("bib.rename")}
                 </button>
               </div>
               <details>
-                <summary>引用位置</summary>
+                <summary>{t("bib.locations")}</summary>
                 {locations.map((c) => (
                   <p key={`${c.file}:${c.from}`}>
                     {c.file}:{c.line}

@@ -2,15 +2,12 @@ import { diffLines } from "diff";
 import { useEffect, useState } from "react";
 import type { Snapshot, SnapshotChange } from "../shared/api";
 import { api } from "./api";
+import { useI18n } from "./i18n";
+import { useSnapshotLabel } from "./workspace/history-tab";
 
 type Change = SnapshotChange;
-const statusName: Record<Change["status"], string> = {
-  added: "新增",
-  removed: "已删除",
-  changed: "有修改",
-  renamed: "改名",
-};
-type Row = { kind: "same" | "add" | "remove" | "skip"; text: string };
+/** `skipped` counts the unchanged lines a folded row stands for. */
+type Row = { kind: "same" | "add" | "remove" | "skip"; text: string; skipped?: number };
 
 /** Unified diff with long unchanged stretches folded to three lines of context. */
 export function diffRows(before: string, after: string): Row[] {
@@ -20,7 +17,7 @@ export function diffRows(before: string, after: string): Row[] {
     const kind: Row["kind"] = part.added ? "add" : part.removed ? "remove" : "same";
     if (kind === "same" && lines.length > 7) {
       rows.push(...lines.slice(0, 3).map((text) => ({ kind, text })));
-      rows.push({ kind: "skip", text: `… ${lines.length - 6} 行未改动 …` });
+      rows.push({ kind: "skip", text: "", skipped: lines.length - 6 });
       rows.push(...lines.slice(-3).map((text) => ({ kind, text })));
     } else rows.push(...lines.map((text) => ({ kind, text })));
   }
@@ -36,6 +33,8 @@ export function SnapshotCompare({
   snapshot: Pick<Snapshot, "id" | "label" | "created">;
   onClose: () => void;
 }) {
+  const { t, locale } = useI18n();
+  const snapshotLabel = useSnapshotLabel();
   const [changes, setChanges] = useState<Change[] | null>(null),
     [selected, setSelected] = useState<Change | null>(null),
     [rows, setRows] = useState<Row[] | null>(null),
@@ -71,14 +70,17 @@ export function SnapshotCompare({
     <div className="compare">
       <div className="row">
         <button type="button" onClick={onClose}>
-          ← 版本列表
+          {t("compare.back")}
         </button>
         <strong>
-          “{snapshot.label}”（{new Date(snapshot.created).toLocaleString()}）→ 现在
+          {t("compare.heading", {
+            label: snapshotLabel(snapshot.label),
+            time: new Date(snapshot.created).toLocaleString(locale === "zh" ? "zh-CN" : "en"),
+          })}
         </strong>
       </div>
       {error && <p className="error">{error}</p>}
-      {changes && !changes.length && <p className="muted">这个版本之后没有文件变化。</p>}
+      {changes && !changes.length && <p className="muted">{t("compare.none")}</p>}
       {changes?.map((c) => (
         <button
           type="button"
@@ -86,12 +88,12 @@ export function SnapshotCompare({
           className={`compare-file ${selected?.id === c.id ? "active" : ""}`}
           onClick={() => setSelected(c)}
         >
-          <span className={`compare-status ${c.status}`}>{statusName[c.status]}</span>{" "}
+          <span className={`compare-status ${c.status}`}>{t(`compare.${c.status}`)}</span>{" "}
           {c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
         </button>
       ))}
-      {selected?.binary && <p className="muted">二进制文件不能逐行对比。</p>}
-      {rows && <p className="muted">{selected?.path} 的修改（- 版本中，+ 现在）</p>}
+      {selected?.binary && <p className="muted">{t("compare.binary")}</p>}
+      {rows && <p className="muted">{t("compare.legend", { path: selected?.path ?? "" })}</p>}
       {rows && (
         <pre className="diff">
           {rows.map((row, i) => (
@@ -101,7 +103,7 @@ export function SnapshotCompare({
               className={`diff-${row.kind}`}
             >
               {row.kind === "add" ? "+ " : row.kind === "remove" ? "- " : "  "}
-              {row.text}
+              {row.kind === "skip" ? t("compare.skipped", { count: row.skipped ?? 0 }) : row.text}
               {"\n"}
             </span>
           ))}

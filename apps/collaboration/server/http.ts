@@ -9,11 +9,11 @@ export type Body = Record<string, unknown>;
 export const str = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
-    : fail(400, `无效字段 ${key}`);
+    : fail(400, "无效字段 {key}", { key });
 export const number = (body: Body, key: string) =>
   typeof body[key] === "number" && Number.isSafeInteger(body[key])
     ? (body[key] as number)
-    : fail(400, `无效字段 ${key}`);
+    : fail(400, "无效字段 {key}", { key });
 export function roleInput(value: string): Role {
   if (!roles.includes(value as Role)) fail(400, "无效角色");
   return value as Role;

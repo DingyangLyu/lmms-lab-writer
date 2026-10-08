@@ -3,6 +3,7 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protoc
 import * as Y from "yjs";
 import type { PublicUser, Role } from "../shared/api";
 import { base64, unbase64 } from "./api";
+import { i18n } from "./i18n";
 export type SyncStatus = "connecting" | "saved" | "saving" | "offline" | "denied";
 /** The fields of a signed-in user the editor needs. */
 export type Person = Pick<PublicUser, "id" | "name">;
@@ -51,7 +52,7 @@ export class WriterProvider {
     void this.cache.whenSynced
       .then(() => this.connect())
       .catch((e) => {
-        this.error(`本机离线草稿保存不可用：${String(e)}`);
+        this.error(i18n.t("sync.draftUnavailable", { error: String(e) }));
         this.connect();
       });
   }
@@ -107,7 +108,7 @@ export class WriterProvider {
     this.status("connecting");
     this.ready = false;
     const socket = new WebSocket(
-      `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/projects/${this.project}/socket?file=${this.file}`,
+      `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/projects/${this.project}/socket?file=${this.file}&locale=${i18n.getLocale()}`,
     );
     this.socket = socket;
     socket.onmessage = (event) => {
@@ -126,7 +127,7 @@ export class WriterProvider {
           if (local.length > 2 && this.editable) this.sendUpdate(local);
           else if (local.length > 2) {
             this.status("denied");
-            this.error("权限已改变，本机未同步文字仍保留，可导出恢复副本；不会覆盖服务器。");
+            this.error(i18n.t("sync.denied"));
           } else {
             this.unsynced = false;
             this.status("saved");
@@ -148,7 +149,7 @@ export class WriterProvider {
           this.role("viewer");
         }
       } catch (e) {
-        this.error(`同步数据错误：${String(e)}`);
+        this.error(i18n.t("sync.badData", { error: String(e) }));
       }
     };
     socket.onclose = (event) => {
@@ -159,7 +160,7 @@ export class WriterProvider {
         this.status("denied");
         this.editable = false;
         this.role("viewer");
-        this.error(event.reason || "连接权限失效，请重新登录；本机草稿保留。");
+        this.error(event.reason || i18n.t("sync.signedOut"));
         return;
       }
       this.status("offline");

@@ -1,6 +1,7 @@
 import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
+import { i18n } from "./i18n";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -41,7 +42,7 @@ export function PdfViewer({
         setError("");
       })
       .catch((e) => {
-        if (!disposed) setError(`PDF 无法显示：${String(e)}`);
+        if (!disposed) setError(i18n.t("pdf.failed", { error: String(e) }));
       });
     return () => {
       disposed = true;
@@ -136,7 +137,7 @@ function PdfPage({
     };
   }, [pdf, number, scale, visible]);
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: The pointer position on the rendered page is the input; keyboard users jump with the editor's "定位到 PDF" and the issue list.
+    // biome-ignore lint/a11y/noStaticElementInteractions: The pointer position on the rendered page is the input; keyboard users jump with the editor's find-in-PDF button and the issue list.
     <div
       className="pdf-page"
       data-page={number}
@@ -146,7 +147,7 @@ function PdfPage({
         const rect = e.currentTarget.getBoundingClientRect();
         onInverse(number, (e.clientX - rect.left) / scale, (e.clientY - rect.top) / scale);
       }}
-      title="双击跳到源码"
+      title={i18n.t("pdf.inverseTitle")}
     >
       <canvas ref={canvas} style={{ width: "100%", height: "100%" }} />
       {highlight && (

@@ -35,7 +35,7 @@ const PROJECT_FILES = 2000,
 const text = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
-    : fail(400, `无效字段 ${key}`);
+    : fail(400, "无效字段 {key}", { key });
 /** Runners authenticate with a project token, not a session. */
 export const runnerRoute = route<Context>(
   "POST",
@@ -162,7 +162,7 @@ async function runnerRequest({ store, collab, req }: Context, action: string, bo
     usage.count + added.length > PROJECT_FILES ||
     usage.bytes + added.reduce((n, f) => n + (f.binary?.length ?? 0), 0) > PROJECT_BYTES
   )
-    fail(413, `项目超过 ${PROJECT_FILES} 个文件或 100 MB，产物未保存`);
+    fail(413, "项目超过 {count} 个文件或 100 MB，产物未保存", { count: PROJECT_FILES });
   const ids: string[] = [];
   await store.db.transaction(async (tx) => {
     // Cancellation can race with the result; only a still-running task may complete.

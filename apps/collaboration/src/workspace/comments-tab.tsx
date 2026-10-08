@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Comment } from "../../shared/api";
 import { api } from "../api";
 import type { Selection } from "../editor";
+import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
 export function CommentsTab({
@@ -19,11 +20,12 @@ export function CommentsTab({
   draft: string;
   setDraft: (draft: string) => void;
 }) {
+  const { t } = useI18n();
   const [reply, setReply] = useState<Record<string, string>>({});
   const { prefix, file, files, busy, canComment, run, reload } = ws;
   return (
     <>
-      <h2>讨论与批注</h2>
+      <h2>{t("comments.title")}</h2>
       {selection && (
         <form
           onSubmit={(e) => {
@@ -39,10 +41,10 @@ export function CommentsTab({
         >
           <blockquote>{selection.quote}</blockquote>
           <textarea
-            aria-label="批注内容"
+            aria-label={t("comments.body")}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="提出修改建议…"
+            placeholder={t("comments.placeholder")}
             required
           />
           <div className="row">
@@ -51,10 +53,10 @@ export function CommentsTab({
               className="primary"
               disabled={busy || !canComment || ws.status !== "saved"}
             >
-              发布批注
+              {t("comments.post")}
             </button>
             <button type="button" onClick={() => setSelection(null)}>
-              收起
+              {t("comments.collapse")}
             </button>
           </div>
         </form>
@@ -66,7 +68,7 @@ export function CommentsTab({
           open={!c.resolved}
         >
           <summary>
-            <span>{c.resolved ? "✓ 已解决" : "待处理"}</span> · {c.authorName}
+            <span>{c.resolved ? t("comments.resolved") : t("comments.open")}</span> · {c.authorName}
           </summary>
           <blockquote>{c.quote}</blockquote>
           <p>{c.body}</p>
@@ -77,11 +79,11 @@ export function CommentsTab({
                 const target = files.find((f) => f.id === c.file);
                 if (target && file?.id !== target.id) {
                   ws.openFile(target);
-                  ws.notify("已打开批注文档，再点“定位”跳转。");
+                  ws.notify(t("comments.openedFile"));
                 } else ws.editor.current?.focusComment(c);
               }}
             >
-              定位
+              {t("comments.locate")}
             </button>
             <button
               type="button"
@@ -93,7 +95,7 @@ export function CommentsTab({
                 })
               }
             >
-              {c.resolved ? "重新打开" : "标为已解决"}
+              {c.resolved ? t("comments.reopen") : t("comments.resolve")}
             </button>
           </div>
           {c.replies.map((r) => (
@@ -114,14 +116,14 @@ export function CommentsTab({
               }}
             >
               <input
-                aria-label="回复批注"
+                aria-label={t("comments.replyLabel")}
                 value={reply[c.id] || ""}
                 onChange={(e) => setReply({ ...reply, [c.id]: e.target.value })}
-                placeholder="回复…"
+                placeholder={t("comments.replyPlaceholder")}
                 required
               />
               <button type="submit" disabled={busy}>
-                回复
+                {t("comments.reply")}
               </button>
             </form>
           )}

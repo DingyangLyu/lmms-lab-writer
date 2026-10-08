@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Invite, Member, Role } from "../../shared/api";
 import { api } from "../api";
-import { roleName } from "../labels";
+import { useI18n } from "../i18n";
+import { roleKey } from "../labels";
 import type { WorkspaceContext } from "./context";
 
 export function MembersTab({
@@ -13,23 +14,24 @@ export function MembersTab({
   members: Member[];
   onDeleted: () => void;
 }) {
+  const { t } = useI18n();
   const [inviteRole, setInviteRole] = useState<Role>("editor"),
     [inviteLink, setInviteLink] = useState("");
   const { prefix, project, busy, run, reload } = ws,
     owner = ws.role === "owner";
   return (
     <>
-      <h2>项目成员</h2>
+      <h2>{t("members.title")}</h2>
       {owner && (
         <>
           <select
-            aria-label="邀请角色"
+            aria-label={t("members.inviteRole")}
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as Role)}
           >
-            <option value="editor">编辑者</option>
-            <option value="commenter">批注者</option>
-            <option value="viewer">只读</option>
+            <option value="editor">{t("role.editor")}</option>
+            <option value="commenter">{t("role.commenter")}</option>
+            <option value="viewer">{t("role.viewer")}</option>
           </select>
           <button
             type="button"
@@ -40,14 +42,14 @@ export function MembersTab({
               })
             }
           >
-            生成 7 天有效的单次邀请
+            {t("members.invite")}
           </button>
           {inviteLink && (
             <label>
-              邀请链接
-              <input readOnly aria-label="邀请链接" value={inviteLink} />
+              {t("members.inviteLink")}
+              <input readOnly aria-label={t("members.inviteLink")} value={inviteLink} />
               <button type="button" onClick={() => void navigator.clipboard.writeText(inviteLink)}>
-                复制链接
+                {t("members.copyLink")}
               </button>
             </label>
           )}
@@ -58,7 +60,7 @@ export function MembersTab({
           <span>{m.username}</span>
           {owner ? (
             <select
-              aria-label={`${m.username} 的角色`}
+              aria-label={t("members.roleOf", { name: m.username })}
               value={m.role}
               disabled={busy}
               onChange={(e) => {
@@ -69,35 +71,35 @@ export function MembersTab({
                 });
               }}
             >
-              {Object.entries(roleName).map(([value, label]) => (
+              {Object.entries(roleKey).map(([value, key]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {t(key)}
                 </option>
               ))}
             </select>
           ) : (
-            <span className="muted">{roleName[m.role]}</span>
+            <span className="muted">{t(roleKey[m.role])}</span>
           )}
           {owner && m.id !== ws.user.id && (
             <button
               type="button"
               disabled={busy}
               onClick={() => {
-                if (confirm(`撤销 ${m.username} 的访问权限？`))
+                if (confirm(t("members.removeConfirm", { name: m.username })))
                   run(async () => {
                     await api(`${prefix}/members/${m.id}`, {}, "DELETE");
                     await reload();
                   });
               }}
             >
-              移除
+              {t("members.remove")}
             </button>
           )}
         </div>
       ))}
       {owner && (
         <details className="project-settings">
-          <summary>项目设置</summary>
+          <summary>{t("members.settings")}</summary>
           <form
             className="row"
             onSubmit={(e) => {
@@ -105,13 +107,18 @@ export function MembersTab({
               const next = new FormData(e.currentTarget).get("name");
               run(async () => {
                 await api(prefix, { name: next }, "PATCH");
-                ws.notify("项目已改名，返回列表后可见。");
+                ws.notify(t("members.renamed"));
               });
             }}
           >
-            <input aria-label="项目名" name="name" defaultValue={project.name} required />
+            <input
+              aria-label={t("members.name")}
+              name="name"
+              defaultValue={project.name}
+              required
+            />
             <button type="submit" disabled={busy}>
-              改名
+              {t("members.rename")}
             </button>
           </form>
           <button
@@ -119,9 +126,7 @@ export function MembersTab({
             className="danger"
             disabled={busy}
             onClick={() => {
-              const typed = prompt(
-                `删除后无法恢复，所有文件、批注和版本都会删除。请先导出项目备份。\n输入项目名“${project.name}”确认删除：`,
-              );
+              const typed = prompt(t("members.deletePrompt", { name: project.name }));
               if (typed !== null)
                 run(async () => {
                   await api(prefix, { confirm: typed }, "DELETE");
@@ -129,7 +134,7 @@ export function MembersTab({
                 });
             }}
           >
-            删除项目
+            {t("members.delete")}
           </button>
         </details>
       )}

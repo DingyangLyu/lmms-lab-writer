@@ -1,11 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, resolve } from "node:path";
+import type { Locale } from "@lmms-lab/i18n";
 import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
 import { sql } from "./db";
 import { type Authed, type Context, context, dispatch, type InProject, json } from "./http";
+import { requestLocale, say } from "./messages";
 import { adminRoutes, passwordRoute } from "./routes/accounts";
 import { bibliographyRoutes } from "./routes/bibliography";
 import { buildRoutes } from "./routes/builds";
@@ -68,18 +70,16 @@ async function serveStatic(ctx: Context, root: string) {
   });
   ctx.res.end(ctx.method === "HEAD" ? undefined : content);
 }
-function sendError(res: ServerResponse, error: unknown) {
+function sendError(res: ServerResponse, error: unknown, locale: Locale) {
   const status = error instanceof HttpError ? error.status : 500;
   if (!res.headersSent)
     json(
       res,
       {
         error:
-          status === 500
-            ? "服务操作失败，数据仍保留；请检查服务日志"
-            : error instanceof Error
-              ? error.message
-              : "操作失败",
+          error instanceof HttpError
+            ? say(locale, error.template, error.params)
+            : say(locale, "服务操作失败，数据仍保留；请检查服务日志"),
       },
       status,
     );
@@ -157,7 +157,7 @@ export async function createWriterServer(options: Options) {
       if (await dispatch(projectScoped, inProject, scope[2] ?? "")) return;
       fail(404, "接口不存在");
     } catch (error) {
-      sendError(res, error);
+      sendError(res, error, requestLocale(req.headers));
     }
   });
   server.on("upgrade", (req, socket, head) => collab.upgrade(req, socket, head));
