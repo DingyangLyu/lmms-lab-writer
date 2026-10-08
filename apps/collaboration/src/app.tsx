@@ -167,11 +167,26 @@ export function App() {
     [project, setProject] = useState<ProjectSummary | null>(null),
     [view, setView] = useState<"projects" | "admin" | "password">("projects");
   const [invite] = useState(() => new URL(location.href).searchParams.get("invite"));
+  // `/?project=<id>` opens a project directly, e.g. from the desktop app.
+  const [wanted] = useState(() => new URL(location.href).searchParams.get("project"));
   useEffect(() => {
     void api<PublicUser>("/me")
       .then(setUser)
       .catch(() => {})
       .finally(() => setReady(true));
+  }, []);
+  useEffect(() => {
+    if (!user || user.mustChange || !wanted) return;
+    void api<ProjectSummary[]>("/projects")
+      .then((list) => {
+        const found = list.find((p) => p.id === wanted);
+        if (found) setProject(found);
+      })
+      .catch(() => {});
+  }, [user, wanted]);
+  const openProject = useCallback((next: ProjectSummary | null) => {
+    setProject(next);
+    history.replaceState(null, "", next ? `/?project=${encodeURIComponent(next.id)}` : "/");
   }, []);
   const back = useCallback(() => setView("projects"), []);
   if (!ready)
@@ -195,8 +210,8 @@ export function App() {
         <ChangePassword onDone={back} onCancel={back} />
       </div>
     );
-  if (project) return <Workspace project={project} user={user} onBack={() => setProject(null)} />;
+  if (project) return <Workspace project={project} user={user} onBack={() => openProject(null)} />;
   return (
-    <Projects user={user} onOpen={setProject} onView={setView} onSignedOut={() => setUser(null)} />
+    <Projects user={user} onOpen={openProject} onView={setView} onSignedOut={() => setUser(null)} />
   );
 }

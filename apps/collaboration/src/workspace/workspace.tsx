@@ -119,6 +119,12 @@ export function Workspace({
             {file && !file.binary ? statusName[status] : "文件预览"}
           </span>
           <span className="username">{user.name}</span>
+          <a
+            href={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
+            title="用已安装的 Writer 桌面端打开，并与本地文件夹保持同步"
+          >
+            在桌面端打开
+          </a>
           <a href={`/api${prefix}/export`}>导出项目</a>
         </div>
       </header>
