@@ -96,3 +96,41 @@ export function createI18n<M extends Record<string, string>>(options: {
     t: (key: keyof M & string, params?: Params) => translate(getLocale(), key, params),
   };
 }
+
+/**
+ * Mistakes that types cannot catch in an app's dictionary modules (`{ file: exports }`, each
+ * exporting `<name>Zh`/`<name>En` pairs): a key defined in two modules, where spreading them
+ * together silently keeps one; keys missing from one language; placeholders that differ. English
+ * may add a plural-only `{count|one|other}`.
+ */
+export function dictionaryProblems(modules: Record<string, Record<string, unknown>>): string[] {
+  const problems: string[] = [];
+  const seen = new Map<string, string>();
+  const names = (text = "") => new Set([...text.matchAll(/\{(\w+)/g)].map((m) => m[1] ?? ""));
+  for (const [file, exports] of Object.entries(modules)) {
+    for (const [name, value] of Object.entries(exports)) {
+      if (!name.endsWith("Zh")) continue;
+      const zh = value as Record<string, string>;
+      const en = (exports[`${name.slice(0, -2)}En`] ?? {}) as Record<string, string>;
+      for (const key of Object.keys(en))
+        if (!(key in zh)) problems.push(`${file}: ${key} has no Chinese`);
+      for (const key of Object.keys(zh)) {
+        const other = seen.get(key);
+        if (other) problems.push(`${key} is defined in ${other} and ${file}`);
+        seen.set(key, file);
+        if (!(key in en)) {
+          problems.push(`${file}: ${key} has no English`);
+          continue;
+        }
+        const chinese = names(zh[key]);
+        const english = names(en[key]);
+        for (const holder of chinese)
+          if (!english.has(holder)) problems.push(`${key}: English lacks {${holder}}`);
+        for (const holder of english)
+          if (!chinese.has(holder) && !en[key]?.includes(`{${holder}|`))
+            problems.push(`${key}: Chinese lacks {${holder}}`);
+      }
+    }
+  }
+  return problems;
+}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createI18n, detectLocale, format } from "./index";
+import { createI18n, detectLocale, dictionaryProblems, format } from "./index";
 
 describe("detectLocale", () => {
   it("prefers the saved choice, then the first Chinese or English system language", () => {
@@ -36,5 +36,24 @@ describe("createI18n", () => {
     i18n.setLocale("zh");
     expect(store.get("test-locale")).toBe("zh");
     expect(i18n.t("hello", { name: "Ada" })).toBe("你好，Ada");
+  });
+});
+
+describe("dictionaryProblems", () => {
+  it("reports duplicate keys, missing languages and mismatched placeholders", () => {
+    expect(
+      dictionaryProblems({
+        "a.ts": {
+          aZh: { "a.one": "一 {name}", "a.count": "{count} 个", "a.only": "只有中文" },
+          aEn: { "a.one": "One", "a.count": "{count} {count|item|items}" },
+        },
+        "b.ts": { bZh: { "a.one": "重复" }, bEn: { "a.one": "Again", "b.extra": "Extra" } },
+      }),
+    ).toEqual([
+      "a.one: English lacks {name}",
+      "a.ts: a.only has no English",
+      "b.ts: b.extra has no Chinese",
+      "a.one is defined in a.ts and b.ts",
+    ]);
   });
 });
