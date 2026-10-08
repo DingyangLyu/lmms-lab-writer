@@ -52,4 +52,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Run Rust tests
+        shell: bash
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml 2>&1 | tee cargo-test.log
+
+      # Job logs need repository access; annotations are public, so failures stay readable.
+      - name: Report Rust test failures
+        if: failure()
+        shell: bash
+        run: |
+          awk '/^failures:$/{on=1} on{print} /^test result:/{on=0}' cargo-test.log > failures.txt
+          [ -s failures.txt ] || tail -n 60 cargo-test.log > failures.txt
+          message=$(head -c 12000 failures.txt | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN { ORS = "%0A" } { print }')
+          echo "::error title=Rust tests failed on ${{ matrix.os }}::$message"
