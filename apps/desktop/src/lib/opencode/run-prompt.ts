@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 import {
   extractTextParts,
   type OpenCodeMessageItem,
@@ -54,9 +55,9 @@ export async function runOpenCodePrompt({
     const session = (await request(
       "/session",
       { method: "POST", body: JSON.stringify({}) },
-      "Failed to create OpenCode session",
+      i18n.t("msg.couldNotCreateAnOpencodeSession"),
     )) as { id?: string };
-    if (!session.id) throw new Error("OpenCode session response missing id");
+    if (!session.id) throw new Error(i18n.t("msg.theOpencodeSessionResponseHasNoId"));
     sessionId = session.id;
 
     const preferred = getPreferredOpenCodeConfig();
@@ -71,7 +72,7 @@ export async function runOpenCodePrompt({
             ...preferred,
           }),
         },
-        "OpenCode message failed",
+        i18n.t("msg.theOpencodeMessageFailed"),
       ),
     );
     const initialText = extractTextParts(reply?.parts).join("\n").trim();
@@ -84,7 +85,7 @@ export async function runOpenCodePrompt({
         await request(
           `/session/${sessionId}/message`,
           { method: "GET" },
-          "Failed to poll OpenCode messages",
+          i18n.t("msg.couldNotPollOpencodeMessages"),
         ),
       );
       for (let i = items.length - 1; i >= 0; i--) {
@@ -98,7 +99,7 @@ export async function runOpenCodePrompt({
       }
       await sleep(500);
     }
-    throw new Error("OpenCode returned an empty response");
+    throw new Error(i18n.t("msg.opencodeReturnedAnEmptyResponse"));
   } finally {
     clearTimeout(timeoutId);
     if (sessionId)

@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 import {
   type ConversationInfo,
   type ConversationTab,
@@ -11,6 +12,9 @@ export type WorkspaceState = {
   lastActive?: Partial<Record<HarnessId, string>>;
 };
 export const EMPTY_WORKSPACE: WorkspaceState = { tabs: [], activeId: null };
+/** The "New … conversation" title of a tab before its session has one, in either language. */
+const isPlaceholderTitle = (title: string) => /^(新 .+ 对话|New .+ conversation)$/.test(title);
+
 export function newTab(
   backend: HarnessId,
   sessionId: string | null = null,
@@ -20,7 +24,7 @@ export function newTab(
     id: crypto.randomUUID(),
     backend,
     sessionId,
-    title: title || `新 ${harnessLabel(backend)} 对话`,
+    title: title || i18n.t("msg.newNameConversation", { name: harnessLabel(backend) }),
     status: "connecting",
     hasDraft: false,
     queued: 0,
@@ -79,7 +83,7 @@ export function updateConversation(
     info = {
       ...info,
       sessionId: info.sessionId || previous.sessionId,
-      title: info.title.startsWith("新 ") ? previous.title : info.title,
+      title: isPlaceholderTitle(info.title) ? previous.title : info.title,
     };
   }
   if (

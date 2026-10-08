@@ -4,6 +4,7 @@ import type { SaveResult } from "@lmms-lab/writing";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
+import { i18n } from "@/lib/i18n";
 import { SaveManager } from "./save-manager";
 
 /** `beforeClose` may veto quitting (e.g. agents still running); editor drafts are flushed after. */
@@ -48,7 +49,9 @@ export function useDocumentSaving(beforeClose?: () => Promise<boolean>) {
         await manager.flushAll();
         await invoke("finish_close");
       } catch (error) {
-        setCloseError(`关闭已取消：有文件尚未保存。请重试或另存副本。${String(error)}`);
+        setCloseError(
+          i18n.t("msg.closingWasCancelledBecauseSomeFilesAreNo", { error: String(error) }),
+        );
       } finally {
         closing = false;
       }
@@ -61,7 +64,9 @@ export function useDocumentSaving(beforeClose?: () => Promise<boolean>) {
         unlisten = stop;
         await invoke("register_save_guard");
       })
-      .catch((error) => setCloseError(`关闭保护未启用：${String(error)}`));
+      .catch((error) =>
+        setCloseError(i18n.t("msg.closeProtectionIsNotActiveError", { error: String(error) })),
+      );
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if ([...manager.documents.values()].some((doc) => doc.dirty || doc.saving)) {
         event.preventDefault();

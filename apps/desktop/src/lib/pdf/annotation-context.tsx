@@ -16,6 +16,7 @@ import {
   selectionMatchesDocument,
 } from "@/lib/editor/selection-context";
 import type { ConversationTab, ConversationTarget } from "@/lib/harness/types";
+import { i18n } from "@/lib/i18n";
 import { sameProject } from "@/lib/project-root";
 import type { PdfAnnotation, PdfMark } from "./annotations";
 export type AnnotationDraft = {
@@ -166,7 +167,7 @@ export function AnnotationProvider({
       if (draft) localStorage.setItem(key, JSON.stringify(draft));
       else localStorage.removeItem(key);
     } catch {
-      setError("批注草稿暂存失败，请保存后再关闭应用。");
+      setError(i18n.t("msg.couldNotStashTheAnnotationDraftSaveBefor"));
     }
   }, [draft, project, draftProject]);
   const perform = async (action: () => Promise<void>) => {
@@ -237,7 +238,7 @@ export function AnnotationProvider({
     const success = await perform(async () => {
       await invoke("pdf_prepare_annotations", { project, ids, backend: target.backend });
       if (projectRef.current !== project)
-        throw new Error("项目已切换，批注任务没有派发。请切回原项目重试。");
+        throw new Error(i18n.t("msg.theProjectChangedSoTheAnnotationTaskWasN"));
       onTask(ids, target);
     });
     if (success) {
@@ -269,7 +270,7 @@ export function AnnotationProvider({
         beginDraft,
         beginTextDraft: (selection, base, style = "highlight") => {
           if (selection.project !== project || !selectionMatchesDocument(selection, base)) {
-            setError("选区和当前文稿不一致，请重新选择需要批注的文字。");
+            setError(i18n.t("msg.theSelectionDoesNotMatchTheCurrentManusc"));
             setOpen(true);
             return;
           }

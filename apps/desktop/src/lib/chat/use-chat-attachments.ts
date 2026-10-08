@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { i18n } from "@/lib/i18n";
 import { importBrowserDocument } from "./files";
 import { type ChatImageFile, imageMime, MAX_IMAGES, readBrowserImage } from "./images";
 
@@ -40,7 +41,10 @@ async function importEach<T>(
         if (!project) throw cause;
         result.files.push(await readDocument(item));
         result.notices.push(
-          `${name(item)} 不能作为图片发送（${message(cause)}），已作为普通文件附加。`,
+          i18n.t("msg.nameCannotBeSentAsAnImageErrorSoItWasAtt", {
+            name: name(item),
+            error: message(cause),
+          }),
         );
       }
     } catch (cause) {
@@ -79,7 +83,7 @@ export function useChatAttachments(
     (read: () => Promise<Imported>, count: number) => {
       if (disabled || !count) return Promise.resolve();
       if (filesRef.current.length + pending.current + count > MAX_IMAGES) {
-        setError(`一次最多添加 ${MAX_IMAGES} 个附件（图片不超过 10 MB，文件不超过 25 MB）。`);
+        setError(i18n.t("msg.addAtMostCountAttachmentsAtATimeImagesUp", { count: MAX_IMAGES }));
         return Promise.resolve();
       }
       pending.current += count;
@@ -122,7 +126,7 @@ export function useChatAttachments(
             (path) => Boolean(imageMime(path)),
             (path) => invoke<ChatImageFile>("read_chat_image", { path }),
             (path) => {
-              if (!project) throw new Error("请先打开项目再添加文件。");
+              if (!project) throw new Error(i18n.t("msg.openAProjectBeforeAddingFiles"));
               return invoke<ChatImageFile>("import_chat_file", { project, path });
             },
           ),
@@ -136,7 +140,7 @@ export function useChatAttachments(
         importEach(
           items,
           project,
-          (file) => file.name || "粘贴文件",
+          (file) => file.name || i18n.t("msg.pastedFile"),
           (file) => Boolean(imageMime(file.name)) || IMAGE_MIMES.includes(file.type),
           readBrowserImage,
           (file) => importBrowserDocument(project, file),
@@ -152,7 +156,7 @@ export function useChatAttachments(
       const paths = await open({
         multiple: true,
         directory: false,
-        title: "添加文件或图片",
+        title: i18n.t("msg.addFilesOrImages"),
       });
       if (paths) await addPaths(Array.isArray(paths) ? paths : [paths]);
     } catch (cause) {

@@ -1,4 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { i18n } from "@/lib/i18n";
 
 export type ChatImageFile = {
   url: string;
@@ -28,9 +29,9 @@ export function imageMime(name: string): string | undefined {
 export function validateImage(file: { size: number; type: string; name: string }): string {
   const mime = file.type || imageMime(file.name);
   if (!mime || !IMAGE_ACCEPT.split(",").includes(mime))
-    throw new Error("请选择 PNG、JPEG、WebP 或 GIF 图片。");
+    throw new Error(i18n.t("msg.chooseAPngJpegWebpOrGifImage"));
   if (!file.size || file.size > MAX_IMAGE_BYTES)
-    throw new Error("单张图片须小于 10 MB，且不能为空。");
+    throw new Error(i18n.t("msg.eachImageMustBeUnder10MbAndNotEmpty"));
   return mime;
 }
 
@@ -41,12 +42,12 @@ export async function readBrowserImage(file: File): Promise<ChatImageFile> {
     reader.onload = () =>
       typeof reader.result === "string"
         ? resolve(reader.result)
-        : reject(new Error("无法读取图片"));
-    reader.onerror = () => reject(new Error(`无法读取 ${file.name}`));
-    reader.onabort = () => reject(new Error("图片读取已取消"));
+        : reject(new Error(i18n.t("msg.couldNotReadTheImage")));
+    reader.onerror = () => reject(new Error(i18n.t("msg.couldNotReadName", { name: file.name })));
+    reader.onabort = () => reject(new Error(i18n.t("msg.imageReadingWasCancelled")));
     reader.readAsDataURL(file.type ? file : new Blob([file], { type: mime }));
   });
-  return { url, mime, filename: file.name || "粘贴图片.png" };
+  return { url, mime, filename: file.name || i18n.t("msg.pastedImagePng") };
 }
 
 export function imageSource(url: string, directory?: string): string | undefined {

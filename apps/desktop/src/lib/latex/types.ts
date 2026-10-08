@@ -64,37 +64,6 @@ export const DEFAULT_LATEX_SETTINGS: LaTeXSettings = {
   config: { version: 1, activeTarget: null, targets: [] },
 };
 
-export const COMPILE_PROMPT = `Please compile the LaTeX document.
-
-Main file: {mainFile}
-
-Guidelines:
-1. First, read .lmms_lab_writer/COMPILE_NOTES.md for previous compilation notes and preferences
-2. If the main file does not exist, auto-detect the correct main .tex file (look for \\documentclass in .tex files)
-3. Prefer xelatex or pdflatex, but feel free to choose the most appropriate compiler based on the document content
-4. Always pass the -synctex=1 flag to generate a SyncTeX file (.synctex.gz) for PDF-to-source navigation
-5. If packages are missing, try installing them with tlmgr
-6. For bibliography or cross-references, consider running multiple passes or using latexmk
-7. If compilation fails, check the .log file to diagnose and fix the issue
-8. After compilation (success or failure), update .lmms_lab_writer/COMPILE_NOTES.md with any useful information: working compiler, installed packages, resolved issues, or tips for future compilations
-9. After successful compilation, let me know the output PDF path`;
-
-export const COMPILER_DISPLAY_NAMES: Record<LaTeXCompiler, string> = {
-  pdflatex: "pdfLaTeX",
-  xelatex: "XeLaTeX",
-  lualatex: "LuaLaTeX",
-  latexmk: "Latexmk",
-  tectonic: "Tectonic",
-};
-
-export const COMPILER_DESCRIPTIONS: Record<LaTeXCompiler, string> = {
-  pdflatex: "Standard LaTeX compiler, fast but limited CJK support",
-  xelatex: "Recommended for CJK - native Unicode and system fonts support",
-  lualatex: "Modern Lua-based compiler with Unicode support, slower than XeLaTeX",
-  latexmk: "Automated build tool that runs LaTeX the right number of times",
-  tectonic: "Portable Unicode engine with automatic package downloads",
-};
-
 // LaTeX Installation Types
 export interface LaTeXDistribution {
   name: string;

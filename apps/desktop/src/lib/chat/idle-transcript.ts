@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 export type TranscriptStorage = {
   put: (key: string, value: unknown) => Promise<void>;
   get: <T>(key: string) => Promise<T | undefined>;
@@ -40,7 +41,8 @@ export class IdleTranscript<T> {
     const run = async () => {
       const snapshot = await this.storage.get<T>(this.key);
       if (this.disposed) return;
-      if (snapshot === undefined) throw new Error("历史缓存未找到，请重新打开此历史对话。");
+      if (snapshot === undefined)
+        throw new Error(i18n.t("msg.theCachedHistoryIsGoneReopenThisConversa"));
       this.restore(snapshot);
       this.saved = false;
       this.changed(false);

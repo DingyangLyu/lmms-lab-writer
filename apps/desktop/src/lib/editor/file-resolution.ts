@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 export type IndexedFileNode = {
   path: string;
   type: "file" | "directory";
@@ -50,6 +51,11 @@ export function resolveFileReference(
   const chosen = preferred.find((candidate) => matches.includes(candidate));
   if (chosen) return chosen;
   if (matches.length > 1)
-    throw new Error(`“${path}”对应多个文件，请指定项目相对路径：${matches.join("、")}`);
+    throw new Error(
+      i18n.t("msg.pathMatchesSeveralFilesGiveAPathRelative", {
+        path,
+        matches: matches.join(i18n.t("msg.listSeparator")),
+      }),
+    );
   return matches[0] || path;
 }

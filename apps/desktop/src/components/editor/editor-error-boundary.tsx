@@ -44,7 +44,7 @@ export class EditorErrorBoundary extends Component<Props, State> {
             {i18n.t("ui.editorComponentError")}
           </h3>
           <p className="text-xs text-muted mb-4 max-w-[200px]">
-            {this.state.error?.message || "An unexpected error occurred"}
+            {this.state.error?.message || i18n.t("ui.anUnexpectedErrorOccurred")}
           </p>
           <button
             type="button"

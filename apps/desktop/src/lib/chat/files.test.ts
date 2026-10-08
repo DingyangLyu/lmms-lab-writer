@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { conversationTitle } from "@/lib/bridge/context";
 import { splitEditorSelectionMessage, withEditorSelection } from "@/lib/editor/selection-context";
+import { i18n } from "@/lib/i18n";
 import {
   attachmentMessage,
   type DocumentAttachment,
@@ -70,5 +72,37 @@ describe("file attachment payload", () => {
     await expect(
       importBrowserDocument("/paper", { size: MAX_FILE_BYTES + 1 } as File),
     ).rejects.toThrow("25 MB");
+  });
+  it("reads back messages written in either interface language", () => {
+    const selection = {
+      project: "/paper",
+      path: "main.tex",
+      ranges: [
+        {
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: 1,
+          endColumn: 5,
+          startOffset: 0,
+          endOffset: 4,
+          text: "text",
+        },
+      ],
+    };
+    const chinese = withEditorSelection(attachmentMessage("", [file]), selection);
+    i18n.setLocale("en");
+    try {
+      const english = withEditorSelection(attachmentMessage("", [file]), selection);
+      expect(english).toContain("Please read these attachments.");
+      expect(english).toContain("Selection 1: L1; from 1:1 to 1:5");
+      for (const text of [chinese, english]) {
+        const message = splitEditorSelectionMessage(text);
+        expect(message?.path).toBe("main.tex");
+        expect(splitAttachmentMessage(message?.instruction ?? "")?.files[0]?.path).toBe(file.path);
+        expect(conversationTitle(text)).toBe(`Attachment: ${file.filename}`);
+      }
+    } finally {
+      i18n.setLocale("zh");
+    }
   });
 });

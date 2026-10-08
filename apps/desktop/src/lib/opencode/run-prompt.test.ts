@@ -51,6 +51,6 @@ describe("runOpenCodePrompt", () => {
     });
     await expect(runOpenCodePrompt(options)).rejects.toThrow("quota");
     serve(() => undefined);
-    await expect(runOpenCodePrompt(options)).rejects.toThrow("Failed to create OpenCode session");
+    await expect(runOpenCodePrompt(options)).rejects.toThrow("创建 OpenCode 会话失败");
   });
 });

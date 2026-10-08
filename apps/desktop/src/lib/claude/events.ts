@@ -1,4 +1,5 @@
 import { type CodexItem, trimCodexHistory } from "@/lib/codex/events";
+import { i18n } from "@/lib/i18n";
 
 type Block = {
   type: string;
@@ -57,7 +58,7 @@ function blockItem(block: Block, id: string): CodexItem {
           : "mcpToolCall",
     query: block.name === "WebSearch" ? String(block.input?.query || "") : undefined,
     server: "Claude Code",
-    tool: block.name || "工具",
+    tool: block.name || i18n.t("msg.tool"),
     command: block.name === "Bash" ? String(block.input?.command || "") : undefined,
     text: JSON.stringify(block.input || {}, null, 2),
     status: "inProgress",

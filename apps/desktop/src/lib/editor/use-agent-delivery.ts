@@ -2,6 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
+import { i18n } from "@/lib/i18n";
 import { openedProjectPath } from "@/lib/project-root";
 import type { SaveManager } from "./save-manager";
 import { type EditorSelectionContext, selectionMatchesDocument } from "./selection-context";
@@ -17,13 +18,13 @@ export function useAgentDelivery(saveManager: SaveManager, projectPath: string |
       if (projectPath) await saveManager.synchronize(projectPath);
       if (!selection) return;
       if (selection.project !== projectPath)
-        throw new Error("项目已切换，请重新选择需要引用的文本。");
+        throw new Error(i18n.t("msg.theProjectChangedSelectTheTextToQuoteAga"));
       const content = await invoke<string>("read_document", {
         project: selection.project,
         path: selection.path,
       });
       if (!selectionMatchesDocument(selection, content))
-        throw new Error("选区原文已变化，请重新选择后再发送，避免修改错误位置。");
+        throw new Error(i18n.t("msg.theSelectedTextHasChangedSelectItAgainBe"));
       await invoke("checkpoint_document", {
         project: selection.project,
         path: selection.path,
@@ -60,7 +61,7 @@ export function useAgentDelivery(saveManager: SaveManager, projectPath: string |
                   });
               }
             } catch (cause) {
-              error = `委派前保存失败：${String(cause)}`;
+              error = i18n.t("msg.savingBeforeDelegationFailedError", { error: String(cause) });
             }
             await invoke("writer_delivery_prepared", { id: payload.id, error });
           },

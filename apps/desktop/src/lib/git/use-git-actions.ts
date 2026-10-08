@@ -7,6 +7,7 @@ import {
   buildAiCommitPrompt,
   sanitizeAiCommitMessage,
 } from "@/lib/git/ai-commit-message";
+import { i18n } from "@/lib/i18n";
 import { runOpenCodePrompt } from "@/lib/opencode/run-prompt";
 import type { OpenCodeStatus } from "@/lib/opencode/use-opencode-daemon";
 import type { useTauriDaemon } from "@/lib/tauri";
@@ -87,26 +88,26 @@ export function useGitActions({
     if (!message) return;
     const result = await daemon.gitCommit(message);
     if (result.success) {
-      toast("Changes committed", "success");
+      toast(i18n.t("msg.changesCommitted"), "success");
       setCommitMessage("");
-    } else toast(result.error || "Failed to commit", "error");
+    } else toast(result.error || i18n.t("msg.failedToCommit"), "error");
   }, [commitMessage, daemon, toast]);
 
   const generateCommitMessage = useCallback(async () => {
     const directory = daemon.projectPath;
     if (!directory) {
-      toast("Please open a project first.", "error");
+      toast(i18n.t("msg.pleaseOpenAProjectFirst"), "error");
       return;
     }
     if (!staged.length) {
-      toast("Stage files before generating commit message.", "error");
+      toast(i18n.t("msg.stageFilesBeforeGeneratingCommitMessage"), "error");
       return;
     }
     setGenerating(true);
     try {
       const ready = await ensureOpenCode(directory);
       if (!ready) {
-        toast("OpenCode is unavailable. Install it with: npm i -g opencode-ai@latest", "error");
+        toast(i18n.t("msg.opencodeIsUnavailableInstallItWithNpmIGO"), "error");
         return;
       }
       const diff = (await Promise.all(staged.map((c) => daemon.gitDiff(c.path, true))))
@@ -115,7 +116,7 @@ export function useGitActions({
         .slice(0, AI_COMMIT_DIFF_LIMIT)
         .trim();
       if (!diff) {
-        toast("No textual staged diff available.", "error");
+        toast(i18n.t("msg.noTextualStagedDiffAvailable"), "error");
         return;
       }
       const message = sanitizeAiCommitMessage(
@@ -127,18 +128,18 @@ export function useGitActions({
         }),
       );
       if (!message) {
-        toast("AI returned an empty commit message.", "error");
+        toast(i18n.t("msg.aiReturnedAnEmptyCommitMessage"), "error");
         return;
       }
       setCommitMessage(message);
-      toast("AI commit draft generated.", "success");
+      toast(i18n.t("msg.aiCommitDraftGenerated"), "success");
     } catch (error) {
       const message = getReadableErrorMessage(
         error,
-        "Could not reach OpenCode. Start or restart the Agent and try again.",
+        i18n.t("msg.couldNotReachOpencodeStartOrRestartTheAg"),
       );
       console.error(`Failed to generate AI commit message: ${message}`);
-      toast(`AI draft failed: ${message}`, "error");
+      toast(i18n.t("msg.aiDraftFailedError", { error: message }), "error");
     } finally {
       setGenerating(false);
     }
@@ -148,24 +149,21 @@ export function useGitActions({
     setPublishError(null);
     const status = await daemon.ghCheck();
     if (!status.installed) {
-      toast("GitHub CLI (gh) is not installed. Install it from https://cli.github.com", "error");
+      toast(i18n.t("msg.githubCliGhIsNotInstalledInstallItFromHt"), "error");
       return;
     }
     if (!status.authenticated) {
       if (daemon.isAuthenticatingGh) {
-        toast("GitHub authentication is already in progress in the terminal window.", "info");
+        toast(i18n.t("msg.githubAuthenticationIsAlreadyInProgressI"), "info");
         return;
       }
-      toast(
-        "Terminal opened for GitHub login. Complete prompts there (type Y when asked), then continue in browser.",
-        "info",
-      );
+      toast(i18n.t("msg.terminalOpenedForGithubLoginCompleteProm"), "info");
       const login = await daemon.ghAuthLogin();
       if (!login.success || !login.authenticated) {
-        toast(login.error || "GitHub authentication failed", "error");
+        toast(login.error || i18n.t("msg.githubAuthenticationFailed"), "error");
         return;
       }
-      toast("Authenticated with GitHub", "success");
+      toast(i18n.t("msg.authenticatedWithGithub"), "success");
     }
     setPublishOpen(true);
   }, [daemon, toast]);
@@ -175,8 +173,8 @@ export function useGitActions({
       const result = await daemon.ghCreateRepo(name, isPrivate, description || undefined);
       if (result.success) {
         setPublishOpen(false);
-        toast(`Repository published: ${result.url}`, "success");
-      } else setPublishError(result.error || "Failed to create repository");
+        toast(i18n.t("msg.repositoryPublishedUrl", { url: result.url ?? "" }), "success");
+      } else setPublishError(result.error || i18n.t("msg.failedToCreateRepository"));
     },
     [daemon, toast],
   );

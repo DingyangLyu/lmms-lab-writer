@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 // OpenCode SDK Types (subset for API integration)
 
 export type FileDiff = {
@@ -257,7 +258,7 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
         (input.filePath as string | undefined) ?? (input.file_path as string | undefined);
       return {
         icon: "glasses",
-        title: "Reading",
+        title: i18n.t("msg.reading"),
         subtitle: filePath ? getFilename(filePath) : undefined,
         filePath,
       };
@@ -265,7 +266,7 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
     case "list":
       return {
         icon: "list",
-        title: "Listing",
+        title: i18n.t("msg.listing"),
         subtitle: input.path ? getFilename(input.path as string) : undefined,
       };
     case "glob":
@@ -283,19 +284,19 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
     case "webfetch":
       return {
         icon: "globe",
-        title: "Fetching",
+        title: i18n.t("msg.fetching"),
         subtitle: truncate(input.url as string),
       };
     case "websearch":
       return {
         icon: "globe",
-        title: "Searching",
+        title: i18n.t("msg.searching"),
         subtitle: truncate(input.query as string),
       };
     case "task":
       return {
         icon: "bot",
-        title: `Agent: ${input.subagent_type || "task"}`,
+        title: i18n.t("msg.agentName", { name: String(input.subagent_type || "task") }),
         subtitle: truncate(input.description as string),
       };
     case "bash": {
@@ -315,7 +316,7 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
         (input.filePath as string | undefined) ?? (input.file_path as string | undefined);
       return {
         icon: "edit",
-        title: "Editing",
+        title: i18n.t("msg.editing"),
         subtitle: filePath ? getFilename(filePath) : undefined,
         filePath,
       };
@@ -325,7 +326,7 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
         (input.filePath as string | undefined) ?? (input.file_path as string | undefined);
       return {
         icon: "file-plus",
-        title: "Writing",
+        title: i18n.t("msg.writing"),
         subtitle: filePath ? getFilename(filePath) : undefined,
         filePath,
       };
@@ -334,19 +335,19 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
     case "todocreate":
       return {
         icon: "checklist",
-        title: "Creating task",
+        title: i18n.t("msg.creatingTask"),
         subtitle: truncate(input.subject as string),
       };
     case "todoread":
     case "todolist":
       return {
         icon: "checklist",
-        title: "Listing tasks",
+        title: i18n.t("msg.listingTasks"),
       };
     case "todoupdate":
       return {
         icon: "checklist",
-        title: "Updating task",
+        title: i18n.t("msg.updatingTask"),
         subtitle: input.status as string,
       };
     case "mcp": {
@@ -364,8 +365,8 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
       const firstHeader = questions?.[0]?.header;
       return {
         icon: "help-circle",
-        title: "Question",
-        subtitle: firstHeader || "Waiting for input",
+        title: i18n.t("msg.question"),
+        subtitle: firstHeader || i18n.t("msg.waitingForInput"),
       };
     }
     default:
@@ -376,8 +377,8 @@ export function getToolInfo(tool: string, input: Record<string, unknown> = {}): 
           (input.search as string | undefined);
         return {
           icon: "globe",
-          title: "Perplexity Search",
-          subtitle: truncate(query ?? "Search"),
+          title: i18n.t("msg.perplexitySearch"),
+          subtitle: truncate(query ?? i18n.t("msg.search")),
         };
       }
 

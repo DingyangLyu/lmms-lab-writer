@@ -1,4 +1,5 @@
 import { mergeById } from "@/lib/chat/idle-transcript";
+import { i18n } from "@/lib/i18n";
 import { openEventStream } from "./event-stream";
 import { appendSearchFallbackHint } from "./search-fallback";
 import type { Event, Message, Part, SessionInfo, SessionStatus } from "./types";
@@ -13,11 +14,13 @@ export function getOpenCodeErrorMessage(error: unknown, fallback: string): strin
   const message = error instanceof Error ? error.message : String(error ?? "");
   return message.trim() || fallback;
 }
+/** Error name when the event stream gives up reconnecting. */
+export const RECONNECT_GAVE_UP = "ReconnectGaveUp";
 const MAX_PART_TEXT_CHARS = 160_000;
 const boundedText = (text: string) =>
   text.length <= MAX_PART_TEXT_CHARS
     ? text
-    : `[内容过长，已释放中间缓存；尾部保留]\n${text.slice(-MAX_PART_TEXT_CHARS)}`;
+    : `${i18n.t("msg.tooLongTheMiddleWasReleasedFromMemoryThe")}\n${text.slice(-MAX_PART_TEXT_CHARS)}`;
 
 function isNetworkLoadFailure(error: unknown): boolean {
   return (
@@ -213,15 +216,18 @@ export class OpenCodeClient {
     try {
       new URL(url);
     } catch {
-      this.options.onError?.(new Error(`Invalid URL: ${url}`));
+      this.options.onError?.(new Error(i18n.t("msg.invalidUrlUrl", { url })));
       return;
     }
 
     try {
       this.eventSource = openEventStream(url);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create EventSource";
-      this.options.onError?.(new Error(`Connection failed: ${message}. URL: ${url}`));
+      const message =
+        error instanceof Error ? error.message : i18n.t("msg.couldNotOpenTheEventStream");
+      this.options.onError?.(
+        new Error(i18n.t("msg.connectionFailedErrorUrlUrl", { error: message, url })),
+      );
       return;
     }
 
@@ -269,7 +275,11 @@ export class OpenCodeClient {
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.options.onError?.(new Error("Max reconnection attempts reached"));
+      this.options.onError?.(
+        Object.assign(new Error(i18n.t("msg.opencodeStoppedReconnectingAfterSeveralA")), {
+          name: RECONNECT_GAVE_UP,
+        }),
+      );
       return;
     }
 
@@ -418,7 +428,10 @@ export class OpenCodeClient {
         signal: this.getSignal(),
       });
       if (!response.ok) {
-        if (strict) throw new Error(`读取 OpenCode 历史失败：${response.status}`);
+        if (strict)
+          throw new Error(
+            i18n.t("msg.couldNotReadOpencodeHistoryStatus", { status: response.status }),
+          );
         console.error(`Failed to list sessions: ${response.statusText}`);
         return [];
       }
@@ -456,9 +469,13 @@ export class OpenCodeClient {
             { headers: this.getHeaders(), signal: this.getSignal() },
           );
           if (response.status === 404) continue;
-          if (!response.ok) throw new Error(`读取对话记录失败：${response.status}`);
+          if (!response.ok)
+            throw new Error(
+              i18n.t("msg.couldNotReadTheConversationStatus", { status: response.status }),
+            );
           const messages = await this.safeParseJson<unknown[]>(response, "history message count");
-          if (!Array.isArray(messages)) throw new Error("历史记录返回了无效数据");
+          if (!Array.isArray(messages))
+            throw new Error(i18n.t("msg.theHistoryReturnedInvalidData"));
           results[index] = messages.length > 0;
         }
       }),
@@ -471,9 +488,10 @@ export class OpenCodeClient {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
-    if (!response.ok) throw new Error(`Failed to get session: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(i18n.t("msg.couldNotLoadTheSessionStatus", { status: response.statusText }));
     const data = await this.safeParseJson<SessionInfo>(response, "getSession");
-    if (!data) throw new Error("Invalid response from server (expected JSON)");
+    if (!data) throw new Error(i18n.t("msg.theServerReturnedInvalidDataExpectedJson"));
     this.store.sessions.set(data.id, data);
     return data;
   }
@@ -485,9 +503,12 @@ export class OpenCodeClient {
       body: JSON.stringify({}),
       signal: this.getSignal(),
     });
-    if (!response.ok) throw new Error(`Failed to create session: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotCreateTheSessionStatus", { status: response.statusText }),
+      );
     const data = await this.safeParseJson<SessionInfo>(response, "createSession");
-    if (!data) throw new Error("Invalid response from server (expected JSON)");
+    if (!data) throw new Error(i18n.t("msg.theServerReturnedInvalidDataExpectedJson"));
     return data;
   }
 
@@ -497,12 +518,16 @@ export class OpenCodeClient {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
-    if (!response.ok) throw new Error(`Failed to delete session: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotDeleteTheSessionStatus", { status: response.statusText }),
+      );
   }
 
   async renameSession(sessionID: string, title: string): Promise<SessionInfo> {
     title = title.trim();
-    if (!title || title.length > 120) throw new Error("对话名称需为 1–120 个字符。");
+    if (!title || title.length > 120)
+      throw new Error(i18n.t("msg.conversationNamesMustBe1120Characters"));
     const response = await fetch(
       `${this.baseUrl}/session/${encodeURIComponent(sessionID)}${this.getQueryParams()}`,
       {
@@ -512,9 +537,12 @@ export class OpenCodeClient {
         signal: this.getSignal(),
       },
     );
-    if (!response.ok) throw new Error(`保存对话名称失败：${response.status}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotSaveTheConversationNameStatus", { status: response.status }),
+      );
     const session = await this.safeParseJson<SessionInfo>(response, "renameSession");
-    if (!session?.id) throw new Error("保存对话名称失败：服务器没有返回会话。");
+    if (!session?.id) throw new Error(i18n.t("msg.couldNotSaveTheConversationNameTheServer"));
     this.store.sessions.set(session.id, session);
     return session;
   }
@@ -525,7 +553,10 @@ export class OpenCodeClient {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
-    if (!response.ok) throw new Error(`读取对话状态失败：${response.status}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotReadTheConversationStatusStatus", { status: response.status }),
+      );
     const statuses = await this.safeParseJson<Record<string, SessionStatus>>(
       response,
       "session/status",
@@ -545,7 +576,8 @@ export class OpenCodeClient {
         signal: this.getSignal(),
       },
     );
-    if (!response.ok) throw new Error(`Failed to get messages: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(i18n.t("msg.couldNotLoadMessagesStatus", { status: response.statusText }));
     const data = await this.safeParseJson<unknown[]>(response, "getMessages");
     const items = Array.isArray(data) ? data : [];
 
@@ -580,7 +612,10 @@ export class OpenCodeClient {
         signal: this.getSignal(),
       },
     );
-    if (!response.ok) throw new Error(`Failed to get parts: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotLoadMessagePartsStatus", { status: response.statusText }),
+      );
     const data = await this.safeParseJson<Part[]>(response, "getParts");
     const parts = Array.isArray(data) ? data.map((part) => this.boundPart(part)) : [];
     this.store.parts.set(`${sessionID}:${messageID}`, parts);
@@ -648,7 +683,12 @@ export class OpenCodeClient {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error("[OpenCode Client] chat error response:", errorText);
-      throw new Error(`Failed to send message: ${response.statusText} - ${errorText}`);
+      throw new Error(
+        i18n.t("msg.couldNotSendTheMessageStatusError", {
+          status: response.statusText,
+          error: errorText,
+        }),
+      );
     }
 
     // Try to read response body for debugging
@@ -664,7 +704,8 @@ export class OpenCodeClient {
         signal: this.getSignal(),
       },
     );
-    if (!response.ok) throw new Error(`Failed to abort: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(i18n.t("msg.couldNotStopTheReplyStatus", { status: response.statusText }));
   }
 
   async answerQuestion(requestID: string, answers: string[][]): Promise<void> {
@@ -679,7 +720,12 @@ export class OpenCodeClient {
     );
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      throw new Error(`Failed to answer question: ${response.statusText} - ${errorText}`);
+      throw new Error(
+        i18n.t("msg.couldNotAnswerTheQuestionStatusError", {
+          status: response.statusText,
+          error: errorText,
+        }),
+      );
     }
   }
 
@@ -688,7 +734,10 @@ export class OpenCodeClient {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
-    if (!response.ok) throw new Error(`Failed to get config: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(
+        i18n.t("msg.couldNotLoadTheConfigurationStatus", { status: response.statusText }),
+      );
     const data = await this.safeParseJson<{ model?: string; default_agent?: string }>(
       response,
       "getConfig",

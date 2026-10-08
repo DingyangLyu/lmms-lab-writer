@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { getReadableErrorMessage } from "@/lib/errors";
+import { i18n } from "@/lib/i18n";
 
 export type OpenCodeStatus = {
   running: boolean;
@@ -50,7 +51,7 @@ export function useOpenCodeDaemon(projectPath: string | null, autoStart: boolean
         startedFor.current = directory;
         return started;
       } catch (cause) {
-        const message = getReadableErrorMessage(cause, "Failed to start OpenCode");
+        const message = getReadableErrorMessage(cause, i18n.t("msg.failedToStartOpencode"));
         console.error(`Failed to start OpenCode: ${message}`);
         setStatus(message.includes("OpenCode not found") ? "unavailable" : "stopped");
         setError(message);
@@ -74,20 +75,17 @@ export function useOpenCodeDaemon(projectPath: string | null, autoStart: boolean
 
   const restart = useCallback(async () => {
     if (!projectPath) {
-      toast("Please open a project first.", "error");
+      toast(i18n.t("msg.pleaseOpenAProjectFirst"), "error");
       return;
     }
     // OpenCode may have been installed since the last check.
     if (status === "unavailable") {
       const current = await check();
       if (!current?.installed) {
-        toast(
-          "OpenCode is still not installed. Please install it first:\nnpm i -g opencode-ai@latest\nor\nbrew install sst/tap/opencode",
-          "error",
-        );
+        toast(i18n.t("msg.opencodeIsStillNotInstalledPleaseInstall"), "error");
         return;
       }
-      if (await start(projectPath)) toast("OpenCode started successfully!", "success");
+      if (await start(projectPath)) toast(i18n.t("msg.opencodeStartedSuccessfully"), "success");
       return;
     }
     try {
@@ -96,7 +94,7 @@ export function useOpenCodeDaemon(projectPath: string | null, autoStart: boolean
       const current = await invoke<OpenCodeStatus>("opencode_status");
       if (!current.installed) {
         setStatus("unavailable");
-        setError("OpenCode is not installed. Please install it first using npm or Homebrew.");
+        setError(i18n.t("msg.opencodeIsNotInstalledPleaseInstallItFir"));
         return;
       }
       const restarted = await invoke<OpenCodeStatus>("opencode_restart", {
@@ -105,9 +103,9 @@ export function useOpenCodeDaemon(projectPath: string | null, autoStart: boolean
       setStatus("running");
       setPort(restarted.port);
       startedFor.current = projectPath;
-      toast("OpenCode started successfully!", "success");
+      toast(i18n.t("msg.opencodeStartedSuccessfully"), "success");
     } catch (cause) {
-      const message = getReadableErrorMessage(cause, "Failed to start OpenCode");
+      const message = getReadableErrorMessage(cause, i18n.t("msg.failedToStartOpencode"));
       console.error(`Failed to start OpenCode: ${message}`);
       setStatus("stopped");
       setError(message);

@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 export type PdfMark = {
   page: number;
   x: number;
@@ -132,5 +133,5 @@ export function annotationPrompt(
   ids: string[],
   backend: import("@/lib/harness/types").HarnessId,
 ): string {
-  return `请用 Writer MCP 的 writer_get_annotations 读取这些批注，ids=${JSON.stringify(ids)}。按每条批注的选文、修改要求和对应 .tex 段落完成修改；先核对当前源码和 sourceChanged。未可靠定位的先按选文查找，仍不确定就向我说明，不能猜测。使用 writer_read_document 获取当前版本，再用 writer_apply_annotation_edit 提交 oldText/newText 替换，不能用 shell/Python 整文件覆盖来绕过合并。sourceChanged 仅提示文稿变化：核对当前段落，可用 writer_reanchor_annotation 更新定位，不要要求我点击行号。无冲突修改自动合并，真正重叠的修改保留为冲突提案，可先处理其他批注。检查引用与 LaTeX，编译验证。完成后用 writer_resolve_annotation，带上 annotationRevision 与已核验的主文件 sourceRevision，标记已处理的批注，并说明改动。当前执行后端：${backend}。`;
+  return i18n.t("msg.annotationPrompt", { ids: JSON.stringify(ids), backend });
 }

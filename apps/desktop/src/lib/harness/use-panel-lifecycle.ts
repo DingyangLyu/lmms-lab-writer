@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useReducer, useRef } from "react";
 import type { ChatDraft } from "@/lib/chat/outbox";
+import { i18n } from "@/lib/i18n";
 import type { ConversationInfo, HarnessLifecycle } from "./types";
 
 // Metadata and incoming messages share one adapter contract across all harnesses.
@@ -46,7 +47,9 @@ export function usePanelLifecycle(
     } catch (cause) {
       inFlight.current = null;
       failed.current = incoming.id;
-      delivery.onError(`派发记录保存失败，尚未发送：${String(cause)}`);
+      delivery.onError(
+        i18n.t("msg.couldNotSaveTheDelegationRecordSoNothing", { error: String(cause) }),
+      );
       return;
     }
     const draft: ChatDraft = { raw: incoming.text, files: [], selection: null };
@@ -63,7 +66,9 @@ export function usePanelLifecycle(
         } catch {
           /* Keep the persisted pending record for manual recovery. */
         }
-        delivery.onError(`派发失败，任务仍保留在标签下方，可重试：${String(cause)}`);
+        delivery.onError(
+          i18n.t("msg.delegationFailedTheTaskIsStillUnderTheTa", { error: String(cause) }),
+        );
       })
       .finally(() => {
         inFlight.current = null;

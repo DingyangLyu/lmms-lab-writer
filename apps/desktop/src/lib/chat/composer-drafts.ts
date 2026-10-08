@@ -1,5 +1,6 @@
 "use client";
 import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
+import { i18n } from "@/lib/i18n";
 import type { ChatImageFile } from "./images";
 
 /** Unsent composer text and attachments, per project conversation tab. Images stay in IndexedDB. */
@@ -15,7 +16,9 @@ export async function flushComposerDrafts(project: string) {
   );
   const failed = results.find((result) => result.status === "rejected");
   if (failed?.status === "rejected")
-    throw new Error(`聊天草稿尚未保存，切换已取消：${String(failed.reason)}`);
+    throw new Error(
+      i18n.t("msg.theChatDraftIsNotSavedYetSoSwitchingWasC", { error: String(failed.reason) }),
+    );
 }
 let database: Promise<IDBDatabase> | undefined;
 function db() {
@@ -97,7 +100,8 @@ export function useComposerDraft(
     const writer = {
       project: project ?? "",
       flush: async () => {
-        if (loaded.current !== key) throw new Error("聊天草稿仍在载入，请稍后重试。");
+        if (loaded.current !== key)
+          throw new Error(i18n.t("msg.theChatDraftIsStillLoadingTryAgainInAMom"));
         const draft = latest.current;
         await writeDraft(key, draft.text.trim() || draft.files.length ? draft : null);
       },

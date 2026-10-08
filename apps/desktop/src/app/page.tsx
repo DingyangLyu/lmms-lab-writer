@@ -1414,7 +1414,7 @@ export default function EditorPage() {
               <EditorSkeleton className="h-full" />
             ) : splitPane.error ? (
               <div className="h-full flex items-center justify-center px-6 text-sm text-muted">
-                Failed to load file: {splitPane.error}
+                {t("page.couldNotLoadTheFileError", { error: splitPane.error })}
               </div>
             ) : splitPane.binaryPreviewUrl ? (
               <div className="h-full flex items-center justify-center overflow-auto p-4 bg-accent-hover">
@@ -1822,7 +1822,7 @@ export default function EditorPage() {
                 <EditorSkeleton className="h-full" />
               ) : gitDiffPreview.error ? (
                 <div className="h-full flex items-center justify-center px-6 text-sm text-muted">
-                  Failed to load diff: {gitDiffPreview.error}
+                  {t("page.couldNotLoadTheDiffError", { error: gitDiffPreview.error })}
                 </div>
               ) : parsedGitDiff?.isBinary ? (
                 <div className="h-full flex items-center justify-center px-6 text-sm text-muted">

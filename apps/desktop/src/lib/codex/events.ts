@@ -1,4 +1,5 @@
 import { stripWriterContext } from "@/lib/bridge/context";
+import { i18n } from "@/lib/i18n";
 export type CodexItem = {
   id: string;
   type: string;
@@ -234,10 +235,10 @@ export function itemsFromCodexThread(thread: {
 
 export function imagesForCodexItem(item: CodexItem): Array<{ url: string; name: string }> {
   if (item.type === "imageView" && item.path)
-    return [{ url: item.path, name: item.path.split("/").pop() || "查看图片" }];
+    return [{ url: item.path, name: item.path.split("/").pop() || i18n.t("msg.viewImage") }];
   return (item.content ?? []).flatMap((part) => {
     if (typeof part === "string" || !["image", "localImage"].includes(part.type)) return [];
     const url = part.url || part.path;
-    return url ? [{ url, name: part.path?.split("/").pop() || "图片附件" }] : [];
+    return url ? [{ url, name: part.path?.split("/").pop() || i18n.t("msg.imageAttachment") }] : [];
   });
 }

@@ -26,6 +26,7 @@ export const uiZh = {
   "ui.editorComponentError": "编辑器组件出错",
   "ui.tryAgain": "重试",
   "ui.dismiss": "关闭",
+  "ui.anUnexpectedErrorOccurred": "发生了意外错误",
 };
 export const uiEn: Record<keyof typeof uiZh, string> = {
   "ui.descriptionOptional": "Description (optional)",
@@ -55,4 +56,5 @@ export const uiEn: Record<keyof typeof uiZh, string> = {
   "ui.editorComponentError": "Editor Component Error",
   "ui.tryAgain": "Try Again",
   "ui.dismiss": "Dismiss",
+  "ui.anUnexpectedErrorOccurred": "An unexpected error occurred",
 };

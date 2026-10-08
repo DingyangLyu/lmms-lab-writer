@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pruneComposerDrafts } from "@/lib/chat/composer-drafts";
+import { i18n } from "@/lib/i18n";
 import type { ConversationInfo, ConversationTarget, HarnessId, IncomingMessage } from "./types";
 import {
   canClose,
@@ -76,12 +77,12 @@ export function useHarnessWorkspace(project?: string | null) {
         ),
       );
     } catch {
-      setError("对话标签保存失败，请勿关闭应用。");
+      setError(i18n.t("msg.couldNotSaveTheConversationTabsDoNotClos"));
     }
   }, [state, incoming, project, loadedProject]);
   const saveIncoming = useCallback((next: Record<string, IncomingMessage[]>) => {
     const project = projectRef.current;
-    if (!project) throw new Error("请先打开项目。");
+    if (!project) throw new Error(i18n.t("msg.openAProjectFirst"));
     localStorage.setItem(`writer-dispatch:${project}`, JSON.stringify(next));
     pendingRef.current = next;
     setIncoming(next);
@@ -179,7 +180,8 @@ export function useHarnessWorkspace(project?: string | null) {
       const existing =
         target.tabId &&
         latest.current.tabs.find((t) => t.id === target.tabId && t.backend === target.backend);
-      if (target.tabId && !existing) throw new Error("目标对话已关闭，请重新选择。");
+      if (target.tabId && !existing)
+        throw new Error(i18n.t("msg.theTargetConversationWasClosedChooseAnot"));
       const id = existing ? existing.id : open(target.backend);
       select(id);
       saveIncoming({

@@ -65,6 +65,8 @@ export const pageZh = {
   "page.listSeparator": "、",
   "page.couldNotReadTheFileEditingIsPausedError": "文件读取失败，编辑已暂停：{error}",
   "page.buildSettingsError": "编译配置：{error}",
+  "page.couldNotLoadTheFileError": "文件加载失败：{error}",
+  "page.couldNotLoadTheDiffError": "差异加载失败：{error}",
 };
 export const pageEn: Record<keyof typeof pageZh, string> = {
   "page.theUserResolvedAndSavedMergeConflictIdRe":
@@ -141,4 +143,6 @@ export const pageEn: Record<keyof typeof pageZh, string> = {
   "page.couldNotReadTheFileEditingIsPausedError":
     "Could not read the file; editing is paused: {error}",
   "page.buildSettingsError": "Build settings: {error}",
+  "page.couldNotLoadTheFileError": "Could not load the file: {error}",
+  "page.couldNotLoadTheDiffError": "Could not load the diff: {error}",
 };

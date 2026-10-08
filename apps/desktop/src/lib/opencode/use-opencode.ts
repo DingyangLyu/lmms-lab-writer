@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { i18n } from "@/lib/i18n";
 import {
   createOpenCodeClient,
   getOpenCodeErrorMessage,
   isAbortError,
   type OpenCodeClient,
+  RECONNECT_GAVE_UP,
 } from "./client";
 import { isVariantSupported, selectInitialModel } from "./model-selection";
 import { STORAGE_KEY_AGENT, STORAGE_KEY_MODEL } from "./preferences";
@@ -287,7 +289,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           `[OpenCode] websearch fallback failed: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
         );
         setStatus({ type: "idle" });
-        setError(err instanceof Error ? err.message : "Failed to run websearch fallback");
+        setError(err instanceof Error ? err.message : i18n.t("msg.failedToRunWebsearchFallback"));
       });
   };
 
@@ -482,13 +484,13 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
                     console.error(
                       `[OpenCode] Auto-recovery failed: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
                     );
-                    setError("Session error. Please try again.");
+                    setError(i18n.t("msg.sessionErrorPleaseTryAgain"));
                   });
               }
             } else {
               // Max retries reached
               console.error("[OpenCode] Max session error retries reached");
-              setError("Session keeps failing. Please restart OpenCode.");
+              setError(i18n.t("msg.sessionKeepsFailingPleaseRestartOpencode"));
               sessionErrorRetryCountRef.current = 0;
             }
           }
@@ -526,7 +528,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         }
         setError(err.message);
         setConnecting(false);
-        if (err.message.includes("Max reconnection attempts")) {
+        if (err.name === RECONNECT_GAVE_UP) {
           setMaxReconnectFailed(true);
         }
       },
@@ -705,7 +707,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       return session;
     } catch (err) {
       if (isAbortError(err)) return null;
-      setError(err instanceof Error ? err.message : "Failed to create session");
+      setError(err instanceof Error ? err.message : i18n.t("msg.failedToCreateSession"));
       return null;
     }
   }, [connected, syncFromStore]);
@@ -761,7 +763,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         }
       } catch (err) {
         if (isAbortError(err)) return;
-        setError(err instanceof Error ? err.message : "Failed to load session");
+        setError(err instanceof Error ? err.message : i18n.t("msg.failedToLoadSession"));
       } finally {
         setSessionLoading(false);
       }
@@ -783,7 +785,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
   const renameSession = useCallback(
     async (sessionId: string, title: string) => {
       const client = clientRef.current;
-      if (!client || !connected) throw new Error("请先连接 OpenCode。");
+      if (!client || !connected) throw new Error(i18n.t("msg.connectToOpencodeFirst"));
       const session = await client.renameSession(sessionId, title);
       setSessions((current) => current.map((entry) => (entry.id === sessionId ? session : entry)));
     },
@@ -806,7 +808,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         syncFromStore();
       } catch (err) {
         if (isAbortError(err)) return;
-        setError(err instanceof Error ? err.message : "Failed to delete session");
+        setError(err instanceof Error ? err.message : i18n.t("msg.failedToDeleteSession"));
       }
     },
     [connected, currentSessionId, syncFromStore],
@@ -826,16 +828,14 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
 
       const sessionId = currentSessionIdRef.current;
       if (!client || !connected || !sessionId) {
-        setError("请先连接 OpenCode 并选择一个会话。");
+        setError(i18n.t("msg.connectToOpencodeAndChooseASessionFirst"));
         return false;
       }
       const modelInfo = providers
         .find((provider) => provider.id === selectedModel?.providerId)
         ?.models.find((model) => model.id === selectedModel?.modelId);
       if (files?.length && modelInfo?.supportsImages === false) {
-        setError(
-          "当前模型被配置为仅支持文字。请切换支持图片的模型，或修正 OpenCode 模型的 modalities.input 配置。",
-        );
+        setError(i18n.t("msg.theCurrentModelIsConfiguredForTextOnlySw"));
         return false;
       }
       setError(null);
@@ -883,7 +883,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         );
         // On error, reset status to idle and show error
         if (!steer) setStatus({ type: "idle" });
-        setError(err instanceof Error ? err.message : "Failed to send message");
+        setError(err instanceof Error ? err.message : i18n.t("msg.failedToSendMessage"));
         return false;
       }
     },
@@ -898,7 +898,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       await client.abort(currentSessionId);
     } catch (err) {
       if (isAbortError(err)) return;
-      setError(err instanceof Error ? err.message : "Failed to abort");
+      setError(err instanceof Error ? err.message : i18n.t("msg.failedToAbort"));
     }
   }, [connected, currentSessionId]);
 
@@ -917,7 +917,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
         console.error(
           `[OpenCode] Failed to answer question: ${getOpenCodeErrorMessage(err, "Unknown error")}`,
         );
-        setError(err instanceof Error ? err.message : "Failed to answer question");
+        setError(err instanceof Error ? err.message : i18n.t("msg.failedToAnswerQuestion"));
       }
     },
     [connected],

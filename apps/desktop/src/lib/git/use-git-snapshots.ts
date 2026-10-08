@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
+import { i18n } from "@/lib/i18n";
 import { afterGitCheck, observeGit, type SnapshotClock } from "./snapshot-clock";
 
 type Status = { isRepo: boolean; head: string | null; snapshot: string | null };
@@ -41,12 +42,12 @@ export function useGitSnapshots(project: string, manager: SaveManager, paused: b
       remember(afterGitCheck(status, Date.now()));
       setMessage(
         result.created
-          ? `已保存 Git 版本 ${result.hash.slice(0, 7)}`
-          : "没有新改动，Git 版本已是最新",
+          ? i18n.t("msg.savedGitVersionHash", { hash: result.hash.slice(0, 7) })
+          : i18n.t("msg.noNewChangesTheGitVersionIsUpToDate"),
       );
       return true;
     } catch (cause) {
-      setError(`Git 版本保存失败：${String(cause)}`);
+      setError(i18n.t("msg.couldNotSaveAGitVersionError", { error: String(cause) }));
       return false;
     } finally {
       busyRef.current = false;
@@ -78,7 +79,8 @@ export function useGitSnapshots(project: string, manager: SaveManager, paused: b
         )
           await save();
       } catch (cause) {
-        if (!cancelled) setError(`Git 自动保存检查失败：${String(cause)}`);
+        if (!cancelled)
+          setError(i18n.t("msg.theGitAutoSaveCheckFailedError", { error: String(cause) }));
       } finally {
         checking = false;
       }

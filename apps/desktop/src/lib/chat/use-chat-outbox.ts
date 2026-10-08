@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { i18n } from "@/lib/i18n";
 import { ChatOutbox, outboxStorage, type QueuedMessage } from "./outbox";
 export function useChatOutbox({
   scope,
@@ -20,7 +21,8 @@ export function useChatOutbox({
   const outbox = useMemo(
     () =>
       new ChatOutbox(scope || "unbound", outboxStorage, (message) => {
-        if (deliveryRef.current.scope !== scope) throw new Error("对话已切换，队列保持原对话。");
+        if (deliveryRef.current.scope !== scope)
+          throw new Error(i18n.t("msg.theConversationChangedTheQueueStaysWithT"));
         return deliveryRef.current.deliver(message);
       }),
     [scope],

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { i18n } from "@/lib/i18n";
 import { readCompilerOverrides } from "./compiler-overrides";
 import type { BuildTarget, TargetBuildResult } from "./types";
 
@@ -27,7 +28,7 @@ export function useTargetBuild({
       if (!(await prepare())) return;
       running.current = true;
       setCompiling(true);
-      toast(`正在编译 ${target.name} · ${target.mainFile}`);
+      toast(i18n.t("msg.compilingNameFile", { name: target.name, file: target.mainFile }));
       try {
         const result = await invoke<TargetBuildResult>("latex_build_target", {
           directory: projectPath,
@@ -36,10 +37,12 @@ export function useTargetBuild({
         });
         if (result.success && result.pdfPath && result.pdfRelative) {
           onBuilt({ relative: result.pdfRelative, absolute: result.pdfPath });
-          toast(`编译完成：${result.pdfRelative}（${result.engine}）`);
+          toast(
+            i18n.t("msg.compiledPdfEngine", { pdf: result.pdfRelative, engine: result.engine }),
+          );
         } else await onFailed(target, result);
       } catch (cause) {
-        toast(`编译未完成：${String(cause)}`, "error");
+        toast(i18n.t("msg.compilationDidNotFinishError", { error: String(cause) }), "error");
       } finally {
         running.current = false;
         setCompiling(false);

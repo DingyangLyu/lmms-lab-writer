@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { i18n } from "@/lib/i18n";
 import {
   type BuildTarget,
   DEFAULT_LATEX_SETTINGS,
@@ -59,7 +60,7 @@ export function useLatexSettings(projectPath: string | null) {
   }, [projectPath, reload]);
   const saveConfig = useCallback(
     async (next: ProjectBuildConfig) => {
-      if (!projectPath) throw new Error("请先打开项目");
+      if (!projectPath) throw new Error(i18n.t("msg.openAProjectFirst2"));
       setSaving(true);
       setError(null);
       const save = serial.current

@@ -1,4 +1,5 @@
 import type { EditorSelectionContext } from "@/lib/editor/selection-context";
+import { i18n } from "@/lib/i18n";
 import type { ChatImageFile } from "./images";
 export type ChatDraft = {
   raw: string;
@@ -65,8 +66,8 @@ export class ChatOutbox {
             state: item.state === "sending" ? "uncertain" : item.state,
           })),
           error: saved.items.some((i) => i.state === "sending")
-            ? "上次发送结果未确认，请核对历史后重试或移除。"
-            : "已恢复本地队列，点击继续后发送。",
+            ? i18n.t("msg.theLastSendWasNotConfirmedCheckTheHistor")
+            : i18n.t("msg.theLocalQueueWasRestoredClickContinueToS"),
         };
       else this.state = { ...this.state, loaded: true };
     } catch (cause) {
@@ -74,7 +75,7 @@ export class ChatOutbox {
         ...this.state,
         paused: true,
         loaded: false,
-        error: `队列读取失败：${String(cause)}`,
+        error: i18n.t("msg.couldNotReadTheQueueError", { error: String(cause) }),
       };
     }
     this.notify();
@@ -89,7 +90,10 @@ export class ChatOutbox {
           this.state = next;
           this.notify();
         } catch (cause) {
-          this.state = { ...this.state, error: `队列保存失败：${String(cause)}` };
+          this.state = {
+            ...this.state,
+            error: i18n.t("msg.couldNotSaveTheQueueError", { error: String(cause) }),
+          };
           this.notify();
           throw cause;
         }
@@ -104,7 +108,7 @@ export class ChatOutbox {
     void this.pump();
   }
   async enqueue(draft: ChatDraft) {
-    if (!this.state.loaded) throw new Error("队列尚未就绪，输入内容已保留。");
+    if (!this.state.loaded) throw new Error(i18n.t("msg.theQueueIsNotReadyYetYourInputWasKept"));
     const message: QueuedMessage = {
       ...structuredClone(draft),
       id: crypto.randomUUID(),
@@ -112,7 +116,8 @@ export class ChatOutbox {
       state: "queued",
     };
     await this.change((current) => {
-      if (current.items.length >= 50) throw new Error("每个对话最多保留 50 条待发消息。");
+      if (current.items.length >= 50)
+        throw new Error(i18n.t("msg.eachConversationCanHoldAtMost50QueuedMes"));
       return { ...current, items: [...current.items, message] };
     });
     void this.pump();
@@ -172,9 +177,7 @@ export class ChatOutbox {
       this.lostWhileWaiting = false;
       this.waitingEpoch = null;
       if (this.state.items.length && !this.state.paused)
-        void this.pause("连接中断后无法确认上一条是否完成，队列已暂停；请核对历史后继续。").catch(
-          () => {},
-        );
+        void this.pause(i18n.t("msg.theConnectionDroppedBeforeTheLastMessage")).catch(() => {});
       return;
     }
     if (
@@ -225,7 +228,7 @@ export class ChatOutbox {
       this.state = {
         ...this.state,
         paused: true,
-        error: `队列发送失败，后续消息已暂停：${String(cause)}`,
+        error: i18n.t("msg.sendingFromTheQueueFailedTheRemainingMes", { error: String(cause) }),
         items: this.state.items.map((item) =>
           item.id === first.id ? { ...item, state: "uncertain" } : item,
         ),

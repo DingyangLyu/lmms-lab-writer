@@ -146,9 +146,9 @@ export function SynctexInstallDialog({
                     {t("latex.installSynctex")}
                   </button>
                   <p className="text-xs text-muted mt-2">
-                    Will run{" "}
-                    <code className="bg-accent-hover px-1 py-0.5">tlmgr install synctex</code> to
-                    install the missing package.
+                    {t("latex.willRun")}{" "}
+                    <code className="bg-accent-hover px-1 py-0.5">tlmgr install synctex</code>{" "}
+                    {t("latex.toInstallTheMissingPackage")}
                   </p>
                 </motion.div>
               )}
@@ -167,11 +167,11 @@ export function SynctexInstallDialog({
                     <span className="text-sm font-medium">
                       {quickStatus === "checking"
                         ? t("latex.installingSynctexViaTlmgr")
-                        : "Installing..."}
+                        : t("latex.installing")}
                     </span>
                   </div>
                   <p className="text-sm text-muted mt-1">
-                    Running{" "}
+                    {t("latex.running")}{" "}
                     <code className="text-xs bg-accent-hover px-1 py-0.5">
                       tlmgr install synctex
                     </code>

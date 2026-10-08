@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { conversationTitle } from "@/lib/bridge/context";
+import { i18n } from "@/lib/i18n";
 import { OpenCodeClient } from "@/lib/opencode/client";
 import type { HarnessId } from "./types";
 export type HistoryEntry = { id: string; title: string; updatedAt?: number };
@@ -19,7 +20,10 @@ export const HISTORY_ADAPTERS: Record<HarnessId, HistoryAdapter> = {
       return {
         entries: (result.data || []).map((t) => ({
           id: t.id,
-          title: t.name?.trim() || conversationTitle(t.preview) || "未命名 Codex 对话",
+          title:
+            t.name?.trim() ||
+            conversationTitle(t.preview) ||
+            i18n.t("msg.untitledCodexConversation"),
           updatedAt: t.updatedAt ? t.updatedAt * 1000 : undefined,
         })),
         cursor: result.nextCursor,
@@ -48,7 +52,7 @@ export const HISTORY_ADAPTERS: Record<HarnessId, HistoryAdapter> = {
       return {
         entries: sessions.map((s) => ({
           id: s.id,
-          title: s.title || "未命名 OpenCode 对话",
+          title: s.title || i18n.t("msg.untitledOpencodeConversation"),
           updatedAt: s.time.updated,
         })),
       };

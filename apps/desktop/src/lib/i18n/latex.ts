@@ -64,6 +64,10 @@ export const latexZh = {
   "latex.installSynctex": "安装 SyncTeX",
   "latex.retrySynctex": "重试 SyncTeX",
   "latex.dismiss": "关闭",
+  "latex.toInstallTheMissingPackage": "来安装缺少的宏包。",
+  "latex.installing": "正在安装…",
+  "latex.willRun": "将运行",
+  "latex.running": "正在运行",
 };
 export const latexEn: Record<keyof typeof latexZh, string> = {
   "latex.mainFileWorkingDirectoryAndOutputDirecto":
@@ -133,4 +137,8 @@ export const latexEn: Record<keyof typeof latexZh, string> = {
   "latex.installSynctex": "Install SyncTeX",
   "latex.retrySynctex": "Retry SyncTeX",
   "latex.dismiss": "Dismiss",
+  "latex.toInstallTheMissingPackage": "to install the missing package.",
+  "latex.installing": "Installing...",
+  "latex.willRun": "Will run",
+  "latex.running": "Running",
 };

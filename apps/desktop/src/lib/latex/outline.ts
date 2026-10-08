@@ -1,3 +1,4 @@
+import { i18n } from "@/lib/i18n";
 export type OutlineEntry = {
   id: string;
   title: string;
@@ -120,7 +121,7 @@ export function latexOutline(source: string): OutlineEntry[] {
           : "";
       entry = {
         id: `${kind}:${line}`,
-        title: `${kind === "figure" ? "图" : "表"} · ${titleText(detail || "") || `第 ${line} 行`}`,
+        title: `${kind === "figure" ? i18n.t("msg.figure") : i18n.t("msg.table")} · ${titleText(detail || "") || i18n.t("msg.lineNumber", { line })}`,
         line,
         kind,
         level: 7,
@@ -142,7 +143,7 @@ export function latexOutline(source: string): OutlineEntry[] {
       while (sections.length && (sections.at(-1)?.level ?? -1) >= level) sections.pop();
       entry = {
         id: `${name}:${line}`,
-        title: titleText(arg.text) || "未命名章节",
+        title: titleText(arg.text) || i18n.t("msg.untitledSection"),
         line,
         kind: "section",
         level,

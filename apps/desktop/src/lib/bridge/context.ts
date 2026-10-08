@@ -1,5 +1,6 @@
-import { splitAttachmentMessage } from "@/lib/chat/files";
+import { READ_ATTACHMENTS, splitAttachmentMessage } from "@/lib/chat/files";
 import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
+import { i18n } from "@/lib/i18n";
 
 const CONTEXT_PREFIX = "[Writer conversation ID: ";
 /** Hide Writer's transport context in message bubbles, retaining delegated tasks/results. */
@@ -22,8 +23,10 @@ export function conversationTitle(text: string | null | undefined, limit = 60): 
     .map((part) => part.trim())
     .find(Boolean);
   const title =
-    (line !== "请阅读这些附件。" && line) ||
-    (attachment?.files[0] ? `附件：${attachment.files[0].name}` : line || "");
+    (line && !Object.values(READ_ATTACHMENTS).includes(line) && line) ||
+    (attachment?.files[0]
+      ? i18n.t("msg.attachmentName", { name: attachment.files[0].name })
+      : line || "");
   const chars = Array.from(title);
   return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : title;
 }

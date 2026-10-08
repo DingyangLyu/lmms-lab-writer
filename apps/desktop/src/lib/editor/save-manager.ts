@@ -1,4 +1,5 @@
 import { type DocumentConflict, mergeText, type SaveResult } from "@lmms-lab/writing";
+import { i18n } from "@/lib/i18n";
 export type Draft = {
   project: string;
   path: string;
@@ -67,7 +68,7 @@ export class SaveManager {
         }
       }
     } catch {
-      draftError = "无法读取本地恢复草稿。请保持应用打开并保存文件。";
+      draftError = i18n.t("msg.couldNotReadTheLocalRecoveryDraftKeepThe");
     }
     const recovered = draft !== null && draft.content !== disk;
     const doc: DocumentSave = {
@@ -116,7 +117,7 @@ export class SaveManager {
 
   edit(project: string, path: string, content: string, editorBase?: string) {
     const doc = this.get(project, path);
-    if (!doc) throw new Error("文件尚未读取，不能保存。请重新打开文件。");
+    if (!doc) throw new Error(i18n.t("msg.theFileHasNotBeenReadYetSoItCannotBeSave"));
     if (content === doc.content) return;
     if (doc.localConflict) {
       const merged = mergeText(doc.localConflict.base, content, doc.localConflict.theirs);
@@ -190,8 +191,7 @@ export class SaveManager {
       );
       doc.draftError = null;
     } catch {
-      doc.draftError =
-        "本地恢复草稿写入失败（存储空间可能不足）。请立即保存或另存副本，保持应用打开。";
+      doc.draftError = i18n.t("msg.couldNotWriteTheLocalRecoveryDraftStorag");
     }
   }
   async flushDocument(doc: DocumentSave): Promise<void> {
@@ -206,7 +206,7 @@ export class SaveManager {
     }
     if (!doc.dirty) return;
     if (doc.localConflict) {
-      doc.error = "编辑器两处修改存在冲突，请在冲突面板中合并；双方草稿已保留。";
+      doc.error = i18n.t("msg.twoSetsOfEditorChangesConflictMergeThemI");
       this.changed();
       throw new Error(doc.error);
     }
@@ -215,7 +215,8 @@ export class SaveManager {
     const run = async () => {
       try {
         while (doc.dirty) {
-          if (doc.localConflict) throw new Error("编辑器修改存在冲突，请打开冲突面板。");
+          if (doc.localConflict)
+            throw new Error(i18n.t("msg.theEditorChangesConflictOpenTheConflictP"));
           const revision = doc.revision;
           const content = doc.content;
           const result = await this.write({
@@ -227,7 +228,7 @@ export class SaveManager {
           if (result?.status === "conflict") {
             if (doc.revision !== revision && !doc.localConflict) continue;
             doc.conflict = result.conflict;
-            throw new Error("发现重叠修改，双方内容已保留，请打开“冲突”合并。");
+            throw new Error(i18n.t("msg.overlappingChangesWereFoundAndBothVersio"));
           }
           const saved = result?.content ?? content;
           doc.conflict = null;
@@ -241,14 +242,15 @@ export class SaveManager {
             doc.base = saved;
             doc.content = saved;
           }
-          if (result?.merged) doc.mergeNotice = "已自动合并外部修改";
+          if (result?.merged)
+            doc.mergeNotice = i18n.t("msg.externalChangesWereMergedAutomatically");
           if (doc.dirty) this.persist(doc);
           else {
             try {
               this.storage.removeItem(PREFIX + documentKey(doc.project, doc.path));
               doc.draftError = null;
             } catch {
-              doc.draftError = "文件已保存，但旧恢复草稿清理失败。";
+              doc.draftError = i18n.t("msg.theFileWasSavedButTheOldRecoveryDraftCou");
             }
           }
           if (result?.versionError) doc.draftError = result.versionError;
@@ -315,7 +317,8 @@ export class SaveManager {
     if (failure?.status === "rejected") throw failure.reason;
   }
   async resolveLocal(doc: DocumentSave, content: string, expected: string) {
-    if (doc.content !== expected) throw new Error("草稿又有修改，请重新打开冲突面板。");
+    if (doc.content !== expected)
+      throw new Error(i18n.t("msg.theDraftChangedAgainReopenTheConflictPan"));
     doc.localConflict = null;
     doc.conflict = null;
     doc.content = content;
@@ -351,14 +354,14 @@ export class SaveManager {
     try {
       this.storage.removeItem(PREFIX + documentKey(project, path));
     } catch {
-      doc.draftError = "文件已保存，但旧恢复草稿清理失败。";
+      doc.draftError = i18n.t("msg.theFileWasSavedButTheOldRecoveryDraftCou");
     }
     this.changed();
   }
   /** Explicitly discarding a draft is only called after the user confirms. */
   discard(project: string, path: string, disk: string) {
     const doc = this.get(project, path);
-    if (doc?.saving) throw new Error("正在保存，请稍后重试。");
+    if (doc?.saving) throw new Error(i18n.t("msg.savingIsInProgressTryAgainInAMoment"));
     if (doc?.timer) clearTimeout(doc.timer);
     if (doc?.persistTimer) clearTimeout(doc.persistTimer);
     this.storage.removeItem(PREFIX + documentKey(project, path));
