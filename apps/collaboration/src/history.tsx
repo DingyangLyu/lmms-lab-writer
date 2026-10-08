@@ -1,7 +1,7 @@
 import { diffLines } from "diff";
 import { useEffect, useState } from "react";
 import type { Snapshot, SnapshotChange } from "../shared/api";
-import { api } from "./api";
+import { api, errorText } from "./api";
 import { useI18n } from "./i18n";
 import { useSnapshotLabel } from "./workspace/history-tab";
 
@@ -42,7 +42,7 @@ export function SnapshotCompare({
   useEffect(() => {
     void api<Change[]>(`${prefix}/snapshots/${snapshot.id}/changes`)
       .then(setChanges)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
   }, [prefix, snapshot.id]);
   useEffect(() => {
     setRows(null);
@@ -61,7 +61,7 @@ export function SnapshotCompare({
       .then(([before, after]) => {
         if (!stale) setRows(diffRows(before, after));
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
     return () => {
       stale = true;
     };

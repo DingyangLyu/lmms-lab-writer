@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FileContent, FileInfo } from "../../shared/api";
-import { api, unbase64 } from "../api";
+import { api, errorText, unbase64 } from "../api";
 import { useI18n } from "../i18n";
 
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
@@ -28,7 +28,7 @@ export function BinaryPreview({ prefix, file }: { prefix: string; file: FileInfo
         current = URL.createObjectURL(new Blob([unbase64(data.base64)], { type }));
         setUrl(current);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
     return () => {
       disposed = true;
       if (current) URL.revokeObjectURL(current);

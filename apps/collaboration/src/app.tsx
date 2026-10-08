@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary, PublicUser } from "../shared/api";
 import { AdminPanel, ChangePassword } from "./account";
-import { api } from "./api";
+import { api, errorText } from "./api";
 import { useI18n } from "./i18n";
 import { roleKey } from "./labels";
 import { LanguageSwitch } from "./language-switch";
@@ -96,7 +96,7 @@ function Projects({
   useEffect(() => {
     void api<ProjectSummary[]>("/projects")
       .then(setProjects)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errorText(e)));
   }, [setError]);
   return (
     <main className="dashboard">

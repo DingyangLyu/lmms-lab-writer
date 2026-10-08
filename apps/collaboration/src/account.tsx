@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Account, IssuedPassword } from "../shared/api";
-import { api } from "./api";
+import { api, errorText } from "./api";
 import { useI18n } from "./i18n";
 
 export function ChangePassword({
@@ -31,7 +31,7 @@ export function ChangePassword({
         setError("");
         void api("/me/password", { current, next })
           .then(onDone)
-          .catch((e) => setError(String(e)))
+          .catch((e) => setError(errorText(e)))
           .finally(() => setBusy(false));
       }}
     >
@@ -99,14 +99,14 @@ export function AdminPanel({ me, onBack }: { me: string; onBack: () => void }) {
     [busy, setBusy] = useState(false);
   const reload = useCallback(async () => setUsers(await api<Account[]>("/admin/users")), []);
   useEffect(() => {
-    void reload().catch((e) => setError(String(e)));
+    void reload().catch((e) => setError(errorText(e)));
   }, [reload]);
   const run = (action: () => Promise<void>) => {
     setBusy(true);
     setError("");
     void action()
       .then(reload)
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(errorText(e)))
       .finally(() => setBusy(false));
   };
   return (

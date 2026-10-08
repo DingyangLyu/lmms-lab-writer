@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Role, SharedJob } from "../shared/api";
-import { api } from "./api";
+import { api, errorText } from "./api";
 import { type MessageKey, useI18n } from "./i18n";
 
 const STATUS: Record<string, MessageKey> = {
@@ -37,7 +37,7 @@ export function TasksPanel({
     try {
       await action();
     } catch (e) {
-      onError(String(e));
+      onError(errorText(e));
     } finally {
       setBusy(false);
     }

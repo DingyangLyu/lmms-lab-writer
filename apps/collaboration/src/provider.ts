@@ -2,7 +2,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
 import type { PublicUser, Role } from "../shared/api";
-import { base64, unbase64 } from "./api";
+import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
 export type SyncStatus = "connecting" | "saved" | "saving" | "offline" | "denied";
 /** The fields of a signed-in user the editor needs. */
@@ -52,7 +52,7 @@ export class WriterProvider {
     void this.cache.whenSynced
       .then(() => this.connect())
       .catch((e) => {
-        this.error(i18n.t("sync.draftUnavailable", { error: String(e) }));
+        this.error(i18n.t("sync.draftUnavailable", { error: errorText(e) }));
         this.connect();
       });
   }
@@ -149,7 +149,7 @@ export class WriterProvider {
           this.role("viewer");
         }
       } catch (e) {
-        this.error(i18n.t("sync.badData", { error: String(e) }));
+        this.error(i18n.t("sync.badData", { error: errorText(e) }));
       }
     };
     socket.onclose = (event) => {

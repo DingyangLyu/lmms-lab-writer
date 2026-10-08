@@ -1,6 +1,7 @@
 import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
+import { errorText } from "./api";
 import { i18n } from "./i18n";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -42,7 +43,7 @@ export function PdfViewer({
         setError("");
       })
       .catch((e) => {
-        if (!disposed) setError(i18n.t("pdf.failed", { error: String(e) }));
+        if (!disposed) setError(i18n.t("pdf.failed", { error: errorText(e) }));
       });
     return () => {
       disposed = true;

@@ -1,7 +1,7 @@
 import { citations, displayBib, normalizeDoi, parseBib } from "@lmms-lab/writing";
 import { useEffect, useState } from "react";
 import type { BibliographyImport, FileContent, SourceFile } from "../../shared/api";
-import { api } from "../api";
+import { api, errorText } from "../api";
 import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
@@ -24,7 +24,7 @@ export function BibliographyTab({
   useEffect(() => {
     void refreshSources()
       .then((s) => setBibFile((old) => old || s.find((f) => f.path.endsWith(".bib"))?.id || ""))
-      .catch((e) => report(String(e)));
+      .catch((e) => report(errorText(e)));
   }, [refreshSources, report]);
   const entries = sources
     .filter((f) => f.path.endsWith(".bib"))

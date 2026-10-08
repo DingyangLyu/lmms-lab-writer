@@ -18,6 +18,9 @@ export async function api<T>(
     throw new Error(data.error || i18n.t("common.requestFailed", { status: response.status }));
   return data as T;
 }
+/** What a user should read: the message, without the "Error:" prefix of String(error). */
+export const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 export const base64 = (bytes: Uint8Array) => {
   let s = "";
   for (let i = 0; i < bytes.length; i += 8192)

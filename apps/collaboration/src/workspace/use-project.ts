@@ -10,7 +10,7 @@ import type {
   Snapshot,
   SourceFile,
 } from "../../shared/api";
-import { api } from "../api";
+import { api, errorText } from "../api";
 import { i18n } from "../i18n";
 
 /**
@@ -68,7 +68,7 @@ export function useProject(
       }
       loading = true;
       void reload()
-        .catch((e) => onError(String(e)))
+        .catch((e) => onError(errorText(e)))
         .finally(() => {
           loading = false;
           if (again && !stopped) {

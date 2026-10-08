@@ -21,7 +21,7 @@ import { useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 import type { Comment, Role } from "../shared/api";
-import { base64, unbase64 } from "./api";
+import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
@@ -200,7 +200,7 @@ export function Editor({
           v.dispatch({ selection: { anchor: a.index, head: z.index }, scrollIntoView: true });
           v.focus();
         } catch (e) {
-          callbacks.current.onError(String(e));
+          callbacks.current.onError(errorText(e));
         }
       },
     });
