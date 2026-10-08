@@ -3,11 +3,45 @@ import { zipSync } from "fflate";
 import * as Y from "yjs";
 import type { FileContent, FileInfo, SourceFile } from "../../shared/api";
 import { sql, uniqueViolation } from "../db";
-import { created, handled, type InProject, route, str } from "../http";
+import { type Body, created, handled, type InProject, number, route, str } from "../http";
+import type { FileMeta } from "../store";
 import { decodeText, fail, isTextPath, safePath, textDoc, uid } from "../util";
 
 const PROJECT_FILES = 2000,
   PROJECT_BYTES = 100_000_000;
+
+/**
+ * New content for a figure or other binary file, guarded by the revision the client last saw.
+ * One automatic version per five minutes keeps the replaced content restorable without a
+ * full project copy for every regenerated plot.
+ */
+async function replaceBinary(ctx: InProject, file: FileMeta, body: Body) {
+  const { store, project } = ctx;
+  const value = str(body, "base64", 14_000_000),
+    revision = number(body, "revision");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) fail(400, "无效文件编码");
+  const bytes = Buffer.from(value, "base64");
+  if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
+  const saved = await store.db.transaction(async (tx) => {
+    const size = await tx.row<{ bytes: number }>(
+      sql`SELECT coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project} AND id<>${file.id}`,
+    );
+    if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) fail(413, "项目超过 100 MB");
+    const recent = await tx.row(
+      sql`SELECT 1 FROM snapshots WHERE project=${project} AND NOT manual AND created>${Date.now() - 300_000}`,
+    );
+    if (!recent) await store.snapshot(project, ctx.user.id, "替换文件前", false, tx);
+    const row =
+      (await tx.row<{ revision: number }>(
+        sql`UPDATE files SET state=${bytes}, revision=revision+1
+            WHERE id=${file.id} AND revision=${revision} AND NOT deleted RETURNING revision`,
+      )) ?? fail(409, "文件已被其他人更新，请先同步");
+    await store.audit(project, ctx.user.id, "file.replace", { file: file.id, path: file.path }, tx);
+    return row.revision;
+  });
+  ctx.collab.changed(project);
+  return { ok: true, revision: saved };
+}
 
 export const fileRoutes = [
   route<InProject>("GET", /^files$/, (ctx) =>
@@ -74,8 +108,8 @@ export const fileRoutes = [
   route<InProject>("PUT", /^files\/([^/]+)$/, async (ctx, [id = ""]) => {
     await ctx.need("edit");
     const file = await ctx.store.fileMeta(ctx.project, id);
-    if (file.binary) fail(400, "二进制文件请上传为新版本文件名");
     const body = await ctx.body();
+    if (file.binary) return replaceBinary(ctx, file, body);
     await ctx.collab.replace(
       ctx.project,
       file.id,

@@ -162,6 +162,19 @@ describe("desktop sign-in and folder sync", () => {
     sync.send({ type: "ping", file: a });
     await sync.next("pong");
 
+    // Binary files are replaced in place, guarded by the revision the client saw.
+    const replace = (revision: number) =>
+      f.call(
+        `/projects/${f.project}/files/${figure}`,
+        { base64: "AQID", revision },
+        f.owner,
+        "PUT",
+      );
+    expect((await replace(1)).data.revision).toBe(2);
+    expect((await replace(1)).status).toBe(409);
+    const figureNow = await f.call(`/projects/${f.project}/files/${figure}`, undefined, f.owner);
+    expect([figureNow.data.base64, figureNow.data.revision]).toEqual(["AQID", 2]);
+
     // Deleting a followed document tells the sync socket instead of closing it.
     await f.call(`/projects/${f.project}/files/${a}`, undefined, f.owner, "DELETE");
     expect((await sync.next("closed", a)).file).toBe(a);
