@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { startAgentHost } from "./agent-host";
 import { isTextPath, safePath } from "./util";
 
 type Job = {
@@ -246,6 +247,9 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
 export async function runWorker() {
   if (!token) throw new Error("请设置项目专属 WRITER_RUNNER_TOKEN");
   console.log(`Writer runner connected to ${origin}; capabilities: ${allowed.join(",")}`);
+  // Live AI conversations from the web (shared runner only; the server refuses other tokens).
+  if (allowed.includes("codex") && process.env.WRITER_AGENT_HOST !== "0")
+    startAgentHost({ server: origin, token });
   while (true) {
     let work = "",
       job: Job | null = null;

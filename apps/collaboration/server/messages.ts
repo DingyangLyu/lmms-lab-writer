@@ -136,6 +136,31 @@ export const englishMessages: Record<string, string> = {
   项目快照过大: "The project snapshot is too large",
   // jobs and runners
   "Runner 凭据无效": "Invalid runner credentials",
+  // live AI conversations (agents.ts)
+  "共享执行器未连接，AI 对话暂不可用":
+    "The shared runner is not connected; AI conversations are unavailable",
+  共享执行器已断开: "The shared runner disconnected",
+  执行器没有响应: "The runner did not respond",
+  "执行器：{error}": "Runner: {error}",
+  "AI 对话操作失败": "The AI conversation request failed",
+  无效对话: "Invalid conversation",
+  对话不存在或未共享: "This conversation does not exist or is not shared with you",
+  只有对话的发起人可以重命名或共享:
+    "Only the member who started this conversation can rename or share it",
+  "对话名称需为 1–120 个字符": "Conversation names must be 1\u2013120 characters",
+  执行器不支持这种权限模式: "The runner does not support this permission mode",
+  这个对话还在运行: "This conversation is still running",
+  "{name} 的 AI 对话正在修改此项目，请等它完成":
+    "{name}'s AI conversation is changing this project; wait until it finishes",
+  这一轮已经结束: "This turn has already ended",
+  消息不能为空: "The message is empty",
+  "一次最多发送 6 张图片": "Send at most 6 images at a time",
+  图片格式或大小不正确: "Wrong image format or size",
+  "图片总大小超过 24 MB": "The images exceed 24 MB in total",
+  "AI 改动无效": "Invalid AI changes",
+  "文件已被其他人修改，未删除": "Someone else changed the file; it was not deleted",
+  文件类型已改变: "The file changed between text and binary",
+  文件已被其他人替换: "Someone else replaced the file",
   任务不存在: "Task not found",
   任务已结束或取消: "The task already finished or was cancelled",
   提交者已无编辑权限: "The submitter can no longer edit",

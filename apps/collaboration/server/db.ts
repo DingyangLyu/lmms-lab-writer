@@ -272,6 +272,18 @@ export const migrations: string[] = [
   `ALTER TABLE comments ADD COLUMN pdf TEXT;
    ALTER TABLE comments ADD COLUMN edited BIGINT;
    ALTER TABLE replies ADD COLUMN edited BIGINT;`,
+  // 8: AI conversations held on the shared runner: who owns them and whether they are shared.
+  `CREATE TABLE agent_threads(
+     id TEXT PRIMARY KEY,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     owner TEXT NOT NULL REFERENCES users(id),
+     harness TEXT NOT NULL,
+     title TEXT NOT NULL DEFAULT '',
+     shared BOOLEAN NOT NULL DEFAULT false,
+     created BIGINT NOT NULL,
+     updated BIGINT NOT NULL
+   );
+   CREATE INDEX agent_threads_project ON agent_threads(project, updated);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

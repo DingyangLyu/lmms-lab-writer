@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import type { Locale } from "@lmms-lab/i18n";
+import { Agents } from "./agents";
 import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
@@ -104,6 +105,7 @@ export async function createWriterServer(options: Options) {
   }
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
+  const agents = new Agents(store, collab, () => origin, options.sharedRunner);
   let templates: Promise<Map<string, Template>> | null = null;
   const services = {
     store,
@@ -177,13 +179,16 @@ export async function createWriterServer(options: Options) {
       sendError(res, error, requestLocale(req.headers));
     }
   });
-  server.on("upgrade", (req, socket, head) => collab.upgrade(req, socket, head));
+  server.on("upgrade", (req, socket, head) =>
+    agents.handles(req) ? agents.upgrade(req, socket, head) : collab.upgrade(req, socket, head),
+  );
   try {
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(options.port ?? 8787, options.host ?? "127.0.0.1", resolve);
     });
   } catch (error) {
+    agents.close();
     collab.close();
     await store.close();
     throw error;
@@ -195,8 +200,10 @@ export async function createWriterServer(options: Options) {
     server,
     store,
     collab,
+    agents,
     origin,
     close: async () => {
+      agents.close();
       collab.close();
       await new Promise<void>((resolve, reject) =>
         server.close((e) => (e ? reject(e) : resolve())),

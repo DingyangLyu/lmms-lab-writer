@@ -4,7 +4,7 @@ import * as Y from "yjs";
 import type { FileContent, FileInfo, SourceFile } from "../../shared/api";
 import { sql, uniqueViolation } from "../db";
 import { type Body, created, handled, type InProject, number, route, str } from "../http";
-import type { FileMeta } from "../store";
+import type { FileMeta, Store } from "../store";
 import { decodeText, fail, isTextPath, safePath, textDoc, uid } from "../util";
 
 export const PROJECT_FILES = 2000,
@@ -43,6 +43,50 @@ async function replaceBinary(ctx: InProject, file: FileMeta, body: Body) {
   return { ok: true, revision: saved };
 }
 
+/**
+ * A new file within the project's limits: text is stored as a Yjs document, anything else as
+ * bytes. Also used for files an AI agent creates.
+ */
+export async function createFile(
+  store: Store,
+  project: string,
+  actor: string,
+  path: string,
+  data: string | Uint8Array,
+): Promise<FileInfo> {
+  safePath(path);
+  const binary = !isTextPath(path);
+  let bytes: Uint8Array;
+  if (binary) bytes = typeof data === "string" ? Buffer.from(data) : data;
+  else {
+    const text = typeof data === "string" ? data : Buffer.from(data).toString("utf8");
+    if (Buffer.byteLength(text) > 2_000_000) fail(413, "文本文件超过 2 MB");
+    const d = textDoc(text);
+    bytes = Y.encodeStateAsUpdate(d);
+    d.destroy();
+  }
+  if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
+  const limits = await store.db.row<{ count: number; bytes: number }>(
+    sql`SELECT count(*) AS count, coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project}`,
+  );
+  if ((limits?.count ?? 0) >= PROJECT_FILES || (limits?.bytes ?? 0) + bytes.length > PROJECT_BYTES)
+    fail(413, "项目超过 2000 个文件或 100 MB");
+  const id = uid();
+  try {
+    await store.db.transaction(async (tx) => {
+      await store.releasePath(project, path, tx);
+      await tx.run(
+        sql`INSERT INTO files(id, project, path, state, is_binary) VALUES(${id}, ${project}, ${path}, ${bytes}, ${binary})`,
+      );
+      await store.audit(project, actor, "file.create", { id, path }, tx);
+    });
+  } catch (error) {
+    if (uniqueViolation(error)) fail(409, "同名文件已存在，请在编辑器中更新");
+    throw error;
+  }
+  return { id, path, binary, revision: 1 };
+}
+
 export const fileRoutes = [
   route<InProject>("GET", /^files$/, (ctx) =>
     ctx.store.db.rows<FileInfo>(
@@ -52,45 +96,20 @@ export const fileRoutes = [
   ),
   route<InProject>("POST", /^files$/, async (ctx) => {
     await ctx.need("edit");
-    const { store, project } = ctx,
-      body = await ctx.body(),
+    const body = await ctx.body(),
       path = safePath(str(body, "path", 240));
     const binary = !isTextPath(path);
     const value = str(body, binary ? "base64" : "content", binary ? 14_000_000 : 2_000_000);
-    let bytes: Uint8Array;
-    if (binary) {
-      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) fail(400, "无效文件编码");
-      bytes = Buffer.from(value, "base64");
-    } else {
-      if (Buffer.byteLength(value) > 2_000_000) fail(413, "文本文件超过 2 MB");
-      const d = textDoc(value);
-      bytes = Y.encodeStateAsUpdate(d);
-      d.destroy();
-    }
-    if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
-    const limits = await store.db.row<{ count: number; bytes: number }>(
-      sql`SELECT count(*) AS count, coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project}`,
+    if (binary && !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) fail(400, "无效文件编码");
+    const info = await createFile(
+      ctx.store,
+      ctx.project,
+      ctx.user.id,
+      path,
+      binary ? Buffer.from(value, "base64") : value,
     );
-    if (
-      (limits?.count ?? 0) >= PROJECT_FILES ||
-      (limits?.bytes ?? 0) + bytes.length > PROJECT_BYTES
-    )
-      fail(413, "项目超过 2000 个文件或 100 MB");
-    const id = uid();
-    try {
-      await store.db.transaction(async (tx) => {
-        await store.releasePath(project, path, tx);
-        await tx.run(
-          sql`INSERT INTO files(id, project, path, state, is_binary) VALUES(${id}, ${project}, ${path}, ${bytes}, ${binary})`,
-        );
-        await store.audit(project, ctx.user.id, "file.create", { id, path }, tx);
-      });
-    } catch (error) {
-      if (uniqueViolation(error)) fail(409, "同名文件已存在，请在编辑器中更新");
-      throw error;
-    }
-    ctx.collab.changed(project);
-    return created({ id, path, binary, revision: 1 } satisfies FileInfo);
+    ctx.collab.changed(ctx.project);
+    return created(info);
   }),
   route<InProject>("GET", /^files\/([^/]+)$/, async (ctx, [id = ""]): Promise<FileContent> => {
     const file = await ctx.store.fileMeta(ctx.project, id);
