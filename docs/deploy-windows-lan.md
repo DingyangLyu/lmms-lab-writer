@@ -33,7 +33,7 @@
 
 ## 首次搭建要点
 
-1. Node LTS：`winget install OpenJS.NodeJS.LTS`，再 `npm.cmd install -g pnpm @openai/codex opencode-ai`。这台电脑的 PowerShell 执行策略是 `Restricted`，`pnpm`、`npm`、`npx` 会解析到被禁止的 `.ps1` 脚本，所以在这台电脑上一律写 `pnpm.cmd`、`npm.cmd`、`npx.cmd`。
+1. Node LTS：`winget install OpenJS.NodeJS.LTS`，再 `npm.cmd install -g pnpm @openai/codex opencode-ai`。这台电脑的 PowerShell 执行策略是 `Restricted`，`.ps1` 脚本不能运行，所以这里一律用 `.cmd` 版本：`npm` 全局目录和 `C:\Program Files\nodejs` 里有 `.cmd` 同名文件的 `.ps1` 包装脚本已改名为 `*.ps1.disabled`，直接输入 `pnpm`、`npm`、`npx`、`codex`、`opencode` 也会走 `.cmd`。`npm.cmd install -g` 或升级 Node 后可能重新生成 `.ps1`，再改名即可；本文仍写 `pnpm.cmd` 等，两种情况都能用。
 2. PostgreSQL：这台电脑上 EnterpriseDB 安装器写不了临时 `.bat` 文件，所以用官方免安装包：解压到 `D:\writer\pgsql`，`initdb -D D:\writer\pgdata -U postgres -A scram-sha-256 -E UTF8 --locale=C`，给 `NT AUTHORITY\NetworkService` 授予数据目录权限，`pg_ctl register -N postgresql-writer -S auto -U "NT AUTHORITY\NetworkService"`，再建 `writer` 用户和数据库。
 3. TeX Live：从清华镜像下载 `install-tl.zip`，用 profile 安装 `scheme-full`（不装文档和源码）到 `D:\texlive\current`。
 4. 代码：`pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."`，`pnpm.cmd --filter @lmms-lab/writer-collaboration build`。
