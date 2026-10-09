@@ -159,9 +159,10 @@ async fn save(project: &str, items: &[Annotation]) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())
 }
+/// Compare text without spacing, TeX syntax or hyphens: PDF lines hyphenate words the source writes whole.
 fn norm(s: &str) -> String {
     s.chars()
-        .filter(|c| !c.is_whitespace() && !"{}\\%$~".contains(*c))
+        .filter(|c| !c.is_whitespace() && !"{}\\%$~-".contains(*c))
         .collect()
 }
 pub(crate) fn context_at(file: String, text: &str, line: u32, method: &str) -> Source {
@@ -740,6 +741,16 @@ mod mapping_tests {
         assert_eq!(source.file, "main.tex");
         assert_eq!(source.line, 3);
         assert_eq!(source.method, "text-match");
+        // A word hyphenated across PDF lines still matches the source.
+        let (hyphenated, _) = locate(
+            project,
+            "main.pdf",
+            &mark,
+            "A unique scien-tific workflow sentence.",
+        )
+        .await
+        .unwrap();
+        assert_eq!(hyphenated.unwrap().line, 3);
         tokio::fs::write(dir.path().join("other.tex"), text)
             .await
             .unwrap();
