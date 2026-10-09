@@ -24,6 +24,7 @@ const { LogPanel } = await import("./workspace/log-panel");
 const { PdfPane } = await import("./workspace/pdf-pane");
 const { ReferencesDialog } = await import("./workspace/references-dialog");
 const { ReviewDialog } = await import("./workspace/review-dialog");
+const { ReviewMargin } = await import("./workspace/review-margin");
 const { ShareDialog } = await import("./workspace/share-dialog");
 const { TasksPanel } = await import("./workspace/tasks-panel");
 const { Dashboard, ago, inFilter } = await import("./dashboard");
@@ -61,8 +62,21 @@ const comment: Comment = {
   resolved: false,
   created: 1,
   updated: 1,
+  edited: null,
+  from: 0,
+  to: 2,
+  line: 1,
+  pdf: null,
   replies: [
-    { id: "r1", comment: "c1", author: "u1", authorName: "lab", body: "已核对", created: 2 },
+    {
+      id: "r1",
+      comment: "c1",
+      author: "u1",
+      authorName: "lab",
+      body: "已核对",
+      created: 2,
+      edited: null,
+    },
   ],
 };
 const proposal: Proposal = {
@@ -107,10 +121,11 @@ describe("client panels render", () => {
           comments={[comment]}
           open
           setOpen={() => {}}
-          selection={{ quote: "选中", start: "", end: "" }}
-          setSelection={() => {}}
-          draft=""
+          draft={{ file: "f1", quote: "选中", body: "", from: 0, to: 2, start: "a", end: "b" }}
           setDraft={() => {}}
+          onSubmit={() => {}}
+          showDraft
+          onLocate={() => {}}
         />,
       ),
       html(<ReviewDialog ws={ws} proposals={[proposal]} onClose={() => {}} />),
@@ -147,6 +162,27 @@ describe("client panels render", () => {
       "AI",
     ])
       expect(rendered).toContain(text);
+  });
+  it("renders the review margin with a thread and a draft", () => {
+    const margin = html(
+      <ReviewMargin
+        ws={ws}
+        layout={{ view: null, events: new EventTarget() }}
+        editor={null}
+        comments={[comment, { ...comment, id: "c2", resolved: true, body: "旧问题" }]}
+        active="c1"
+        setActive={() => {}}
+        draft={{ file: "f1", quote: "新选文", body: "", from: 3, to: 6 }}
+        setDraft={() => {}}
+        onSubmit={() => {}}
+        selection={null}
+        onAdd={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    for (const text of ["1 条批注", "已解决或失去定位 1", "请核对", "已核对", "新选文"])
+      expect(margin).toContain(text);
+    expect(margin).not.toContain("旧问题");
   });
   it("renders build results with clickable issues", () => {
     const b = {

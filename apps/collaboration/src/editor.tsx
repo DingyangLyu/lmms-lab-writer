@@ -29,7 +29,7 @@ import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
-export type Selection = { quote: string; start: string; end: string };
+export type Selection = { quote: string; start: string; end: string; from: number; to: number };
 /** A collaborator in the same file, as their cursor shows them. */
 export type Peer = { name: string; color: string };
 const LIMIT = 2_000_000;
@@ -46,6 +46,8 @@ const commentMarks = StateField.define<DecorationSet>({
 export type EditorHandle = {
   text: () => string;
   selection: () => Selection | null;
+  /** Where each highlighted comment is now, following edits since the comments loaded. */
+  commentRanges: () => Map<string, { from: number; to: number }>;
   insert: (text: string) => void;
   focusComment: (comment: Comment) => void;
   /** 1-based line of the cursor, for jumping to the PDF. */
@@ -67,6 +69,10 @@ export function Editor({
   onText,
   onPeers,
   actions,
+  activeComment,
+  onCommentClick,
+  onSelect,
+  onLayout,
 }: {
   project: string;
   file: string;
@@ -85,13 +91,43 @@ export function Editor({
   onPeers?: (peers: Peer[]) => void;
   /** Buttons at the right of the toolbar above the text. */
   actions?: ReactNode;
+  /** The thread shown as selected, drawn stronger in the text. */
+  activeComment?: string | null;
+  /** A click on commented text. */
+  onCommentClick?: (id: string) => void;
+  /** The selection's offsets as it changes, or null when nothing is selected. */
+  onSelect?: (range: { from: number; to: number } | null) => void;
+  /** The CodeMirror view and every scroll, resize or edit, for the review margin. */
+  onLayout?: (view: EditorView | null) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
   const editability = useRef(new Compartment());
-  const callbacks = useRef({ onRole, onStatus, onError, onReady, hints, onText, onPeers });
-  callbacks.current = { onRole, onStatus, onError, onReady, hints, onText, onPeers };
+  const callbacks = useRef({
+    onRole,
+    onStatus,
+    onError,
+    onReady,
+    hints,
+    onText,
+    onPeers,
+    onCommentClick,
+    onSelect,
+    onLayout,
+  });
+  callbacks.current = {
+    onRole,
+    onStatus,
+    onError,
+    onReady,
+    hints,
+    onText,
+    onPeers,
+    onCommentClick,
+    onSelect,
+    onLayout,
+  };
   const readOnly = useRef(role);
   readOnly.current = role;
   useEffect(() => {
@@ -169,16 +205,35 @@ export function Editor({
             autocorrect: "off",
           }),
           EditorView.updateListener.of((update) => {
+            if (update.selectionSet || update.docChanged) {
+              const main = update.state.selection.main;
+              callbacks.current.onSelect?.(main.empty ? null : { from: main.from, to: main.to });
+            }
+            if (update.docChanged || update.geometryChanged || update.viewportChanged)
+              callbacks.current.onLayout?.(update.view);
             if (!update.docChanged || !callbacks.current.onText) return;
             textTimer ??= setTimeout(() => {
               textTimer = null;
               callbacks.current.onText?.(update.view.state.doc.toString());
             }, 400);
           }),
+          EditorView.domEventHandlers({
+            click: (event) => {
+              const id = (event.target as HTMLElement)
+                .closest("[data-comment]")
+                ?.getAttribute("data-comment");
+              if (id) callbacks.current.onCommentClick?.(id);
+              return false;
+            },
+            scroll: (_event, view) => {
+              callbacks.current.onLayout?.(view);
+            },
+          }),
         ],
       }),
     });
     view.current = v;
+    callbacks.current.onLayout?.(v);
     callbacks.current.onText?.(v.state.doc.toString());
     reportPeers();
     callbacks.current.onReady({
@@ -187,6 +242,8 @@ export function Editor({
         const s = v.state.selection.main;
         if (s.empty) return null;
         return {
+          from: s.from,
+          to: s.to,
           quote: v.state.sliceDoc(s.from, s.to),
           start: base64(
             Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, s.from)),
@@ -195,6 +252,14 @@ export function Editor({
             Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, s.to, -1)),
           ),
         };
+      },
+      commentRanges: () => {
+        const ranges = new Map<string, { from: number; to: number }>();
+        v.state.field(commentMarks).between(0, v.state.doc.length, (from, to, deco) => {
+          const id = deco.spec.attributes?.["data-comment"];
+          if (typeof id === "string" && !ranges.has(id)) ranges.set(id, { from, to });
+        });
+        return ranges;
       },
       insert: (insert) => {
         if (!p.editable) return;
@@ -229,6 +294,7 @@ export function Editor({
       if (textTimer) clearTimeout(textTimer);
       p.awareness.off("change", reportPeers);
       callbacks.current.onPeers?.([]);
+      callbacks.current.onLayout?.(null);
       callbacks.current.onReady(null);
       v.destroy();
       undo.destroy();
@@ -250,7 +316,7 @@ export function Editor({
     if (!v || !p) return;
     const decorate = () => {
       const ranges = [];
-      for (const c of comments.filter((c) => c.file === file)) {
+      for (const c of comments.filter((c) => c.file === file && !c.resolved)) {
         try {
           const a = Y.createAbsolutePositionFromRelativePosition(
               Y.decodeRelativePosition(unbase64(c.start)),
@@ -263,8 +329,8 @@ export function Editor({
           if (a && z && a.index < z.index && z.index <= v.state.doc.length)
             ranges.push(
               Decoration.mark({
-                class: `writer-note-highlight ${c.resolved ? "writer-note-resolved" : ""}`,
-                attributes: { title: `${c.authorName}: ${c.body}` },
+                class: `writer-note-highlight ${c.id === activeComment ? "writer-note-active" : ""}`,
+                attributes: { title: `${c.authorName}: ${c.body}`, "data-comment": c.id },
               }).range(a.index, z.index),
             );
         } catch {
@@ -272,6 +338,7 @@ export function Editor({
         }
       }
       v.dispatch({ effects: setMarks.of(Decoration.set(ranges, true)) });
+      callbacks.current.onLayout?.(v);
     };
     decorate();
     // Re-anchor from Yjs positions at most a few times per second, not on every keystroke.
@@ -287,7 +354,7 @@ export function Editor({
       if (timer) clearTimeout(timer);
       p.doc.off("update", update);
     };
-  }, [comments, file]);
+  }, [comments, file, activeComment]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <FoldToolbar view={() => view.current} actions={actions} />

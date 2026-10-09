@@ -4,10 +4,17 @@
  * with the editor and the PDF beside it, the build log below (the desktop's terminal) and AI
  * tasks on the right (the desktop's assistant). Phones get the side panels as overlays.
  */
-import { pathSync, TabBar, type TabItem } from "@lmms-lab/workbench";
+import {
+  type PdfAnnotation,
+  type PdfAnnotationHost,
+  pathSync,
+  TabBar,
+  type TabItem,
+} from "@lmms-lab/workbench";
 import { parseBib } from "@lmms-lab/writing";
 import {
   ChatCircleTextIcon,
+  ChatsCircleIcon,
   CrosshairIcon,
   DownloadSimpleIcon,
   FilePdfIcon,
@@ -22,7 +29,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Engine, FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { download } from "../api";
-import { Editor, type EditorHandle, type Peer, type Selection } from "../editor";
+import { Editor, type EditorHandle, type Peer } from "../editor";
 import { useI18n } from "../i18n";
 import { roleKey, statusKey } from "../labels";
 import { projectHints } from "../latex-completion";
@@ -35,37 +42,15 @@ import type { WorkspaceContext } from "./context";
 import { FilePanel } from "./file-panel";
 import { HistoryPanel } from "./history-panel";
 import { LogPanel } from "./log-panel";
-import { PdfPane } from "./pdf-pane";
+import { draftFromPdf, postDraft, useDraft } from "./notes";
+import { OUTPUT_PDF, PdfPane } from "./pdf-pane";
 import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
+import { type MarginLayout, ReviewMargin } from "./review-margin";
 import { ShareDialog } from "./share-dialog";
 import { TasksPanel } from "./tasks-panel";
 import { Btn, ResizeHandle, Select, ToggleButton, useStoredSize } from "./ui";
 import { useProject } from "./use-project";
-
-/** The comment being written survives reloads (stored per user and project). */
-function useCommentDraft(key: string, report: (message: string) => void) {
-  const { t } = useI18n();
-  const [draft, setDraft] = useState(""),
-    [selection, setSelection] = useState<Selection | null>(null);
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(key) || "null");
-      if (saved) {
-        setDraft(saved.body || "");
-        setSelection(saved.selection || null);
-      }
-    } catch {}
-  }, [key]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify({ body: draft, selection }));
-    } catch {
-      report(t("workspace.draftNotSaved"));
-    }
-  }, [draft, selection, key, report, t]);
-  return { draft, setDraft, selection, setSelection };
-}
 
 /** Narrow windows show the side panels over the editor instead of beside it. */
 function useNarrow() {
@@ -122,7 +107,29 @@ export function Workspace({
   const { busy, error, setError, run } = useAction();
   const data = useProject(prefix, { onRole: setRole, onError: setError });
   const editor = useRef<EditorHandle | null>(null);
-  const comment = useCommentDraft(`writer-note-draft:${user.id}:${project.id}`, setError);
+  const [draft, setDraft] = useDraft(
+    `writer-note-draft:${user.id}:${project.id}`,
+    setError,
+    t("workspace.draftNotSaved"),
+  );
+  const [reviewOpen, setReviewOpen] = useState(() => {
+    try {
+      return localStorage.getItem("writer-web-review") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  const [activeComment, setActiveComment] = useState<string | null>(null),
+    [selected, setSelected] = useState<{ from: number; to: number } | null>(null),
+    [pdfNavigation, setPdfNavigation] = useState(0);
+  const layout = useMemo<MarginLayout>(() => ({ view: null, events: new EventTarget() }), []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("writer-web-review", reviewOpen ? "open" : "closed");
+    } catch {
+      /* The choice lasts for this visit only. */
+    }
+  }, [reviewOpen]);
   // The whole page is the workbench while a project is open, so menus and dialogs that the
   // shared components portal to <body> get its styles too.
   useEffect(() => {
@@ -172,12 +179,81 @@ export function Workspace({
     files: data.files,
     openFile: (next: FileInfo) => {
       setActiveId(next.id);
-      comment.setSelection(null);
+      setSelected(null);
       if (narrow) setSidebar(false);
     },
     status,
   };
   const b = useBuild(ws, data.latestBuild, data.sources);
+  const marginShown = reviewOpen && !narrow && !!file && !file.binary;
+  const activate = (id: string | null) => {
+    setActiveComment(id);
+    if (id && data.comments.find((c) => c.id === id)?.pdf) setPdfNavigation((n) => n + 1);
+  };
+  const commentOnSelection = () => {
+    const s = editor.current?.selection();
+    if (!s || !file) {
+      setError(t("workspace.selectFirst"));
+      return;
+    }
+    setDraft({ file: file.id, body: draft?.body ?? "", ...s });
+    if (narrow) setCommentsOpen(true);
+    else setReviewOpen(true);
+  };
+  const submitDraft = () =>
+    draft &&
+    run(async () => {
+      const made = await postDraft(prefix, draft);
+      setDraft(null);
+      await data.reload();
+      setActiveComment((made as { id: string }).id);
+    });
+  const locate = (c: { id: string; file: string; line: number | null }) => {
+    const target = data.files.find((f) => f.id === c.file);
+    if (target && c.line) b.openLocation(target.path, c.line);
+    activate(c.id);
+    if (!narrow) setReviewOpen(true);
+  };
+  // Comments made on the PDF are drawn on it again while it is the same build.
+  const pdfNotes: PdfAnnotationHost = {
+    items: data.comments
+      .filter((c) => c.pdf)
+      .map(
+        (c): PdfAnnotation => ({
+          id: c.id,
+          pdf: OUTPUT_PDF,
+          quote: c.quote,
+          comment: c.body,
+          style: c.pdf?.style ?? "highlight",
+          marks: (c.pdf?.marks ?? []).map((m) => ({ ...m, pageWidth: 1, pageHeight: 1 })),
+          fingerprint: c.pdf?.fingerprint ?? "",
+          createdAt: c.created,
+          resolved: c.resolved,
+          source: null,
+          mappingNote: "",
+          resolution: "",
+        }),
+      ),
+    draft,
+    selectedId: activeComment,
+    navigation: pdfNavigation,
+    setOpen: setCommentsOpen,
+    beginDraft: (selection) => {
+      const build = b.build;
+      if (!build) return;
+      run(async () => {
+        const next = await draftFromPdf(prefix, build.id, data.files, selection, (f) =>
+          f.id === file?.id ? (editor.current?.text() ?? null) : null,
+        );
+        if (draft?.body.trim() && !next.body) next.body = draft.body;
+        setDraft(next);
+        const target = data.files.find((f) => f.id === next.file);
+        if (target && target.id !== file?.id) ws.openFile(target);
+        if (narrow) setCommentsOpen(true);
+        else setReviewOpen(true);
+      });
+    },
+  };
   const compileRef = useRef(b.compile);
   compileRef.current = b.compile;
   // Overleaf's and the desktop's shortcuts both compile.
@@ -221,15 +297,7 @@ export function Workspace({
         disabled={!ws.canComment}
         className="inline-flex items-center gap-1 hover:text-foreground disabled:opacity-40"
         title={t("workspace.commentSelection")}
-        onClick={() => {
-          const s = editor.current?.selection();
-          if (!s) {
-            setError(t("workspace.selectFirst"));
-            return;
-          }
-          comment.setSelection(s);
-          setCommentsOpen(true);
-        }}
+        onClick={commentOnSelection}
       >
         <ChatCircleTextIcon className="size-3.5" />
         <span className="hidden sm:inline">{t("workspace.commentSelection")}</span>
@@ -337,6 +405,17 @@ export function Workspace({
         onText={(value) => setText({ file: file.path, value })}
         onPeers={setPeers}
         actions={editorActions}
+        activeComment={activeComment}
+        onCommentClick={(id) => {
+          activate(id);
+          if (narrow) setCommentsOpen(true);
+          else setReviewOpen(true);
+        }}
+        onSelect={setSelected}
+        onLayout={(view) => {
+          layout.view = view;
+          layout.events.dispatchEvent(new Event("layout"));
+        }}
       />
     )
   ) : (
@@ -395,6 +474,14 @@ export function Workspace({
               onClick={() => b.setOpen(!b.open)}
             >
               <FilePdfIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <ToggleButton
+              pressed={reviewOpen}
+              label={t("notes.toggleMargin")}
+              onClick={() => setReviewOpen((v) => !v)}
+              className="hidden md:flex"
+            >
+              <ChatsCircleIcon className="size-4" weight="bold" />
             </ToggleButton>
             <ToggleButton
               pressed={rightOpen}
@@ -469,7 +556,11 @@ export function Workspace({
             comments={data.comments}
             open={commentsOpen}
             setOpen={setCommentsOpen}
-            {...comment}
+            draft={draft}
+            setDraft={setDraft}
+            onSubmit={submitDraft}
+            showDraft={!marginShown || draft?.file !== file?.id}
+            onLocate={locate}
           />
           <Btn onClick={() => setDialog("references")}>{t("tab.bibliography")}</Btn>
           <Btn onClick={() => setDialog("review")}>
@@ -542,7 +633,7 @@ export function Workspace({
         <div className="flex w-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1">
             {narrow && b.open ? (
-              <PdfPane ws={ws} b={b} onClose={() => b.setOpen(false)} />
+              <PdfPane ws={ws} b={b} notes={pdfNotes} onClose={() => b.setOpen(false)} />
             ) : (
               <div className="flex min-w-0 flex-1 flex-col">
                 {tabs.length > 0 && (
@@ -565,7 +656,29 @@ export function Workspace({
                     variant="editor"
                   />
                 )}
-                {center}
+                {marginShown ? (
+                  <div className="flex min-h-0 flex-1">
+                    <div className="flex min-w-0 flex-1 flex-col">{center}</div>
+                    <div className="w-72 shrink-0 xl:w-80">
+                      <ReviewMargin
+                        ws={ws}
+                        layout={layout}
+                        editor={editor.current}
+                        comments={data.comments.filter((c) => c.file === file?.id)}
+                        active={activeComment}
+                        setActive={activate}
+                        draft={draft?.file === file?.id ? draft : null}
+                        setDraft={setDraft}
+                        onSubmit={submitDraft}
+                        selection={selected}
+                        onAdd={commentOnSelection}
+                        onClose={() => setReviewOpen(false)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  center
+                )}
               </div>
             )}
             {pdfShown && (
@@ -579,7 +692,7 @@ export function Workspace({
                   style={{ width: pdfSize.size }}
                   className="flex min-w-0 shrink-0 flex-col border-l border-border"
                 >
-                  <PdfPane ws={ws} b={b} onClose={() => b.setOpen(false)} />
+                  <PdfPane ws={ws} b={b} notes={pdfNotes} onClose={() => b.setOpen(false)} />
                 </div>
               </>
             )}

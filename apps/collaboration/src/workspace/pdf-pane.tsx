@@ -1,4 +1,5 @@
 /** The compiled PDF beside the editor, as the desktop's split preview, with the build status. */
+import { PdfAnnotationContext, type PdfAnnotationHost } from "@lmms-lab/workbench";
 import { PdfViewer } from "@lmms-lab/workbench/pdf-viewer";
 import { CrosshairIcon, DownloadSimpleIcon, XIcon } from "@phosphor-icons/react";
 import "../pdf-setup";
@@ -20,13 +21,19 @@ export function BuildSummary({ b }: { b: BuildState }) {
   );
 }
 
+/** The name comments use for the compiled PDF (there is one per project). */
+export const OUTPUT_PDF = "output.pdf";
+
 export function PdfPane({
   ws,
   b,
+  notes,
   onClose,
 }: {
   ws: WorkspaceContext;
   b: BuildState;
+  /** Comments drawn on the PDF and started from a selection on it. */
+  notes?: PdfAnnotationHost;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -73,11 +80,15 @@ export function PdfPane({
       </div>
       <div className="min-h-0 flex-1">
         {build?.pdf ? (
-          <PdfViewer
-            src={`/api${ws.prefix}/builds/${build.id}/pdf`}
-            highlight={b.highlight}
-            onSynctexClick={b.showPdfInSource}
-          />
+          <PdfAnnotationContext.Provider value={ws.canComment ? (notes ?? null) : null}>
+            <PdfViewer
+              src={`/api${ws.prefix}/builds/${build.id}/pdf`}
+              project={ws.project.id}
+              pdfPath={OUTPUT_PDF}
+              highlight={b.highlight}
+              onSynctexClick={b.showPdfInSource}
+            />
+          </PdfAnnotationContext.Provider>
         ) : (
           <div className="flex h-full items-center justify-center bg-accent-hover p-6 text-center text-xs text-muted">
             {build ? t("build.noPdf") : t("build.none")}

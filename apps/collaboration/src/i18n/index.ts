@@ -9,6 +9,7 @@ import { dashboardEn, dashboardZh } from "./dashboard";
 import { editorEn, editorZh } from "./editor";
 import { filesEn, filesZh } from "./files";
 import { membersEn, membersZh } from "./members";
+import { notesEn, notesZh } from "./notes";
 import { compareEn, compareZh, reviewEn, reviewZh } from "./review";
 import { shellEn, shellZh } from "./shell";
 import { tasksEn, tasksZh } from "./tasks";
@@ -26,6 +27,7 @@ const zh = {
   ...editorZh,
   ...filesZh,
   ...membersZh,
+  ...notesZh,
   ...reviewZh,
   ...shellZh,
   ...tasksZh,
@@ -43,6 +45,7 @@ const en: Record<keyof typeof zh, string> = {
   ...editorEn,
   ...filesEn,
   ...membersEn,
+  ...notesEn,
   ...reviewEn,
   ...shellEn,
   ...tasksEn,

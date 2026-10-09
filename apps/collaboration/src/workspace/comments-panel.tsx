@@ -1,47 +1,44 @@
 /**
- * Comments in the status bar, as the desktop's comment history: a counter button opening a
- * panel with the comment being written, filters, search and every thread with its replies.
+ * Every comment of the project from the status bar, as the desktop's comment history: a
+ * counter opening a panel with filters, search and each thread, plus the comment being written
+ * when the review margin is not showing it.
  */
-import {
-  CaretDownIcon,
-  CheckCircleIcon,
-  CircleIcon,
-  CrosshairIcon,
-  XIcon,
-} from "@phosphor-icons/react";
+import { CaretDownIcon, CheckCircleIcon, CrosshairIcon, XIcon } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import type { Comment } from "../../shared/api";
-import { api } from "../api";
-import type { Selection } from "../editor";
 import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
-import { Btn, Input, Popover, TextArea } from "./ui";
+import type { CommentDraft } from "./notes";
+import { DraftCard } from "./review-margin";
+import { ThreadCard } from "./thread-card";
+import { Input, Popover } from "./ui";
 
 export function CommentsPanel({
   ws,
   comments,
   open,
   setOpen,
-  selection,
-  setSelection,
   draft,
   setDraft,
+  onSubmit,
+  showDraft,
+  onLocate,
 }: {
   ws: WorkspaceContext;
   comments: Comment[];
   open: boolean;
   setOpen: (open: boolean) => void;
-  selection: Selection | null;
-  setSelection: (selection: Selection | null) => void;
-  draft: string;
-  setDraft: (draft: string) => void;
+  draft: CommentDraft | null;
+  setDraft: (draft: CommentDraft | null) => void;
+  onSubmit: () => void;
+  /** Whether the draft is written here (no review margin beside the editor). */
+  showDraft: boolean;
+  onLocate: (comment: Comment) => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const button = useRef<HTMLButtonElement>(null);
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all"),
-    [query, setQuery] = useState(""),
-    [reply, setReply] = useState<Record<string, string>>({});
-  const { prefix, file, files, busy, canComment, run, reload } = ws;
+    [query, setQuery] = useState("");
   const pending = comments.filter((c) => !c.resolved),
     resolved = comments.filter((c) => c.resolved);
   const needle = query.trim().toLowerCase();
@@ -53,8 +50,7 @@ export function CommentsPanel({
           .toLowerCase()
           .includes(needle)),
   );
-  const path = (id: string) => files.find((f) => f.id === id)?.path ?? "";
-  const time = (ms: number) => new Date(ms).toLocaleString(locale === "zh" ? "zh-CN" : "en");
+  const path = (id: string) => ws.files.find((f) => f.id === id)?.path ?? "";
   return (
     <>
       <button
@@ -71,7 +67,7 @@ export function CommentsPanel({
             {resolved.length}
           </span>
         )}
-        {selection && <span className="text-orange-600">{t("shell.draft")}</span>}
+        {draft && <span className="text-orange-600">{t("shell.draft")}</span>}
         <CaretDownIcon className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       <Popover
@@ -121,47 +117,15 @@ export function CommentsPanel({
             className="w-44"
           />
         </div>
-        <div className="min-h-0 overflow-y-auto overscroll-contain p-3">
-          {selection && (
-            <form
-              aria-label={t("shell.newComment")}
-              className="mb-3 space-y-2 border border-orange-400 p-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!file) return;
-                run(async () => {
-                  await api(`${prefix}/comments`, { file: file.id, ...selection, body: draft });
-                  setDraft("");
-                  setSelection(null);
-                  await reload();
-                });
-              }}
-            >
-              <div className="flex justify-between gap-2">
-                <strong>{t("shell.newCommentOn", { path: file?.path ?? "" })}</strong>
-                <button type="button" onClick={() => setSelection(null)}>
-                  {t("shell.discardDraft")}
-                </button>
-              </div>
-              <blockquote className="max-h-16 overflow-auto border-l-2 border-orange-400 pl-2 text-muted">
-                {selection.quote}
-              </blockquote>
-              <TextArea
-                aria-label={t("comments.body")}
-                rows={3}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={t("comments.placeholder")}
-                required
-              />
-              <Btn
-                type="submit"
-                tone="solid"
-                disabled={busy || !canComment || !draft.trim() || ws.status !== "saved"}
-              >
-                {t("comments.post")}
-              </Btn>
-            </form>
+        <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain p-3">
+          {draft && showDraft && (
+            <DraftCard
+              ws={ws}
+              draft={draft}
+              setDraft={setDraft}
+              onSubmit={onSubmit}
+              heading={t("shell.newCommentOn", { path: path(draft.file) })}
+            />
           )}
           {!shown.length && (
             <p className="py-5 text-center text-muted">
@@ -169,105 +133,33 @@ export function CommentsPanel({
             </p>
           )}
           {shown.map((c) => (
-            <article
+            <ThreadCard
               key={c.id}
-              className={`mb-2 border ${c.resolved ? "border-emerald-200" : "border-border"}`}
-            >
-              <div className="flex items-start gap-2 px-3 py-2">
-                {c.resolved ? (
-                  <CheckCircleIcon
-                    weight="fill"
-                    className="mt-0.5 size-4 shrink-0 text-emerald-600"
-                  />
-                ) : (
-                  <CircleIcon className="mt-0.5 size-4 shrink-0 text-muted" />
-                )}
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <strong className={c.resolved ? "text-emerald-700" : ""}>{c.authorName}</strong>
-                    <span className="text-muted">
-                      {path(c.file)} · {time(c.created)}
-                    </span>
-                  </div>
-                  <blockquote className="max-h-20 overflow-auto border-l-2 border-border pl-2 text-muted">
-                    {c.quote}
-                  </blockquote>
-                  <p className="whitespace-pre-wrap break-words">{c.body}</p>
-                  {c.replies.map((r) => (
-                    <p
-                      key={r.id}
-                      className="whitespace-pre-wrap break-words border-l-2 border-border pl-2"
-                    >
-                      <strong>{r.authorName}</strong>{" "}
-                      <span className="text-muted">{time(r.created)}</span>
-                      <br />
-                      {r.body}
-                    </p>
-                  ))}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
+              ws={ws}
+              comment={c}
+              active
+              heading={
+                <div className="flex items-center gap-2 text-[11px] text-muted">
+                  <span className="truncate">
+                    {path(c.file)}
+                    {c.line ? `:${c.line}` : ` · ${t("notes.unanchored")}`}
+                  </span>
+                  {c.line && (
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 hover:text-accent"
+                      className="ml-auto inline-flex shrink-0 items-center gap-1 hover:text-foreground"
                       onClick={() => {
-                        const target = files.find((f) => f.id === c.file);
-                        if (target && file?.id !== target.id) {
-                          ws.openFile(target);
-                          ws.notify(t("comments.openedFile"));
-                        } else ws.editor.current?.focusComment(c);
+                        onLocate(c);
                         setOpen(false);
                       }}
                     >
                       <CrosshairIcon className="size-3.5" />
                       {t("comments.locate")}
                     </button>
-                    <button
-                      type="button"
-                      disabled={busy || !canComment}
-                      className={c.resolved ? "" : "text-emerald-700"}
-                      onClick={() =>
-                        run(async () => {
-                          await api(
-                            `${prefix}/comments/${c.id}`,
-                            { resolved: !c.resolved },
-                            "PATCH",
-                          );
-                          await reload();
-                        })
-                      }
-                    >
-                      {c.resolved ? t("comments.reopen") : t("comments.resolve")}
-                    </button>
-                  </div>
-                  {canComment && (
-                    <form
-                      className="flex gap-2 pt-1"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        run(async () => {
-                          await api(`${prefix}/comments/${c.id}/reply`, {
-                            body: reply[c.id] || "",
-                          });
-                          setReply({ ...reply, [c.id]: "" });
-                          await reload();
-                        });
-                      }}
-                    >
-                      <Input
-                        aria-label={t("comments.replyLabel")}
-                        value={reply[c.id] || ""}
-                        onChange={(e) => setReply({ ...reply, [c.id]: e.target.value })}
-                        placeholder={t("comments.replyPlaceholder")}
-                        className="min-w-0 flex-1"
-                        required
-                      />
-                      <Btn type="submit" disabled={busy}>
-                        {t("comments.reply")}
-                      </Btn>
-                    </form>
                   )}
                 </div>
-              </div>
-            </article>
+              }
+            />
           ))}
         </div>
       </Popover>
