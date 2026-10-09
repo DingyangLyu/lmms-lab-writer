@@ -4,6 +4,8 @@
  * app (Tauri commands, server requests) is passed in through props or a context. The PDF
  * preview loads pdf.js, so it has its own entry: `@lmms-lab/workbench/pdf-viewer`.
  */
+export * from "./comments/comment-thread";
+export * from "./comments/locate-quote";
 export * from "./editor/drag-selection";
 export * from "./editor/font-stacks";
 export * from "./editor/latex-source-editor";

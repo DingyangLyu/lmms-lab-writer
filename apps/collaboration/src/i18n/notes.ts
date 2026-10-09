@@ -7,13 +7,6 @@ export const notesZh = {
   "notes.empty": "选中正文，点旁边的“添加批注”；也可以在 PDF 上拖选文字批注。",
   "notes.unanchored": "批注的原文已被删除",
   "notes.waitSync": "等待正文同步到服务器",
-  "notes.justNow": "刚刚",
-  "notes.edited": "已编辑",
-  "notes.edit": "编辑",
-  "notes.delete": "删除",
-  "notes.deleteConfirm": "删除这条批注和它的所有回复？",
-  "notes.deleteReplyConfirm": "删除这条回复？",
-  "notes.fromPdf": "在 PDF 上做的批注",
 };
 export const notesEn: Record<keyof typeof notesZh, string> = {
   "notes.margin": "Review margin",
@@ -25,11 +18,4 @@ export const notesEn: Record<keyof typeof notesZh, string> = {
     "Select text and click “Add comment” beside it, or drag over text in the PDF to comment there.",
   "notes.unanchored": "The commented text was deleted",
   "notes.waitSync": "Waiting for the text to sync to the server",
-  "notes.justNow": "just now",
-  "notes.edited": "edited",
-  "notes.edit": "Edit",
-  "notes.delete": "Delete",
-  "notes.deleteConfirm": "Delete this comment and all its replies?",
-  "notes.deleteReplyConfirm": "Delete this reply?",
-  "notes.fromPdf": "Made on the PDF",
 };

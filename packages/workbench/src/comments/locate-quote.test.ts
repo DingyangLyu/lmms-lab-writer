@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { locateQuote } from "./notes";
+import { locateQuote } from "./locate-quote";
 
 const SOURCE = [
   "\\section{Results}",
