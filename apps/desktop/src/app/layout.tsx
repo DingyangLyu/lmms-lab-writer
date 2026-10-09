@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
-import { Roboto, Roboto_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import { ExternalLinkHandler } from "@/components/external-link-handler";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
-const modernSans = Roboto({
+// Bundled (SIL OFL 1.1, see ./fonts) so builds never fetch from Google Fonts.
+const modernSans = localFont({
+  src: "./fonts/roboto-latin.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "700"],
+  weight: "100 900",
 });
 
-const modernMono = Roboto_Mono({
+const modernMono = localFont({
+  src: "./fonts/roboto-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "700"],
+  weight: "100 700",
 });
 
 export const metadata: Metadata = {
