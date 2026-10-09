@@ -59,7 +59,7 @@ import {
   latexLanguage,
 } from "@lmms-lab/latex-editor";
 import { documentEdits } from "@lmms-lab/writing";
-import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import { memo, type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../i18n";
 import { trackEditorDrag } from "./drag-selection";
 import { resolveMonoFontFamily } from "./font-stacks";
@@ -193,7 +193,8 @@ function appearance(settings: Partial<EditorSettings>, dark: boolean): Extension
   ];
 }
 
-function configurable(
+/** Theme, settings and editability of a LaTeX editor; reconfigure it when they change. */
+export function editorConfiguration(
   settings: Partial<EditorSettings>,
   dark: boolean,
   readOnly: boolean,
@@ -228,9 +229,112 @@ function configurable(
   ];
 }
 
+/** LaTeX section, environment and comment folding with the workbench's gutter markers. */
+export function latexFoldExtensions(): Extension {
+  return [
+    latexFolding,
+    codeFolding({ placeholderText: i18n.t("editor.expand") }),
+    foldGutter({
+      markerDOM: (expanded) => {
+        const marker = document.createElement("span");
+        marker.textContent = expanded ? "⌄" : "›";
+        marker.title = expanded
+          ? i18n.t("editor.foldThisCommentSectionOrEnvironment")
+          : i18n.t("editor.unfold");
+        marker.setAttribute("aria-label", marker.title);
+        return marker;
+      },
+    }),
+  ];
+}
+
+/** The strip above the editor: fold the current block or all comments, unfold; `actions` go right. */
+export function FoldToolbar({
+  view,
+  actions,
+}: {
+  view: () => EditorView | null;
+  actions?: ReactNode;
+}) {
+  const { t } = useI18n();
+  const foldComments = () => {
+    const current = view();
+    if (!current) return;
+    const ranges = latexFoldRanges(current.state.doc).filter((range) => range.comment);
+    const covering = ranges.find(
+      (range) =>
+        range.from < current.state.selection.main.head &&
+        range.to >= current.state.selection.main.head,
+    );
+    current.dispatch({
+      effects: ranges.map((range) => foldEffect.of(range)),
+      selection: covering ? EditorSelection.cursor(covering.from) : undefined,
+    });
+    current.focus();
+  };
+  return (
+    <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-3 py-1 text-[11px] text-muted">
+      <span>{t("editor.fold")}</span>
+      <button
+        type="button"
+        onClick={() => {
+          const current = view();
+          if (!current) return;
+          const line = current.state.doc.lineAt(current.state.selection.main.head).number;
+          const range = latexFoldRanges(current.state.doc)
+            .filter(
+              (fold) => fold.startLine <= line && current.state.doc.lineAt(fold.to).number >= line,
+            )
+            .at(-1);
+          if (range)
+            current.dispatch({
+              selection: EditorSelection.cursor(range.from),
+              effects: foldEffect.of(range),
+            });
+          else foldCode(current);
+          current.focus();
+        }}
+        className="hover:text-foreground"
+        title={t("editor.foldTheSectionOrEnvironmentAtTheCursor")}
+      >
+        {t("editor.currentBlock")}
+      </button>
+      <button
+        type="button"
+        onClick={foldComments}
+        className="hover:text-foreground"
+        title={t("editor.multiLineAndLongSingleLineCommentsTheFil")}
+      >
+        {t("editor.comments")}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const current = view();
+          if (current) unfoldCode(current);
+        }}
+        className="hover:text-foreground"
+        title={t("editor.unfoldTheBlockAtTheCursor")}
+      >
+        {t("editor.unfoldCurrent")}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const current = view();
+          if (current) unfoldAll(current);
+        }}
+        className="hover:text-foreground"
+      >
+        {t("editor.unfoldAll")}
+      </button>
+      {actions && <div className="ml-auto flex items-center gap-3">{actions}</div>}
+    </div>
+  );
+}
+
 /** Native contenteditable input keeps IME pre-edit text in its wrapped LaTeX line. */
 export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSourceEditorProps) {
-  const { t } = useI18n();
   const container = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const initialProps = useRef(props);
@@ -278,19 +382,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           EditorState.lineSeparator.of(initial.content?.includes("\r\n") ? "\r\n" : "\n"),
           latexLanguage,
           annotationDecorations,
-          latexFolding,
-          codeFolding({ placeholderText: i18n.t("editor.expand") }),
-          foldGutter({
-            markerDOM: (expanded) => {
-              const marker = document.createElement("span");
-              marker.textContent = expanded ? "⌄" : "›";
-              marker.title = expanded
-                ? i18n.t("editor.foldThisCommentSectionOrEnvironment")
-                : i18n.t("editor.unfold");
-              marker.setAttribute("aria-label", marker.title);
-              return marker;
-            },
-          }),
+          latexFoldExtensions(),
           history(),
           drawSelection(),
           rectangularSelection(),
@@ -324,7 +416,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
             indentWithTab,
           ]),
           config.current.of(
-            configurable(
+            editorConfiguration(
               initial.editorSettings ?? {},
               initial.editorTheme === "one-dark",
               initial.readOnly ?? false,
@@ -385,7 +477,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: config.current.reconfigure(
-        configurable(
+        editorConfiguration(
           props.editorSettings ?? {},
           props.editorTheme === "one-dark",
           props.readOnly ?? false,
@@ -460,77 +552,9 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
     view.focus();
   }, [props.goToLine]);
 
-  const foldComments = () => {
-    const view = viewRef.current;
-    if (!view) return;
-    const ranges = latexFoldRanges(view.state.doc).filter((range) => range.comment);
-    const covering = ranges.find(
-      (range) =>
-        range.from < view.state.selection.main.head && range.to >= view.state.selection.main.head,
-    );
-    view.dispatch({
-      effects: ranges.map((range) => foldEffect.of(range)),
-      selection: covering ? EditorSelection.cursor(covering.from) : undefined,
-    });
-    view.focus();
-  };
-
   return (
     <div className={`flex min-h-0 flex-col ${props.className ?? ""}`}>
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-3 py-1 text-[11px] text-muted">
-        <span>{t("editor.fold")}</span>
-        <button
-          type="button"
-          onClick={() => {
-            const view = viewRef.current;
-            if (!view) return;
-            const line = view.state.doc.lineAt(view.state.selection.main.head).number;
-            const range = latexFoldRanges(view.state.doc)
-              .filter(
-                (fold) => fold.startLine <= line && view.state.doc.lineAt(fold.to).number >= line,
-              )
-              .at(-1);
-            if (range)
-              view.dispatch({
-                selection: EditorSelection.cursor(range.from),
-                effects: foldEffect.of(range),
-              });
-            else foldCode(view);
-            view.focus();
-          }}
-          className="hover:text-foreground"
-          title={t("editor.foldTheSectionOrEnvironmentAtTheCursor")}
-        >
-          {t("editor.currentBlock")}
-        </button>
-        <button
-          type="button"
-          onClick={foldComments}
-          className="hover:text-foreground"
-          title={t("editor.multiLineAndLongSingleLineCommentsTheFil")}
-        >
-          {t("editor.comments")}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (viewRef.current) unfoldCode(viewRef.current);
-          }}
-          className="hover:text-foreground"
-          title={t("editor.unfoldTheBlockAtTheCursor")}
-        >
-          {t("editor.unfoldCurrent")}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (viewRef.current) unfoldAll(viewRef.current);
-          }}
-          className="hover:text-foreground"
-        >
-          {t("editor.unfoldAll")}
-        </button>
-      </div>
+      <FoldToolbar view={() => viewRef.current} />
       <div ref={container} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   );

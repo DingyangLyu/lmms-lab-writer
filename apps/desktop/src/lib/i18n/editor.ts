@@ -277,13 +277,6 @@ export const editorZh = {
   "git.staged": "已暂存",
   "git.commit": "提交",
   "git.open": "打开",
-  "files.noFolderOpen": "未打开文件夹",
-  "files.refreshFiles": "刷新文件",
-  "files.newFolder": "新建文件夹",
-  "files.newFile": "新建文件",
-  "files.collapseFileList": "折叠文件列表",
-  "files.expandFileList": "展开文件列表",
-  "files.projectFiles": "项目文件",
 };
 export const editorEn: Record<keyof typeof editorZh, string> = {
   "save.eachSaveKeepsThePreviousTextTheLatest30A":
@@ -580,11 +573,4 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "git.staged": "Staged",
   "git.commit": "Commit",
   "git.open": "Open",
-  "files.noFolderOpen": "No folder open",
-  "files.refreshFiles": "Refresh Files",
-  "files.newFolder": "New Folder",
-  "files.newFile": "New File",
-  "files.collapseFileList": "Collapse file list",
-  "files.expandFileList": "Expand file list",
-  "files.projectFiles": "Project files",
 };

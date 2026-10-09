@@ -18,10 +18,7 @@ export const uiZh = {
   "ui.autoShell": "自动选择 Shell",
   "ui.terminal": "终端",
   "ui.openAProjectToUseTerminal": "打开项目后才能使用终端",
-  "ui.editorComponentError": "编辑器组件出错",
-  "ui.tryAgain": "重试",
   "ui.dismiss": "关闭",
-  "ui.anUnexpectedErrorOccurred": "发生了意外错误",
 };
 export const uiEn: Record<keyof typeof uiZh, string> = {
   "ui.descriptionOptional": "Description (optional)",
@@ -43,8 +40,5 @@ export const uiEn: Record<keyof typeof uiZh, string> = {
   "ui.autoShell": "Auto shell",
   "ui.terminal": "Terminal",
   "ui.openAProjectToUseTerminal": "Open a project to use terminal",
-  "ui.editorComponentError": "Editor Component Error",
-  "ui.tryAgain": "Try Again",
   "ui.dismiss": "Dismiss",
-  "ui.anUnexpectedErrorOccurred": "An unexpected error occurred",
 };

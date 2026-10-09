@@ -22,12 +22,23 @@ type Props = {
   pdfPath?: string;
   refreshKey?: number;
   prepare?: (pdfPath: string) => Promise<PreparedPdf>;
+  /** A region to outline and scroll to, in PDF points from the page's top-left corner. */
+  highlight?: PdfRegionBox | null;
   onSynctexClick?: (page: number, x: number, y: number) => void;
 };
+export type PdfRegionBox = { page: number; x: number; y: number; width: number; height: number };
 export function PdfViewer(props: Props) {
   return <PdfPreview key={`${props.src}:${props.refreshKey ?? 0}`} {...props} />;
 }
-function PdfPreview({ src, project, pdfPath, prepare, onSynctexClick, goToPage }: Props) {
+function PdfPreview({
+  src,
+  project,
+  pdfPath,
+  prepare,
+  highlight,
+  onSynctexClick,
+  goToPage,
+}: Props) {
   const { t } = useI18n();
   const notes = useAnnotations();
   const [previewSource, setPreviewSource] = useState<string | null>(null);
@@ -204,6 +215,19 @@ function PdfPreview({ src, project, pdfPath, prepare, onSynctexClick, goToPage }
         40;
     }
   }, [notes?.selectedId, notes?.navigation, numPages, availableWidth, annotations]);
+  useEffect(() => {
+    if (!highlight || !numPages || !availableWidth) return;
+    const container = containerRef.current;
+    const page = container?.querySelector<HTMLElement>(`[data-pdf-page="${highlight.page}"]`);
+    const natural = pagesRef.current.get(highlight.page);
+    if (!container || !page) return;
+    const scale = natural ? page.getBoundingClientRect().height / natural.height : 1;
+    container.scrollTop +=
+      page.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      (highlight.y + highlight.height / 2) * scale -
+      container.clientHeight / 2;
+  }, [highlight, numPages, availableWidth]);
   useEffect(() => {
     if (!goToPage || !numPages || !availableWidth) return;
     containerRef.current
@@ -400,6 +424,7 @@ function PdfPreview({ src, project, pdfPath, prepare, onSynctexClick, goToPage }
                 annotations={annotations}
                 fingerprint={fingerprint}
                 selectedId={notes?.selectedId}
+                highlight={highlight}
                 containerRef={containerRef}
                 pagesRef={pagesRef}
                 onSynctexClick={onSynctexClick}
@@ -422,6 +447,7 @@ function VirtualPdfPages({
   annotations,
   fingerprint,
   selectedId,
+  highlight,
   containerRef,
   pagesRef,
   onSynctexClick,
@@ -435,6 +461,7 @@ function VirtualPdfPages({
   annotations: PdfAnnotation[];
   fingerprint: string;
   selectedId?: string | null;
+  highlight?: PdfRegionBox | null;
   containerRef: React.RefObject<HTMLElement | null>;
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
   onSynctexClick?: (page: number, x: number, y: number) => void;
@@ -453,6 +480,7 @@ function VirtualPdfPages({
           annotations={annotations}
           fingerprint={fingerprint}
           selectedId={selectedId}
+          highlight={highlight?.page === page ? highlight : null}
           containerRef={containerRef}
           pagesRef={pagesRef}
           onSynctexClick={onSynctexClick}
@@ -472,6 +500,7 @@ function VirtualPdfPage({
   annotations,
   fingerprint,
   selectedId,
+  highlight,
   containerRef,
   pagesRef,
   onSynctexClick,
@@ -485,6 +514,7 @@ function VirtualPdfPage({
   annotations: PdfAnnotation[];
   fingerprint: string;
   selectedId?: string | null;
+  highlight?: PdfRegionBox | null;
   containerRef: React.RefObject<HTMLElement | null>;
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
   onSynctexClick?: (page: number, x: number, y: number) => void;
@@ -558,6 +588,18 @@ function VirtualPdfPage({
             const size = pdf.getViewport({ scale: 1 });
             pagesRef.current.set(page, { width: size.width, height: size.height });
             setNatural({ width: size.width, height: size.height });
+          }}
+        />
+      )}
+      {highlight && natural && (
+        <div
+          className="pointer-events-none absolute z-[5] border-2 border-[#ff5500] bg-[#ff5500]/10"
+          aria-hidden="true"
+          style={{
+            left: `${(highlight.x / natural.width) * 100}%`,
+            top: `${(highlight.y / natural.height) * 100}%`,
+            width: `${(Math.max(highlight.width, 4) / natural.width) * 100}%`,
+            height: `${(Math.max(highlight.height, 4) / natural.height) * 100}%`,
           }}
         />
       )}
