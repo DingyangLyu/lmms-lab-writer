@@ -110,6 +110,8 @@ export type Comment = {
   from: number | null;
   to: number | null;
   line: number | null;
+  /** The anchored source text now (at most 4000 characters), to check a local copy against. */
+  excerpt: string | null;
   pdf: CommentPdf | null;
   replies: Reply[];
 };

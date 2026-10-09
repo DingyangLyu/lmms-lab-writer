@@ -43,6 +43,7 @@ describe("comment threads", () => {
       to,
       line: 2,
       quote: "barrier (from the PDF)",
+      excerpt: "barrier",
       pdf: { fingerprint: "abc", style: "highlight" },
       edited: null,
     });

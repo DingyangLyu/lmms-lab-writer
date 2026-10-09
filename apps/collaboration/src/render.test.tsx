@@ -66,6 +66,7 @@ const comment: Comment = {
   from: 0,
   to: 2,
   line: 1,
+  excerpt: "引文",
   pdf: null,
   replies: [
     {

@@ -10,7 +10,9 @@ import { sql } from "../db";
 import { type Body, created, type InProject, number, route, str } from "../http";
 import { fail, uid } from "../util";
 
-type Row = Omit<Comment, "replies" | "from" | "to" | "line" | "pdf"> & { pdf: string | null };
+type Row = Omit<Comment, "replies" | "from" | "to" | "line" | "excerpt" | "pdf"> & {
+  pdf: string | null;
+};
 
 const thread = async (ctx: InProject, id: string) => {
   await ctx.need("comment");
@@ -115,6 +117,7 @@ export const commentRoutes = [
           from: live && a ? a.index : null,
           to: live && z ? z.index : null,
           line: live && a ? content.slice(0, a.index).split("\n").length : null,
+          excerpt: live && a && z ? content.slice(a.index, z.index).slice(0, 4000) : null,
           pdf: pdf ? (JSON.parse(pdf) as CommentPdf) : null,
           replies: replies.filter((r) => r.comment === c.id),
         });
