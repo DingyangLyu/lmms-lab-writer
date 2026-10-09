@@ -24,13 +24,8 @@ export const appZh = {
   "signIn.join": "加入项目",
   "signIn.submit": "登录",
   "signIn.storage": "账号和文件都保存在实验室自己的 Y-Writer 服务器上。",
-  "projects.title": "我的论文",
   "projects.changePassword": "修改密码",
   "projects.signOut": "退出登录",
-  "projects.newName": "新项目名称",
-  "projects.create": "创建项目",
-  "projects.open": "打开文稿 →",
-  "projects.empty": "创建项目，或打开合作者发来的邀请链接。",
 };
 export const appEn: Record<keyof typeof appZh, string> = {
   "common.requestFailed": "Request failed ({status})",
@@ -59,11 +54,6 @@ export const appEn: Record<keyof typeof appZh, string> = {
   "signIn.join": "Join project",
   "signIn.submit": "Sign in",
   "signIn.storage": "Accounts and files stay on your lab's own Y-Writer server.",
-  "projects.title": "My papers",
   "projects.changePassword": "Change password",
   "projects.signOut": "Sign out",
-  "projects.newName": "New project name",
-  "projects.create": "Create project",
-  "projects.open": "Open →",
-  "projects.empty": "Create a project, or open an invitation link from a co-author.",
 };

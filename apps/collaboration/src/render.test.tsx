@@ -1,6 +1,14 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { Build, Comment, Member, Proposal, Snapshot, SourceFile } from "../shared/api";
+import type {
+  Build,
+  Comment,
+  Member,
+  ProjectSummary,
+  Proposal,
+  Snapshot,
+  SourceFile,
+} from "../shared/api";
 
 // pdf.js needs a browser; the pane is rendered without a PDF.
 vi.mock("./pdf-viewer", () => ({ PdfViewer: () => null }));
@@ -15,6 +23,7 @@ const { CommentsTab } = await import("./workspace/comments-tab");
 const { HistoryTab } = await import("./workspace/history-tab");
 const { MembersTab } = await import("./workspace/members-tab");
 const { ReviewTab } = await import("./workspace/review-tab");
+const { Dashboard, ago, inFilter } = await import("./dashboard");
 
 import type { WorkspaceContext } from "./workspace/context";
 
@@ -141,5 +150,56 @@ describe("client panels render", () => {
     expect(pane).toContain("编译有错误");
     expect(pane).toContain("main.tex:4");
     expect(pane).toContain("没有生成 PDF");
+  });
+});
+
+describe("project dashboard", () => {
+  const now = Date.now();
+  const projects: ProjectSummary[] = [
+    { id: "a", name: "我的论文", role: "owner", owner: "lab", updated: now - 3_600_000 },
+    { id: "b", name: "Shared draft", role: "editor", owner: "coauthor", updated: now - 120_000 },
+    { id: "c", name: "Old talk", role: "owner", owner: "lab", archived: true, updated: now },
+    { id: "d", name: "Scrap", role: "viewer", owner: "coauthor", trashed: true, updated: now },
+  ];
+  it("files projects under one filter each", () => {
+    const names = (filter: Parameters<typeof inFilter>[1]) =>
+      projects.filter((p) => inFilter(p, filter)).map((p) => p.id);
+    expect(names("all")).toEqual(["a", "b"]);
+    expect(names("mine")).toEqual(["a"]);
+    expect(names("shared")).toEqual(["b"]);
+    expect(names("archived")).toEqual(["c"]);
+    expect(names("trashed")).toEqual(["d"]);
+  });
+  it("words times relative to now", () => {
+    expect(ago(now - 10_000, "zh", "刚刚", now)).toBe("刚刚");
+    expect(ago(now - 3 * 3_600_000, "en", "just now", now)).toBe("3 hours ago");
+    expect(ago(now - 86_400_000, "zh", "刚刚", now)).toBe("昨天");
+    expect(ago(undefined, "en", "just now", now)).toBe("—");
+  });
+  it("lists the active projects with owners, filters and actions", () => {
+    const page = html(
+      <Dashboard
+        user={{ id: "u1", name: "lab", admin: false, mustChange: false }}
+        onOpen={() => {}}
+        onView={() => {}}
+        onSignedOut={() => {}}
+        initialProjects={projects}
+      />,
+    );
+    for (const text of [
+      "新建项目",
+      "全部项目",
+      "共享给我的",
+      "回收站",
+      "我的论文",
+      "Shared draft",
+      "coauthor",
+      "你",
+      "最后修改",
+      "移到回收站",
+    ])
+      expect(page).toContain(text);
+    expect(page).not.toContain("Old talk");
+    expect(page).not.toContain("Scrap");
   });
 });

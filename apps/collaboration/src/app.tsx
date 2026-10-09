@@ -2,112 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary, PublicUser } from "../shared/api";
 import { ChangePassword } from "./account";
 import { AdminConsole } from "./admin";
-import { api, errorText } from "./api";
+import { api } from "./api";
 import { AuthPage } from "./auth";
+import { Dashboard } from "./dashboard";
 import { useI18n } from "./i18n";
-import { roleKey } from "./labels";
-import { LanguageSwitch } from "./language-switch";
-import { useAction } from "./use-action";
 import { Workspace } from "./workspace/workspace";
-
-function Projects({
-  user,
-  onOpen,
-  onView,
-  onSignedOut,
-}: {
-  user: PublicUser;
-  onOpen: (project: ProjectSummary) => void;
-  onView: (view: "admin" | "password") => void;
-  onSignedOut: () => void;
-}) {
-  const { t } = useI18n();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]),
-    [name, setName] = useState(""),
-    [pending, setPending] = useState(0);
-  const { busy, error, setError, run } = useAction();
-  useEffect(() => {
-    void api<ProjectSummary[]>("/projects")
-      .then(setProjects)
-      .catch((e) => setError(errorText(e)));
-  }, [setError]);
-  useEffect(() => {
-    if (!user.admin) return;
-    void api<{ pending: number }>("/admin/summary")
-      .then((s) => setPending(s.pending))
-      .catch(() => {});
-  }, [user.admin]);
-  return (
-    <main className="dashboard">
-      <header>
-        <div>
-          <img className="brand-small" src="/logo-small-light.svg" alt="Y-Writer" />
-          <h1>{t("projects.title")}</h1>
-        </div>
-        <div className="row">
-          <LanguageSwitch />
-          <span>{user.name}</span>
-          {user.admin && (
-            <button type="button" onClick={() => onView("admin")}>
-              {t("console.open")}
-              {pending > 0 && <span className="count">{pending}</span>}
-            </button>
-          )}
-          <button type="button" onClick={() => onView("password")}>
-            {t("projects.changePassword")}
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              run(async () => {
-                await api("/logout", {});
-                onSignedOut();
-              })
-            }
-          >
-            {t("projects.signOut")}
-          </button>
-        </div>
-      </header>
-      <form
-        className="new-project row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(async () => {
-            onOpen(await api<ProjectSummary>("/projects", { name }));
-            setName("");
-          });
-        }}
-      >
-        <input
-          aria-label={t("projects.newName")}
-          placeholder={t("projects.newName")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <button className="primary" disabled={busy} type="submit">
-          {t("projects.create")}
-        </button>
-      </form>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="projects">
-        {projects.map((p) => (
-          <button className="project-card" key={p.id} type="button" onClick={() => onOpen(p)}>
-            <span className="eyebrow">{t(roleKey[p.role])}</span>
-            <h2>{p.name}</h2>
-            <span className="muted">{t("projects.open")}</span>
-          </button>
-        ))}
-      </div>
-      {!projects.length && <p className="muted">{t("projects.empty")}</p>}
-    </main>
-  );
-}
 
 export function App() {
   const { t } = useI18n();
@@ -173,6 +72,11 @@ export function App() {
     );
   if (project) return <Workspace project={project} user={user} onBack={() => openProject(null)} />;
   return (
-    <Projects user={user} onOpen={openProject} onView={setView} onSignedOut={() => setUser(null)} />
+    <Dashboard
+      user={user}
+      onOpen={openProject}
+      onView={setView}
+      onSignedOut={() => setUser(null)}
+    />
   );
 }

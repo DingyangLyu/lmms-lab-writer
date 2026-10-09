@@ -25,6 +25,7 @@
     "@lmms-lab/latex-editor": "workspace:*",
     "@lmms-lab/sync": "workspace:*",
     "@lmms-lab/writing": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
     "diff": "^8.0.4",
     "fflate": "^0.8.3",
     "lib0": "^0.2.119",
