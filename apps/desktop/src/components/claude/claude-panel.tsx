@@ -1,33 +1,37 @@
 "use client";
+import type {
+  ChatDraft,
+  ChatImageFile,
+  ChatOutbox,
+  HarnessLifecycle,
+} from "@lmms-lab/workbench/agents";
+import {
+  AttachmentStrip,
+  ChatHistoryItems,
+  DeliveryControls,
+  type DeliveryMode,
+  type EditorSelectionContext,
+  GrowingTextarea,
+  mergeById,
+  prepareChatFiles,
+  RenameChat,
+  selectionRangeLabel,
+  shouldSendOnEnter,
+  useChatAttachments,
+  useChatOutbox,
+  useComposerDraft,
+  useIdleTranscript,
+  usePanelLifecycle,
+  withEditorSelection,
+} from "@lmms-lab/workbench/agents";
 import { ArrowUpIcon, PaperclipIcon, PlusIcon, StopIcon } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationBridge } from "@/components/bridge/conversation-bridge";
-import { AttachmentStrip } from "@/components/chat/attachment-strip";
-import { DeliveryControls, type DeliveryMode } from "@/components/chat/delivery-controls";
-import { GrowingTextarea } from "@/components/chat/growing-textarea";
-import { ChatHistoryItems } from "@/components/chat/history-items";
-import { RenameChat } from "@/components/chat/rename-chat";
 import { ResizableComposer } from "@/components/ui/panel-height";
 import { useConversationBridge } from "@/lib/bridge/use-conversation-bridge";
-import { useComposerDraft } from "@/lib/chat/composer-drafts";
-import { prepareChatFiles } from "@/lib/chat/files";
-import { mergeById } from "@/lib/chat/idle-transcript";
-import type { ChatImageFile } from "@/lib/chat/images";
-import type { ChatDraft, ChatOutbox } from "@/lib/chat/outbox";
-import { useChatAttachments } from "@/lib/chat/use-chat-attachments";
-import { useChatOutbox } from "@/lib/chat/use-chat-outbox";
-import { useIdleTranscript } from "@/lib/chat/use-idle-transcript";
 import { type ClaudeEvent, type ClaudeMessages, reduceClaudeEvent } from "@/lib/claude/events";
-import { shouldSendOnEnter } from "@/lib/codex/composer-keys";
-import {
-  type EditorSelectionContext,
-  selectionRangeLabel,
-  withEditorSelection,
-} from "@/lib/editor/selection-context";
-import type { HarnessLifecycle } from "@/lib/harness/types";
-import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
 import { useI18n } from "@/lib/i18n";
 
 type Session = { id: string; name: string; directory: string; updatedAt: number };

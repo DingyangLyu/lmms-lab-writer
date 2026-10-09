@@ -1,0 +1,39 @@
+/**
+ * The AI chat panels shared by the desktop and web apps: the Codex conversation, the
+ * conversation tabs and history, and the chat building blocks the other backends reuse.
+ */
+export * from "./chat/attachment-strip";
+export * from "./chat/chat-image";
+export * from "./chat/chat-link";
+export * from "./chat/composer-drafts";
+export * from "./chat/delivery-controls";
+export * from "./chat/files";
+export * from "./chat/growing-textarea";
+export * from "./chat/history-items";
+export * from "./chat/idle-transcript";
+export * from "./chat/images";
+export * from "./chat/links";
+export * from "./chat/outbox";
+export * from "./chat/rename-chat";
+export * from "./chat/textarea-sizing";
+export * from "./chat/transcript-cache";
+export * from "./chat/use-chat-attachments";
+export * from "./chat/use-chat-outbox";
+export * from "./chat/use-idle-transcript";
+export * from "./chat/user-file-message";
+export * from "./codex/backend";
+export * from "./codex/codex-activity-card";
+export * from "./codex/codex-markdown";
+export * from "./codex/codex-panel";
+export * from "./codex/composer-keys";
+export * from "./codex/events";
+export * from "./context";
+export * from "./harness/error-boundary";
+export * from "./harness/harness-workspace";
+export * from "./harness/history-dialog";
+export * from "./harness/types";
+export * from "./harness/use-panel-lifecycle";
+export * from "./harness/use-workspace";
+export * from "./harness/workspace";
+export * from "./platform";
+export * from "./selection-context";

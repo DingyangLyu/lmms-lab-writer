@@ -15,7 +15,7 @@ export {
 
 export function annotationPrompt(
   ids: string[],
-  backend: import("@/lib/harness/types").HarnessId,
+  backend: import("@lmms-lab/workbench/agents").HarnessId,
 ): string {
   return i18n.t("msg.annotationPrompt", { ids: JSON.stringify(ids), backend });
 }

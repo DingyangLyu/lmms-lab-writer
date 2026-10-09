@@ -1,11 +1,13 @@
 "use client";
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
+import {
+  ChatImage,
+  splitEditorSelectionMessage,
+  stripWriterContext,
+  UserFileMessage,
+} from "@lmms-lab/workbench/agents";
 import { memo, useEffect, useMemo, useState } from "react";
-import { ChatImage } from "@/components/chat/chat-image";
-import { UserFileMessage } from "@/components/chat/user-file-message";
-import { stripWriterContext } from "@/lib/bridge/context";
-import { splitEditorSelectionMessage } from "@/lib/editor/selection-context";
 import { useI18n } from "@/lib/i18n";
 import { stripSearchFallbackHint } from "@/lib/opencode/search-fallback";
 import type {

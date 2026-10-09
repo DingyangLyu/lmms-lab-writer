@@ -1,6 +1,6 @@
 # 在实验室 Windows 电脑上部署（内网，不用 Docker）
 
-实验室工作站 DESKTOP-0L24B21 用的就是这种方式：协作服务直接用 Node 跑在 Windows 上，数据放在本机 PostgreSQL，组员在校园网里打开 `http://<这台电脑的 IP>`。同一台电脑上的 Codex 和 OpenCode 作为“共享执行器”，替所有项目执行组员提交的 AI 任务。需要公网访问时，再按 [deploy-windows.md](deploy-windows.md) 加 HTTPS 或经一台公网服务器转发。
+实验室工作站 DESKTOP-0L24B21 用的就是这种方式：协作服务直接用 Node 跑在 Windows 上，数据放在本机 PostgreSQL，组员在校园网里打开 `http://<这台电脑的 IP>`。同一台电脑上的 Codex 作为“共享执行器”，为所有项目提供网页右侧的 AI 对话（与桌面端同一个面板）。需要公网访问时，再按 [deploy-windows.md](deploy-windows.md) 加 HTTPS 或经一台公网服务器转发。
 
 ```
 组员浏览器 / 桌面端 ──HTTP :80──▶ node（Writer Server）──▶ PostgreSQL（本机）
@@ -20,6 +20,7 @@
 | `D:\texlive\current` | TeX Live（服务端编译 PDF 用的 latexmk） |
 | `D:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
 | `D:\writer\backups` | 每天 3 点的数据库备份，保留 14 天 |
+| `%USERPROFILE%\.writer-runner\projects` | AI 对话的项目工作副本（每个项目一份；可以删除，每轮开始前会从服务器重新同步） |
 
 任务计划程序里 `\Writer\` 下的三个任务都以 yuanbai 身份、“不管用户是否登录都运行”：
 
@@ -44,7 +45,11 @@
 
 - Codex 用这台电脑上 `~/.codex` 的登录（与 Codex 桌面版共用，不要复制 `auth.json`，ChatGPT 登录的刷新令牌会轮换，副本会互相作废）；OpenCode 用 `~/.local/share/opencode/auth.json` 和 `~/.config/opencode/opencode.json`。所有 AI 任务都消耗这个账号的额度。
 - Codex 在 Windows 的后台任务里无法使用自身沙箱，所以设为 `danger-full-access`：组员的提示词能以 yuanbai 的权限访问这台电脑上的文件（包括上面的凭据）。只给信任的组员编辑权限。执行器不会把 `WRITER_*` 令牌、密码和数据库 URL 交给 AI。
-- 访问 OpenAI 需要本机代理（FlClash）可用；代理不通时 Codex 任务会失败，OpenCode 用的国内模型不受影响。
+- 访问 OpenAI 需要本机代理（FlClash）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
+- 网页 AI 对话：Writer Runner 启用了 `codex` 能力时，会再连一条 WebSocket 到服务器（`/api/runner/agents`，同一个共享执行器令牌），由一个 `codex app-server` 服务所有项目。每个项目在 `%USERPROFILE%\.writer-runner\projects\<项目 ID>` 有一份工作副本，每轮开始前和服务器同步；Codex 每改完一步，改动就合并进共享正文（以发起这一轮的成员名义），与他人同时改到同一处的部分转为待审阅建议。每轮开始前服务器自动保存一个版本“AI 对话修改前”，可在“版本”里恢复。
+- 只有项目的所有者和编辑者能用 AI 对话；对话默认只有发起人能看到，可在对话标题旁或“历史对话”里共享给项目成员。同一项目同时只运行一轮。
+- 因为 `WRITER_CODEX_SANDBOX=danger-full-access`，网页上的权限只提供“完全访问”；其他机器可用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview,fullAccess` 指定。工作副本位置可用 `WRITER_AGENT_WORKSPACES` 改；`WRITER_AGENT_HOST=0` 关闭网页 AI 对话。
+- 更新代码后要同时重启 Writer Server 和 Writer Runner（见下），网页 AI 对话才会用上新版本。
 
 ## 账号和注册
 

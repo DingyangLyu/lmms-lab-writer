@@ -1,16 +1,19 @@
+import {
+  conversationTitle,
+  type HarnessId,
+  type HistoryAdapter,
+  type HistoryPage,
+} from "@lmms-lab/workbench/agents";
 import { invoke } from "@tauri-apps/api/core";
-import { conversationTitle } from "@/lib/bridge/context";
 import { i18n } from "@/lib/i18n";
 import { OpenCodeClient } from "@/lib/opencode/client";
-import type { HarnessId } from "./types";
-export type HistoryEntry = { id: string; title: string; updatedAt?: number };
-export type HistoryPage = { entries: HistoryEntry[]; cursor?: string | null };
+
 type Scope = { project: string; baseUrl: string };
-type HistoryAdapter = {
+type ScopedAdapter = {
   list: (scope: Scope, cursor?: string) => Promise<HistoryPage>;
   rename: (scope: Scope, id: string, title: string) => Promise<void>;
 };
-export const HISTORY_ADAPTERS: Record<HarnessId, HistoryAdapter> = {
+const HISTORY_ADAPTERS: Record<HarnessId, ScopedAdapter> = {
   codex: {
     async list({ project }, cursor) {
       const result = await invoke<{
@@ -62,3 +65,16 @@ export const HISTORY_ADAPTERS: Record<HarnessId, HistoryAdapter> = {
     },
   },
 };
+
+/** One backend's past conversations in the open project, for the shared history dialog. */
+export function desktopHistory(
+  backend: HarnessId,
+  scope: Scope & { openCodeReady: boolean },
+): HistoryAdapter {
+  const adapter = HISTORY_ADAPTERS[backend];
+  return {
+    list: (cursor) => adapter.list(scope, cursor),
+    rename: (id, title) => adapter.rename(scope, id, title),
+    ready: backend !== "opencode" || scope.openCodeReady,
+  };
+}

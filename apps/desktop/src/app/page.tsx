@@ -1,11 +1,21 @@
 "use client";
 
+import type { ConversationTarget } from "@lmms-lab/workbench/agents";
+import {
+  ChatImageDirectory,
+  type EditorSelectionContext,
+  type EditorTextRange,
+  flushComposerDrafts,
+  isHarnessId,
+  isWriterManagedPath,
+  parseChatLink,
+  sameEditorSelection,
+} from "@lmms-lab/workbench/agents";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChatImageDirectory } from "@/components/chat/chat-image";
 import { OpenFromServer } from "@/components/collab/open-from-server";
 import { SyncPanel } from "@/components/collab/sync-panel";
 import {
@@ -33,9 +43,6 @@ import {
   type TabReorderPosition,
 } from "@/components/ui/tab-bar";
 import { useToast } from "@/components/ui/toast";
-import { flushComposerDrafts } from "@/lib/chat/composer-drafts";
-import { isWriterManagedPath } from "@/lib/chat/files";
-import { parseChatLink } from "@/lib/chat/links";
 import { linkedFolders } from "@/lib/collab/accounts";
 import { useSharedRunner } from "@/lib/collab/runner";
 import { TeamCommentsProvider } from "@/lib/collab/team-comments";
@@ -45,11 +52,6 @@ import { fileKind, fileLanguage } from "@/lib/editor/file-kind";
 import { buildFileIndex, resolveFileReference } from "@/lib/editor/file-resolution";
 import { ProjectTransition } from "@/lib/editor/project-transition";
 import { projectRelativePath } from "@/lib/editor/save-manager";
-import {
-  type EditorSelectionContext,
-  type EditorTextRange,
-  sameEditorSelection,
-} from "@/lib/editor/selection-context";
 import { useAgentDelivery } from "@/lib/editor/use-agent-delivery";
 import { useDocumentSaving } from "@/lib/editor/use-document-saving";
 import { usePanelResize } from "@/lib/editor/use-panel-resize";
@@ -57,8 +59,6 @@ import { getReadableErrorMessage, getSynctexLookupMessage } from "@/lib/errors";
 import { resolveLocalFile, revealInFileManager } from "@/lib/file-manager";
 import { parseUnifiedDiffContent } from "@/lib/git/unified-diff";
 import { useGitActions } from "@/lib/git/use-git-actions";
-import type { ConversationTarget } from "@/lib/harness/types";
-import { isHarnessId } from "@/lib/harness/types";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
 import { useI18n } from "@/lib/i18n";
 import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";

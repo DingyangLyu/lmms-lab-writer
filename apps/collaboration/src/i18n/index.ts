@@ -1,5 +1,6 @@
 import { createI18n } from "@lmms-lab/i18n";
 import { accountEn, accountZh } from "./account";
+import { agentsEn, agentsZh } from "./agents";
 import { appEn, appZh } from "./app";
 import { authEn, authZh } from "./auth";
 import { bibliographyEn, bibliographyZh } from "./bibliography";
@@ -12,7 +13,6 @@ import { membersEn, membersZh } from "./members";
 import { notesEn, notesZh } from "./notes";
 import { compareEn, compareZh, reviewEn, reviewZh } from "./review";
 import { shellEn, shellZh } from "./shell";
-import { tasksEn, tasksZh } from "./tasks";
 import { workspaceEn, workspaceZh } from "./workspace";
 
 const zh = {
@@ -30,7 +30,7 @@ const zh = {
   ...notesZh,
   ...reviewZh,
   ...shellZh,
-  ...tasksZh,
+  ...agentsZh,
   ...workspaceZh,
 };
 const en: Record<keyof typeof zh, string> = {
@@ -48,7 +48,7 @@ const en: Record<keyof typeof zh, string> = {
   ...notesEn,
   ...reviewEn,
   ...shellEn,
-  ...tasksEn,
+  ...agentsEn,
   ...workspaceEn,
 };
 

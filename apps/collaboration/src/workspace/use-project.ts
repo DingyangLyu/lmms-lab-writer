@@ -6,7 +6,6 @@ import type {
   Member,
   Proposal,
   Role,
-  SharedJob,
   Snapshot,
   SourceFile,
 } from "../../shared/api";
@@ -27,18 +26,16 @@ export function useProject(
     [members, setMembers] = useState<Member[]>([]),
     [snapshots, setSnapshots] = useState<Snapshot[]>([]),
     [proposals, setProposals] = useState<Proposal[]>([]),
-    [jobs, setJobs] = useState<SharedJob[]>([]),
     [latestBuild, setLatestBuild] = useState<Build | null>(null),
     [sources, setSources] = useState<SourceFile[]>([]);
   const { onRole, onError } = callbacks;
   const reload = useCallback(async () => {
-    const [f, c, m, s, p, j, b] = await Promise.all([
+    const [f, c, m, s, p, b] = await Promise.all([
       api<FileInfo[]>(`${prefix}/files`),
       api<Comment[]>(`${prefix}/comments`),
       api<Member[]>(`${prefix}/members`),
       api<Snapshot[]>(`${prefix}/snapshots`),
       api<Proposal[]>(`${prefix}/proposals`),
-      api<SharedJob[]>(`${prefix}/jobs`),
       api<Build | null>(`${prefix}/builds/latest`),
     ]);
     setFiles(f);
@@ -46,7 +43,6 @@ export function useProject(
     setMembers(m);
     setSnapshots(s);
     setProposals(p);
-    setJobs(j);
     setLatestBuild((old) => (old?.id === b?.id ? old : b));
   }, [prefix]);
   /** Project text for citation and label completion and the bibliography tab. */
@@ -110,7 +106,6 @@ export function useProject(
     members,
     snapshots,
     proposals,
-    jobs,
     latestBuild,
     sources,
     reload,

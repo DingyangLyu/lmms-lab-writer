@@ -1,6 +1,13 @@
 "use client";
 
 import {
+  AttachmentStrip,
+  type EditorSelectionContext,
+  GrowingTextarea,
+  selectionRangeLabel,
+  useChatAttachments,
+} from "@lmms-lab/workbench/agents";
+import {
   ArrowUpIcon,
   CaretLeftIcon,
   CaretRightIcon,
@@ -9,10 +16,6 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AttachmentStrip } from "@/components/chat/attachment-strip";
-import { GrowingTextarea } from "@/components/chat/growing-textarea";
-import { useChatAttachments } from "@/lib/chat/use-chat-attachments";
-import { type EditorSelectionContext, selectionRangeLabel } from "@/lib/editor/selection-context";
 import { i18n, useI18n } from "@/lib/i18n";
 import { findSelectedModel } from "@/lib/opencode/model-selection";
 import { ChevronIcon, StopIcon } from "./icons";

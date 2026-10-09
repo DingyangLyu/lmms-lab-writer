@@ -1,4 +1,12 @@
 "use client";
+import { workbenchI18n } from "@lmms-lab/workbench";
+import {
+  type ConversationTarget,
+  HARNESSES,
+  harnessLabel,
+  isHarnessId,
+  STATUS_LABELS,
+} from "@lmms-lab/workbench/agents";
 import {
   CaretDownIcon,
   CaretRightIcon,
@@ -11,13 +19,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTeamComments } from "@/lib/collab/team-comments";
-import {
-  type ConversationTarget,
-  HARNESSES,
-  harnessLabel,
-  isHarnessId,
-  STATUS_LABELS,
-} from "@/lib/harness/types";
 import { type MessageKey, useI18n } from "@/lib/i18n";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
 import type { PdfAnnotation } from "@/lib/pdf/annotations";
@@ -643,7 +644,7 @@ export function AnnotationManager() {
                         {notes.conversations.map((tab) => (
                           <option key={tab.id} value={tab.id}>
                             {harnessLabel(tab.backend)} · {tab.title} ·{" "}
-                            {t(STATUS_LABELS[tab.status])}
+                            {workbenchI18n.t(STATUS_LABELS[tab.status])}
                           </option>
                         ))}
                       </optgroup>

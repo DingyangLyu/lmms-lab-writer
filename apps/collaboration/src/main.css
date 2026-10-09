@@ -8,5 +8,6 @@
 @import "@lmms-lab/workbench/scoped-preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "@lmms-lab/workbench/theme.css";
+@import "@lmms-lab/workbench/agents.css";
 
 @source "../../../packages/workbench/src";

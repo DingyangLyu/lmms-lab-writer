@@ -2,12 +2,12 @@
 
 import "@/lib/monaco/config";
 
+import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import Editor, { type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { teamMarks, useTeamComments } from "@/lib/collab/team-comments";
 import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
-import type { EditorTextRange } from "@/lib/editor/selection-context";
 import { type SourceMark, useSourceAnnotations } from "@/lib/editor/source-annotations";
 import type { EditorSettings, EditorTheme } from "@/lib/editor/types";
 import { i18n, useI18n } from "@/lib/i18n";

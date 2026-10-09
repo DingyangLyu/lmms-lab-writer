@@ -1,19 +1,21 @@
 "use client";
 
+import type { ChatDraft, ChatImageFile, ChatOutbox } from "@lmms-lab/workbench/agents";
+import {
+  DeliveryControls,
+  type DeliveryMode,
+  prepareChatFiles,
+  useChatOutbox,
+  useComposerDraft,
+  useIdleTranscript,
+  usePanelLifecycle,
+  withEditorSelection,
+} from "@lmms-lab/workbench/agents";
 import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConversationBridge } from "@/components/bridge/conversation-bridge";
-import { DeliveryControls, type DeliveryMode } from "@/components/chat/delivery-controls";
 import { ResizableComposer } from "@/components/ui/panel-height";
 import { useConversationBridge } from "@/lib/bridge/use-conversation-bridge";
-import { useComposerDraft } from "@/lib/chat/composer-drafts";
-import { prepareChatFiles } from "@/lib/chat/files";
-import type { ChatImageFile } from "@/lib/chat/images";
-import type { ChatDraft, ChatOutbox } from "@/lib/chat/outbox";
-import { useChatOutbox } from "@/lib/chat/use-chat-outbox";
-import { useIdleTranscript } from "@/lib/chat/use-idle-transcript";
-import { withEditorSelection } from "@/lib/editor/selection-context";
-import { usePanelLifecycle } from "@/lib/harness/use-panel-lifecycle";
 import { useI18n } from "@/lib/i18n";
 import { getOpenCodeErrorMessage } from "@/lib/opencode/client";
 import type { ToolPart } from "@/lib/opencode/types";

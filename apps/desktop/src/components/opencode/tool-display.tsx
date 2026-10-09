@@ -1,7 +1,7 @@
 "use client";
 
+import { ChatImage } from "@lmms-lab/workbench/agents";
 import { useMemo, useState } from "react";
-import { ChatImage } from "@/components/chat/chat-image";
 import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/lib/i18n";
 import type { ToolPart } from "@/lib/opencode/types";

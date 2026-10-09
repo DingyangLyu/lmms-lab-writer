@@ -1,5 +1,7 @@
 "use client";
 import { PdfAnnotationContext } from "@lmms-lab/workbench";
+import type { ConversationTab, ConversationTarget } from "@lmms-lab/workbench/agents";
+import { type EditorSelectionContext, selectionMatchesDocument } from "@lmms-lab/workbench/agents";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -12,11 +14,6 @@ import {
   useState,
 } from "react";
 import type { SaveManager } from "@/lib/editor/save-manager";
-import {
-  type EditorSelectionContext,
-  selectionMatchesDocument,
-} from "@/lib/editor/selection-context";
-import type { ConversationTab, ConversationTarget } from "@/lib/harness/types";
 import { i18n } from "@/lib/i18n";
 import { sameProject } from "@/lib/project-root";
 import type { PdfAnnotation, PdfMark } from "./annotations";

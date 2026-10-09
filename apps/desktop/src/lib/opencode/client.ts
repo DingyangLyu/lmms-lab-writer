@@ -1,4 +1,4 @@
-import { mergeById } from "@/lib/chat/idle-transcript";
+import { mergeById } from "@lmms-lab/workbench/agents";
 import { i18n } from "@/lib/i18n";
 import { openEventStream } from "./event-stream";
 import { appendSearchFallbackHint } from "./search-fallback";

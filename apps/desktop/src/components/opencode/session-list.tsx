@@ -1,8 +1,8 @@
 "use client";
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { RenameChat } from "@lmms-lab/workbench/agents";
 import { useMemo, useState } from "react";
-import { RenameChat } from "@/components/chat/rename-chat";
 import { useI18n } from "@/lib/i18n";
 import type { SessionInfo } from "@/lib/opencode/types";
 import { TrashIcon } from "./icons";

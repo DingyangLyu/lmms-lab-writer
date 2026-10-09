@@ -101,9 +101,15 @@ importers:
       react-dom:
         specifier: ^19.2.6
         version: 19.2.6(react@19.2.6)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.15)(react@19.2.6)
       react-pdf:
         specifier: ^10.4.1
         version: 10.4.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -471,9 +477,15 @@ importers:
       react-dom:
         specifier: ^19.2.6
         version: 19.2.6(react@19.2.6)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.15)(react@19.2.6)
       react-pdf:
         specifier: ^10.4.1
         version: 10.4.1(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

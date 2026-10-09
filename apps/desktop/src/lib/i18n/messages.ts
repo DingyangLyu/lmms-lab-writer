@@ -1,40 +1,7 @@
 export const msgZh = {
-  "msg.eachFileMustBe25MbOrSmaller": "单个文件不能超过 25 MB。",
-  "msg.openAProjectBeforeAddingFiles": "请先打开项目再添加文件。",
-  "msg.couldNotReadName": "无法读取 {name}",
-  "msg.openAProjectFirst": "请先打开项目。",
-  "msg.couldNotReadTheFile": "无法读取文件",
-  "msg.fileReadingWasCancelled": "文件读取取消",
-  "msg.attachmentName": "附件：{name}",
-  "msg.theChatDraftIsNotSavedYetSoSwitchingWasC": "聊天草稿尚未保存，切换已取消：{error}",
-  "msg.theChatDraftIsStillLoadingTryAgainInAMom": "聊天草稿仍在载入，请稍后重试。",
-  "msg.chooseAPngJpegWebpOrGifImage": "请选择 PNG、JPEG、WebP 或 GIF 图片。",
-  "msg.eachImageMustBeUnder10MbAndNotEmpty": "单张图片须小于 10 MB，且不能为空。",
-  "msg.pastedImagePng": "粘贴图片.png",
-  "msg.imageReadingWasCancelled": "图片读取已取消",
-  "msg.couldNotReadTheImage": "无法读取图片",
-  "msg.theCachedHistoryIsGoneReopenThisConversa": "历史缓存未找到，请重新打开此历史对话。",
-  "msg.addAtMostCountAttachmentsAtATimeImagesUp":
-    "一次最多添加 {count} 个附件（图片不超过 10 MB，文件不超过 25 MB）。",
-  "msg.nameCannotBeSentAsAnImageErrorSoItWasAtt":
-    "{name} 不能作为图片发送（{error}），已作为普通文件附加。",
-  "msg.addFilesOrImages": "添加文件或图片",
-  "msg.pastedFile": "粘贴文件",
-  "msg.theConversationChangedTheQueueStaysWithT": "对话已切换，队列保持原对话。",
-  "msg.theConnectionDroppedBeforeTheLastMessage":
-    "连接中断后无法确认上一条是否完成，队列已暂停；请核对历史后继续。",
-  "msg.theLastSendWasNotConfirmedCheckTheHistor": "上次发送结果未确认，请核对历史后重试或移除。",
-  "msg.sendingFromTheQueueFailedTheRemainingMes": "队列发送失败，后续消息已暂停：{error}",
-  "msg.eachConversationCanHoldAtMost50QueuedMes": "每个对话最多保留 50 条待发消息。",
-  "msg.theLocalQueueWasRestoredClickContinueToS": "已恢复本地队列，点击继续后发送。",
-  "msg.theQueueIsNotReadyYetYourInputWasKept": "队列尚未就绪，输入内容已保留。",
-  "msg.couldNotReadTheQueueError": "队列读取失败：{error}",
-  "msg.couldNotSaveTheQueueError": "队列保存失败：{error}",
   "msg.pathMatchesSeveralFilesGiveAPathRelative":
     "“{path}”对应多个文件，请指定项目相对路径：{matches}",
   "msg.listSeparator": "、",
-  "msg.delegationFailedTheTaskIsStillUnderTheTa": "派发失败，任务仍保留在标签下方，可重试：{error}",
-  "msg.couldNotSaveTheDelegationRecordSoNothing": "派发记录保存失败，尚未发送：{error}",
   "msg.closingWasCancelledBecauseSomeFilesAreNo":
     "关闭已取消：有文件尚未保存。请重试或另存副本。{error}",
   "msg.closeProtectionIsNotActiveError": "关闭保护未启用：{error}",
@@ -62,12 +29,7 @@ export const msgZh = {
   "msg.noNewChangesTheGitVersionIsUpToDate": "没有新改动，Git 版本已是最新",
   "msg.untitledOpencodeConversation": "未命名 OpenCode 对话",
   "msg.untitledCodexConversation": "未命名 Codex 对话",
-  "msg.newNameConversation": "新 {name} 对话",
-  "msg.couldNotSaveTheConversationTabsDoNotClos": "对话标签保存失败，请勿关闭应用。",
-  "msg.theTargetConversationWasClosedChooseAnot": "目标对话已关闭，请重新选择。",
   "msg.tool": "工具",
-  "msg.viewImage": "查看图片",
-  "msg.imageAttachment": "图片附件",
   "msg.openAProjectFirst2": "请先打开项目",
   "msg.compilingNameFile": "正在编译 {name} · {file}",
   "msg.compiledPdfEngine": "编译完成：{pdf}（{engine}）",
@@ -160,52 +122,9 @@ export const msgZh = {
   "msg.search": "搜索",
 };
 export const msgEn: Record<keyof typeof msgZh, string> = {
-  "msg.eachFileMustBe25MbOrSmaller": "Each file must be 25 MB or smaller.",
-  "msg.openAProjectBeforeAddingFiles": "Open a project before adding files.",
-  "msg.couldNotReadName": "Could not read {name}",
-  "msg.openAProjectFirst": "Open a project first.",
-  "msg.couldNotReadTheFile": "Could not read the file",
-  "msg.fileReadingWasCancelled": "File reading was cancelled",
-  "msg.attachmentName": "Attachment: {name}",
-  "msg.theChatDraftIsNotSavedYetSoSwitchingWasC":
-    "The chat draft is not saved yet, so switching was cancelled: {error}",
-  "msg.theChatDraftIsStillLoadingTryAgainInAMom":
-    "The chat draft is still loading. Try again in a moment.",
-  "msg.chooseAPngJpegWebpOrGifImage": "Choose a PNG, JPEG, WebP or GIF image.",
-  "msg.eachImageMustBeUnder10MbAndNotEmpty": "Each image must be under 10 MB and not empty.",
-  "msg.pastedImagePng": "pasted-image.png",
-  "msg.imageReadingWasCancelled": "Image reading was cancelled",
-  "msg.couldNotReadTheImage": "Could not read the image",
-  "msg.theCachedHistoryIsGoneReopenThisConversa":
-    "The cached history is gone. Reopen this conversation from history.",
-  "msg.addAtMostCountAttachmentsAtATimeImagesUp":
-    "Add at most {count} attachments at a time (images up to 10 MB, files up to 25 MB).",
-  "msg.nameCannotBeSentAsAnImageErrorSoItWasAtt":
-    "{name} cannot be sent as an image ({error}), so it was attached as a file.",
-  "msg.addFilesOrImages": "Add files or images",
-  "msg.pastedFile": "Pasted file",
-  "msg.theConversationChangedTheQueueStaysWithT":
-    "The conversation changed; the queue stays with the original one.",
-  "msg.theConnectionDroppedBeforeTheLastMessage":
-    "The connection dropped before the last message was confirmed, so the queue is paused. Check the history, then continue.",
-  "msg.theLastSendWasNotConfirmedCheckTheHistor":
-    "The last send was not confirmed. Check the history, then retry or remove it.",
-  "msg.sendingFromTheQueueFailedTheRemainingMes":
-    "Sending from the queue failed; the remaining messages are paused: {error}",
-  "msg.eachConversationCanHoldAtMost50QueuedMes":
-    "Each conversation can hold at most 50 queued messages.",
-  "msg.theLocalQueueWasRestoredClickContinueToS":
-    "The local queue was restored. Click continue to send it.",
-  "msg.theQueueIsNotReadyYetYourInputWasKept": "The queue is not ready yet; your input was kept.",
-  "msg.couldNotReadTheQueueError": "Could not read the queue: {error}",
-  "msg.couldNotSaveTheQueueError": "Could not save the queue: {error}",
   "msg.pathMatchesSeveralFilesGiveAPathRelative":
     "“{path}” matches several files; give a path relative to the project: {matches}",
   "msg.listSeparator": ", ",
-  "msg.delegationFailedTheTaskIsStillUnderTheTa":
-    "Delegation failed; the task is still under the tab and can be retried: {error}",
-  "msg.couldNotSaveTheDelegationRecordSoNothing":
-    "Could not save the delegation record, so nothing was sent: {error}",
   "msg.closingWasCancelledBecauseSomeFilesAreNo":
     "Closing was cancelled because some files are not saved. Try again or save a copy. {error}",
   "msg.closeProtectionIsNotActiveError": "Close protection is not active: {error}",
@@ -238,14 +157,7 @@ export const msgEn: Record<keyof typeof msgZh, string> = {
   "msg.noNewChangesTheGitVersionIsUpToDate": "No new changes; the Git version is up to date",
   "msg.untitledOpencodeConversation": "Untitled OpenCode conversation",
   "msg.untitledCodexConversation": "Untitled Codex conversation",
-  "msg.newNameConversation": "New {name} conversation",
-  "msg.couldNotSaveTheConversationTabsDoNotClos":
-    "Could not save the conversation tabs. Do not close the app.",
-  "msg.theTargetConversationWasClosedChooseAnot":
-    "The target conversation was closed. Choose another one.",
   "msg.tool": "Tool",
-  "msg.viewImage": "View image",
-  "msg.imageAttachment": "Image attachment",
   "msg.openAProjectFirst2": "Open a project first",
   "msg.compilingNameFile": "Compiling {name} · {file}",
   "msg.compiledPdfEngine": "Compiled: {pdf} ({engine})",

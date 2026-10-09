@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./pdf-viewer": "./src/pdf/pdf-viewer.tsx",
     "./theme.css": "./src/theme.css",
-    "./scoped-preflight.css": "./src/scoped-preflight.css"
+    "./scoped-preflight.css": "./src/scoped-preflight.css",
+    "./agents": "./src/agents/index.ts",
+    "./agents.css": "./src/agents.css"
   },
   "scripts": {
     "test": "vitest run",
@@ -31,7 +33,9 @@
     "react": "^19.2.6",
     "react-arborist": "^3.8.0",
     "react-dom": "^19.2.6",
-    "react-pdf": "^10.4.1"
+    "react-markdown": "^10.1.0",
+    "react-pdf": "^10.4.1",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "^6.20.2",
@@ -49,7 +53,9 @@
     "react": "^19.2.6",
     "react-arborist": "^3.8.0",
     "react-dom": "^19.2.6",
+    "react-markdown": "^10.1.0",
     "react-pdf": "^10.4.1",
+    "remark-gfm": "^4.0.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }

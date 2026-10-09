@@ -26,7 +26,7 @@ const { ReferencesDialog } = await import("./workspace/references-dialog");
 const { ReviewDialog } = await import("./workspace/review-dialog");
 const { ReviewMargin } = await import("./workspace/review-margin");
 const { ShareDialog } = await import("./workspace/share-dialog");
-const { TasksPanel } = await import("./workspace/tasks-panel");
+const { AgentsPanel, projectPath } = await import("./workspace/agents-panel");
 const { Dashboard, ago, inFilter } = await import("./dashboard");
 
 import type { WorkspaceContext } from "./workspace/context";
@@ -141,11 +141,12 @@ describe("client panels render", () => {
         />,
       ),
       html(
-        <TasksPanel
+        <AgentsPanel
           project="p1"
-          memberRole="owner"
-          jobs={[]}
-          reload={async () => {}}
+          user={ws.user}
+          memberRole="commenter"
+          visible
+          onOpenFile={() => {}}
           onError={() => {}}
         />,
       ),
@@ -160,9 +161,16 @@ describe("client panels render", () => {
       "coauthor",
       "Paper",
       "1 处引用",
-      "AI",
+      "AI 对话只对项目的所有者和编辑者开放",
     ])
       expect(rendered).toContain(text);
+  });
+  it("opens the files the agent names, wherever the runner keeps its copy", () => {
+    expect(projectPath("main.tex:12", "p1")).toEqual({ path: "main.tex", line: 12 });
+    expect(
+      projectPath("C:\\Users\\lab\\.writer-runner\\projects\\p1\\sec\\intro.tex:3", "p1"),
+    ).toEqual({ path: "sec/intro.tex", line: 3 });
+    expect(projectPath("https://example.org/paper", "p1")).toBeNull();
   });
   it("renders the review margin with a thread and a draft", () => {
     const margin = html(

@@ -1,4 +1,4 @@
-import { type CodexItem, trimCodexHistory } from "@/lib/codex/events";
+import { type CodexItem, trimCodexHistory } from "@lmms-lab/workbench/agents";
 import { i18n } from "@/lib/i18n";
 
 type Block = {

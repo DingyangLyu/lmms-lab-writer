@@ -4,6 +4,7 @@
  */
 import { format, type Locale, type Params } from "@lmms-lab/i18n";
 import { createContext, type ReactNode, useCallback, useContext } from "react";
+import { agentsEn, agentsZh } from "./agents/messages";
 
 export const workbenchZh = {
   "chat.dragToResizeTheInputArea": "拖动调整输入区高度",
@@ -246,12 +247,14 @@ export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
   "thread.replyPlaceholder": "Reply…",
   "thread.reply": "Reply",
 };
-export type WorkbenchKey = keyof typeof workbenchZh;
+const zh = { ...workbenchZh, ...agentsZh };
+const en: Record<keyof typeof zh, string> = { ...workbenchEn, ...agentsEn };
+export type WorkbenchKey = keyof typeof zh;
 
 let current: Locale = "zh";
 const LocaleContext = createContext<Locale>("zh");
 const translate = (locale: Locale, key: WorkbenchKey, params?: Params) =>
-  format((locale === "en" ? workbenchEn : workbenchZh)[key] ?? workbenchZh[key] ?? key, params);
+  format((locale === "en" ? en : zh)[key] ?? zh[key] ?? key, params);
 
 /** The host app's interface language; every workbench component below follows it. */
 export function WorkbenchLocale({ locale, children }: { locale: Locale; children: ReactNode }) {
@@ -270,4 +273,8 @@ export function useWorkbenchI18n() {
 export const workbenchI18n = {
   t: (key: WorkbenchKey, params?: Params) => translate(current, key, params),
   getLocale: () => current,
+  /** Outside React only (tests); inside the app <WorkbenchLocale> decides. */
+  setLocale: (locale: Locale) => {
+    current = locale;
+  },
 };

@@ -1,12 +1,12 @@
 "use client";
 
+import { type EditorSelectionContext, selectionMatchesDocument } from "@lmms-lab/workbench/agents";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { i18n } from "@/lib/i18n";
 import { openedProjectPath } from "@/lib/project-root";
 import { listenHere } from "@/lib/tauri/window-events";
 import type { SaveManager } from "./save-manager";
-import { type EditorSelectionContext, selectionMatchesDocument } from "./selection-context";
 
 /**
  * Agents must see what the user sees. Before a message (or a delegated turn) reaches an

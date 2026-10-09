@@ -1,8 +1,8 @@
-import type { EditorSelectionContext } from "@/lib/editor/selection-context";
+import type { EditorSelectionContext } from "@lmms-lab/workbench/agents";
 
 export type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
 
-export type Props = import("@/lib/harness/types").HarnessLifecycle & {
+export type Props = import("@lmms-lab/workbench/agents").HarnessLifecycle & {
   active?: boolean;
   onWorkingChange?: (busy: boolean) => void;
   className?: string;
@@ -40,4 +40,4 @@ export type AskUserQuestion = {
   multiSelect?: boolean;
 };
 
-export type AttachedFile = import("@/lib/chat/images").ChatImageFile;
+export type AttachedFile = import("@lmms-lab/workbench/agents").ChatImageFile;
