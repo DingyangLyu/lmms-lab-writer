@@ -1,206 +1,119 @@
-> **DingyangLyu 分支：** 商用限制及保留的 MIT 权利见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。仍指向上游官网、Homebrew 和下载页的链接提供的是上游产品，不代表本分支的商业授权版本。
-
 <div align="center">
 
-<a href="https://writer.lmms-lab.com">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="imgs/logo-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="imgs/logo-light.svg">
-  <img alt="LMMs-Lab Writer" src="imgs/logo-light.svg" width="512">
+  <img alt="Y-Writer" src="imgs/logo-light.svg" width="360">
 </picture>
-</a>
 
-**言者所以在意，得意而忘言。**
+**为课题组准备的 LaTeX 写作平台：在桌面端和 AI 一起写，在实验室自己的服务器上多人实时协作。**
 
-[![Website](https://img.shields.io/badge/-官网-8957e5?style=flat-square&logo=safari&logoColor=white)](https://writer.lmms-lab.com)
-[![Docs](https://img.shields.io/badge/-文档-0969da?style=flat-square&logo=gitbook&logoColor=white)](https://writer.lmms-lab.com/docs)
-[![Download](https://img.shields.io/badge/-下载-2ea44f?style=flat-square&logo=github&logoColor=white)](https://writer.lmms-lab.com/download)
-
-[![macOS](https://img.shields.io/badge/-macOS-111111?style=flat-square&logo=apple&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
-[![Windows](https://img.shields.io/badge/-Windows-0078D4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
 [![License: Source Available](https://img.shields.io/badge/License-Source_Available-f0c000?style=flat-square)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&color=e8a317)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
+[![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-[English](README.md) | 中文 | [日本語](README_ja.md)
+[English](README.md) | 中文
 
 </div>
 
 ---
 
-[![](imgs/demo.webp)](https://www.bilibili.com/video/BV1JpFQzbEL4/?share_source=copy_web&vd_source=d485f09c61c71104d778f222a1872b9d)
+Y-Writer 由两部分组成，可以配合使用：
 
-## 为什么选择 LMMs-Lab Writer？
+- **桌面端**（macOS、Windows）：本地优先的 LaTeX 编辑器，Codex、Claude Code 和 OpenCode 直接修改项目文件，每一处 AI 修改都可以先审阅再保留。
+- **协作服务器**（网页）：课题组自己的类 Overleaf 服务——多人实时编辑、批注讨论、服务器编译 PDF、共享 AI 任务和账号审批，部署在你们自己管理的机器上。
 
-作为研究人员，你的宝贵时间应倾注于那些突破性的发现——而不是浪费在繁琐的 LaTeX 模板、解决宏包冲突，或是在 Overleaf 和 ChatGPT 之间反复复制粘贴。
-
-LMMs-Lab Writer 是一款**本地优先、AI 原生**的 LaTeX 编辑器。你的文件始终安全地存储在本地，而 AI 智能体则能直接协助编辑。编译、审阅、发布——所有环节都在一个应用内流畅完成。
-
-## 一键搞定 LaTeX 环境
-
-告别动辄数小时的 TeX Live 安装过程。LMMs-Lab Writer **自动检测并配置最小化的 LaTeX 发行版**。如果编译过程中发现缺少宏包，它会自动为你安装。无需任何手动配置，打开应用，即刻开始创作。
-
-支持 **TinyTeX**、**MiKTeX**、**MacTeX** 和 **TeX Live**——所有环境配置均由应用一键接管。
+同一个项目可以两边都用：桌面端把本地文件夹和服务器上的项目双向同步。
 
 <div align="center">
-<img src="imgs/latex.png" alt="一键 LaTeX 环境配置，自动安装宏包" width="720">
+<img src="imgs/web-workspace-zh.webp" alt="网页编辑页：LaTeX 源码与编译好的 PDF 并排" width="900">
 </div>
 
-## 原生支持多语言写作
+## 功能
 
-无论是**中文、英文、日文、韩文，还是阿拉伯文**，都能流畅写作。XeLaTeX 和 LuaLaTeX 作为一等公民，提供对 Unicode 和系统字体的完整支持。通过内置的 `ctex`、`xeCJK` 等多语言宏包，中日韩（CJK）文档**开箱即用**，无需任何额外折腾。
+### 桌面端
 
-<div align="center">
-<img src="imgs/compile-cn.png" alt="完整的 CJK 和 Unicode 支持（XeLaTeX）">
-</div>
+- **和 AI 一起写**：Codex、Claude Code、OpenCode 并排使用，可同时开多个对话、互相委派任务，PDF 或源码批注可以直接派给 AI 处理。
+- **AI 修改先审阅**：记录每一轮 AI 修改，逐项接受、拒绝或撤销；真正冲突的改动进入合并面板，不会覆盖你的内容。
+- **LaTeX 开箱即用**：编译目标、模板、缺少 TeX 时的安装引导，源码与 PDF 的 SyncTeX 互相跳转，XeLaTeX/LuaLaTeX 支持中文等 Unicode 文字。
+- **安全保存**：本地恢复草稿、与外部修改三方合并、自动 Git 版本。
+- **多窗口**：每个窗口打开一个项目（macOS 可从 Dock 右键或“文件 → 新建窗口”打开）。
+- **中英文界面**，默认跟随系统语言。
 
-## OpenCode：深度集成的 AI 工作流
+### 协作服务器
 
-内置的 **OpenCode** 面板将 AI 的能力直接注入编辑器核心：
-
-```
-你："增加一个相关工作章节，对比我们的方法与 LoRA 和 QLoRA 的异同"
-AI 智能体：*实时在 main.tex 中撰写内容*
-你：*点击编译* 搞定。
-```
-
-- 与 AI 对话、发送文件、管理会话上下文
-- AI 能够读取整个项目，理解完整的上下文语境
-- 修改内容即时呈现在编辑器中，所见即所得
-- 支持 **任意模型**——无论是 Claude, GPT, Gemini, DeepSeek，还是本地运行的模型
-
-它还完美兼容 **Claude Code**、**Cursor**、**Codex CLI**、**Aider** 等任何文件编辑工具。编辑器会实时监听项目目录，同步反映所有外部更改。
-
-<div align="center">
-<img src="imgs/interaction.png" alt="OpenCode AI 集成——与 AI 对话编写 LaTeX" width="512">
-</div>
-
-## 内置 Git，专为协作设计
-
-Git 绝非事后补充的功能——它被**原生构建在侧边栏**中：
-
-- **暂存、提交、对比差异、推送、拉取**——全图形化界面操作
-- **AI 自动生成提交信息**——基于你的修改内容智能总结
-- **并排差异查看器**——在提交前轻松审阅 AI 的修改
-- **一键发布到 GitHub**——无需接触终端即可创建仓库并推送代码
-- **GitHub CLI 集成**——无缝的身份验证体验
-
-不再需要为 Overleaf 的 Git 同步功能每月支付 $21。在这里，版本控制是免费且核心的功能。
-
-<div align="center">
-<img src="imgs/git-support.png" alt="Git 集成——从侧边栏暂存、提交、差异对比、推送" width="720">
-</div>
-
-## 源码可见，非商业免费
-
-本分支源码公开。个人非商业使用、非商业教学和科研免费；适用新许可的原创新增及修改部分，商业用途须事先取得书面授权。上游和已经按 MIT 发布的版本保留原有权利。
-
-- 你的文件**永远不会离开你的设备**
-- AI 工具使用**你自己的 API 密钥**
-- 所有功能**完全离线可用**（编辑、编译、Git 操作）
-- 可按 [LICENSE](LICENSE) 在允许的非商业范围内 Fork、修改和自托管
-
-## 跨平台原生体验
-
-原生支持 **macOS**（Apple Silicon 和 Intel）以及 **Windows**（64 位）。基于 [Tauri](https://tauri.app/) 构建，带来极致的原生性能——绝非笨重的 Electron 套壳应用。
+- **多人实时编辑**（Yjs）：协作者光标、批注与回复、版本与对比、共享文献库。
+- **服务器编译 PDF**：报错定位到源码，源码与 PDF 互相跳转。
+- **与桌面端同步**：在桌面端把服务器项目打开成本地文件夹，修改双向同步，冲突会保留副本而不是丢失。
+- **共享 AI 任务**：一台登录了 Codex 或 OpenCode 的实验室电脑替所有项目执行任务，结果以修改提案的形式等待审阅。
+- **面向课题组的账号**：用户自行注册、管理员批准后使用；邀请链接、管理后台，以及项目内的所有者、编辑者、批注者、只读者角色。
+- **跑在自己的机器上**：PostgreSQL 加每日备份；可用 Docker，也可以直接部署在实验室的 Windows 电脑上。
 
 <div align="center">
 <table>
 <tr>
-<td align="center"><strong>浅色模式</strong></td>
-<td align="center"><strong>深色模式</strong></td>
+<td><img src="imgs/web-login-zh.webp" alt="登录与注册" width="440"></td>
+<td><img src="imgs/web-admin-zh.webp" alt="管理后台：审核注册申请" width="440"></td>
 </tr>
 <tr>
-<td><img src="imgs/light.png" alt="浅色模式"></td>
-<td><img src="imgs/dark.png" alt="深色模式"></td>
+<td align="center">登录或注册</td>
+<td align="center">审核新成员</td>
 </tr>
 </table>
 </div>
 
-```bash
-# macOS (Homebrew)
-brew tap EvolvingLMMs-Lab/tap && brew install --cask lmms-lab-writer
-```
-
-或者直接从官网[下载 macOS / Windows 版本](https://writer.lmms-lab.com/download)。
-
----
-
-## Overleaf vs. LMMs-Lab Writer
-
-| | Overleaf | LMMs-Lab Writer |
-|---|---|---|
-| **文件存储** | 仅限云端 | 本地（完全掌控） |
-| **AI 编辑** | 仅基础语法检查 | OpenCode + 任意 AI 智能体 |
-| **多语言支持** | CJK 支持有限 | 完整 Unicode、XeLaTeX、系统字体支持 |
-| **LaTeX 环境** | 预设环境 | 一键安装，智能托管 |
-| **Git 集成** | 需付费 | 免费，原生内置 |
-| **离线使用** | 不支持 | 完整支持 |
-| **编译速度** | 云端排队 | 本地极速编译 |
-| **源码许可** | 专有 | 源码可见；适用新许可的贡献限非商业使用 |
-| **价格** | $21-42/月 | 非商业免费；商业用途需授权 |
-
 ## 快速开始
 
-**1. 下载安装**
-
-前往 [writer.lmms-lab.com/download](https://writer.lmms-lab.com/download) 下载，macOS 用户也可通过 Homebrew 安装。
-
-**2. 打开项目**
-
-启动应用，点击 **打开文件夹**，选择你的 LaTeX 项目目录。应用会自动识别主文件。
-
-**3. AI 辅助写作**
-
-使用内置的 OpenCode 面板，或者在终端运行你喜欢的 AI 工具：
-
-```bash
-claude "写一段摘要，总结我们的三个核心贡献"
-```
-
-**4. 编译与发布**
-
-点击编译，预览 PDF。在侧边栏暂存更改、提交代码、推送到 GitHub——一气呵成。
-
-## 常见问题
-
-**我需要单独安装 LaTeX 吗？**
-通常不需要。应用会自动检测并安装一个最小化的 LaTeX 发行版。编译时如果缺少宏包，也会自动为你安装。
-
-**支持中文等非英文文档吗？**
-完美支持。通过 XeLaTeX 和 LuaLaTeX 提供完整的 Unicode 支持。中文、日文、韩文、阿拉伯文等均可开箱即用。
-
-**我的数据安全吗？**
-绝对安全。所有文件都存储在你的本地设备上。AI 工具也是在本地运行或通过你自己的 API 密钥调用，我们不会上传你的任何数据。
-
-**可以兼容 Overleaf 项目吗？**
-可以。只需将你的 Overleaf Git 仓库克隆到本地，然后用 Writer 打开即可无缝衔接。
-
-**没有网络能用吗？**
-当然。编辑、编译和 Git 操作均支持完全离线使用。
-
-## 参与开发
+需要 Node.js 24、`package.json` 中指定的 pnpm 版本，以及 Rust（编译桌面端时）。
 
 ```bash
 git clone https://github.com/DingyangLyu/lmms-lab-writer.git
 cd lmms-lab-writer
 pnpm install
-pnpm tauri:dev
 ```
 
-请参阅 **[开发者指南](docs/dev.md)** 了解完整的架构、技术栈、Rust 命令、调试技巧以及贡献规范。
+**桌面端**
 
-## 许可证
+```bash
+pnpm tauri:dev      # 开发模式
+pnpm tauri:build    # 生成当前平台的安装包
+```
 
-本分支中有权按新条款授权的原创新增及修改，采用 [DingyangLyu Writer Noncommercial License v1.0](LICENSE)：个人非商业使用、非商业教学和科研免费，商业用途需事先书面授权。这是源码可见许可，不是 OSI 定义的开源许可。
+**协作服务器**（本机试用，使用内嵌数据库）
 
-[上游 MIT 许可](LICENSES/MIT-LMMs-Lab.txt)和版权声明完整保留。本分支于 2026-10-03 整理公开历史并重新发布快照，这不追溯撤销独立取得的既有权利。范围见 [NOTICE](NOTICE) 和[许可说明](docs/licensing.md)。商业授权请联系 [DingyangLyu](https://github.com/DingyangLyu)。
+```bash
+cp apps/collaboration/.env.example apps/collaboration/.env   # 设置 WRITER_ADMIN_PASSWORD（至少 12 位）
+pnpm --filter @lmms-lab/writer-collaboration build
+pnpm --filter @lmms-lab/writer-collaboration start           # http://127.0.0.1:8787
+```
 
----
+课题组正式使用请连接 PostgreSQL，并参考下面的部署文档。
 
-<div align="center">
+## 文档
 
-**由 [LMMs-Lab](https://lmms-lab.com) 匠心打造**
+| 主题 | 文档 |
+| --- | --- |
+| 部署在实验室 Windows 电脑上（不用 Docker） | [docs/deploy-windows-lan.md](docs/deploy-windows-lan.md) |
+| 用 Docker 和 Caddy 部署公网 HTTPS 服务 | [docs/deploy-windows.md](docs/deploy-windows.md) |
+| 文献库、修改审阅、协作服务器与执行器 | [docs/research-tools-and-collaboration.md](docs/research-tools-and-collaboration.md) |
+| 架构、命令与开发约定 | [docs/dev.md](docs/dev.md) |
 
-每一篇传世论文都有起点。你的杰作，从这里开始。
+## 目录结构
 
-</div>
+```
+apps/desktop          Tauri v2 桌面端（Next.js 前端，Rust 后端）
+apps/collaboration    协作服务器与网页编辑器（Node、PostgreSQL、React、Yjs）
+packages/sync         桌面端使用的文件夹 ↔ 服务器同步引擎
+packages/writing      三方合并、审阅分块、文献处理
+packages/latex-editor CodeMirror 的 LaTeX 语法与折叠
+packages/i18n         两个应用共用的中英文文案
+```
+
+## 许可
+
+本分支新增的原创内容采用 [DingyangLyu Writer 非商业许可 v1.0](LICENSE)：个人、非商业的教学与科研使用免费；商业使用须事先取得书面授权。该许可不是 OSI 认可的开源许可证。
+
+Y-Writer 基于 LMMs-Lab 的 [LMMs-Lab Writer](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)。[上游 MIT 许可](LICENSES/MIT-LMMs-Lab.txt)与署名均予保留；上游的网站、下载和 Homebrew 软件包指的是上游产品，而非本分支。本分支快照已于 2026-10-03 以重建的公开历史重新发布，这不撤销任何已独立授予的权利。详见 [NOTICE](NOTICE) 与[许可说明](docs/licensing.md)。商业授权请联系 [DingyangLyu](https://github.com/DingyangLyu)。
+
+Y-Writer 字标使用 [Outfit](https://github.com/Outfitio/Outfit-Fonts) 字体（SIL Open Font License 1.1）。

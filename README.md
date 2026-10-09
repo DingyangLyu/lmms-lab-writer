@@ -1,214 +1,119 @@
-> **DingyangLyu fork:** See [LICENSE](LICENSE) and [NOTICE](NOTICE) for commercial-use restrictions and preserved MIT rights. Website, Homebrew, and download links naming the upstream project still refer to upstream products, not a commercially licensed release of this fork.
-
-This fork includes desktop bibliography management and per-task change review, plus an initial self-hosted multiplayer editor with shared source comments and reviewable AI tasks. See the [local setup, Docker deployment, backup instructions, and current limitations](docs/research-tools-and-collaboration.md).
-
 <div align="center">
 
-<a href="https://writer.lmms-lab.com">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="imgs/logo-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="imgs/logo-light.svg">
-  <img alt="LMMs-Lab Writer" src="imgs/logo-light.svg" width="512">
+  <img alt="Y-Writer" src="imgs/logo-light.svg" width="360">
 </picture>
-</a>
 
-**The AI-native LaTeX editor for researchers who prioritize ideas over syntax.**
+**A LaTeX writing workspace for research groups: write with AI agents on your desktop, collaborate in real time on your lab's own server.**
 
-[![Website](https://img.shields.io/badge/-Website-8957e5?style=flat-square&logo=safari&logoColor=white)](https://writer.lmms-lab.com)
-[![Docs](https://img.shields.io/badge/-Docs-0969da?style=flat-square&logo=gitbook&logoColor=white)](https://writer.lmms-lab.com/docs)
-[![Download](https://img.shields.io/badge/-Download-2ea44f?style=flat-square&logo=github&logoColor=white)](https://writer.lmms-lab.com/download)
-
-[![Release](https://img.shields.io/github/v/release/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&label=Release&color=6c47ff)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
 [![License: Source Available](https://img.shields.io/badge/License-Source_Available-f0c000?style=flat-square)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/EvolvingLMMs-Lab/lmms-lab-writer?style=flat-square&color=e8a317)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer)
-
-[![macOS](https://img.shields.io/badge/-macOS-111111?style=flat-square&logo=apple&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
-[![Windows](https://img.shields.io/badge/-Windows-0078D4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Rust](https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-English | [中文](README_zh.md) | [日本語](README_ja.md)
+English | [中文](README_zh.md)
 
 </div>
 
 ---
 
-[![](imgs/demo.webp)](https://youtu.be/rX0FdCEqw0s?si=dXxYfSUVPemeBAOs)
+Y-Writer has two parts that work together:
 
-## Why LMMs-Lab Writer?
+- **Desktop app** (macOS, Windows): a local-first LaTeX editor where Codex, Claude Code and OpenCode edit your project directly, and every AI change can be reviewed before you keep it.
+- **Collaboration server** (web): your group's own Overleaf-style service, with real-time co-editing, comments, server-side PDF builds, shared AI tasks and account approval — deployed on a lab machine you control.
 
-As a researcher, your time belongs to breakthroughs—not wrestling with LaTeX boilerplate, resolving package conflicts, or the endless copy-paste loop between Overleaf and ChatGPT.
-
-LMMs-Lab Writer is a **local-first, AI-native** LaTeX editor. Your files remain secure on your machine. AI agents assist with editing directly. Compile, review, and publish—all within a single, unified environment.
-
-## One-Click LaTeX Setup
-
-Say goodbye to hour-long TeX Live installations. LMMs-Lab Writer **automatically detects and installs a lightweight LaTeX distribution**. If a package is missing, it’s installed on the fly during compilation. Zero manual configuration required—just open the app and start writing.
-
-Supports **TinyTeX**, **MiKTeX**, **MacTeX**, and **TeX Live**—with streamlined, one-click management.
+Projects can live on both: the desktop app keeps a local folder in two-way sync with a server project.
 
 <div align="center">
-<img src="imgs/latex.png" alt="One-click LaTeX setup with auto package installation" width="720">
+<img src="imgs/web-workspace-en.webp" alt="The web workspace: LaTeX source beside the compiled PDF" width="900">
 </div>
 
-## Built for Every Language
+## Features
 
-Write effortlessly in **English, Chinese, Japanese, Korean, Arabic, or any other language**. XeLaTeX and LuaLaTeX are supported out of the box with full Unicode and system font compatibility. CJK documents work instantly with `ctex`, `xeCJK`, and other multilingual packages—no extra setup needed.
+### Desktop app
 
-<div align="center">
-<img src="imgs/compile-cn.png" alt="Full CJK and Unicode support with XeLaTeX">
-</div>
+- **Write with AI agents** — Codex, Claude Code and OpenCode side by side, several conversations at once, delegation between them, and PDF or source annotations sent to an agent as tasks.
+- **Review AI edits** — every agent turn is recorded; accept, reject or undo each change, with real overlaps sent to a merge panel instead of overwriting you.
+- **LaTeX that just builds** — build targets, templates, missing-TeX detection, SyncTeX between source and PDF, XeLaTeX/LuaLaTeX for Chinese and other Unicode text.
+- **Safe saving** — recovery drafts, three-way merges with outside changes, and automatic Git versions.
+- **Several windows**, one project each (Dock menu / File → New Window on macOS).
+- **Chinese and English** interface, following the system language.
 
-## AI-Powered Workflows with OpenCode and Codex
+### Collaboration server
 
-The built-in agent panel lets you switch between **OpenCode** and the local **Codex app-server**. Both can edit your project directly:
-
-```
-You: "Add a related work section comparing our method to LoRA and QLoRA"
-Agent: *writes directly to main.tex in real-time*
-You: *hit compile* Done.
-```
-
-- Chat with AI, attach files, and manage context seamlessly
-- AI analyzes your entire project for deep context awareness
-- Edits are reflected in the editor in real-time
-- Compatible with **any model**—Claude, GPT, Gemini, DeepSeek, or local LLMs
-- Codex reuses your local Codex login and supports live web search for literature discovery, with links you can verify before adding citations
-
-It also pairs perfectly with **Claude Code**, **Cursor**, **Codex CLI**, **Aider**, and other tools. The editor monitors your project directory, syncing external changes instantly.
-
-<div align="center">
-<img src="imgs/interaction.png" alt="OpenCode AI integration — chat with AI to write LaTeX" width="512">
-</div>
-
-## Git Integration for Modern Collaboration
-
-Git isn't just an add-on; it's **deeply integrated into the sidebar**:
-
-- **Stage, commit, diff, push, pull**—entirely via the UI
-- **AI-generated commit messages** based on your staged changes
-- **Side-by-side diff viewer** for reviewing AI suggestions before committing
-- **One-click GitHub publishing**—create and push repositories without touching the terminal
-- **Seamless GitHub CLI integration** for effortless authentication
-
-Stop paying premium prices for basic Git sync. Here, version control is free, powerful, and built-in.
-
-<div align="center">
-<img src="imgs/git-support.png" alt="Git integration — stage, commit, diff, push from the sidebar" width="720">
-</div>
-
-## Source Available, Free for Noncommercial Use
-
-This fork is source available. Personal, educational, and research uses that are noncommercial are free; commercial use of covered fork contributions requires prior written authorization. Upstream MIT rights and previously published MIT versions remain unchanged. See [License](#license).
-
-- Your files **never leave your local machine**
-- AI tools utilize **your own API keys**
-- Fully functional **offline** (editing, compilation, Git)
-- Fork, modify, and self-host for permitted noncommercial purposes under [LICENSE](LICENSE)
-
-## Cross-Platform
-
-Native performance on **macOS** (Apple Silicon & Intel) and **Windows** (64-bit). Built with [Tauri](https://tauri.app/) for a lightweight, responsive experience—not just another heavy Electron wrapper.
+- **Real-time co-editing** (Yjs) with cursors, comments and replies, versions and comparisons, and a shared bibliography.
+- **PDF builds on the server** with error locations and source ↔ PDF jumps.
+- **Desktop sync** — open a server project in the desktop app as a local folder; edits flow both ways, conflicts become copies instead of lost work.
+- **Shared AI tasks** — a lab machine with Codex or OpenCode signed in runs tasks for every project; results arrive as proposals to review.
+- **Accounts for a group** — people register and an administrator approves them; invitation links, an admin console, and per-project roles (owner, editor, commenter, viewer).
+- **Runs on your hardware** — PostgreSQL with daily backups; Docker, or natively on a Windows lab PC.
 
 <div align="center">
 <table>
 <tr>
-<td align="center"><strong>Light Mode</strong></td>
-<td align="center"><strong>Dark Mode</strong></td>
+<td><img src="imgs/web-login-en.webp" alt="Sign-in and registration" width="440"></td>
+<td><img src="imgs/web-admin-en.webp" alt="Administration: approving a registration" width="440"></td>
 </tr>
 <tr>
-<td><img src="imgs/light.png" alt="Light mode"></td>
-<td><img src="imgs/dark.png" alt="Dark mode"></td>
+<td align="center">Sign in or register</td>
+<td align="center">Approve new members</td>
 </tr>
 </table>
 </div>
 
-```bash
-# macOS (Homebrew)
-brew tap EvolvingLMMs-Lab/tap && brew install --cask lmms-lab-writer
-```
+## Getting started
 
-Or [download for macOS / Windows](https://writer.lmms-lab.com/download) from the website.
-
----
-
-## Overleaf vs. LMMs-Lab Writer
-
-| | Overleaf | LMMs-Lab Writer |
-|---|---|---|
-| **File storage** | Cloud only | Local (your machine) |
-| **AI editing** | Basic grammar | OpenCode + any AI agent |
-| **Non-English** | Limited CJK support | Full Unicode, XeLaTeX, system fonts |
-| **LaTeX setup** | Pre-configured | One-click install, agent-managed |
-| **Git** | Paid plans only | Free, built into sidebar |
-| **Offline** | No | Full support |
-| **Compilation** | Cloud queue | Local, instant |
-| **Source licensing** | Proprietary | Source available; covered contributions restricted to noncommercial use |
-| **Price** | $21-42/month | Noncommercial use free; commercial authorization required |
-
-## Quick Start
-
-**1. Download & Install**
-
-Get the latest version from [writer.lmms-lab.com/download](https://writer.lmms-lab.com/download), or install via Homebrew on macOS.
-
-**2. Open Your Project**
-
-Launch the app, click **Open Folder**, and select your LaTeX project. The main file is detected automatically.
-
-**3. Write with AI**
-
-Leverage the integrated OpenCode panel, or execute any AI tool via the terminal:
-
-```bash
-claude "Write the abstract summarizing our three key contributions"
-```
-
-**4. Compile & Publish**
-
-One click to compile and preview your PDF. Stage changes, commit, and push to GitHub—all from the sidebar.
-
-## FAQ
-
-**Do I need to install LaTeX separately?**
-Not necessarily. The app automates the installation of a minimal LaTeX distribution. Missing packages are handled automatically during compilation.
-
-**Does it work with non-English documents?**
-Absolutely. Full Unicode support is provided via XeLaTeX and LuaLaTeX. CJK, Arabic, Cyrillic—all work out of the box.
-
-**Is my data sent anywhere?**
-No. All files remain locally on your device. AI tools operate locally or via your personal API keys.
-
-**Can I use this with Overleaf projects?**
-Yes. Simply clone your Overleaf Git repository locally and open it in Writer.
-
-**Does it work offline?**
-Yes. Editing, compilation, and Git operations are fully functional without an internet connection.
-
-## Development
+Requirements: Node.js 24, the pnpm version pinned in `package.json`, and Rust (for the desktop app).
 
 ```bash
 git clone https://github.com/DingyangLyu/lmms-lab-writer.git
 cd lmms-lab-writer
 pnpm install
-pnpm tauri:dev
 ```
 
-See the **[Developer Guide](docs/dev.md)** for full architecture, tech stack, Rust commands, debugging, and contribution conventions.
+**Desktop app**
+
+```bash
+pnpm tauri:dev      # development
+pnpm tauri:build    # installers for this platform
+```
+
+**Collaboration server** (local trial with the embedded database)
+
+```bash
+cp apps/collaboration/.env.example apps/collaboration/.env   # set WRITER_ADMIN_PASSWORD (12+ characters)
+pnpm --filter @lmms-lab/writer-collaboration build
+pnpm --filter @lmms-lab/writer-collaboration start           # http://127.0.0.1:8787
+```
+
+For a group, use PostgreSQL and one of the deployment guides below.
+
+## Documentation
+
+| Topic | Guide |
+| --- | --- |
+| Lab deployment on a Windows PC (no Docker) | [docs/deploy-windows-lan.md](docs/deploy-windows-lan.md) |
+| Public HTTPS deployment with Docker and Caddy | [docs/deploy-windows.md](docs/deploy-windows.md) |
+| Bibliography, change review, collaboration server, runners | [docs/research-tools-and-collaboration.md](docs/research-tools-and-collaboration.md) |
+| Architecture, commands and conventions | [docs/dev.md](docs/dev.md) |
+
+## Project layout
+
+```
+apps/desktop          Tauri v2 desktop app (Next.js frontend, Rust backend)
+apps/collaboration    Collaboration server and web editor (Node, PostgreSQL, React, Yjs)
+packages/sync         Folder ↔ server sync engine used by the desktop app
+packages/writing      Three-way merge, review hunks, bibliography
+packages/latex-editor CodeMirror LaTeX grammar and folding
+packages/i18n         Chinese/English text for both apps
+```
 
 ## License
 
 Covered original fork contributions use the [DingyangLyu Writer Noncommercial License v1.0](LICENSE): personal, noncommercial teaching and research use is free; commercial use requires prior written authorization. This is not an OSI-approved open-source license.
 
-The [upstream MIT license](LICENSES/MIT-LMMs-Lab.txt) and attribution are preserved. This fork snapshot was reissued on 2026-10-03 with reconstructed public history; this does not revoke independently granted rights. See [NOTICE](NOTICE) and the [licensing guide](docs/licensing.md). Contact [DingyangLyu](https://github.com/DingyangLyu) for commercial authorization.
+Y-Writer is built on [LMMs-Lab Writer](https://github.com/EvolvingLMMs-Lab/lmms-lab-writer) by LMMs-Lab. The [upstream MIT license](LICENSES/MIT-LMMs-Lab.txt) and attribution are preserved; upstream websites, downloads and Homebrew packages refer to the upstream product, not to this fork. This fork snapshot was reissued on 2026-10-03 with reconstructed public history; this does not revoke independently granted rights. See [NOTICE](NOTICE) and the [licensing guide](docs/licensing.md). Contact [DingyangLyu](https://github.com/DingyangLyu) for commercial authorization.
 
----
-
-<div align="center">
-
-**Built by [LMMs-Lab](https://lmms-lab.com)**
-
-Every legendary paper started somewhere. Yours starts here.
-
-</div>
+The Y-Writer wordmark is set in [Outfit](https://github.com/Outfitio/Outfit-Fonts) (SIL Open Font License 1.1).
