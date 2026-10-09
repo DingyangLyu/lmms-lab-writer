@@ -10,19 +10,22 @@ import type {
   SourceFile,
 } from "../shared/api";
 
-// pdf.js needs a browser; the pane is rendered without a PDF.
-vi.mock("./pdf-viewer", () => ({ PdfViewer: () => null }));
+// pdf.js needs a browser; the panes are rendered without a PDF.
+vi.mock("@lmms-lab/workbench/pdf-viewer", () => ({ PdfViewer: () => null }));
+vi.mock("./pdf-setup", () => ({}));
 vi.stubGlobal("location", new URL("http://127.0.0.1:8787/"));
 /** Server rendering separates adjacent text with comments. */
 const html = (node: Parameters<typeof renderToString>[0]) =>
   renderToString(node).replaceAll("<!-- -->", "");
 const { App } = await import("./app");
-const { BibliographyTab } = await import("./workspace/bibliography-tab");
-const { BuildPane } = await import("./workspace/build");
-const { CommentsTab } = await import("./workspace/comments-tab");
-const { HistoryTab } = await import("./workspace/history-tab");
-const { MembersTab } = await import("./workspace/members-tab");
-const { ReviewTab } = await import("./workspace/review-tab");
+const { CommentsPanel } = await import("./workspace/comments-panel");
+const { HistoryPanel } = await import("./workspace/history-panel");
+const { LogPanel } = await import("./workspace/log-panel");
+const { PdfPane } = await import("./workspace/pdf-pane");
+const { ReferencesDialog } = await import("./workspace/references-dialog");
+const { ReviewDialog } = await import("./workspace/review-dialog");
+const { ShareDialog } = await import("./workspace/share-dialog");
+const { TasksPanel } = await import("./workspace/tasks-panel");
 const { Dashboard, ago, inFilter } = await import("./dashboard");
 
 import type { WorkspaceContext } from "./workspace/context";
@@ -96,60 +99,76 @@ describe("client panels render", () => {
   it("renders the loading shell", () => {
     expect(html(<App />)).toContain("正在载入");
   });
-  it("renders every inspector tab with data", () => {
+  it("renders the workbench panels with data", () => {
     const rendered = [
       html(
-        <CommentsTab
+        <CommentsPanel
           ws={ws}
           comments={[comment]}
+          open
+          setOpen={() => {}}
           selection={{ quote: "选中", start: "", end: "" }}
           setSelection={() => {}}
           draft=""
           setDraft={() => {}}
         />,
       ),
-      html(<ReviewTab ws={ws} proposals={[proposal]} />),
-      html(<HistoryTab ws={ws} snapshots={[snapshot]} />),
-      html(<MembersTab ws={ws} members={[member]} onDeleted={() => {}} />),
-      html(<BibliographyTab ws={ws} sources={sources} refreshSources={async () => sources} />),
+      html(<ReviewDialog ws={ws} proposals={[proposal]} onClose={() => {}} />),
+      html(<HistoryPanel ws={ws} snapshots={[snapshot]} />),
+      html(<ShareDialog ws={ws} members={[member]} onClose={() => {}} onDeleted={() => {}} />),
+      html(
+        <ReferencesDialog
+          ws={ws}
+          sources={sources}
+          refreshSources={async () => sources}
+          onClose={() => {}}
+        />,
+      ),
+      html(
+        <TasksPanel
+          project="p1"
+          memberRole="owner"
+          jobs={[]}
+          reload={async () => {}}
+          onError={() => {}}
+        />,
+      ),
     ].join("");
     for (const text of [
       "请核对",
       "已核对",
+      "选中",
       "待审阅",
       "投稿前",
       "自动",
       "coauthor",
       "Paper",
       "1 处引用",
+      "AI",
     ])
       expect(rendered).toContain(text);
   });
   it("renders build results with clickable issues", () => {
-    const pane = html(
-      <BuildPane
-        prefix="/projects/p1"
-        b={{
-          build,
-          compiling: false,
-          open: true,
-          setOpen: () => {},
-          texFiles: [file],
-          chosenMain: "main.tex",
-          setMain: () => {},
-          chosenEngine: "pdflatex",
-          setEngine: () => {},
-          highlight: null,
-          compile: () => {},
-          showCursorInPdf: () => {},
-          showPdfInSource: () => {},
-          openLocation: () => {},
-        }}
-      />,
-    );
-    expect(pane).toContain("编译有错误");
-    expect(pane).toContain("main.tex:4");
-    expect(pane).toContain("没有生成 PDF");
+    const b = {
+      build,
+      compiling: false,
+      open: true,
+      setOpen: () => {},
+      texFiles: [file],
+      chosenMain: "main.tex",
+      setMain: () => {},
+      chosenEngine: "pdflatex" as const,
+      setEngine: () => {},
+      highlight: null,
+      compile: () => {},
+      showCursorInPdf: () => {},
+      showPdfInSource: () => {},
+      openLocation: () => {},
+    };
+    const log = html(<LogPanel b={b} onClose={() => {}} />);
+    expect(log).toContain("编译有错误");
+    expect(log).toContain("main.tex:4");
+    expect(html(<PdfPane ws={ws} b={b} onClose={() => {}} />)).toContain("没有生成 PDF");
   });
 });
 

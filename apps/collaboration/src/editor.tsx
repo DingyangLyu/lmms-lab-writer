@@ -1,23 +1,27 @@
-import {
-  autocompletion,
-  closeBrackets,
-  closeBracketsKeymap,
-  completionKeymap,
-} from "@codemirror/autocomplete";
-import { defaultKeymap } from "@codemirror/commands";
-import { bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { autocompletion, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { defaultKeymap, indentWithTab, toggleLineComment } from "@codemirror/commands";
+import { bracketMatching, foldKeymap } from "@codemirror/language";
+import { gotoLine, highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
+  drawSelection,
   EditorView,
   highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
   keymap,
-  lineNumbers,
+  rectangularSelection,
 } from "@codemirror/view";
-import { latexFolding, latexHighlighting, latexLanguage } from "@lmms-lab/latex-editor";
-import { useEffect, useRef } from "react";
+import { latexLanguage } from "@lmms-lab/latex-editor";
+import {
+  DEFAULT_EDITOR_SETTINGS,
+  editorConfiguration,
+  FoldToolbar,
+  latexFoldExtensions,
+} from "@lmms-lab/workbench";
+import { type ReactNode, useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 import type { Comment, Role } from "../shared/api";
@@ -26,6 +30,8 @@ import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
 export type Selection = { quote: string; start: string; end: string };
+/** A collaborator in the same file, as their cursor shows them. */
+export type Peer = { name: string; color: string };
 const LIMIT = 2_000_000;
 /** Comment highlights follow edits by position mapping between (throttled) re-anchors. */
 const setMarks = StateEffect.define<DecorationSet>();
@@ -58,6 +64,9 @@ export function Editor({
   onError,
   onReady,
   hints,
+  onText,
+  onPeers,
+  actions,
 }: {
   project: string;
   file: string;
@@ -70,13 +79,19 @@ export function Editor({
   onReady: (handle: EditorHandle | null) => void;
   /** Read lazily on each completion, so new keys appear without recreating the editor. */
   hints: () => ProjectHints;
+  /** The text, at most a few times a second, for the outline. */
+  onText?: (text: string) => void;
+  /** Everyone else editing this file, from the collaboration cursors. */
+  onPeers?: (peers: Peer[]) => void;
+  /** Buttons at the right of the toolbar above the text. */
+  actions?: ReactNode;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
   const editability = useRef(new Compartment());
-  const callbacks = useRef({ onRole, onStatus, onError, onReady, hints });
-  callbacks.current = { onRole, onStatus, onError, onReady, hints };
+  const callbacks = useRef({ onRole, onStatus, onError, onReady, hints, onText, onPeers });
+  callbacks.current = { onRole, onStatus, onError, onReady, hints, onText, onPeers };
   const readOnly = useRef(role);
   readOnly.current = role;
   useEffect(() => {
@@ -92,6 +107,16 @@ export function Editor({
     provider.current = p;
     const text = p.doc.getText("content"),
       undo = new Y.UndoManager(text);
+    const canEdit = () => ["owner", "editor"].includes(readOnly.current);
+    let textTimer: ReturnType<typeof setTimeout> | null = null;
+    const reportPeers = () =>
+      callbacks.current.onPeers?.(
+        [...p.awareness.getStates()]
+          .filter(([client]) => client !== p.doc.clientID)
+          .map(([, state]) => state.user as Peer | undefined)
+          .filter((user): user is Peer => !!user?.name),
+      );
+    p.awareness.on("change", reportPeers);
     const v = new EditorView({
       parent: host.current,
       state: EditorState.create({
@@ -111,55 +136,51 @@ export function Editor({
             }
             return transaction;
           }),
-          lineNumbers(),
           latexLanguage,
-          latexHighlighting(false),
-          latexFolding,
-          foldGutter(),
-          EditorView.lineWrapping,
-          highlightActiveLine(),
+          latexFoldExtensions(),
+          drawSelection(),
+          rectangularSelection(),
           bracketMatching(),
-          closeBrackets(),
-          search({ top: true }),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
           highlightSelectionMatches(),
+          highlightSpecialChars(),
+          search({ top: true }),
           autocompletion({ override: [latexCompletion(() => callbacks.current.hints())] }),
           keymap.of([
+            { key: "Mod-/", run: toggleLineComment },
+            { key: "Ctrl-g", run: gotoLine },
             ...yUndoManagerKeymap,
             ...closeBracketsKeymap,
             ...searchKeymap,
             ...foldKeymap,
             ...completionKeymap,
             ...defaultKeymap,
+            indentWithTab,
           ]),
           yCollab(text, p.awareness, { undoManager: undo }),
-          editability.current.of(
-            EditorState.readOnly.of(!["owner", "editor"].includes(readOnly.current)),
-          ),
+          // The desktop editor's theme, gutters, wrapping and brackets, read-only by role.
+          editability.current.of(editorConfiguration(DEFAULT_EDITOR_SETTINGS, false, !canEdit())),
           commentMarks,
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.label"),
             spellcheck: "false",
+            autocapitalize: "off",
+            autocorrect: "off",
           }),
-          EditorView.theme({
-            "&": { height: "100%", fontSize: "15px" },
-            ".cm-scroller": {
-              overflow: "auto",
-              fontFamily: '"SF Mono",Menlo,"PingFang SC",monospace',
-            },
-            ".cm-content": { padding: "16px 0" },
-            ".cm-line": { padding: "0 12px" },
-            ".cm-gutters": {
-              background: "#f8fafb",
-              borderRight: "1px solid #e2e6ea",
-              color: "#7a858e",
-            },
-            ".writer-comment": { background: "#ffefb6", borderBottom: "2px solid #dba323" },
-            ".writer-comment-resolved": { borderBottom: "2px solid #39a471" },
+          EditorView.updateListener.of((update) => {
+            if (!update.docChanged || !callbacks.current.onText) return;
+            textTimer ??= setTimeout(() => {
+              textTimer = null;
+              callbacks.current.onText?.(update.view.state.doc.toString());
+            }, 400);
           }),
         ],
       }),
     });
     view.current = v;
+    callbacks.current.onText?.(v.state.doc.toString());
+    reportPeers();
     callbacks.current.onReady({
       text: () => v.state.doc.toString(),
       selection: () => {
@@ -205,6 +226,9 @@ export function Editor({
       },
     });
     return () => {
+      if (textTimer) clearTimeout(textTimer);
+      p.awareness.off("change", reportPeers);
+      callbacks.current.onPeers?.([]);
       callbacks.current.onReady(null);
       v.destroy();
       undo.destroy();
@@ -215,10 +239,9 @@ export function Editor({
   }, [project, file, user]);
   useEffect(() => {
     view.current?.dispatch({
-      effects: editability.current.reconfigure([
-        EditorState.readOnly.of(!["owner", "editor"].includes(role)),
-        EditorView.editable.of(["owner", "editor"].includes(role)),
-      ]),
+      effects: editability.current.reconfigure(
+        editorConfiguration(DEFAULT_EDITOR_SETTINGS, false, !["owner", "editor"].includes(role)),
+      ),
     });
   }, [role]);
   useEffect(() => {
@@ -240,7 +263,7 @@ export function Editor({
           if (a && z && a.index < z.index && z.index <= v.state.doc.length)
             ranges.push(
               Decoration.mark({
-                class: c.resolved ? "writer-comment-resolved" : "writer-comment",
+                class: `writer-note-highlight ${c.resolved ? "writer-note-resolved" : ""}`,
                 attributes: { title: `${c.authorName}: ${c.body}` },
               }).range(a.index, z.index),
             );
@@ -265,5 +288,10 @@ export function Editor({
       p.doc.off("update", update);
     };
   }, [comments, file]);
-  return <div ref={host} className="editor-host" />;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <FoldToolbar view={() => view.current} actions={actions} />
+      <div ref={host} className="min-h-0 flex-1 overflow-hidden" />
+    </div>
+  );
 }

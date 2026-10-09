@@ -20,8 +20,6 @@ export const editorZh = {
   "project.roleChanged": "项目权限已变更，请返回项目列表重新进入。",
   "preview.download": "下载 {path}",
   "preview.external": "此文件可下载后用本机应用打开。",
-  "pdf.failed": "PDF 无法显示：{error}",
-  "pdf.inverseTitle": "双击跳到源码",
 };
 export const editorEn: Record<keyof typeof editorZh, string> = {
   "complete.section": "Section",
@@ -47,6 +45,4 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "project.roleChanged": "Your access to this project changed; return to the project list.",
   "preview.download": "Download {path}",
   "preview.external": "Download this file to open it with an app on your computer.",
-  "pdf.failed": "The PDF cannot be shown: {error}",
-  "pdf.inverseTitle": "Double-click to jump to the source",
 };

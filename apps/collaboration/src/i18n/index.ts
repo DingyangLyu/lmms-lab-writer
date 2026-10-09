@@ -10,6 +10,7 @@ import { editorEn, editorZh } from "./editor";
 import { filesEn, filesZh } from "./files";
 import { membersEn, membersZh } from "./members";
 import { compareEn, compareZh, reviewEn, reviewZh } from "./review";
+import { shellEn, shellZh } from "./shell";
 import { tasksEn, tasksZh } from "./tasks";
 import { workspaceEn, workspaceZh } from "./workspace";
 
@@ -26,6 +27,7 @@ const zh = {
   ...filesZh,
   ...membersZh,
   ...reviewZh,
+  ...shellZh,
   ...tasksZh,
   ...workspaceZh,
 };
@@ -42,6 +44,7 @@ const en: Record<keyof typeof zh, string> = {
   ...filesEn,
   ...membersEn,
   ...reviewEn,
+  ...shellEn,
   ...tasksEn,
   ...workspaceEn,
 };

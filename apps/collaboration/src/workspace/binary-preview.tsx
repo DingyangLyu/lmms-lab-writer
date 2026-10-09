@@ -1,7 +1,10 @@
+/** Images and PDFs of the project shown in the editor area; other files can be downloaded. */
+import { PdfViewer } from "@lmms-lab/workbench/pdf-viewer";
 import { useEffect, useState } from "react";
 import type { FileContent, FileInfo } from "../../shared/api";
 import { api, errorText, unbase64 } from "../api";
 import { useI18n } from "../i18n";
+import "../pdf-setup";
 
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
@@ -34,23 +37,28 @@ export function BinaryPreview({ prefix, file }: { prefix: string; file: FileInfo
       if (current) URL.revokeObjectURL(current);
     };
   }, [prefix, file.id, ext, image]);
+  if (error)
+    return (
+      <p role="alert" className="p-4 text-xs text-red-600">
+        {error}
+      </p>
+    );
+  if (!url) return <div className="flex-1 bg-accent-hover" />;
+  if (ext === "pdf") return <PdfViewer src={url} />;
   return (
-    <div className="binary-preview">
-      {error && <p className="error">{error}</p>}
-      {url && (
-        <>
-          <a href={url} download={file.path.split("/").pop()}>
-            {t("preview.download", { path: file.path })}
-          </a>
-          {ext === "pdf" ? (
-            <iframe title={file.path} src={url} />
-          ) : image ? (
-            <img alt={file.path} src={url} />
-          ) : (
-            <p>{t("preview.external")}</p>
-          )}
-        </>
-      )}
+    <div className="flex min-h-0 flex-1 flex-col bg-accent-hover">
+      <div className="flex shrink-0 items-center justify-end border-b border-border px-3 py-1 text-xs">
+        <a href={url} download={file.path.split("/").pop()} className="hover:text-accent">
+          {t("preview.download", { path: file.path })}
+        </a>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+        {image ? (
+          <img alt={file.path} src={url} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <p className="text-xs text-muted">{t("preview.external")}</p>
+        )}
+      </div>
     </div>
   );
 }

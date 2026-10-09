@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { ProjectSummary, PublicUser } from "../shared/api";
 import { ChangePassword } from "./account";
 import { AdminConsole } from "./admin";
@@ -6,7 +6,11 @@ import { api } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { useI18n } from "./i18n";
-import { Workspace } from "./workspace/workspace";
+
+// The workbench (editor, PDF preview, file tree) loads when a project is first opened.
+const Workspace = lazy(() =>
+  import("./workspace/workspace").then((m) => ({ default: m.Workspace })),
+);
 
 export function App() {
   const { t } = useI18n();
@@ -70,7 +74,18 @@ export function App() {
         <ChangePassword onDone={back} onCancel={back} />
       </div>
     );
-  if (project) return <Workspace project={project} user={user} onBack={() => openProject(null)} />;
+  if (project)
+    return (
+      <Suspense
+        fallback={
+          <div className="auth">
+            <p>{t("common.loading")}</p>
+          </div>
+        }
+      >
+        <Workspace project={project} user={user} onBack={() => openProject(null)} />
+      </Suspense>
+    );
   return (
     <Dashboard
       user={user}
