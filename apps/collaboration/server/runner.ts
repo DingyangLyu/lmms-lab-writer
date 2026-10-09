@@ -248,8 +248,8 @@ export async function runWorker() {
   if (!token) throw new Error("请设置项目专属 WRITER_RUNNER_TOKEN");
   console.log(`Writer runner connected to ${origin}; capabilities: ${allowed.join(",")}`);
   // Live AI conversations from the web (shared runner only; the server refuses other tokens).
-  if (allowed.includes("codex") && process.env.WRITER_AGENT_HOST !== "0")
-    startAgentHost({ server: origin, token });
+  if (allowed.some((h) => ["codex", "claude"].includes(h)) && process.env.WRITER_AGENT_HOST !== "0")
+    startAgentHost({ server: origin, token, harnesses: allowed });
   while (true) {
     let work = "",
       job: Job | null = null;

@@ -1,5 +1,5 @@
-import { type CodexItem, trimCodexHistory } from "@lmms-lab/workbench/agents";
-import { i18n } from "@/lib/i18n";
+import { workbenchI18n as i18n } from "../../i18n";
+import { type CodexItem, trimCodexHistory } from "../codex/events";
 
 type Block = {
   type: string;
@@ -23,6 +23,9 @@ export type ClaudeEvent = {
   errors?: string[];
   request_id?: string;
   request?: { subtype: string; tool_name?: string; input: Record<string, unknown> };
+  /** A shared backend's additions: what reached the shared project, who is changing it. */
+  results?: Array<{ path: string; status: string; reason?: string }>;
+  busy?: { thread: string; userName: string; mine: boolean } | null;
   message?: { id?: string; content: Block[] | string };
   event?: {
     type: string;

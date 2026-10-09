@@ -15,15 +15,15 @@ import type { Locale } from "@lmms-lab/i18n";
 import { mergeText, reviewHunks } from "@lmms-lab/writing";
 import { WebSocket, WebSocketServer } from "ws";
 import {
-  AGENT_PERMISSIONS,
   type AgentBusy,
   type AgentChangeResult,
   type AgentEvent,
   type AgentFile,
-  type AgentPermission,
   type AgentStatus,
   type AgentThread,
   CHANGES_EVENT,
+  CLAUDE_EVENT,
+  HARNESS_PERMISSIONS,
   THREADS_EVENT,
 } from "../shared/agents";
 import { allowedOrigin, bearer, userFor } from "./auth";
@@ -82,6 +82,16 @@ const optional = (params: Params, key: string, max = 200) =>
 const threadId = (value: unknown) =>
   typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value) ? value : fail(400, "无效对话");
 const visible = (thread: ThreadRow, user: string) => thread.owner === user || thread.shared;
+/** Where a harness's turn begins and ends in the events its runner sends. */
+const turnMarker = (event: AgentEvent): "start" | "end" | null => {
+  if (event.method === "turn/started") return "start";
+  if (event.method === "turn/completed") return "end";
+  if (event.method === CLAUDE_EVENT) {
+    const type = (event.params?.event as { type?: string } | undefined)?.type;
+    return type === "writer_started" ? "start" : type === "writer_done" ? "end" : null;
+  }
+  return null;
+};
 /** Data URLs of at most six images and 24 MB, as the desktop accepts them. */
 function images(params: Params) {
   const value = params.images ?? [];
@@ -129,7 +139,7 @@ export class Agents {
     });
   }
   status(): AgentStatus {
-    return this.runner?.status ?? { online: false, name: null, harnesses: [], permissions: [] };
+    return this.runner?.status ?? { online: false, name: null, harnesses: [], permissions: {} };
   }
   busy(project: string): AgentBusy {
     const turn = this.turns.get(project);
@@ -190,7 +200,7 @@ export class Agents {
     const previous = this.runner;
     const runner: Runner = {
       socket: socketOpen,
-      status: { online: true, name, harnesses: [], permissions: [] },
+      status: { online: true, name, harnesses: [], permissions: {} },
       alive: true,
     };
     this.runner = runner;
@@ -276,15 +286,23 @@ export class Agents {
     }
     if (isObject(message.status)) {
       const offered = message.status;
-      const harnesses = Array.isArray(offered.harnesses) ? offered.harnesses : [];
-      const permissions = Array.isArray(offered.permissions) ? offered.permissions : [];
+      const harnesses = (Array.isArray(offered.harnesses) ? offered.harnesses : []).filter(
+        (h): h is string =>
+          typeof h === "string" &&
+          !!this.shared?.capabilities.includes(h) &&
+          h in HARNESS_PERMISSIONS,
+      );
+      const permissions = isObject(offered.permissions) ? offered.permissions : {};
       runner.status = {
         online: true,
         name: runner.status.name,
-        harnesses: harnesses.filter(
-          (h): h is string => typeof h === "string" && !!this.shared?.capabilities.includes(h),
+        harnesses,
+        permissions: Object.fromEntries(
+          harnesses.map((h) => {
+            const offeredModes = Array.isArray(permissions[h]) ? (permissions[h] as unknown[]) : [];
+            return [h, (HARNESS_PERMISSIONS[h] ?? []).filter((p) => offeredModes.includes(p))];
+          }),
         ),
-        permissions: AGENT_PERMISSIONS.filter((p) => permissions.includes(p)),
       };
       for (const b of this.browsers) send(b.socket, { status: runner.status });
       return;
@@ -329,7 +347,8 @@ export class Agents {
     if (!id) return;
     const thread = await this.thread(id);
     if (!thread || (project && thread.project !== project)) return;
-    if (event.method === "turn/started" && !this.turns.has(thread.project)) {
+    const marker = turnMarker(event);
+    if (marker === "start" && !this.turns.has(thread.project)) {
       const owner = await this.store.db.row<{ username: string }>(
         sql`SELECT username FROM users WHERE id=${thread.owner}`,
       );
@@ -341,7 +360,7 @@ export class Agents {
       });
       this.announceBusy(thread.project);
     }
-    if (event.method === "turn/completed") {
+    if (marker === "end") {
       if (this.turns.get(thread.project)?.thread === thread.id) {
         this.turns.delete(thread.project);
         this.announceBusy(thread.project);
@@ -443,31 +462,15 @@ export class Agents {
       case "codex.models":
         return this.call("codex.models", {});
       case "codex.threads":
-        return { data: await this.list(project, user.id) };
+        return { data: await this.list(project, user.id, "codex") };
       case "codex.startThread": {
-        const permissionMode = this.permission(params);
+        const permissionMode = this.permission("codex", params);
         const result = await this.call<{ thread?: { id?: unknown } }>("codex.startThread", {
           project,
           model: optional(params, "model"),
           permissionMode,
         });
-        const id = threadId(result?.thread?.id),
-          now = Date.now();
-        await this.store.db.run(
-          sql`INSERT INTO agent_threads(id, project, owner, harness, title, shared, created, updated)
-              VALUES(${id}, ${project}, ${user.id}, 'codex', '', false, ${now}, ${now})`,
-        );
-        this.threads.set(id, {
-          id,
-          project,
-          owner: user.id,
-          harness: "codex",
-          title: "",
-          shared: false,
-          updated: now,
-        });
-        await this.store.audit(project, user.id, "agent.start", { thread: id, harness: "codex" });
-        this.announceThreads(project);
+        await this.register(project, user, "codex", threadId(result?.thread?.id));
         return result;
       }
       case "codex.resume": {
@@ -475,7 +478,7 @@ export class Agents {
         return this.call("codex.resume", {
           project,
           threadId: thread.id,
-          permissionMode: this.permission(params),
+          permissionMode: this.permission("codex", params),
         });
       }
       case "codex.read": {
@@ -483,7 +486,60 @@ export class Agents {
         return this.call("codex.read", { project, threadId: thread.id });
       }
       case "codex.startTurn":
-        return this.startTurn(browser, user, params);
+        return this.startTurn(browser, user, "codex", params);
+      case "claude.initialize":
+        return this.call("claude.initialize", { project }, 60_000);
+      case "claude.sessions":
+        return (await this.list(project, user.id, "claude")).map((t) => this.session(t, project));
+      case "claude.createSession": {
+        const thread = await this.register(project, user, "claude", uid());
+        return this.session(
+          { ...thread, name: null, ownerName: user.username, mine: true },
+          project,
+        );
+      }
+      case "claude.read": {
+        const thread = await this.access(project, user, params);
+        const saved = await this.call<Params>("claude.read", { project, threadId: thread.id });
+        const [summary] = (await this.list(project, user.id, "claude")).filter(
+          (t) => t.id === thread.id,
+        );
+        return { ...saved, session: summary && this.session(summary, project) };
+      }
+      case "claude.rename": {
+        const thread = await this.access(project, user, params);
+        await this.rename(thread, user, params);
+        return { ok: true };
+      }
+      case "claude.startTurn":
+        return this.startTurn(browser, user, "claude", params);
+      case "claude.steer": {
+        const thread = await this.access(project, user, params);
+        if (this.turns.get(project)?.thread !== thread.id) fail(409, "这一轮已经结束");
+        const message = text(params, "text", 200_000),
+          pictures = images(params);
+        if (!message.trim() && !pictures.length) fail(400, "消息不能为空");
+        return this.call("claude.steer", {
+          project,
+          threadId: thread.id,
+          text: message,
+          images: pictures,
+        });
+      }
+      case "claude.respond": {
+        const thread = await this.access(project, user, params);
+        return this.call("claude.respond", {
+          project,
+          threadId: thread.id,
+          requestId: text(params, "requestId"),
+          allow: params.allow === true,
+          answers: isObject(params.answers) ? params.answers : null,
+        });
+      }
+      case "claude.stop": {
+        const thread = await this.access(project, user, params);
+        return this.call("claude.stop", { project, threadId: thread.id });
+      }
       case "codex.steer": {
         const thread = await this.access(project, user, params);
         if (this.turns.get(project)?.thread !== thread.id) fail(409, "这一轮已经结束");
@@ -508,15 +564,14 @@ export class Agents {
       }
       case "codex.rename": {
         const thread = await this.access(project, user, params);
-        if (thread.owner !== user.id) fail(403, "只有对话的发起人可以重命名或共享");
-        const name = text(params, "name", 1000).trim();
-        if (!name || [...name].length > 120) fail(400, "对话名称需为 1–120 个字符");
-        await this.store.db.run(sql`UPDATE agent_threads SET title=${name} WHERE id=${thread.id}`);
-        thread.title = name;
+        await this.rename(thread, user, params);
         // Codex's own copy of the name is a convenience; the registry is what members see.
         if (this.runner)
-          void this.call("codex.rename", { project, threadId: thread.id, name }).catch(() => {});
-        this.announceThreads(project);
+          void this.call("codex.rename", {
+            project,
+            threadId: thread.id,
+            name: thread.title,
+          }).catch(() => {});
         return { ok: true };
       }
       case "codex.respond": {
@@ -564,15 +619,17 @@ export class Agents {
    * One turn per project: the agent's working copy is the whole project. A version saved
    * first makes the turn revertible from History.
    */
-  private async startTurn(browser: Browser, user: User, params: Params) {
+  private async startTurn(browser: Browser, user: User, harness: string, params: Params) {
     const { project } = browser;
     const thread = await this.access(project, user, params);
-    const permissionMode = this.permission(params);
+    if (thread.harness !== harness) fail(404, "对话不存在或未共享");
+    const options = isObject(params.options) ? params.options : params;
+    const permissionMode = this.permission(harness, options);
     const message = text(params, "text", 200_000),
       pictures = images(params);
     if (!message.trim() && !pictures.length) fail(400, "消息不能为空");
-    const model = optional(params, "model"),
-      effort = optional(params, "effort", 40);
+    const model = optional(options, "model"),
+      effort = optional(options, "effort", 40);
     const running = this.busy(project);
     if (running)
       fail(
@@ -583,6 +640,18 @@ export class Agents {
         { name: running.userName },
       );
     if (!this.runner) fail(503, "共享执行器未连接，AI 对话暂不可用");
+    // Claude Code sessions are named after their first message, as on the desktop.
+    const firstLine = message
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (harness === "claude" && !thread.title && firstLine) {
+      thread.title = [...firstLine].slice(0, 40).join("");
+      await this.store.db.run(
+        sql`UPDATE agent_threads SET title=${thread.title} WHERE id=${thread.id}`,
+      );
+      this.announceThreads(project);
+    }
     const turn: Turn = {
       thread: thread.id,
       user: user.id,
@@ -595,7 +664,7 @@ export class Agents {
       await this.store.snapshot(project, user.id, "AI 对话修改前");
       this.collab.changed(project);
       const result = await this.call(
-        "codex.startTurn",
+        `${harness}.startTurn`,
         {
           project,
           threadId: thread.id,
@@ -618,13 +687,56 @@ export class Agents {
       throw error;
     }
   }
-  private permission(params: Params): AgentPermission {
-    const value = params.permissionMode ?? "askForApproval";
-    if (!AGENT_PERMISSIONS.includes(value as AgentPermission))
+  private permission(harness: string, params: Params): string {
+    const value = params.permissionMode ?? (harness === "claude" ? "default" : "askForApproval");
+    if (typeof value !== "string" || !HARNESS_PERMISSIONS[harness]?.includes(value))
       fail(400, "无效字段 {key}", { key: "permissionMode" });
-    if (!this.status().permissions.includes(value as AgentPermission))
-      fail(400, "执行器不支持这种权限模式");
-    return value as AgentPermission;
+    if (!this.status().permissions[harness]?.includes(value)) fail(400, "执行器不支持这种权限模式");
+    return value;
+  }
+  /** A new conversation: private to whoever started it. */
+  private async register(project: string, user: User, harness: string, id: string) {
+    const now = Date.now();
+    await this.store.db.run(
+      sql`INSERT INTO agent_threads(id, project, owner, harness, title, shared, created, updated)
+          VALUES(${id}, ${project}, ${user.id}, ${harness}, '', false, ${now}, ${now})`,
+    );
+    const thread: ThreadRow = {
+      id,
+      project,
+      owner: user.id,
+      harness,
+      title: "",
+      shared: false,
+      updated: now,
+    };
+    this.threads.set(id, thread);
+    await this.store.audit(project, user.id, "agent.start", { thread: id, harness });
+    this.announceThreads(project);
+    return thread;
+  }
+  private async rename(thread: ThreadRow, user: User, params: Params) {
+    if (thread.owner !== user.id) fail(403, "只有对话的发起人可以重命名或共享");
+    const name = text(params, "name", 1000).trim();
+    if (!name || [...name].length > 120) fail(400, "对话名称需为 1–120 个字符");
+    await this.store.db.run(sql`UPDATE agent_threads SET title=${name} WHERE id=${thread.id}`);
+    thread.title = name;
+    this.announceThreads(thread.project);
+  }
+  /** A Claude Code session as the panel lists it. */
+  private session(
+    thread: Pick<AgentThread, "id" | "name" | "updated" | "mine" | "shared" | "ownerName">,
+    project: string,
+  ) {
+    return {
+      id: thread.id,
+      name: thread.name ?? "",
+      directory: project,
+      updatedAt: thread.updated,
+      mine: thread.mine,
+      shared: thread.shared,
+      ownerName: thread.ownerName,
+    };
   }
   private async thread(id: string): Promise<ThreadRow | null> {
     const cached = this.threads.get(id);
@@ -650,11 +762,11 @@ export class Agents {
       sql`UPDATE agent_threads SET updated=${thread.updated} WHERE id=${thread.id}`,
     );
   }
-  private async list(project: string, user: string): Promise<AgentThread[]> {
+  private async list(project: string, user: string, harness: string): Promise<AgentThread[]> {
     const rows = await this.store.db.rows<ThreadRow & { ownerName: string }>(
       sql`SELECT t.id, t.project, t.owner, t.harness, t.title, t.shared, t.updated, u.username AS "ownerName"
           FROM agent_threads t JOIN users u ON u.id=t.owner
-          WHERE t.project=${project} AND (t.owner=${user} OR t.shared)
+          WHERE t.project=${project} AND t.harness=${harness} AND (t.owner=${user} OR t.shared)
           ORDER BY t.updated DESC LIMIT 200`,
     );
     return rows.map((r) => ({

@@ -9,6 +9,7 @@ import {
 import dynamic from "next/dynamic";
 import type { ComponentProps } from "react";
 import type { Props as OpenCodeProps } from "@/components/opencode/types";
+import { desktopClaudeBackend } from "@/lib/claude/desktop-backend";
 import { desktopCodexBackend } from "@/lib/codex/desktop-backend";
 import { desktopHistory } from "@/lib/harness/history";
 
@@ -20,7 +21,7 @@ const PANELS = {
   codex: dynamic(() => import("@lmms-lab/workbench/agents").then((m) => m.CodexPanel), {
     ssr: false,
   }),
-  claude: dynamic(() => import("@/components/claude/claude-panel").then((m) => m.ClaudePanel), {
+  claude: dynamic(() => import("@lmms-lab/workbench/agents").then((m) => m.ClaudePanel), {
     ssr: false,
   }),
 };
@@ -39,7 +40,11 @@ export function HarnessWorkspace({
     <SharedHarnessWorkspace
       {...props}
       panels={PANELS}
-      panelProps={{ opencode, codex: { backend: desktopCodexBackend } }}
+      panelProps={{
+        opencode,
+        codex: { backend: desktopCodexBackend },
+        claude: { backend: desktopClaudeBackend },
+      }}
       history={(backend: HarnessId) =>
         desktopHistory(backend, {
           project: props.shared.directory ?? "",

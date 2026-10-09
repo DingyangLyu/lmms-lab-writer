@@ -1,25 +1,45 @@
 /**
- * The right column: the desktop's AI conversation panel, with Codex running on the lab's
+ * The right column: the desktop's AI conversation panels, with the agents running on the lab's
  * shared runner. Conversations are private to whoever starts them unless shared; their edits
  * land in the shared text (a version is saved before every turn).
  */
-
 import { workbenchI18n } from "@lmms-lab/workbench";
 import {
+  ClaudePanel,
   CodexPanel,
-  type Harness,
+  HARNESSES,
+  HarnessButtons,
+  type HarnessId,
   HarnessWorkspace,
   type HistoryAdapter,
+  type HistoryEntry,
   parseChatLink,
   useHarnessWorkspace,
 } from "@lmms-lab/workbench/agents";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PublicUser, Role } from "../../shared/api";
 import { i18n, useI18n } from "../i18n";
-import { AgentLink, relayCodexBackend } from "./agent-link";
+import { AgentLink, relayClaudeBackend, relayCodexBackend } from "./agent-link";
 
-const HARNESSES: readonly Harness[] = [{ id: "codex", label: "Codex" }];
-const PANELS = { codex: CodexPanel };
+const PANELS = { codex: CodexPanel, claude: ClaudePanel };
+/** How a conversation shows in the history: whose it is and whether it is shared. */
+const entry = (item: {
+  id: string;
+  name?: string | null;
+  updated?: number;
+  mine?: boolean;
+  shared?: boolean;
+  ownerName?: string;
+}): HistoryEntry => ({
+  id: item.id,
+  title: item.name || workbenchI18n.t("codex.untitledConversation"),
+  updatedAt: item.updated,
+  detail: item.mine
+    ? workbenchI18n.t(item.shared ? "harness.shared" : "harness.private")
+    : workbenchI18n.t("codex.sharedByName", { name: item.ownerName ?? "" }),
+  shared: item.shared,
+  mine: item.mine,
+});
 
 /** A path the agent printed: relative to the project, or inside the runner's copy of it. */
 export function projectPath(reference: string, project: string) {
@@ -53,47 +73,74 @@ export function AgentsPanel({
     [allowed, project, user.id],
   );
   useEffect(() => () => link?.close(), [link]);
-  const backend = useMemo(() => link && relayCodexBackend(link), [link]);
-  const workspace = useHarnessWorkspace(allowed ? project : null);
-  // One backend: an empty column opens a conversation instead of asking which.
+  const backends = useMemo(
+    () => link && { codex: relayCodexBackend(link), claude: relayClaudeBackend(link) },
+    [link],
+  );
+  const [offered, setOffered] = useState<string[]>([]);
   useEffect(() => {
-    if (allowed && workspace.ready && !workspace.tabs.length) workspace.open("codex");
-  }, [allowed, workspace]);
-  if (!allowed || !backend)
+    if (!link) return;
+    const stop = link.onStatus((status) => setOffered(status.harnesses));
+    void link.connect().catch(() => {});
+    return stop;
+  }, [link]);
+  // What the runner offers; Codex until it has said.
+  const harnesses = HARNESSES.filter((h) =>
+    offered.length ? offered.includes(h.id) && h.id in PANELS : h.id === "codex",
+  );
+  const workspace = useHarnessWorkspace(allowed ? project : null);
+  const first = harnesses[0]?.id;
+  // An empty column opens a conversation instead of asking which.
+  useEffect(() => {
+    if (allowed && first && workspace.ready && !workspace.tabs.length) workspace.open(first);
+  }, [allowed, first, workspace]);
+  if (!allowed || !backends)
     return <p className="p-4 text-sm text-muted">{t("agents.ownersAndEditorsOnly")}</p>;
-  const history: HistoryAdapter = {
-    list: async () => {
-      const { data = [] } = await backend.listThreads(project);
-      return {
-        entries: data.map((thread) => ({
-          id: thread.id,
-          title: thread.name || workbenchI18n.t("codex.untitledConversation"),
-          updatedAt: thread.updated,
-          detail: thread.mine
-            ? workbenchI18n.t(thread.shared ? "harness.shared" : "harness.private")
-            : workbenchI18n.t("codex.sharedByName", { name: thread.ownerName ?? "" }),
-          shared: thread.shared,
-          mine: thread.mine,
-        })),
-      };
-    },
-    rename: async (id, title) => {
-      await backend.renameThread(id, title);
-    },
-    share: async (id, shared) => {
-      await backend.shareThread?.(id, shared);
-    },
-  };
+  const history = (backend: HarnessId): HistoryAdapter =>
+    backend === "claude"
+      ? {
+          list: async () => ({
+            entries: (await backends.claude.listSessions(project)).map((s) =>
+              entry({ ...s, updated: s.updatedAt }),
+            ),
+          }),
+          rename: async (id, title) => {
+            await backends.claude.renameSession(project, id, title);
+          },
+          share: async (id, shared) => {
+            await backends.claude.shareSession?.(id, shared);
+          },
+        }
+      : {
+          list: async () => ({
+            entries: ((await backends.codex.listThreads(project)).data ?? []).map(entry),
+          }),
+          rename: async (id, title) => {
+            await backends.codex.renameThread(id, title);
+          },
+          share: async (id, shared) => {
+            await backends.codex.shareThread?.(id, shared);
+          },
+        };
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {harnesses.length > 1 && (
+        <div className="flex shrink-0 items-center border-b border-border px-2 py-1.5">
+          <HarnessButtons
+            workspace={workspace}
+            harnesses={harnesses}
+            onChoose={(backend) => workspace.focus(backend)}
+          />
+        </div>
+      )}
       <HarnessWorkspace
         workspace={workspace}
         visible={visible}
-        preferredBackend="codex"
-        harnesses={HARNESSES}
+        preferredBackend={first ?? "codex"}
+        harnesses={harnesses}
         panels={PANELS}
-        panelProps={{ codex: { backend } }}
-        history={() => history}
+        panelProps={{ codex: { backend: backends.codex }, claude: { backend: backends.claude } }}
+        history={history}
         onBackendChange={() => {}}
         shared={{
           directory: project,

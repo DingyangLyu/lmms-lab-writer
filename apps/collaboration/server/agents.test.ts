@@ -63,9 +63,9 @@ function client(url: string, headers: Record<string, string>) {
   return { ws, messages, until, request, opened };
 }
 
-async function setup() {
+async function setup(capabilities = ["codex"]) {
   const f = await fixture({
-    sharedRunner: { token: TOKEN, name: "Lab runner", capabilities: ["codex"] },
+    sharedRunner: { token: TOKEN, name: "Lab runner", capabilities },
   });
   const origin = f.app.origin;
   const browser = async (cookie: string) => {
@@ -186,7 +186,9 @@ describe("live AI conversations on the shared runner", () => {
     });
     await runner.opened;
     runner.ws.send(
-      JSON.stringify({ status: { harnesses: ["codex", "other"], permissions: ["fullAccess"] } }),
+      JSON.stringify({
+        status: { harnesses: ["codex", "other"], permissions: { codex: ["fullAccess"] } },
+      }),
     );
     let threads = 0;
     runner.ws.on("message", (raw) => {
@@ -205,11 +207,11 @@ describe("live AI conversations on the shared runner", () => {
     await expect(f.browser(commenterCookie)).rejects.toThrow(/403/);
     const owner = await f.browser(f.owner);
     const editor = await f.browser(editorCookie);
-    await owner.until((m) => m.status?.online && m.status.permissions.length === 1);
+    await owner.until((m) => m.status?.online && m.status.permissions.codex?.length === 1);
     expect(owner.messages.find((m) => m.status?.online).status).toMatchObject({
       name: "Lab runner",
       harnesses: ["codex"],
-      permissions: ["fullAccess"],
+      permissions: { codex: ["fullAccess"] },
     });
     await expect(
       owner.request("codex.startThread", { permissionMode: "askForApproval" }),
@@ -257,7 +259,7 @@ describe("live AI conversations on the shared runner", () => {
     });
     await runner.opened;
     runner.ws.send(
-      JSON.stringify({ status: { harnesses: ["codex"], permissions: ["fullAccess"] } }),
+      JSON.stringify({ status: { harnesses: ["codex"], permissions: { codex: ["fullAccess"] } } }),
     );
     runner.ws.on("message", (raw) => {
       const m = JSON.parse(String(raw));
@@ -321,5 +323,92 @@ describe("live AI conversations on the shared runner", () => {
       (m) => m.event?.method === CHANGES_EVENT && m.event.params.results[0].status === "proposal",
     );
     expect(notice.event.params.results[1].reason).toMatch(/未删除/);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("Claude Code on the shared runner", () => {
+  it("runs turns with approvals, resumes the session and merges the edits", async () => {
+    const f = await setup(["codex", "claude"]);
+    const dir = await mkdtemp(join(tmpdir(), "writer-claude-"));
+    const claude = join(dir, "claude.sh");
+    await writeFile(
+      claude,
+      `#!/bin/sh\nexec "${process.execPath}" "${join(import.meta.dirname, "fake-claude.mjs")}" "$@"\n`,
+    );
+    await chmod(claude, 0o755);
+    const host = new AgentHost({
+      server: f.origin,
+      token: TOKEN,
+      root: join(dir, "work"),
+      harnesses: ["claude"],
+      claude,
+      log: () => {},
+    }).start();
+    cleanups.push(async () => {
+      host.stop();
+      await rm(dir, { recursive: true, force: true });
+    });
+    const chapter = await f.file("chapter.tex", "Hello world\n");
+    const owner = await f.browser(f.owner);
+    await owner.until((m) => m.status?.online && m.status.harnesses.includes("claude"));
+    expect(owner.messages.find((m) => m.status?.online).status.permissions.claude).toEqual([
+      "default",
+      "acceptEdits",
+      "bypassPermissions",
+      "plan",
+    ]);
+    expect((await owner.request("claude.initialize")).models[0].value).toBe("default");
+    const session = await owner.request("claude.createSession");
+    expect(session).toMatchObject({ directory: f.project, mine: true, shared: false });
+
+    const options = { model: "default", effort: "high", permissionMode: "acceptEdits" };
+    await owner.request("claude.startTurn", {
+      threadId: session.id,
+      text: "replace chapter.tex world=>team",
+      images: [],
+      options,
+    });
+    const done = (count: number) =>
+      owner.until(
+        (m) =>
+          owner.messages.filter(
+            (x) =>
+              x.event?.method === "claude/event" && x.event.params.event.type === "writer_done",
+          ).length >= count && m.event?.params?.event?.type === "writer_done",
+      );
+    await done(1);
+    expect(await f.text(chapter)).toBe("Hello team\n");
+    expect(owner.messages.some((m) => m.event?.method === CHANGES_EVENT)).toBe(true);
+    expect(owner.messages.filter((m) => "busy" in m).at(-1).busy).toBeNull();
+    const [listed] = await owner.request("claude.sessions");
+    expect(listed).toMatchObject({ id: session.id, name: "replace chapter.tex world=>team" });
+
+    // The default mode asks first; the answer goes back to the CLI, and the session resumes.
+    await owner.request("claude.startTurn", {
+      threadId: session.id,
+      text: "replace chapter.tex team=>lab",
+      images: [],
+      options: { ...options, permissionMode: "default" },
+    });
+    const ask = await owner.until(
+      (m) =>
+        m.event?.params?.event?.type === "control_request" &&
+        m.event.params.event.request_id === "p1",
+    );
+    expect(ask.event.params.threadId).toBe(session.id);
+    const pending = await owner.request("claude.read", { threadId: session.id });
+    expect(pending.busy).toBe(true);
+    expect(pending.pending[0].request_id).toBe("p1");
+    await owner.request("claude.respond", { threadId: session.id, requestId: "p1", allow: true });
+    await done(2);
+    expect(await f.text(chapter)).toBe("Hello lab\n");
+    const saved = await owner.request("claude.read", { threadId: session.id });
+    expect(saved.busy).toBe(false);
+    expect(saved.session.name).toBe("replace chapter.tex world=>team");
+    expect(saved.events.filter((e: { type: string }) => e.type === "result").at(-1).result).toBe(
+      "changed (resumed)",
+    );
+    const versions = (await f.call(`/projects/${f.project}/snapshots`, undefined, f.owner)).data;
+    expect(versions.filter((v: { label: string }) => v.label === "AI 对话修改前")).toHaveLength(2);
   });
 });

@@ -7,7 +7,7 @@
  */
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -19,6 +19,9 @@ import {
   type AgentChangeResult,
   type AgentFile,
   type AgentPermission,
+  CLAUDE_EVENT,
+  CLAUDE_PERMISSIONS,
+  type ClaudePermission,
 } from "../shared/agents";
 import { isTextPath } from "./util";
 
@@ -38,10 +41,91 @@ export type AgentHostOptions = {
   token: string;
   /** Parent of the per-project working folders. */
   root?: string;
+  /** Where Claude Code transcripts are kept (the CLI keeps its own context too). */
+  sessions?: string;
+  /** The harnesses this runner hosts; Codex unless configured otherwise. */
+  harnesses?: string[];
   codex?: string;
+  claude?: string;
   permissions?: AgentPermission[];
+  claudePermissions?: ClaudePermission[];
   log?: (message: string) => void;
 };
+/** One Claude Code turn: a stream-json CLI process for the session. */
+type ClaudeRun = {
+  pending: Map<string, Json>;
+  busy: boolean;
+  delivery: { accepting: boolean; initialized: boolean; outstanding: number };
+  send: (message: Json) => void;
+  kill: () => void;
+};
+const CLAUDE_ARGS = [
+  "-p",
+  "--input-format",
+  "stream-json",
+  "--output-format",
+  "stream-json",
+  "--verbose",
+  "--include-partial-messages",
+  "--permission-prompt-tool",
+  "stdio",
+];
+const CLAUDE_PROMPT =
+  "You are working in Y-Writer on a copy of a shared LaTeX project kept by the lab's runner. After each tool step, the files you change here are merged into your collaborators' live text, and the project was saved as a version before this turn. Follow the user's requested scope and preserve unrelated changes. Verify citations against primary sources and never invent bibliographic details. Do not commit, push or publish anything, and do not read credentials or files outside this folder. Link project files with relative Markdown links and line numbers when useful.";
+const CLAUDE_INIT = {
+  type: "control_request",
+  request_id: "writer-init",
+  request: { subtype: "initialize" },
+};
+/** Claude Code's content for a message: its text, and images as base64 sources. */
+export function claudeInput(text: string, images: string[]): Json {
+  const content: Json[] = [];
+  if (text.trim()) content.push({ type: "text", text });
+  for (const url of images) {
+    const match = /^data:(image\/[a-z]+);base64,(.+)$/.exec(url);
+    if (match)
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: match[1], data: match[2] },
+      });
+  }
+  return {
+    type: "user",
+    session_id: "",
+    message: { role: "user", content },
+    parent_tool_use_id: null,
+    uuid: randomUUID(),
+  };
+}
+/** The CLI's permission flags; skipping approvals must be asked for explicitly. */
+const claudePermissionArgs = (mode: ClaudePermission) =>
+  mode === "bypassPermissions"
+    ? ["--permission-mode", mode, "--dangerously-skip-permissions"]
+    : ["--permission-mode", mode];
+/** The agents run collaborators' prompts: they get none of Writer's tokens or passwords. */
+function agentEnv() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env))
+    if (/^WRITER_.*(TOKEN|PASSWORD|DATABASE_URL)/.test(key)) delete env[key];
+  return env;
+}
+/** Starts a CLI in its own process group (Unix), so stopping it stops its tools too. */
+function spawnAgent(binary: string, args: string[], cwd: string) {
+  const child = spawn(binary, args, {
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: agentEnv(),
+    windowsHide: true,
+    detached: process.platform !== "win32",
+  });
+  const kill = (signal: NodeJS.Signals = "SIGTERM") => {
+    try {
+      if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+      else child.kill(signal);
+    } catch {}
+  };
+  return { child, kill };
+}
 
 /** Codex's composer choices as app-server policies, exactly as the desktop sends them. */
 const POLICIES: Record<
@@ -137,13 +221,9 @@ class AppServer {
     private onMessage: (message: Json) => void,
     private onClose: () => void,
   ) {
-    // The agent runs collaborators' prompts: it gets none of Writer's tokens or passwords.
-    const env = { ...process.env };
-    for (const key of Object.keys(env))
-      if (/^WRITER_.*(TOKEN|PASSWORD|DATABASE_URL)/.test(key)) delete env[key];
     this.child = spawn(binary, ["-c", 'web_search="live"', "app-server", "--listen", "stdio://"], {
       stdio: ["pipe", "pipe", "pipe"],
-      env,
+      env: agentEnv(),
       windowsHide: true,
     });
     this.child.stderr.resume();
@@ -236,12 +316,25 @@ export class AgentHost {
   readonly root: string;
   readonly permissions: AgentPermission[];
   private log: (message: string) => void;
+  readonly sessions: string;
+  readonly harnesses: string[];
+  readonly claudePermissions: ClaudePermission[];
+  private claudeRuns = new Map<string, ClaudeRun>();
+  private claudeCatalog: { at: number; value: Json } | null = null;
   constructor(private options: AgentHostOptions) {
     this.root =
       options.root ||
       process.env.WRITER_AGENT_WORKSPACES ||
       join(homedir(), ".writer-runner", "projects");
+    this.sessions = options.sessions || join(dirname(this.root), "claude-sessions");
+    this.harnesses = (options.harnesses ?? ["codex"]).filter((h) =>
+      ["codex", "claude"].includes(h),
+    );
     this.permissions = options.permissions ?? defaultPermissions();
+    const claudeModes = process.env.WRITER_CLAUDE_PERMISSIONS?.split(",").map((p) => p.trim());
+    this.claudePermissions =
+      options.claudePermissions ??
+      CLAUDE_PERMISSIONS.filter((p) => !claudeModes?.length || claudeModes.includes(p));
     this.log = options.log ?? ((message) => console.log(message));
   }
   start() {
@@ -265,8 +358,15 @@ export class AgentHost {
       this.socket = socket;
       this.retry = 1000;
       this.failure = "";
-      this.log(`Writer AI conversations connected (${this.permissions.join(",")})`);
-      this.send({ status: { harnesses: ["codex"], permissions: this.permissions } });
+      this.log(
+        `Writer AI conversations connected: ${this.harnesses.join(", ")} (Codex: ${this.permissions.join(",")})`,
+      );
+      this.send({
+        status: {
+          harnesses: this.harnesses,
+          permissions: { codex: this.permissions, claude: this.claudePermissions },
+        },
+      });
     });
     socket.on("message", (raw) => this.fromServer(String(raw)));
     socket.on("error", (error) => {
@@ -474,6 +574,30 @@ export class AgentHost {
           const id = (request.params as Json | undefined)?.threadId;
           return typeof id === "string" && this.threadProject.get(id) === project;
         });
+      case "claude.initialize":
+        return this.claudeModels(project);
+      case "claude.read":
+        return this.claudeRead(project, threadId);
+      case "claude.startTurn":
+        return this.claudeTurn(project, threadId, params);
+      case "claude.steer":
+        return this.claudeSteer(project, threadId, params);
+      case "claude.respond":
+        return this.claudeRespond(threadId, params);
+      case "claude.stop": {
+        const run = this.claudeRuns.get(threadId);
+        if (!run) throw new Error("The Claude conversation has ended");
+        run.delivery.accepting = false;
+        run.send({
+          type: "control_request",
+          request_id: randomUUID(),
+          request: { subtype: "interrupt" },
+        });
+        setTimeout(() => {
+          if (run.busy) run.kill();
+        }, 3000).unref();
+        return { ok: true };
+      }
       default:
         throw new Error(`Unknown request ${method}`);
     }
@@ -642,6 +766,351 @@ export class AgentHost {
       size += bytes;
     }
     await flush();
+  }
+  private claudeBinary() {
+    return this.options.claude || process.env.WRITER_CLAUDE_BIN || "claude";
+  }
+  private claudeFiles(project: string, threadId: string) {
+    this.workspace(project);
+    if (!/^[0-9a-f-]{36}$/i.test(threadId)) throw new Error("Invalid Claude session ID");
+    const dir = join(this.sessions, project);
+    return { dir, meta: join(dir, `${threadId}.json`), log: join(dir, `${threadId}.jsonl`) };
+  }
+  /** Once Claude Code has its own record of the session, later turns resume it. */
+  private async claudeNative(project: string, threadId: string) {
+    try {
+      const meta = JSON.parse(await readFile(this.claudeFiles(project, threadId).meta, "utf8"));
+      return meta.native === true;
+    } catch {
+      return false;
+    }
+  }
+  private async claudeAppend(project: string, threadId: string, event: Json, native: boolean) {
+    const files = this.claudeFiles(project, threadId);
+    await mkdir(files.dir, { recursive: true });
+    await appendFile(files.log, `${JSON.stringify(event)}\n`);
+    if (native && !(await this.claudeNative(project, threadId)))
+      await writeFile(files.meta, JSON.stringify({ native: true }));
+  }
+  /** The account's models, from a short-lived CLI (kept for ten minutes). */
+  private async claudeModels(project: string) {
+    if (this.claudeCatalog && Date.now() - this.claudeCatalog.at < 600_000)
+      return this.claudeCatalog.value;
+    const workspace = this.workspace(project);
+    await mkdir(workspace.dir, { recursive: true });
+    const { child, kill } = spawnAgent(this.claudeBinary(), CLAUDE_ARGS, workspace.dir);
+    try {
+      const value = await new Promise<Json>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Claude Code start-up timed out")), 40_000);
+        const fail = (error: Error) => {
+          clearTimeout(timer);
+          reject(error);
+        };
+        child.on("error", fail);
+        child.on("exit", () =>
+          fail(new Error("Claude Code exited during start-up. Check the CLI setup on the runner.")),
+        );
+        child.stdin.on("error", () => {});
+        child.stderr.resume();
+        createInterface({ input: child.stdout }).on("line", (line) => {
+          let event: Json;
+          try {
+            event = JSON.parse(line) as Json;
+          } catch {
+            return;
+          }
+          const response = event.response as Json | undefined;
+          if (event.type !== "control_response" || response?.request_id !== "writer-init") return;
+          clearTimeout(timer);
+          if (response.subtype === "error") reject(new Error(String(response.error)));
+          else
+            resolve({
+              models: (response.response as Json | undefined)?.models ?? [],
+              available: true,
+            });
+        });
+        child.stdin.write(`${JSON.stringify(CLAUDE_INIT)}\n`);
+      });
+      this.claudeCatalog = { at: Date.now(), value };
+      return value;
+    } finally {
+      kill();
+    }
+  }
+  private async claudeRead(project: string, threadId: string) {
+    const text = await readFile(this.claudeFiles(project, threadId).log, "utf8").catch(() => "");
+    const events = text
+      .split("\n")
+      .filter(Boolean)
+      .flatMap((line) => {
+        // A line cut short by a crash is skipped rather than failing the whole history.
+        try {
+          return [JSON.parse(line) as Json];
+        } catch {
+          return [];
+        }
+      });
+    const run = this.claudeRuns.get(threadId);
+    return { events, busy: !!run?.busy, pending: run ? [...run.pending.values()] : [] };
+  }
+  /** Claude events reach the server in order; a finished tool's file changes go first. */
+  private claudeEmit(
+    project: string,
+    workspace: Workspace,
+    threadId: string,
+    event: Json,
+    push = false,
+  ) {
+    workspace.queue = workspace.queue
+      .then(async () => {
+        if (push)
+          await this.push(project, workspace, threadId).catch((error) =>
+            this.log(
+              `Writer AI changes not sent: ${error instanceof Error ? error.message : error}`,
+            ),
+          );
+        this.send({ project, event: { method: CLAUDE_EVENT, params: { threadId, event } } });
+      })
+      .catch(() => {});
+  }
+  private async claudeTurn(project: string, threadId: string, params: Json) {
+    const workspace = this.workspace(project);
+    this.claudeFiles(project, threadId);
+    if (workspace.thread) throw new Error("Another AI turn is still running in this project");
+    if (this.claudeRuns.get(threadId)?.busy) throw new Error("This conversation is still running.");
+    const mode = params.permissionMode as ClaudePermission;
+    if (!this.claudePermissions.includes(mode))
+      throw new Error("This runner does not support that permission mode");
+    const effort = typeof params.effort === "string" && params.effort ? params.effort : null;
+    if (effort && !["low", "medium", "high", "xhigh", "max"].includes(effort))
+      throw new Error("Invalid reasoning effort");
+    const model =
+      typeof params.model === "string" && params.model && params.model !== "default"
+        ? params.model
+        : null;
+    const images = Array.isArray(params.images)
+      ? params.images.filter((i): i is string => typeof i === "string")
+      : [];
+    const input = claudeInput(typeof params.text === "string" ? params.text : "", images);
+    workspace.thread = threadId;
+    try {
+      await this.sync(project, workspace, (params.files ?? []) as AgentFile[]);
+      const native = await this.claudeNative(project, threadId);
+      const { child, kill } = spawnAgent(
+        this.claudeBinary(),
+        [
+          ...CLAUDE_ARGS,
+          native ? `--resume=${threadId}` : `--session-id=${threadId}`,
+          ...claudePermissionArgs(mode),
+          "--append-system-prompt",
+          CLAUDE_PROMPT,
+          ...(model ? [`--model=${model}`] : []),
+          ...(effort ? ["--effort", effort] : []),
+        ],
+        workspace.dir,
+      );
+      child.stdin.on("error", () => {});
+      const run: ClaudeRun = {
+        pending: new Map(),
+        busy: true,
+        delivery: { accepting: true, initialized: false, outstanding: 1 },
+        send: (message) => {
+          if (child.stdin.writable) child.stdin.write(`${JSON.stringify(message)}\n`);
+        },
+        kill,
+      };
+      this.claudeRuns.set(threadId, run);
+      await this.claudeAppend(project, threadId, input, false);
+      this.claudeEmit(project, workspace, threadId, input);
+      this.claudeEmit(project, workspace, threadId, { type: "writer_started" });
+      this.claudeWatch(project, workspace, threadId, run, child, input);
+      run.send(CLAUDE_INIT);
+      return { ok: true };
+    } catch (error) {
+      workspace.thread = null;
+      throw error;
+    }
+  }
+  /** One turn's stream, as the desktop's bridge reads it: steering, approvals, the end. */
+  private claudeWatch(
+    project: string,
+    workspace: Workspace,
+    threadId: string,
+    run: ClaudeRun,
+    child: ChildProcessWithoutNullStreams,
+    input: Json,
+  ) {
+    let initialized = false,
+      resultSeen = false,
+      failure: string | null = null,
+      stderr = "",
+      finished = false;
+    const startup = setTimeout(() => {
+      if (initialized) return;
+      failure = "Claude Code start-up timed out.";
+      run.kill();
+    }, 60_000);
+    child.stderr.on("data", (chunk) => {
+      stderr = (stderr + String(chunk)).slice(-4000);
+    });
+    createInterface({ input: child.stdout }).on("line", (line) => {
+      let event: Json;
+      try {
+        event = JSON.parse(line) as Json;
+      } catch {
+        return;
+      }
+      const response = event.response as Json | undefined;
+      if (event.type === "control_response" && response?.request_id === "writer-init") {
+        if (response.subtype === "error") {
+          failure = String(response.error);
+          run.kill();
+          return;
+        }
+        initialized = true;
+        clearTimeout(startup);
+        run.send(input);
+        run.delivery.initialized = true;
+        return;
+      }
+      if (event.type === "control_request" && typeof event.request_id === "string") {
+        if ((event.request as Json | undefined)?.subtype !== "can_use_tool") {
+          run.send({
+            type: "control_response",
+            response: {
+              subtype: "error",
+              request_id: event.request_id,
+              error: "Unsupported control request",
+            },
+          });
+          return;
+        }
+        run.pending.set(event.request_id, event);
+      }
+      if (event.type === "control_cancel_request" && typeof event.request_id === "string")
+        run.pending.delete(event.request_id);
+      if (event.type === "result") {
+        // A steered turn ends with the interrupted result; the replacement message goes on.
+        if (run.delivery.accepting && run.delivery.outstanding > 1) {
+          run.delivery.outstanding--;
+          run.pending.clear();
+          this.claudeEmit(project, workspace, threadId, { type: "writer_steering" });
+          return;
+        }
+        run.delivery.accepting = false;
+      }
+      if (
+        ["assistant", "user", "result"].includes(String(event.type)) ||
+        (event.type === "system" && event.subtype === "init")
+      )
+        void this.claudeAppend(
+          project,
+          threadId,
+          event,
+          event.type === "assistant" || event.type === "system",
+        ).catch((error) => {
+          failure = `Could not save the history: ${error}`;
+        });
+      const content = (event.message as { content?: unknown } | undefined)?.content;
+      const toolDone =
+        event.type === "user" &&
+        Array.isArray(content) &&
+        content.some((block) => (block as Json | null)?.type === "tool_result");
+      this.claudeEmit(project, workspace, threadId, event, toolDone);
+      if (event.type === "result") {
+        resultSeen = true;
+        child.stdin.end();
+        setTimeout(() => run.kill(), 5000).unref();
+      }
+    });
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(startup);
+      run.pending.clear();
+      run.busy = false;
+      if (!resultSeen && !failure)
+        failure =
+          stderr.trim() ||
+          "Claude Code exited early. Check the sign-in and model setup on the runner.";
+      if (failure) {
+        const event = { type: "writer_error", error: failure };
+        void this.claudeAppend(project, threadId, event, false).catch(() => {});
+        this.claudeEmit(project, workspace, threadId, event);
+      }
+      if (this.claudeRuns.get(threadId) === run) this.claudeRuns.delete(threadId);
+      // The last changes reach the server before the turn is reported finished.
+      workspace.queue = workspace.queue
+        .then(async () => {
+          await this.push(project, workspace, threadId).catch((error) =>
+            this.log(
+              `Writer AI changes not sent: ${error instanceof Error ? error.message : error}`,
+            ),
+          );
+          if (workspace.thread === threadId) workspace.thread = null;
+          this.send({
+            project,
+            event: { method: CLAUDE_EVENT, params: { threadId, event: { type: "writer_done" } } },
+          });
+        })
+        .catch(() => {});
+    };
+    child.on("close", finish);
+    child.on("error", (error) => {
+      failure ??= `Could not start Claude Code: ${error.message}`;
+      finish();
+    });
+  }
+  private async claudeSteer(project: string, threadId: string, params: Json) {
+    const run = this.claudeRuns.get(threadId);
+    if (!run) throw new Error("The current task has finished; send normally.");
+    if (!run.busy || !run.delivery.accepting || !run.delivery.initialized)
+      throw new Error(
+        "The current task has finished or is not ready yet; send normally in a moment.",
+      );
+    if (run.delivery.outstanding > 1)
+      throw new Error(
+        "The previous guidance is still being delivered; send later or add it to the queue.",
+      );
+    const images = Array.isArray(params.images)
+      ? params.images.filter((i): i is string => typeof i === "string")
+      : [];
+    const message = claudeInput(typeof params.text === "string" ? params.text : "", images);
+    // Interrupt and the new message share the ordered stdin of the same native session.
+    run.delivery.outstanding++;
+    run.send({
+      type: "control_request",
+      request_id: randomUUID(),
+      request: { subtype: "interrupt" },
+    });
+    run.send(message);
+    await this.claudeAppend(project, threadId, message, false);
+    this.claudeEmit(project, this.workspace(project), threadId, message);
+    return { ok: true };
+  }
+  private claudeRespond(threadId: string, params: Json) {
+    const run = this.claudeRuns.get(threadId);
+    if (!run) throw new Error("The Claude conversation has ended");
+    const requestId = String(params.requestId ?? "");
+    const request = run.pending.get(requestId);
+    if (!request) throw new Error("This permission request has ended");
+    const body = (request.request ?? {}) as Json;
+    const allow = params.allow === true;
+    let input = { ...((body.input as Json | undefined) ?? {}) };
+    if (body.tool_name === "AskUserQuestion" && allow)
+      input = { ...input, answers: params.answers ?? {} };
+    run.send({
+      type: "control_response",
+      response: {
+        subtype: "success",
+        request_id: requestId,
+        response: allow
+          ? { behavior: "allow", updatedInput: input }
+          : { behavior: "deny", message: "The user denied this action." },
+      },
+    });
+    run.pending.delete(requestId);
+    return { ok: true };
   }
   /** Queued per project, so a turn's changes reach the server before its end is reported. */
   private fromCodex(message: Json) {

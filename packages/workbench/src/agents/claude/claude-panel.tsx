@@ -1,41 +1,40 @@
 "use client";
-import type {
-  ChatDraft,
-  ChatImageFile,
-  ChatOutbox,
-  HarnessLifecycle,
-} from "@lmms-lab/workbench/agents";
-import {
-  AttachmentStrip,
-  ChatHistoryItems,
-  DeliveryControls,
-  type DeliveryMode,
-  type EditorSelectionContext,
-  GrowingTextarea,
-  mergeById,
-  prepareChatFiles,
-  RenameChat,
-  selectionRangeLabel,
-  shouldSendOnEnter,
-  useChatAttachments,
-  useChatOutbox,
-  useComposerDraft,
-  useIdleTranscript,
-  usePanelLifecycle,
-  withEditorSelection,
-} from "@lmms-lab/workbench/agents";
 import { ArrowUpIcon, PaperclipIcon, PlusIcon, StopIcon } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConversationBridge } from "@/components/bridge/conversation-bridge";
-import { ResizableComposer } from "@/components/ui/panel-height";
-import { useConversationBridge } from "@/lib/bridge/use-conversation-bridge";
-import { type ClaudeEvent, type ClaudeMessages, reduceClaudeEvent } from "@/lib/claude/events";
-import { useI18n } from "@/lib/i18n";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { ResizableComposer } from "../../ui/panel-height";
+import { AttachmentStrip } from "../chat/attachment-strip";
+import { useComposerDraft } from "../chat/composer-drafts";
+import { DeliveryControls, type DeliveryMode } from "../chat/delivery-controls";
+import { prepareChatFiles } from "../chat/files";
+import { GrowingTextarea } from "../chat/growing-textarea";
+import { ChatHistoryItems } from "../chat/history-items";
+import { mergeById } from "../chat/idle-transcript";
+import type { ChatImageFile } from "../chat/images";
+import type { ChatDraft, ChatOutbox } from "../chat/outbox";
+import { RenameChat } from "../chat/rename-chat";
+import { ShareToggle } from "../chat/share-toggle";
+import { changeSummary, SharedRunnerNotice } from "../chat/shared-runner-notice";
+import { useChatAttachments } from "../chat/use-chat-attachments";
+import { useChatOutbox } from "../chat/use-chat-outbox";
+import { useIdleTranscript } from "../chat/use-idle-transcript";
+import { shouldSendOnEnter } from "../codex/composer-keys";
+import type { HarnessLifecycle } from "../harness/types";
+import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
+import { useBridge } from "../platform";
+import {
+  type EditorSelectionContext,
+  selectionRangeLabel,
+  withEditorSelection,
+} from "../selection-context";
+import {
+  CLAUDE_SESSIONS_EVENT,
+  type ClaudeBackend,
+  type ClaudeModel as Model,
+  type ClaudeSession as Session,
+} from "./backend";
+import { type ClaudeEvent, type ClaudeMessages, reduceClaudeEvent } from "./events";
 
-type Session = { id: string; name: string; directory: string; updatedAt: number };
-type Model = { value: string; displayName: string; supportedEffortLevels?: string[] };
 const PERMISSIONS = [
   {
     value: "default",
@@ -62,6 +61,7 @@ type PermissionMode = (typeof PERMISSIONS)[number]["value"];
 const isPermissionMode = (value: string | null): value is PermissionMode =>
   PERMISSIONS.some((option) => option.value === value);
 type Props = HarnessLifecycle & {
+  backend: ClaudeBackend;
   active: boolean;
   directory?: string;
   onWorkingChange: (busy: boolean) => void;
@@ -74,6 +74,7 @@ type Props = HarnessLifecycle & {
   onPendingMessageSent?: () => void;
 };
 export function ClaudePanel({
+  backend,
   active,
   directory,
   onWorkingChange,
@@ -114,6 +115,9 @@ export function ClaudePanel({
   const [permission, setPermission] = useState<PermissionMode>("default");
   const [history, setHistory] = useState(false);
   const [approvals, setApprovals] = useState<ClaudeEvent[]>([]);
+  /** Shared runner: the agent's changes to the project, and another member's running turn. */
+  const [notice, setNotice] = useState<string | null>(null);
+  const [projectBusy, setProjectBusy] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<ChatImageFile[]>([]);
   useComposerDraft(directory, lifecycle.instanceId, input, setInput, files, setFiles);
@@ -135,7 +139,7 @@ export function ClaudePanel({
     },
     [directory],
   );
-  const bridge = useConversationBridge(
+  const bridge = useBridge(
     "claude",
     sessionId,
     directory,
@@ -143,20 +147,15 @@ export function ClaudePanel({
     busy || preparing,
     { model, effort, permissionMode: permission },
   );
-  const bridgeWorking = bridge.snapshot.conversations.some(
-    (s) => s.id === bridge.fullId && Boolean(s.activeJob),
-  );
+  const bridgeWorking = bridge.working;
+  const [allowed, setAllowed] = useState<PermissionMode[]>(PERMISSIONS.map((p) => p.value));
   const refresh = useCallback(async () => {
-    if (directory) setSessions(await invoke<Session[]>("claude_list_sessions", { cwd: directory }));
-  }, [directory]);
+    if (directory) setSessions(await backend.listSessions(directory));
+  }, [directory, backend]);
   const openSession = useCallback(
     async (id: string) => {
-      const saved = await invoke<{
-        session: Session;
-        events: ClaudeEvent[];
-        busy: boolean;
-        pending: ClaudeEvent[];
-      }>("claude_read_session", { cwd: directory, sessionId: id });
+      if (!directory) return;
+      const saved = await backend.readSession(directory, id);
       remember(id);
       pinned.current = true;
       setMessages(saved.events.reduce(reduceClaudeEvent, { items: [], messageId: "" }));
@@ -165,7 +164,7 @@ export function ClaudePanel({
       setHistory(false);
       setError("");
     },
-    [directory, remember],
+    [directory, remember, backend],
   );
   useEffect(() => {
     onWorkingChange(busy || preparing || bridgeWorking);
@@ -186,57 +185,75 @@ export function ClaudePanel({
     sessionRef.current = initialSession.current ?? null;
     setSessionId(initialSession.current ?? null);
     void (async () => {
-      unlisten = await listen<{ directory: string; sessionId: string; event: ClaudeEvent }>(
-        "claude://event",
-        ({ payload }) => {
-          if (
-            disposed ||
-            payload.directory !== directory ||
-            payload.sessionId !== sessionRef.current
-          )
-            return;
-          const event = payload.event;
-          setMessages((current) => reduceClaudeEvent(current, event));
-          if (event.type === "control_request")
-            setApprovals((current) => [
-              ...current.filter((a) => a.request_id !== event.request_id),
-              event,
-            ]);
-          if (event.type === "control_cancel_request")
-            setApprovals((current) => current.filter((a) => a.request_id !== event.request_id));
-          if (event.type === "writer_error") {
-            setError(event.error || t("claude.claudeCodeFailed"));
-            if (outboxRef.current?.state.items.length)
-              void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
-          }
-          if (event.type === "result" && event.is_error) {
-            setError(event.errors?.join("\n") || event.result || t("claude.claudeCodeFailed"));
-            if (outboxRef.current?.state.items.length)
-              void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
-          }
-          if (event.type === "writer_started") setBusy(true);
-          if (event.type === "writer_done") {
-            setCompletion((value) => value + 1);
-            setBusy(false);
-            setApprovals([]);
-            void refresh();
-          }
-          if (event.type === "writer_steering") {
-            setApprovals([]);
-            setAnswers({});
-          }
-        },
-      );
+      unlisten = await backend.listen((payload) => {
+        if (disposed) return;
+        if (payload.event.type === CLAUDE_SESSIONS_EVENT) {
+          void refresh().catch(() => {});
+          return;
+        }
+        if (payload.event.type === "writer_busy") {
+          const other = payload.event.busy;
+          setProjectBusy(
+            other && !other.mine && other.thread !== sessionRef.current ? other.userName : null,
+          );
+          return;
+        }
+        if (payload.event.type === "writer_disconnected") {
+          setReady(false);
+          setBusy(false);
+          setError(t("claude.claudeCodeDisconnectedClickReconnect"));
+          return;
+        }
+        if (
+          (payload.directory && payload.directory !== directory) ||
+          payload.sessionId !== sessionRef.current
+        )
+          return;
+        const event = payload.event;
+        if (event.type === "writer_changes") {
+          setNotice(changeSummary(event.results ?? [], t));
+          return;
+        }
+        setMessages((current) => reduceClaudeEvent(current, event));
+        if (event.type === "control_request")
+          setApprovals((current) => [
+            ...current.filter((a) => a.request_id !== event.request_id),
+            event,
+          ]);
+        if (event.type === "control_cancel_request")
+          setApprovals((current) => current.filter((a) => a.request_id !== event.request_id));
+        if (event.type === "writer_error") {
+          setError(event.error || t("claude.claudeCodeFailed"));
+          if (outboxRef.current?.state.items.length)
+            void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
+        }
+        if (event.type === "result" && event.is_error) {
+          setError(event.errors?.join("\n") || event.result || t("claude.claudeCodeFailed"));
+          if (outboxRef.current?.state.items.length)
+            void outboxRef.current.pause(t("claude.theRunFailedTheQueueIsPaused"));
+        }
+        if (event.type === "writer_started") setBusy(true);
+        if (event.type === "writer_done") {
+          setCompletion((value) => value + 1);
+          setBusy(false);
+          setApprovals([]);
+          void refresh();
+        }
+        if (event.type === "writer_steering") {
+          setApprovals([]);
+          setAnswers({});
+        }
+      });
       if (disposed) {
         unlisten?.();
         return;
       }
-      const [catalog] = await Promise.all([
-        invoke<{ models: Model[] }>("claude_initialize", { cwd: directory }),
-        refresh(),
-      ]);
+      const [catalog] = await Promise.all([backend.initialize(directory), refresh()]);
       if (disposed) return;
       setModels(catalog.models || []);
+      const modes = backend.permissions?.() ?? PERMISSIONS.map((p) => p.value);
+      setAllowed(modes);
+      setPermission((current) => (modes.includes(current) ? current : (modes[0] ?? current)));
       const previous =
         sessionRef.current ||
         (initialSession.current === undefined
@@ -262,7 +279,7 @@ export function ClaudePanel({
       disposed = true;
       unlisten?.();
     };
-  }, [directory, retry, openSession, remember, refresh]);
+  }, [directory, retry, openSession, remember, refresh, backend]);
   useEffect(() => {
     const el = historyRef.current;
     if (!el || !active) return;
@@ -301,23 +318,24 @@ export function ClaudePanel({
         let id = expectedSession;
         if (!id) {
           if (steer) throw new Error(t("claude.noConversationIsRunning"));
-          const session = await invoke<Session>("claude_create_session", { cwd: directory });
+          const session = await backend.createSession(directory);
           id = session.id;
           remember(id);
         }
         await bridge.register(id);
         pinned.current = true;
+        setNotice(null);
         if (steer)
-          await invoke("claude_steer_turn", {
-            cwd: directory,
+          await backend.steerTurn({
+            directory,
             sessionId: id,
             text: withEditorSelection(payload.text, draft.selection),
             images: payload.images.map((file) => file.url),
           });
         else {
           setBusy(true);
-          await invoke("claude_start_turn", {
-            cwd: directory,
+          await backend.startTurn({
+            directory,
             sessionId: id,
             text: withEditorSelection(payload.text, draft.selection),
             images: payload.images.map((file) => file.url),
@@ -347,6 +365,7 @@ export function ClaudePanel({
       permission,
       refresh,
       t,
+      backend,
     ],
   );
   const outbox = useChatOutbox({
@@ -449,12 +468,7 @@ export function ClaudePanel({
   const respond = async (allow: boolean) => {
     if (!approval || !sessionId) return;
     try {
-      await invoke("claude_respond_permission", {
-        sessionId,
-        requestId: approval.request_id,
-        allow,
-        answers,
-      });
+      await backend.respondPermission(sessionId, approval.request_id ?? "", allow, answers);
       setApprovals((current) => current.filter((a) => a.request_id !== approval.request_id));
       setAnswers({});
     } catch (cause) {
@@ -462,6 +476,7 @@ export function ClaudePanel({
     }
   };
   const currentModel = models.find((entry) => entry.value === model);
+  const currentSession = sessions.find((s) => s.id === sessionId);
   const efforts = currentModel?.supportedEffortLevels || ["low", "medium", "high"];
   return (
     <div
@@ -472,7 +487,21 @@ export function ClaudePanel({
         <div className="min-w-0 truncate text-sm font-medium">
           {sessions.find((s) => s.id === sessionId)?.name || "Claude Code"}
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+          {backend.shareSession && currentSession && sessionId && (
+            <ShareToggle
+              mine={currentSession.mine}
+              shared={currentSession.shared}
+              ownerName={currentSession.ownerName}
+              onError={setError}
+              onShare={async (shared) => {
+                await backend.shareSession?.(sessionId, shared);
+                setSessions((current) =>
+                  current.map((entry) => (entry.id === sessionId ? { ...entry, shared } : entry)),
+                );
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={() => {
@@ -507,7 +536,7 @@ export function ClaudePanel({
           </button>
         </div>
       </header>
-      <ConversationBridge bridge={bridge} />
+      {bridge.view}
       {history && (
         <div className="max-h-48 shrink-0 overflow-y-auto border-b border-border p-2">
           {sessions.map((session) => (
@@ -529,11 +558,7 @@ export function ClaudePanel({
               <RenameChat
                 name={session.name}
                 onRename={async (name) => {
-                  await invoke("claude_rename_session", {
-                    cwd: directory,
-                    sessionId: session.id,
-                    name,
-                  });
+                  await backend.renameSession(directory ?? "", session.id, name);
                   await refresh();
                 }}
               />
@@ -566,11 +591,15 @@ export function ClaudePanel({
         {!idleHistory.sleeping && !messages.items.length && (
           <div className="space-y-2 py-6 text-sm text-muted">
             <p className="font-medium text-foreground">
-              {ready
-                ? t("claude.usesClaudeCodeOnThisComputer")
-                : t("claude.connectingToClaudeCode")}
+              {!ready
+                ? t("claude.connectingToClaudeCode")
+                : backend.kind === "shared"
+                  ? t("claude.runsOnTheLabRunnerAndEditsTheSharedProject")
+                  : t("claude.usesClaudeCodeOnThisComputer")}
             </p>
-            <p>{t("claude.usesYourLocalSignInAndModelSettingsItCan")}</p>
+            {backend.kind !== "shared" && (
+              <p>{t("claude.usesYourLocalSignInAndModelSettingsItCan")}</p>
+            )}
           </div>
         )}
         <ChatHistoryItems items={messages.items} onFileClick={onFileClick} directory={directory} />
@@ -638,6 +667,7 @@ export function ClaudePanel({
           </div>
         </div>
       )}
+      <SharedRunnerNotice notice={notice} busyName={projectBusy} />
       {error && (
         <div
           role="alert"
@@ -747,7 +777,7 @@ export function ClaudePanel({
                 }}
                 className="max-w-28 shrink-0 border border-border bg-background px-1.5 py-1"
               >
-                {PERMISSIONS.map((option) => (
+                {PERMISSIONS.filter((option) => allowed.includes(option.value)).map((option) => (
                   <option key={option.value} value={option.value}>
                     {t(option.label)}
                   </option>
@@ -766,11 +796,19 @@ export function ClaudePanel({
                 }}
                 className="min-w-20 max-w-40 flex-1 truncate border border-border bg-background px-1.5 py-1"
               >
-                {!models.length && <option value="default">{t("claude.localDefault")}</option>}
+                {!models.length && (
+                  <option value="default">
+                    {t(backend.kind === "shared" ? "claude.runnerDefault" : "claude.localDefault")}
+                  </option>
+                )}
                 {models.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.value === "default"
-                      ? t("claude.localDefault")
+                      ? t(
+                          backend.kind === "shared"
+                            ? "claude.runnerDefault"
+                            : "claude.localDefault",
+                        )
                       : `${m.value} · ${m.displayName}`}
                   </option>
                 ))}
@@ -816,7 +854,7 @@ export function ClaudePanel({
                   void outbox
                     .pause(t("claude.taskStoppedTheQueueIsPaused"))
                     .catch(() => {})
-                    .then(() => invoke("claude_stop", { sessionId }))
+                    .then(() => sessionId && backend.stop(sessionId))
                     .catch((cause) => setError(String(cause)))
                 }
                 className="flex size-8 shrink-0 items-center justify-center border border-border"

@@ -2,9 +2,26 @@
  * The browser's end of live AI conversations: one WebSocket per open project to the server's
  * relay (server/agents.ts), and the Codex backend the shared chat panel runs on.
  */
-import type { CodexBackend, CodexEvent, CodexPermissionMode } from "@lmms-lab/workbench/agents";
-import { CODEX_BUSY_EVENT } from "@lmms-lab/workbench/agents";
-import type { AgentBusy, AgentStatus, AgentThread } from "../../shared/agents";
+import {
+  CLAUDE_SESSIONS_EVENT,
+  type ClaudeBackend,
+  type ClaudeEvent,
+  type ClaudePermissionMode,
+  type ClaudeSession,
+  type ClaudeSnapshot,
+  CODEX_BUSY_EVENT,
+  type CodexBackend,
+  type CodexEvent,
+  type CodexPermissionMode,
+} from "@lmms-lab/workbench/agents";
+import {
+  type AgentBusy,
+  type AgentStatus,
+  type AgentThread,
+  CHANGES_EVENT,
+  CLAUDE_EVENT,
+  THREADS_EVENT,
+} from "../../shared/agents";
 import { i18n } from "../i18n";
 
 type Call = {
@@ -14,7 +31,8 @@ type Call = {
 };
 
 export class AgentLink {
-  status: AgentStatus = { online: false, name: null, harnesses: [], permissions: [] };
+  status: AgentStatus = { online: false, name: null, harnesses: [], permissions: {} };
+  private statusListeners = new Set<(status: AgentStatus) => void>();
   busy: AgentBusy = null;
   private socket: WebSocket | null = null;
   private opening: Promise<void> | null = null;
@@ -44,6 +62,7 @@ export class AgentLink {
         }
         if ("status" in data) {
           this.status = data.status as AgentStatus;
+          for (const listener of this.statusListeners) listener(this.status);
           if (!ready) {
             ready = true;
             this.socket = socket;
@@ -101,6 +120,13 @@ export class AgentLink {
       socket.send(JSON.stringify({ id, method, params }));
     });
   }
+  /** What the runner offers, as it connects and changes. */
+  onStatus(listener: (status: AgentStatus) => void) {
+    this.statusListeners.add(listener);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
   listen(handler: (event: CodexEvent) => void) {
     this.listeners.add(handler);
     return () => {
@@ -151,7 +177,52 @@ export function relayCodexBackend(link: AgentLink): CodexBackend {
       link.request("codex.respond", { threadId, requestId, response }),
     pendingRequests: () => link.request("codex.pending"),
     listen: async (handler) => link.listen(handler),
-    permissions: () => link.status.permissions as CodexPermissionMode[],
+    permissions: () => (link.status.permissions.codex ?? []) as CodexPermissionMode[],
     shareThread: (threadId, shared) => link.request("thread.share", { threadId, shared }),
+  };
+}
+
+/** The Claude Code panel's backend over the relay: the lab runner's CLI, shared per project. */
+export function relayClaudeBackend(link: AgentLink): ClaudeBackend {
+  const thread = (event: CodexEvent) => String(event.params?.threadId ?? "");
+  return {
+    kind: "shared",
+    initialize: () => link.request("claude.initialize", {}, 70_000),
+    listSessions: () => link.request<ClaudeSession[]>("claude.sessions"),
+    createSession: () => link.request<ClaudeSession>("claude.createSession"),
+    readSession: (_directory, sessionId) =>
+      link.request<ClaudeSnapshot>("claude.read", { threadId: sessionId }),
+    renameSession: (_directory, sessionId, name) =>
+      link.request("claude.rename", { threadId: sessionId, name }),
+    // Saving a version and bringing the runner's copy up to date come first.
+    startTurn: ({ sessionId, text, images, options }) =>
+      link.request("claude.startTurn", { threadId: sessionId, text, images, options }, 200_000),
+    steerTurn: ({ sessionId, text, images }) =>
+      link.request("claude.steer", { threadId: sessionId, text, images }),
+    respondPermission: (sessionId, requestId, allow, answers) =>
+      link.request("claude.respond", { threadId: sessionId, requestId, allow, answers }),
+    stop: (sessionId) => link.request("claude.stop", { threadId: sessionId }),
+    listen: async (handler) =>
+      link.listen((event) => {
+        if (event.method === CLAUDE_EVENT)
+          handler({
+            sessionId: thread(event),
+            event: (event.params as { event?: ClaudeEvent } | undefined)?.event ?? { type: "" },
+          });
+        else if (event.method === THREADS_EVENT)
+          handler({ sessionId: "", event: { type: CLAUDE_SESSIONS_EVENT } });
+        else if (event.method === CHANGES_EVENT)
+          handler({
+            sessionId: thread(event),
+            event: { type: "writer_changes", results: event.params?.results },
+          });
+        else if (event.method === CODEX_BUSY_EVENT)
+          handler({ sessionId: "", event: { type: "writer_busy", busy: event.params?.busy } });
+        else if (event.method === "codex/connectionClosed")
+          handler({ sessionId: "", event: { type: "writer_disconnected" } });
+      }),
+    permissions: () => (link.status.permissions.claude ?? []) as ClaudePermissionMode[],
+    shareSession: (sessionId, shared) =>
+      link.request("thread.share", { threadId: sessionId, shared }),
   };
 }

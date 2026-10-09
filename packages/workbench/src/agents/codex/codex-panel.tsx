@@ -18,6 +18,8 @@ import { mergeById } from "../chat/idle-transcript";
 import type { ChatImageFile } from "../chat/images";
 import type { ChatDraft, ChatOutbox } from "../chat/outbox";
 import { RenameChat } from "../chat/rename-chat";
+import { ShareToggle } from "../chat/share-toggle";
+import { changeSummary, SharedRunnerNotice } from "../chat/shared-runner-notice";
 import { useChatAttachments } from "../chat/use-chat-attachments";
 import { useChatOutbox } from "../chat/use-chat-outbox";
 import { useIdleTranscript } from "../chat/use-idle-transcript";
@@ -84,27 +86,6 @@ type Props = HarnessLifecycle & {
   pendingMessage?: string | null;
   onPendingMessageSent?: () => void;
 };
-
-/** One line on what the shared runner did with the agent's file changes. */
-function changeSummary(
-  results: NonNullable<NonNullable<CodexEvent["params"]>["results"]>,
-  t: ReturnType<typeof useI18n>["t"],
-) {
-  const applied = results.filter((r) => r.status === "applied").length,
-    proposals = results.filter((r) => r.status === "proposal"),
-    skipped = results.filter((r) => r.status === "skipped");
-  return [
-    applied ? t("codex.countFilesUpdatedInTheSharedProject", { count: applied }) : "",
-    proposals.length
-      ? t("codex.overlapsWithCollaboratorsKeptAsSuggestionsPaths", {
-          paths: proposals.map((r) => r.path).join(", "),
-        })
-      : "",
-    ...skipped.map((r) => `${r.path}: ${r.reason ?? ""}`),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 function threadLabel(
   thread: ThreadSummary,
@@ -696,37 +677,19 @@ export function CodexPanel({
           {currentThread ? threadLabel(currentThread, "Codex") : "Codex"}
         </div>
         <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-          {backend.shareThread && currentThread?.mine && threadId && (
-            <button
-              type="button"
-              aria-pressed={!!currentThread.shared}
-              onClick={() => {
-                const shared = !currentThread.shared;
-                void backend
-                  .shareThread?.(threadId, shared)
-                  .then(() =>
-                    setThreads((current) =>
-                      current.map((entry) =>
-                        entry.id === threadId ? { ...entry, shared } : entry,
-                      ),
-                    ),
-                  )
-                  .catch((cause) => setError(String(cause)));
+          {backend.shareThread && currentThread && threadId && (
+            <ShareToggle
+              mine={currentThread.mine}
+              shared={currentThread.shared}
+              ownerName={currentThread.ownerName}
+              onError={setError}
+              onShare={async (shared) => {
+                await backend.shareThread?.(threadId, shared);
+                setThreads((current) =>
+                  current.map((entry) => (entry.id === threadId ? { ...entry, shared } : entry)),
+                );
               }}
-              className={`border px-2 py-1 text-xs ${currentThread.shared ? "border-accent text-accent" : "border-border hover:bg-accent-hover"}`}
-              title={
-                currentThread.shared
-                  ? t("harness.sharedWithTheProjectClickToMakeItPrivate")
-                  : t("harness.onlyYouCanSeeThisConversationClickToShar")
-              }
-            >
-              {currentThread.shared ? t("harness.shared") : t("harness.private")}
-            </button>
-          )}
-          {currentThread && currentThread.mine === false && (
-            <span className="max-w-32 truncate text-xs text-muted">
-              {t("codex.sharedByName", { name: currentThread.ownerName ?? "" })}
-            </span>
+            />
           )}
           <button
             type="button"
@@ -926,14 +889,7 @@ export function CodexPanel({
           </div>
         </div>
       )}
-      {(notice || projectBusy) && (
-        <div role="status" className="border-t border-border px-3 py-2 text-xs text-muted">
-          {projectBusy && (
-            <p>{t("codex.nameSAiConversationIsChangingTheProject", { name: projectBusy })}</p>
-          )}
-          {notice && <p>{notice}</p>}
-        </div>
-      )}
+      <SharedRunnerNotice notice={notice} busyName={projectBusy} />
       {error && (
         <div role="alert" className="border-t border-border px-3 py-2 text-xs text-red-600">
           {error}

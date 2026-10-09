@@ -9,12 +9,16 @@
  *
  * Browser → server: `codex.initialize`, `codex.models`, `codex.threads`, `codex.startThread`,
  * `codex.resume`, `codex.read`, `codex.startTurn`, `codex.steer`, `codex.interrupt`,
- * `codex.rename`, `codex.respond`, `codex.pending`, `thread.share`.
- * Server → runner: the same `codex.*` methods with the project and its files added.
+ * `codex.rename`, `codex.respond`, `codex.pending`; `claude.initialize`, `claude.sessions`,
+ * `claude.createSession`, `claude.read`, `claude.rename`, `claude.startTurn`, `claude.steer`,
+ * `claude.respond`, `claude.stop`; and `thread.share` for any of them.
+ * Server → runner: the same methods with the project and its files added.
  * Runner → server: `files.read` (binary contents) and `changes` (what the agent edited).
+ * Claude Code's stream-json events travel as `{method: "claude/event", params: {threadId,
+ * event}}`; `writer_started` / `writer_done` mark a turn.
  */
 
-/** The permission choices of the Codex composer (as on the desktop). */
+/** The permission choices of each composer (as on the desktop). */
 export type AgentPermission = "readOnly" | "askForApproval" | "autoReview" | "fullAccess";
 export const AGENT_PERMISSIONS: readonly AgentPermission[] = [
   "readOnly",
@@ -22,14 +26,21 @@ export const AGENT_PERMISSIONS: readonly AgentPermission[] = [
   "autoReview",
   "fullAccess",
 ];
+export const CLAUDE_PERMISSIONS = ["default", "acceptEdits", "bypassPermissions", "plan"] as const;
+export type ClaudePermission = (typeof CLAUDE_PERMISSIONS)[number];
+export const HARNESS_PERMISSIONS: Record<string, readonly string[]> = {
+  codex: AGENT_PERMISSIONS,
+  claude: CLAUDE_PERMISSIONS,
+};
+export const CLAUDE_EVENT = "claude/event";
 
 export type AgentStatus = {
   online: boolean;
   /** The runner's name, e.g. the lab workstation. */
   name: string | null;
   harnesses: string[];
-  /** The permission modes this runner can honour; Codex's sandbox does not run everywhere. */
-  permissions: AgentPermission[];
+  /** Per harness, the permission modes this runner can honour (Codex's sandbox does not run everywhere). */
+  permissions: Record<string, string[]>;
 };
 
 /** A conversation as the project lists it: private to its owner unless shared. */
