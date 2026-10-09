@@ -246,7 +246,12 @@ export function AnnotationProvider({
     }
   };
   const beginDraft = (value: AnnotationDraft) => {
-    setDraft(value);
+    // Selecting again re-targets a comment still being written instead of discarding it.
+    setDraft((current) =>
+      current?.comment.trim() && !value.comment.trim()
+        ? { ...value, comment: current.comment }
+        : value,
+    );
     setOpen(true);
     setSelectedId(null);
   };
