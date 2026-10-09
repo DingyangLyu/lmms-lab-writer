@@ -3,7 +3,13 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
-import { collectSelection, type PdfAnnotation, visibleTextMarks } from "@/lib/pdf/annotations";
+import {
+  collectSelection,
+  MAX_MARKS,
+  type PdfAnnotation,
+  visibleTextMarks,
+} from "@/lib/pdf/annotations";
+import { attachPdfSelection } from "@/lib/pdf/text-selection";
 import { fitPageWidth, pageScale, viewportAnchor } from "@/lib/pdf/viewport";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -74,6 +80,7 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
   const [firstWidth, setFirstWidth] = useState(612);
   const [pixelRatio, setPixelRatio] = useState(1);
   const [mode, setMode] = useState<"read" | "highlight" | "underline">("highlight");
+  const [notice, setNotice] = useState<string | null>(null);
   const containerRef = useRef<HTMLElement>(null);
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchorRef = useRef<{ page: number; fraction: number } | null>(null);
@@ -209,10 +216,26 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
     selectionTimer.current = setTimeout(() => {
       if (!containerRef.current) return;
       const selected = collectSelection(containerRef.current, effectiveScale);
-      if (selected)
-        notes.beginDraft({ ...selected, pdf: pdfPath, style: mode, fingerprint, comment: "" });
+      if (!selected) return;
+      // The backend rejects these; say so now instead of after the comment is written.
+      if (
+        selected.marks.length > MAX_MARKS ||
+        new TextEncoder().encode(selected.quote).length > 20000
+      ) {
+        setNotice(t("pdf.selectionTooLargeToComment"));
+        return;
+      }
+      setNotice(null);
+      notes.beginDraft({ ...selected, pdf: pdfPath, style: mode, fingerprint, comment: "" });
     }, 0);
   };
+  const captureRef = useRef(capture);
+  captureRef.current = capture;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    return attachPdfSelection(container, () => captureRef.current());
+  }, []);
   const zoom = (amount: number) => {
     rememberAnchor();
     setManualScale(Math.max(0.1, Math.min(4, effectiveScale + amount)));
@@ -287,6 +310,11 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
           {t("pdf.dragOverTextToCommentManageThemUnderComm")}
         </p>
       )}
+      {notice && (
+        <p role="status" className="shrink-0 border-b border-border px-2 py-1 text-xs text-accent">
+          {notice}
+        </p>
+      )}
       {mappingInfo.warnings.length > 0 && (
         <p
           role="status"
@@ -308,7 +336,6 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
       )}
       <section
         ref={containerRef}
-        onMouseUp={capture}
         onKeyUp={capture}
         aria-label={t("pdf.pdfDocumentSelectTextToComment")}
         className="min-h-0 min-w-0 flex-1 overflow-auto bg-accent-hover p-4"

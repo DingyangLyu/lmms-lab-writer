@@ -67,6 +67,8 @@ export function normalizeRect(
     pageHeight: page.height / scale,
   };
 }
+/** The backend accepts at most this many rectangles per annotation. */
+export const MAX_MARKS = 200;
 export function collectSelection(
   container: HTMLElement,
   scale: number,
@@ -76,53 +78,80 @@ export function collectSelection(
   const range = selection.getRangeAt(0);
   if (!container.contains(range.commonAncestorContainer)) return null;
   const marks: PdfMark[] = [];
-  const quoted: string[] = [];
+  const lines: string[] = [];
   for (const element of Array.from(container.querySelectorAll<HTMLElement>("[data-pdf-page]"))) {
     const textLayer = element.querySelector(".react-pdf__Page__textContent");
     if (!textLayer || !range.intersectsNode(textLayer)) continue;
     const pageRect = element.getBoundingClientRect();
     const naturalWidth = Number(element.dataset.pdfWidth);
     const actualScale = naturalWidth > 0 ? pageRect.width / naturalWidth : scale;
-    const walker = container.ownerDocument.createTreeWalker(textLayer, NodeFilter.SHOW_TEXT);
-    const pageText: string[] = [];
-    let node: Node | null = walker.nextNode();
-    while (node) {
-      if (node.textContent?.trim() && range.intersectsNode(node)) {
-        const start = range.startContainer === node ? range.startOffset : 0;
-        const end = range.endContainer === node ? range.endOffset : node.textContent.length;
-        if (start < end) {
-          const textRange = container.ownerDocument.createRange();
-          textRange.setStart(node, start);
-          textRange.setEnd(node, end);
-          pageText.push(textRange.toString());
-          // Element ranges include page/canvas/container rectangles on WebKit.
-          // A range contained in one text node produces only the selected glyphs.
-          for (const rect of Array.from(textRange.getClientRects())) {
-            const mark = normalizeRect(
-              rect,
-              pageRect,
-              Number(element.dataset.pdfPage),
-              actualScale,
-            );
-            if (mark && !marks.some((m) => sameMark(m, mark))) marks.push(mark);
-          }
-        }
+    // PDF.js ends each text line with a <br>; the text runs carry their own spaces.
+    const walker = container.ownerDocument.createTreeWalker(
+      textLayer,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+    );
+    let line = "";
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!range.intersectsNode(node)) continue;
+      if (node.nodeName === "BR") {
+        lines.push(line);
+        line = "";
       }
-      node = walker.nextNode();
+      if (!(node instanceof Text)) continue;
+      const start = range.startContainer === node ? range.startOffset : 0;
+      const end = range.endContainer === node ? range.endOffset : node.length;
+      if (start >= end) continue;
+      const textRange = container.ownerDocument.createRange();
+      textRange.setStart(node, start);
+      textRange.setEnd(node, end);
+      const text = textRange.toString();
+      line += text;
+      if (!text.trim()) continue;
+      // Element ranges include page/canvas/container rectangles on WebKit.
+      // A range contained in one text node produces only the selected glyphs.
+      for (const rect of Array.from(textRange.getClientRects())) {
+        const mark = normalizeRect(rect, pageRect, Number(element.dataset.pdfPage), actualScale);
+        if (mark) marks.push(mark);
+      }
     }
-    if (pageText.length) quoted.push(pageText.join(" "));
+    lines.push(line);
   }
-  const quote = quoted.join("\n").trim();
-  return quote && marks.length ? { quote, marks: marks.slice(0, 200) } : null;
+  const quote = joinLines(lines);
+  return quote && marks.length ? { quote, marks: mergeMarks(marks) } : null;
 }
-function sameMark(a: PdfMark, b: PdfMark) {
-  return (
-    a.page === b.page &&
-    Math.abs(a.x - b.x) < 0.0001 &&
-    Math.abs(a.y - b.y) < 0.0001 &&
-    Math.abs(a.width - b.width) < 0.0001 &&
-    Math.abs(a.height - b.height) < 0.0001
-  );
+/** Text lines as running text; a word hyphenated at a line end is joined again. */
+export function joinLines(lines: string[]): string {
+  let text = "";
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    if (!line) continue;
+    text = !text ? line : /\p{L}-$/u.test(text) ? text + line : `${text} ${line}`;
+  }
+  return text;
+}
+/** Joins neighbouring rectangles on one line, so a long selection stays a few marks per line. */
+export function mergeMarks(marks: PdfMark[]): PdfMark[] {
+  const merged: PdfMark[] = [];
+  for (const mark of marks) {
+    const last = merged.at(-1);
+    if (!last || !sameLine(last, mark)) {
+      merged.push({ ...mark });
+      continue;
+    }
+    const left = Math.min(last.x, mark.x),
+      top = Math.min(last.y, mark.y),
+      right = Math.max(last.x + last.width, mark.x + mark.width),
+      bottom = Math.max(last.y + last.height, mark.y + mark.height);
+    Object.assign(last, { x: left, y: top, width: right - left, height: bottom - top });
+  }
+  return merged;
+}
+function sameLine(a: PdfMark, b: PdfMark) {
+  if (a.page !== b.page) return false;
+  const overlap = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  if (overlap < Math.min(a.height, b.height) / 2) return false;
+  const gap = Math.max(0, b.x - (a.x + a.width), a.x - (b.x + b.width)) * a.pageWidth;
+  return gap <= 1.5 * Math.max(a.height, b.height) * a.pageHeight;
 }
 /** Older cross-page captures contain full-page element boxes alongside valid text boxes. */
 export function visibleTextMarks(marks: PdfMark[]): PdfMark[] {

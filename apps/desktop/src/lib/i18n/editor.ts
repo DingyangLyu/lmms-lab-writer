@@ -250,6 +250,8 @@ export const editorZh = {
   "pdf.retry": "重试",
   "pdf.restoredTheTextMappingOfCountCountFontFo": "已恢复 {count} 种字体的文字映射",
   "pdf.thePdfFailedToLoadError": "PDF 加载失败：{error}",
+  "pdf.selectionTooLargeToComment":
+    "选区太大，无法存成一条批注（上限约 200 行或 20000 字节），请分段选择。",
   "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+点击查看",
   "editor.multiLineAndLongSingleLineCommentsTheFil": "包括多行注释和单条长注释；不修改文件内容",
   "editor.foldTheSectionOrEnvironmentAtTheCursor": "折叠光标所在章节或环境（⌘⌥[）",
@@ -628,6 +630,8 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "pdf.restoredTheTextMappingOfCountCountFontFo":
     "Restored the text mapping of {count} {count|font|fonts}",
   "pdf.thePdfFailedToLoadError": "The PDF failed to load: {error}",
+  "pdf.selectionTooLargeToComment":
+    "This selection is too large for one comment (about 200 lines or 20,000 bytes at most); select it in parts.",
   "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+click to open",
   "editor.multiLineAndLongSingleLineCommentsTheFil":
     "Multi-line and long single-line comments; the file is not changed",
