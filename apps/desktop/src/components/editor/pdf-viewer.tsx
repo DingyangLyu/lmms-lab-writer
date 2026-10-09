@@ -91,6 +91,9 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
     () => notes?.items.filter((note) => note.pdf === pdfPath) ?? [],
     [notes?.items, pdfPath],
   );
+  const staleCount = fingerprint
+    ? annotations.filter((note) => !note.resolved && note.fingerprint !== fingerprint).length
+    : 0;
   const effectiveScale = zoomMode === "fit" ? pageScale(availableWidth, firstWidth) : manualScale;
   const rememberAnchor = useCallback(() => {
     const container = containerRef.current;
@@ -314,6 +317,15 @@ function PdfPreview({ src, project, pdfPath, onSynctexClick, goToPage }: Props) 
         <p role="status" className="shrink-0 border-b border-border px-2 py-1 text-xs text-accent">
           {notice}
         </p>
+      )}
+      {staleCount > 0 && (
+        <button
+          type="button"
+          onClick={() => notes?.setOpen(true)}
+          className="shrink-0 border-b border-border px-2 py-1 text-left text-[11px] text-muted hover:text-foreground"
+        >
+          {t("pdf.countCommentsWereMadeOnAnEarlierBuild", { count: staleCount })}
+        </button>
       )}
       {mappingInfo.warnings.length > 0 && (
         <p

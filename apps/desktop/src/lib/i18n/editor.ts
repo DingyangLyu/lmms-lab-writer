@@ -252,6 +252,8 @@ export const editorZh = {
   "pdf.thePdfFailedToLoadError": "PDF 加载失败：{error}",
   "pdf.selectionTooLargeToComment":
     "选区太大，无法存成一条批注（上限约 200 行或 20000 字节），请分段选择。",
+  "pdf.countCommentsWereMadeOnAnEarlierBuild":
+    "{count} 条批注做在旧版 PDF 上，位置可能已变，未在页面上标出 · 点此打开批注",
   "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+点击查看",
   "editor.multiLineAndLongSingleLineCommentsTheFil": "包括多行注释和单条长注释；不修改文件内容",
   "editor.foldTheSectionOrEnvironmentAtTheCursor": "折叠光标所在章节或环境（⌘⌥[）",
@@ -632,6 +634,8 @@ export const editorEn: Record<keyof typeof editorZh, string> = {
   "pdf.thePdfFailedToLoadError": "The PDF failed to load: {error}",
   "pdf.selectionTooLargeToComment":
     "This selection is too large for one comment (about 200 lines or 20,000 bytes at most); select it in parts.",
+  "pdf.countCommentsWereMadeOnAnEarlierBuild":
+    "{count} {count|comment was|comments were} made on an earlier build of this PDF and may have moved, so {count|it is|they are} not drawn · open Comments",
   "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+click to open",
   "editor.multiLineAndLongSingleLineCommentsTheFil":
     "Multi-line and long single-line comments; the file is not changed",
