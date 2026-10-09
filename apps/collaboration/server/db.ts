@@ -268,6 +268,10 @@ export const migrations: string[] = [
      coalesce((SELECT max(a.created) FROM audit a WHERE a.project=p.id), 0));
    ALTER TABLE members ADD COLUMN archived BOOLEAN NOT NULL DEFAULT false;
    ALTER TABLE members ADD COLUMN trashed BIGINT;`,
+  // 7: comments made on the PDF keep their highlight; comments and replies record edits.
+  `ALTER TABLE comments ADD COLUMN pdf TEXT;
+   ALTER TABLE comments ADD COLUMN edited BIGINT;
+   ALTER TABLE replies ADD COLUMN edited BIGINT;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

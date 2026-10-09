@@ -81,6 +81,16 @@ export type Reply = {
   authorName: string;
   body: string;
   created: number;
+  /** When the author last changed the text. */
+  edited: number | null;
+};
+/** Where on the compiled PDF a comment was made, to draw it on that PDF again. */
+export type CommentPdf = {
+  /** PDF.js fingerprint of the PDF the selection was made on. */
+  fingerprint: string;
+  style: "highlight" | "underline";
+  /** Rectangles as fractions of their page, top-left origin. */
+  marks: Array<{ page: number; x: number; y: number; width: number; height: number }>;
 };
 export type Comment = {
   id: string;
@@ -95,6 +105,12 @@ export type Comment = {
   resolved: boolean;
   created: number;
   updated: number;
+  edited: number | null;
+  /** The anchored text's current offsets in the file and its first line; null once deleted. */
+  from: number | null;
+  to: number | null;
+  line: number | null;
+  pdf: CommentPdf | null;
   replies: Reply[];
 };
 

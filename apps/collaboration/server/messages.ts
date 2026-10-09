@@ -154,6 +154,12 @@ export const englishMessages: Record<string, string> = {
     "The project would exceed {count} files or 100 MB; the output was not saved",
   // projects and proposals
   请填写项目名: "Enter a project name",
+  回复不存在: "Reply not found",
+  "无效的 PDF 选区坐标": "Invalid PDF selection coordinates",
+  只有作者可以修改批注内容: "Only the author can change this comment",
+  只有作者或所有者可以删除批注: "Only the author or an owner can delete this comment",
+  只有作者可以修改回复: "Only the author can change this reply",
+  只有作者或所有者可以删除回复: "Only the author or an owner can delete this reply",
   "{path} 不是 UTF-8 编码，请转换后再上传": "{path} is not UTF-8 text; convert it and upload again",
   压缩包中有重复的文件路径: "The zip contains the same path twice",
   "无法读取压缩包，请上传 .zip 文件": "The upload could not be read; upload a .zip file",
