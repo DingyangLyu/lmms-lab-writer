@@ -1,5 +1,7 @@
 # 在 Windows 11 专业版上部署协作服务并开放到公网
 
+只在实验室内网使用、不想装 Docker 时，见 [deploy-windows-lan.md](deploy-windows-lan.md)。
+
 这份说明把协作服务（`apps/collaboration`）跑在一台 Win11 专业版电脑上：用 Docker Desktop 运行服务、PostgreSQL 和每日备份，再由 Caddy 自动申请 HTTPS 证书，通过路由器把 80/443 端口转发到这台电脑。
 
 ```
