@@ -10,6 +10,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTeamComments } from "@/lib/collab/team-comments";
 import {
   type ConversationTarget,
   HARNESSES,
@@ -35,6 +36,12 @@ const ACTIONS: Record<string, MessageKey> = {
 export function AnnotationManager() {
   const { t } = useI18n();
   const notes = useAnnotations();
+  const team = useTeamComments();
+  // In a folder linked to a server, a new comment goes to the team unless kept on this computer.
+  const [destination, setDestination] = useState<"team" | "local">("team"),
+    [sharing, setSharing] = useState(false),
+    [shareError, setShareError] = useState<string | null>(null);
+  const toTeam = !!team?.link && destination === "team";
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetId, setTargetId] = useState("new:codex");
   // biome-ignore lint/correctness/useExhaustiveDependencies: selections belong to one project.
@@ -348,15 +355,56 @@ export function AnnotationManager() {
                         placeholder={t("annot.describeTheChangeYouWant")}
                         className="w-full resize-y border border-border bg-background p-2"
                       />
+                      {team?.link && (
+                        <label className="flex items-center gap-2">
+                          {t("team.saveTo")}
+                          <select
+                            value={destination}
+                            onChange={(e) => setDestination(e.target.value as "team" | "local")}
+                            className="border border-border bg-background px-2 py-1"
+                          >
+                            <option value="team">{t("team.toTeam")}</option>
+                            <option value="local">{t("team.toLocal")}</option>
+                          </select>
+                        </label>
+                      )}
+                      {shareError && (
+                        <p role="alert" className="text-red-600">
+                          {shareError}
+                        </p>
+                      )}
                       <button
                         type="button"
-                        disabled={notes.busy || !notes.draft.comment.trim()}
-                        onClick={() => void notes.saveDraft()}
+                        disabled={notes.busy || sharing || !notes.draft.comment.trim()}
+                        onClick={() => {
+                          const draft = notes.draft;
+                          if (!toTeam || !team || !draft) {
+                            void notes.saveDraft();
+                            return;
+                          }
+                          setSharing(true);
+                          setShareError(null);
+                          void team
+                            .share(draft)
+                            .then(() => notes.setDraft(null))
+                            .catch((cause) =>
+                              setShareError(
+                                t("team.shareFailed", {
+                                  error: cause instanceof Error ? cause.message : String(cause),
+                                }),
+                              ),
+                            )
+                            .finally(() => setSharing(false));
+                        }}
                         className="border border-foreground bg-foreground px-3 py-1.5 text-background disabled:opacity-40"
                       >
-                        {notes.busy
-                          ? t("annot.savingCommentAndGitVersion")
-                          : t("annot.saveCommentAndRecordInGit")}
+                        {toTeam
+                          ? sharing
+                            ? t("team.sharing")
+                            : t("team.shareComment")
+                          : notes.busy
+                            ? t("annot.savingCommentAndGitVersion")
+                            : t("annot.saveCommentAndRecordInGit")}
                       </button>
                     </section>
                   )}

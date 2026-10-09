@@ -4,6 +4,7 @@ import type { DocumentConflict } from "@lmms-lab/writing";
 import { invoke } from "@tauri-apps/api/core";
 import { ask, save } from "@tauri-apps/plugin-dialog";
 import { type ReactNode, useState } from "react";
+import { TeamComments } from "@/components/collab/team-comments";
 import type { DocumentSave, SaveManager } from "@/lib/editor/save-manager";
 import { useI18n } from "@/lib/i18n";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
@@ -126,6 +127,7 @@ export function SaveStatus({
           })}
         </button>
         {project && <AnnotationManager />}
+        {project && <TeamComments onOpenFile={onOpenFile} />}
         {project && collaboration}
         {project && (
           <BibliographyPanel

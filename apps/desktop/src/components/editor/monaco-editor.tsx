@@ -5,6 +5,7 @@ import "@/lib/monaco/config";
 import Editor, { type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { teamMarks, useTeamComments } from "@/lib/collab/team-comments";
 import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
 import type { EditorTextRange } from "@/lib/editor/selection-context";
 import { type SourceMark, useSourceAnnotations } from "@/lib/editor/source-annotations";
@@ -64,6 +65,14 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
     props.path,
     props.content,
   );
+  const team = useTeamComments();
+  // Team comments are placed on the text shown now; local marks only while they match it.
+  const content = props.content ?? "";
+  const shared = useMemo(
+    () => (team && props.path ? teamMarks(team.comments, props.path, content) : []),
+    [team, props.path, content],
+  );
+  const current = annotationContent === content;
   const [ranges, setRanges] = useState<EditorTextRange[] | null>(null);
   const [style, setStyle] = useState<"highlight" | "underline">("highlight");
   const annotate = (selection: EditorTextRange[], content: string) => {
@@ -77,9 +86,14 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
   const child = {
     ...props,
     className: "h-full",
-    annotationMarks: marks,
-    annotationContent,
-    onAnnotationClick: (id: string) => notes?.focusAnnotation(id),
+    annotationMarks: shared.length ? [...(current ? marks : []), ...shared] : marks,
+    annotationContent: shared.length ? content : annotationContent,
+    onAnnotationClick: (id: string) => {
+      if (id.startsWith("team:")) {
+        team?.setFocus(id.slice(5));
+        team?.setOpen(true);
+      } else notes?.focusAnnotation(id);
+    },
     onAnnotate: annotate,
     onSelectionChange: (selection: EditorTextRange[] | null) => {
       setRanges(selection);

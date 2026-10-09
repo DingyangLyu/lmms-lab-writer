@@ -38,6 +38,7 @@ import { isWriterManagedPath } from "@/lib/chat/files";
 import { parseChatLink } from "@/lib/chat/links";
 import { linkedFolders } from "@/lib/collab/accounts";
 import { useSharedRunner } from "@/lib/collab/runner";
+import { TeamCommentsProvider } from "@/lib/collab/team-comments";
 import { useFolderSync } from "@/lib/collab/use-folder-sync";
 import { useEditorSettings } from "@/lib/editor";
 import { fileKind, fileLanguage } from "@/lib/editor/file-kind";
@@ -2000,610 +2001,621 @@ export default function EditorPage() {
       onSource={handleAnnotationSource}
       onPdf={handleFileSelect}
     >
-      {switchingProject && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed inset-0 z-[250] flex items-center justify-center bg-background/70"
-        >
-          <p className="border border-border bg-background px-5 py-3 text-sm shadow-md">
-            {t("page.savingAndOpeningTheFolder")}
-          </p>
-        </div>
-      )}
-      <div className="h-dvh flex flex-col" inert={switchingProject}>
-        <div className="flex-shrink-0 flex flex-col">
-          <header className="h-12 border-b border-border flex items-center">
-            <div className="w-full px-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex items-center">
-                  <Image
-                    src="/logo-small-light.svg"
-                    alt="Y-Writer"
-                    width={140}
-                    height={28}
-                    className="h-7 w-auto dark:hidden"
-                  />
-                  <Image
-                    src="/logo-small-dark.svg"
-                    alt="Y-Writer"
-                    width={140}
-                    height={28}
-                    className="h-7 w-auto hidden dark:block"
-                  />
-                </div>
-                <span className="text-border">/</span>
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="text-sm font-medium px-2 py-1 -ml-2 truncate">
-                    {daemon.projectPath ? pathSync.basename(daemon.projectPath) : "Y-Writer"}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleOpenFolder()}
-                  disabled={choosingProject || daemon.isOpeningProject}
-                  aria-label={t("page.openFolder")}
-                  title={t("page.openFolderCtrlOCurrentChangesAreSavedFir")}
-                  className="flex h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:bg-accent-hover disabled:opacity-50"
-                >
-                  <FolderOpenIcon className="size-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">
-                    {choosingProject ? t("page.opening") : t("page.openFolder")}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={openWindow}
-                  aria-label={t("page.newWindow")}
-                  title={t("page.newWindowShortcut")}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center border border-border hover:bg-accent-hover"
-                >
-                  <AppWindowIcon className="size-4" aria-hidden="true" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 h-8">
-                {daemon.projectPath && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSidebar((prev) => !prev)}
-                    className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
-                      showSidebar
-                        ? "border-foreground"
-                        : "hover:bg-accent-hover hover:border-border-dark"
-                    }`}
-                    title={t("page.toggleSidebar")}
-                  >
-                    <SidebarSimpleIcon className="size-4" weight="bold" />
-                  </button>
-                )}
-
-                {daemon.projectPath && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTerminal((prev) => !prev)}
-                    className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
-                      showTerminal
-                        ? "border-foreground"
-                        : "hover:bg-accent-hover hover:border-border-dark"
-                    }`}
-                    title={t("page.toggleTerminal")}
-                  >
-                    <TerminalIcon className="size-4" weight="bold" />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleToggleRightPanel}
-                  className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
-                    showRightPanel
-                      ? "border-foreground"
-                      : "hover:bg-accent-hover hover:border-border-dark"
-                  }`}
-                  title={t("page.toggleAgentMode")}
-                >
-                  <RobotIcon className="size-4" weight="bold" />
-                </button>
-
-                {daemon.projectPath && (
-                  <>
-                    <span className="text-border text-lg select-none">/</span>
-                    <div className="flex items-center gap-2 h-8">
-                      <select
-                        aria-label={t("page.buildTarget")}
-                        value={latexSettings.settings.config.activeTarget ?? ""}
-                        disabled={
-                          targetBuild.compiling || latexSettings.isDetecting || latexSettings.saving
-                        }
-                        onChange={(event) =>
-                          void latexSettings.selectTarget(event.target.value).catch(() => {})
-                        }
-                        className="h-8 max-w-40 truncate border border-border bg-background px-2 text-xs"
-                      >
-                        {!latexSettings.settings.config.targets.length && (
-                          <option value="">{t("page.addBuildTarget")}</option>
-                        )}
-                        {latexSettings.settings.config.targets.map((target) => (
-                          <option key={target.id} value={target.id}>
-                            {target.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowTemplateImport(true)}
-                        className="h-8 border border-border px-2 text-xs"
-                        title={t("page.createANewProjectFromAZipOrFolder")}
-                      >
-                        {t("page.importTemplate")}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCompileWithDetection}
-                        disabled={
-                          targetBuild.compiling || latexSettings.isDetecting || latexSettings.saving
-                        }
-                        className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
-                          latexSettings.isDetecting
-                            ? "opacity-50 cursor-not-allowed"
-                            : "hover:bg-accent-hover hover:border-border-dark"
-                        }`}
-                        title={
-                          targetBuild.compiling
-                            ? t("page.compiling")
-                            : t("page.compileTheSelectedTargetCtrlShiftB")
-                        }
-                      >
-                        <PlayCircleIcon className="size-4" />
-                      </button>
-                      {targetBuild.compiling && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void invoke("latex_stop_compilation").catch((cause) =>
-                              toast(String(cause), "error"),
-                            )
-                          }
-                          className="h-8 border border-border px-2 text-xs"
-                        >
-                          {t("page.stopBuild")}
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => openSettings()}
-                        className="h-8 w-8 border border-border bg-background text-foreground hover:bg-accent-hover hover:border-border-dark transition-colors flex items-center justify-center"
-                        title={t("page.settings")}
-                        aria-label={t("page.settings")}
-                      >
-                        <GearIcon className="size-4" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </header>
-        </div>
-
-        {daemon.projectPath && (
-          <SaveStatus
-            collaboration={
-              daemon.projectPath ? (
-                <SyncPanel
-                  sync={folderSync}
-                  runner={sharedRunner}
-                  projectPath={daemon.projectPath}
-                  onOpenFromServer={() => setOpenFromServer(null)}
-                  onOpenSettings={() => openSettings("collab")}
-                />
-              ) : null
-            }
-            onOpenFile={handleChatFileClick}
-            onConflictResolved={(conflict) => {
-              if (!conflict.owner.startsWith("agent:")) return;
-              const native = conflict.owner.slice(6),
-                separator = native.indexOf(":");
-              const backend = native.slice(0, separator),
-                sessionId = native.slice(separator + 1);
-              if (!isHarnessId(backend)) return;
-              const tab = conversations.tabs.find(
-                (t) => t.backend === backend && t.sessionId === sessionId,
-              );
-              if (tab)
-                conversations.dispatch(
-                  { backend, tabId: tab.id },
-                  t("page.theUserResolvedAndSavedMergeConflictIdRe", {
-                    id: conflict.id,
-                    path: conflict.path,
-                    comment: conflict.annotationId
-                      ? t("page.andCommentId", { id: conflict.annotationId })
-                      : "",
-                  }),
-                );
-            }}
-            agentBusy={conversations.tabs.some(
-              (t) => t.status === "running" || t.status === "waiting",
-            )}
-            rightActions={
-              <HarnessButtons
-                workspace={conversations}
-                onChoose={(backend) => {
-                  conversations.focus(backend);
-                  setAgentBackend(backend);
-                  setShowRightPanel(true);
-                }}
-              />
-            }
-            manager={saveManager}
-            project={daemon.projectPath}
-            path={selectedFile}
-            closeError={saving.closeError}
-            clearCloseError={saving.clearCloseError}
-            onOpenDraft={(path, content) => {
-              primaryLoadRequestIdRef.current++;
-              setSelectedFile(path);
-              setFileContent(content);
-              setFileLoadError(null);
-              setIsLoadingFile(false);
-              setBinaryPreviewUrl(null);
-              setEditorViewMode("file");
-            }}
-            highlightAmbiguousUnicode={editorSettings.settings.highlightAmbiguousUnicode}
-            onToggleUnicodeHighlight={() =>
-              editorSettings.updateSettings({
-                highlightAmbiguousUnicode: !editorSettings.settings.highlightAmbiguousUnicode,
-              })
-            }
-            onReload={(path, content) => {
-              if (path === selectedFile) {
-                setFileContent(content);
-                setFileLoadError(null);
-              }
-              setSplitPane((prev) =>
-                prev?.selectedFile === path ? { ...prev, content, error: null } : prev,
-              );
-            }}
-          />
+      <TeamCommentsProvider projectPath={daemon.projectPath}>
+        {switchingProject && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed inset-0 z-[250] flex items-center justify-center bg-background/70"
+          >
+            <p className="border border-border bg-background px-5 py-3 text-sm shadow-md">
+              {t("page.savingAndOpeningTheFolder")}
+            </p>
+          </div>
         )}
-        {latexSettings.error && (
-          <p role="alert" className="border-b border-border px-3 py-2 text-xs text-red-600">
-            {t("page.buildSettingsError", { error: latexSettings.error })}
-          </p>
-        )}
-        <main className="flex-1 min-h-0 flex relative overflow-hidden">
-          <AnimatePresence mode="wait">
-            {showSidebar && (
-              <div key="sidebar-container" className="flex flex-shrink-0">
-                <aside
-                  style={{
-                    width: resizing === "sidebar" ? "var(--sidebar-width)" : sidebarWidth,
-                    willChange: resizing === "sidebar" ? "width" : undefined,
-                  }}
-                  className="border-r border-border flex flex-col flex-shrink-0 overflow-hidden"
-                >
-                  <TabBar
-                    tabs={sidebarTabs}
-                    activeTab={sidebarTab}
-                    onTabSelect={(id) => setSidebarTab(id as "files" | "git")}
-                    variant="sidebar"
-                  />
-
-                  {sidebarTab === "files" && (
-                    <FileSidebarPanel
-                      projectPath={daemon.projectPath}
-                      files={daemon.files}
-                      selectedFile={selectedFile}
-                      highlightedFile={highlightedFile}
-                      onFileSelect={handleFileSelect}
-                      onCreateFile={() => setCreateDialog({ type: "file" })}
-                      onCreateDirectory={() => setCreateDialog({ type: "directory" })}
-                      onRefreshFiles={daemon.refreshFiles}
-                      outlinePath={
-                        selectedFile?.endsWith(".tex")
-                          ? selectedFile
-                          : latexSettings.activeTarget?.mainFile
-                      }
-                      outlineSource={selectedFile?.endsWith(".tex") ? fileContent : undefined}
-                      readSource={daemon.readFile}
-                      onOutlineNavigate={async (path, line) => {
-                        await handleFileSelect(path);
-                        setPendingGoToLine(line);
-                      }}
-                      fileOperations={{
-                        createFile: daemon.createFile,
-                        createDirectory: daemon.createDirectory,
-                        renamePath: daemon.renamePath,
-                        deletePath: daemon.deletePath,
-                      }}
+        <div className="h-dvh flex flex-col" inert={switchingProject}>
+          <div className="flex-shrink-0 flex flex-col">
+            <header className="h-12 border-b border-border flex items-center">
+              <div className="w-full px-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center">
+                    <Image
+                      src="/logo-small-light.svg"
+                      alt="Y-Writer"
+                      width={140}
+                      height={28}
+                      className="h-7 w-auto dark:hidden"
                     />
+                    <Image
+                      src="/logo-small-dark.svg"
+                      alt="Y-Writer"
+                      width={140}
+                      height={28}
+                      className="h-7 w-auto hidden dark:block"
+                    />
+                  </div>
+                  <span className="text-border">/</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-sm font-medium px-2 py-1 -ml-2 truncate">
+                      {daemon.projectPath ? pathSync.basename(daemon.projectPath) : "Y-Writer"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenFolder()}
+                    disabled={choosingProject || daemon.isOpeningProject}
+                    aria-label={t("page.openFolder")}
+                    title={t("page.openFolderCtrlOCurrentChangesAreSavedFir")}
+                    className="flex h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    <FolderOpenIcon className="size-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">
+                      {choosingProject ? t("page.opening") : t("page.openFolder")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openWindow}
+                    aria-label={t("page.newWindow")}
+                    title={t("page.newWindowShortcut")}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center border border-border hover:bg-accent-hover"
+                  >
+                    <AppWindowIcon className="size-4" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 h-8">
+                  {daemon.projectPath && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSidebar((prev) => !prev)}
+                      className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
+                        showSidebar
+                          ? "border-foreground"
+                          : "hover:bg-accent-hover hover:border-border-dark"
+                      }`}
+                      title={t("page.toggleSidebar")}
+                    >
+                      <SidebarSimpleIcon className="size-4" weight="bold" />
+                    </button>
                   )}
 
-                  {sidebarTab === "git" && (
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      <GitSidebarPanel
+                  {daemon.projectPath && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTerminal((prev) => !prev)}
+                      className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
+                        showTerminal
+                          ? "border-foreground"
+                          : "hover:bg-accent-hover hover:border-border-dark"
+                      }`}
+                      title={t("page.toggleTerminal")}
+                    >
+                      <TerminalIcon className="size-4" weight="bold" />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleToggleRightPanel}
+                    className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
+                      showRightPanel
+                        ? "border-foreground"
+                        : "hover:bg-accent-hover hover:border-border-dark"
+                    }`}
+                    title={t("page.toggleAgentMode")}
+                  >
+                    <RobotIcon className="size-4" weight="bold" />
+                  </button>
+
+                  {daemon.projectPath && (
+                    <>
+                      <span className="text-border text-lg select-none">/</span>
+                      <div className="flex items-center gap-2 h-8">
+                        <select
+                          aria-label={t("page.buildTarget")}
+                          value={latexSettings.settings.config.activeTarget ?? ""}
+                          disabled={
+                            targetBuild.compiling ||
+                            latexSettings.isDetecting ||
+                            latexSettings.saving
+                          }
+                          onChange={(event) =>
+                            void latexSettings.selectTarget(event.target.value).catch(() => {})
+                          }
+                          className="h-8 max-w-40 truncate border border-border bg-background px-2 text-xs"
+                        >
+                          {!latexSettings.settings.config.targets.length && (
+                            <option value="">{t("page.addBuildTarget")}</option>
+                          )}
+                          {latexSettings.settings.config.targets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowTemplateImport(true)}
+                          className="h-8 border border-border px-2 text-xs"
+                          title={t("page.createANewProjectFromAZipOrFolder")}
+                        >
+                          {t("page.importTemplate")}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCompileWithDetection}
+                          disabled={
+                            targetBuild.compiling ||
+                            latexSettings.isDetecting ||
+                            latexSettings.saving
+                          }
+                          className={`h-8 w-8 border border-border transition-colors flex items-center justify-center bg-background text-foreground ${
+                            latexSettings.isDetecting
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-accent-hover hover:border-border-dark"
+                          }`}
+                          title={
+                            targetBuild.compiling
+                              ? t("page.compiling")
+                              : t("page.compileTheSelectedTargetCtrlShiftB")
+                          }
+                        >
+                          <PlayCircleIcon className="size-4" />
+                        </button>
+                        {targetBuild.compiling && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void invoke("latex_stop_compilation").catch((cause) =>
+                                toast(String(cause), "error"),
+                              )
+                            }
+                            className="h-8 border border-border px-2 text-xs"
+                          >
+                            {t("page.stopBuild")}
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => openSettings()}
+                          className="h-8 w-8 border border-border bg-background text-foreground hover:bg-accent-hover hover:border-border-dark transition-colors flex items-center justify-center"
+                          title={t("page.settings")}
+                          aria-label={t("page.settings")}
+                        >
+                          <GearIcon className="size-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </header>
+          </div>
+
+          {daemon.projectPath && (
+            <SaveStatus
+              collaboration={
+                daemon.projectPath ? (
+                  <SyncPanel
+                    sync={folderSync}
+                    runner={sharedRunner}
+                    projectPath={daemon.projectPath}
+                    onOpenFromServer={() => setOpenFromServer(null)}
+                    onOpenSettings={() => openSettings("collab")}
+                  />
+                ) : null
+              }
+              onOpenFile={handleChatFileClick}
+              onConflictResolved={(conflict) => {
+                if (!conflict.owner.startsWith("agent:")) return;
+                const native = conflict.owner.slice(6),
+                  separator = native.indexOf(":");
+                const backend = native.slice(0, separator),
+                  sessionId = native.slice(separator + 1);
+                if (!isHarnessId(backend)) return;
+                const tab = conversations.tabs.find(
+                  (t) => t.backend === backend && t.sessionId === sessionId,
+                );
+                if (tab)
+                  conversations.dispatch(
+                    { backend, tabId: tab.id },
+                    t("page.theUserResolvedAndSavedMergeConflictIdRe", {
+                      id: conflict.id,
+                      path: conflict.path,
+                      comment: conflict.annotationId
+                        ? t("page.andCommentId", { id: conflict.annotationId })
+                        : "",
+                    }),
+                  );
+              }}
+              agentBusy={conversations.tabs.some(
+                (t) => t.status === "running" || t.status === "waiting",
+              )}
+              rightActions={
+                <HarnessButtons
+                  workspace={conversations}
+                  onChoose={(backend) => {
+                    conversations.focus(backend);
+                    setAgentBackend(backend);
+                    setShowRightPanel(true);
+                  }}
+                />
+              }
+              manager={saveManager}
+              project={daemon.projectPath}
+              path={selectedFile}
+              closeError={saving.closeError}
+              clearCloseError={saving.clearCloseError}
+              onOpenDraft={(path, content) => {
+                primaryLoadRequestIdRef.current++;
+                setSelectedFile(path);
+                setFileContent(content);
+                setFileLoadError(null);
+                setIsLoadingFile(false);
+                setBinaryPreviewUrl(null);
+                setEditorViewMode("file");
+              }}
+              highlightAmbiguousUnicode={editorSettings.settings.highlightAmbiguousUnicode}
+              onToggleUnicodeHighlight={() =>
+                editorSettings.updateSettings({
+                  highlightAmbiguousUnicode: !editorSettings.settings.highlightAmbiguousUnicode,
+                })
+              }
+              onReload={(path, content) => {
+                if (path === selectedFile) {
+                  setFileContent(content);
+                  setFileLoadError(null);
+                }
+                setSplitPane((prev) =>
+                  prev?.selectedFile === path ? { ...prev, content, error: null } : prev,
+                );
+              }}
+            />
+          )}
+          {latexSettings.error && (
+            <p role="alert" className="border-b border-border px-3 py-2 text-xs text-red-600">
+              {t("page.buildSettingsError", { error: latexSettings.error })}
+            </p>
+          )}
+          <main className="flex-1 min-h-0 flex relative overflow-hidden">
+            <AnimatePresence mode="wait">
+              {showSidebar && (
+                <div key="sidebar-container" className="flex flex-shrink-0">
+                  <aside
+                    style={{
+                      width: resizing === "sidebar" ? "var(--sidebar-width)" : sidebarWidth,
+                      willChange: resizing === "sidebar" ? "width" : undefined,
+                    }}
+                    className="border-r border-border flex flex-col flex-shrink-0 overflow-hidden"
+                  >
+                    <TabBar
+                      tabs={sidebarTabs}
+                      activeTab={sidebarTab}
+                      onTabSelect={(id) => setSidebarTab(id as "files" | "git")}
+                      variant="sidebar"
+                    />
+
+                    {sidebarTab === "files" && (
+                      <FileSidebarPanel
                         projectPath={daemon.projectPath}
-                        gitStatus={gitStatus}
-                        gitGraph={daemon.gitGraph}
-                        gitLogEntries={daemon.gitLogEntries}
-                        {...git.panel}
-                        onInitGit={daemon.gitInit}
-                        isInitializingGit={daemon.isInitializingGit}
-                        onPreviewDiff={handlePreviewGitDiff}
-                        onOpenFile={(path) => {
-                          void handleFileSelect(path);
+                        files={daemon.files}
+                        selectedFile={selectedFile}
+                        highlightedFile={highlightedFile}
+                        onFileSelect={handleFileSelect}
+                        onCreateFile={() => setCreateDialog({ type: "file" })}
+                        onCreateDirectory={() => setCreateDialog({ type: "directory" })}
+                        onRefreshFiles={daemon.refreshFiles}
+                        outlinePath={
+                          selectedFile?.endsWith(".tex")
+                            ? selectedFile
+                            : latexSettings.activeTarget?.mainFile
+                        }
+                        outlineSource={selectedFile?.endsWith(".tex") ? fileContent : undefined}
+                        readSource={daemon.readFile}
+                        onOutlineNavigate={async (path, line) => {
+                          await handleFileSelect(path);
+                          setPendingGoToLine(line);
                         }}
-                        isPushing={daemon.isPushing}
-                        isPulling={daemon.isPulling}
-                        isAuthenticatingGh={daemon.isAuthenticatingGh}
+                        fileOperations={{
+                          createFile: daemon.createFile,
+                          createDirectory: daemon.createDirectory,
+                          renamePath: daemon.renamePath,
+                          deletePath: daemon.deletePath,
+                        }}
+                      />
+                    )}
+
+                    {sidebarTab === "git" && (
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <GitSidebarPanel
+                          projectPath={daemon.projectPath}
+                          gitStatus={gitStatus}
+                          gitGraph={daemon.gitGraph}
+                          gitLogEntries={daemon.gitLogEntries}
+                          {...git.panel}
+                          onInitGit={daemon.gitInit}
+                          isInitializingGit={daemon.isInitializingGit}
+                          onPreviewDiff={handlePreviewGitDiff}
+                          onOpenFile={(path) => {
+                            void handleFileSelect(path);
+                          }}
+                          isPushing={daemon.isPushing}
+                          isPulling={daemon.isPulling}
+                          isAuthenticatingGh={daemon.isAuthenticatingGh}
+                        />
+                      </div>
+                    )}
+                  </aside>
+                  <div className="relative group w-1 flex-shrink-0">
+                    <motion.div
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0}
+                      dragMomentum={false}
+                      onDragStart={() => startResize("sidebar")}
+                      onDrag={(_event, info) => handleResizeDrag("sidebar", info)}
+                      onDragEnd={endResize}
+                      className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize z-10"
+                      style={{ x: 0 }}
+                    />
+                    <div
+                      className={`w-full h-full transition-colors ${resizing === "sidebar" ? "bg-foreground/20" : "group-hover:bg-foreground/20"}`}
+                    />
+                  </div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex-1 min-w-0 w-0 flex flex-col overflow-hidden">
+              {daemon.projectPath && editorPanelItems.length > 0 ? (
+                <div ref={editorWorkspaceRef} className="relative flex-1 min-h-0">
+                  {splitDropHint && (
+                    <div className="pointer-events-none absolute inset-0 z-10">
+                      <div
+                        className={`absolute inset-y-0 w-1/2 transition-opacity duration-100 ${
+                          splitDropHint === "left"
+                            ? "left-0 border-r border-accent/40 bg-gradient-to-r from-foreground/15 to-transparent shadow-[inset_-20px_0_24px_-20px_rgba(0,0,0,0.45)]"
+                            : "right-0 border-l border-accent/40 bg-gradient-to-l from-foreground/15 to-transparent shadow-[inset_20px_0_24px_-20px_rgba(0,0,0,0.45)]"
+                        }`}
                       />
                     </div>
                   )}
-                </aside>
-                <div className="relative group w-1 flex-shrink-0">
-                  <motion.div
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0}
-                    dragMomentum={false}
-                    onDragStart={() => startResize("sidebar")}
-                    onDrag={(_event, info) => handleResizeDrag("sidebar", info)}
-                    onDragEnd={endResize}
-                    className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize z-10"
-                    style={{ x: 0 }}
-                  />
-                  <div
-                    className={`w-full h-full transition-colors ${resizing === "sidebar" ? "bg-foreground/20" : "group-hover:bg-foreground/20"}`}
+
+                  <DockviewPanelLayout
+                    panels={editorPanelItems}
+                    className="dockview-editor-layout"
                   />
                 </div>
-              </div>
-            )}
-          </AnimatePresence>
-
-          <div className="flex-1 min-w-0 w-0 flex flex-col overflow-hidden">
-            {daemon.projectPath && editorPanelItems.length > 0 ? (
-              <div ref={editorWorkspaceRef} className="relative flex-1 min-h-0">
-                {splitDropHint && (
-                  <div className="pointer-events-none absolute inset-0 z-10">
-                    <div
-                      className={`absolute inset-y-0 w-1/2 transition-opacity duration-100 ${
-                        splitDropHint === "left"
-                          ? "left-0 border-r border-accent/40 bg-gradient-to-r from-foreground/15 to-transparent shadow-[inset_-20px_0_24px_-20px_rgba(0,0,0,0.45)]"
-                          : "right-0 border-l border-accent/40 bg-gradient-to-l from-foreground/15 to-transparent shadow-[inset_20px_0_24px_-20px_rgba(0,0,0,0.45)]"
-                      }`}
-                    />
-                  </div>
-                )}
-
-                <DockviewPanelLayout panels={editorPanelItems} className="dockview-editor-layout" />
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                {daemon.projectPath ? (
-                  <div />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center px-6">
-                    <Image
-                      src="/logo-light.svg"
-                      alt="Y-Writer"
-                      width={320}
-                      height={96}
-                      className="h-24 w-auto mb-10 dark:hidden"
-                    />
-                    <Image
-                      src="/logo-dark.svg"
-                      alt="Y-Writer"
-                      width={320}
-                      height={96}
-                      className="h-24 w-auto mb-10 hidden dark:block"
-                    />
-                    <button type="button" onClick={handleOpenFolder} className="btn btn-primary">
-                      {t("page.openFolder")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowTemplateImport(true)}
-                      className="mt-3 border border-border px-4 py-2 text-sm"
-                    >
-                      {t("page.importALatexTemplateZipFolder")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOpenFromServer(null)}
-                      className="mt-3 border border-border px-4 py-2 text-sm"
-                    >
-                      {t("collab.open.button")}
-                    </button>
-                    <RecentProjects
-                      projects={recentProjects.projects}
-                      onSelect={handleOpenRecentProject}
-                      onRemove={recentProjects.removeProject}
-                      onClearAll={recentProjects.clearAll}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* LaTeX Install Prompt - shown when no compiler is detected */}
-            {daemon.projectPath &&
-              latexCompiler.compilersStatus &&
-              !hasAnyCompiler &&
-              !latexCompiler.isDetecting && (
-                <div className="border-t border-border">
-                  <LaTeXInstallPrompt onRefreshCompilers={latexCompiler.detectCompilers} />
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  {daemon.projectPath ? (
+                    <div />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center px-6">
+                      <Image
+                        src="/logo-light.svg"
+                        alt="Y-Writer"
+                        width={320}
+                        height={96}
+                        className="h-24 w-auto mb-10 dark:hidden"
+                      />
+                      <Image
+                        src="/logo-dark.svg"
+                        alt="Y-Writer"
+                        width={320}
+                        height={96}
+                        className="h-24 w-auto mb-10 hidden dark:block"
+                      />
+                      <button type="button" onClick={handleOpenFolder} className="btn btn-primary">
+                        {t("page.openFolder")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplateImport(true)}
+                        className="mt-3 border border-border px-4 py-2 text-sm"
+                      >
+                        {t("page.importALatexTemplateZipFolder")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpenFromServer(null)}
+                        className="mt-3 border border-border px-4 py-2 text-sm"
+                      >
+                        {t("collab.open.button")}
+                      </button>
+                      <RecentProjects
+                        projects={recentProjects.projects}
+                        onSelect={handleOpenRecentProject}
+                        onRemove={recentProjects.removeProject}
+                        onClearAll={recentProjects.clearAll}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
-            <TerminalPanel
-              projectPath={daemon.projectPath}
-              open={showTerminal}
-              shellMode={editorSettings.settings.terminalShellMode}
-              customShell={editorSettings.settings.terminalShellPath}
-              fontFamily={editorSettings.settings.terminalFontFamily}
-              fontSize={editorSettings.settings.terminalFontSize}
-              lineHeight={editorSettings.settings.terminalLineHeight}
-              prefersReducedMotion={Boolean(prefersReducedMotion)}
-              onClose={() => setShowTerminal(false)}
-            />
-          </div>
+              {/* LaTeX Install Prompt - shown when no compiler is detected */}
+              {daemon.projectPath &&
+                latexCompiler.compilersStatus &&
+                !hasAnyCompiler &&
+                !latexCompiler.isDetecting && (
+                  <div className="border-t border-border">
+                    <LaTeXInstallPrompt onRefreshCompilers={latexCompiler.detectCompilers} />
+                  </div>
+                )}
 
-          <AnimatePresence>
-            {(conversations.tabs.length > 0 || showRightPanel) && (
-              <div
-                key="right-panel-container"
-                inert={!showRightPanel}
-                aria-hidden={!showRightPanel}
-                className="flex flex-shrink-0 bg-background overflow-hidden"
-                style={{
-                  width: !showRightPanel
-                    ? 0
-                    : resizing === "right"
-                      ? `calc(var(--right-panel-width) + 4px)`
-                      : rightPanelWidth + 4,
-                }}
-              >
-                <div className="relative group w-1 flex-shrink-0">
-                  <motion.div
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0}
-                    dragMomentum={false}
-                    onDragStart={() => startResize("right")}
-                    onDrag={(_event, info) => handleResizeDrag("right", info)}
-                    onDragEnd={endResize}
-                    className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize z-10"
-                    style={{ x: 0 }}
-                  />
-                  <div
-                    className={`w-full h-full transition-colors ${resizing === "right" ? "bg-foreground/20" : "group-hover:bg-foreground/20"}`}
-                  />
-                </div>
-                <aside
-                  style={{
-                    width: resizing === "right" ? "var(--right-panel-width)" : rightPanelWidth,
-                    willChange: resizing === "right" ? "width" : undefined,
-                  }}
-                  className="border-l border-border flex flex-col flex-shrink-0 overflow-hidden"
-                >
-                  <ChatImageDirectory.Provider value={daemon.projectPath ?? undefined}>
-                    <HarnessWorkspace
-                      workspace={conversations}
-                      preferredBackend={agentBackend}
-                      visible={showRightPanel}
-                      onBackendChange={setAgentBackend}
-                      shared={{
-                        directory: daemon.projectPath ?? undefined,
-                        onFileClick: handleChatFileClick,
-                        editorSelection:
-                          editorSelection?.project === daemon.projectPath ? editorSelection : null,
-                        onClearSelection: () => setEditorSelection(null),
-                        onSelectionSent: (sent) =>
-                          setEditorSelection((current) =>
-                            sameEditorSelection(current, sent) ? null : current,
-                          ),
-                        onBeforeSend: prepareEditorMessage,
-                      }}
-                      opencode={{
-                        baseUrl: `http://localhost:${opencode.port}`,
-                        autoConnect: opencode.status === "running" && !!daemon.projectPath,
-                        daemonStatus: opencode.status,
-                        onRestartOpenCode: opencode.restart,
-                        onMaxReconnectFailed: opencode.showDisconnected,
-                      }}
-                    />
-                  </ChatImageDirectory.Provider>
-                </aside>
-              </div>
-            )}
-          </AnimatePresence>
-        </main>
-
-        <OpenCodeDisconnectedDialog
-          open={opencode.disconnected}
-          onClose={opencode.closeDisconnected}
-          onRestart={opencode.restartFromDisconnected}
-        />
-
-        <OpenCodeErrorDialog
-          open={!!opencode.error}
-          error={opencode.error ?? ""}
-          onClose={opencode.clearError}
-          onRetry={opencode.restart}
-          onKillPort={opencode.killPortAndRestart}
-        />
-
-        {createDialog && (
-          <InputDialog
-            title={createDialog.type === "file" ? t("page.newFile") : t("page.newFolder")}
-            placeholder={createDialog.type === "file" ? "file.tex" : "folder"}
-            onConfirm={handleCreateConfirm}
-            onCancel={() => setCreateDialog(null)}
-            validator={validateFileName}
-          />
-        )}
-
-        {showTemplateImport && (
-          <TemplateImportDialog
-            onClose={() => setShowTemplateImport(false)}
-            onImported={handleOpenRecentProject}
-          />
-        )}
-        {openFromServer !== false && (
-          <OpenFromServer
-            initial={openFromServer}
-            onClose={() => setOpenFromServer(false)}
-            onOpened={(path) => {
-              setOpenFromServer(false);
-              void handleOpenRecentProject(path);
-            }}
-          />
-        )}
-        <LaTeXSettingsDialog
-          initialTab={settingsTab}
-          open={showLatexSettings}
-          onClose={() => setShowLatexSettings(false)}
-          settings={latexSettings.settings}
-          onUpdateSettings={latexSettings.updateSettings}
-          editorSettings={editorSettings.settings}
-          onUpdateEditorSettings={editorSettings.updateSettings}
-          texFiles={texFiles}
-          buildSettings={
-            daemon.projectPath ? (
-              <BuildTargetsEditor
-                project={daemon.projectPath}
-                config={latexSettings.settings.config}
-                texFiles={texFiles}
-                onSave={latexSettings.saveConfig}
+              <TerminalPanel
+                projectPath={daemon.projectPath}
+                open={showTerminal}
+                shellMode={editorSettings.settings.terminalShellMode}
+                customShell={editorSettings.settings.terminalShellPath}
+                fontFamily={editorSettings.settings.terminalFontFamily}
+                fontSize={editorSettings.settings.terminalFontSize}
+                lineHeight={editorSettings.settings.terminalLineHeight}
+                prefersReducedMotion={Boolean(prefersReducedMotion)}
+                onClose={() => setShowTerminal(false)}
               />
-            ) : undefined
-          }
-        />
+            </div>
 
-        <SynctexInstallDialog
-          open={showSynctexInstallDialog}
-          onClose={() => {
-            setShowSynctexInstallDialog(false);
-            pendingSynctexRetryRef.current = null;
-          }}
-          onInstallComplete={handleSynctexInstallComplete}
-        />
+            <AnimatePresence>
+              {(conversations.tabs.length > 0 || showRightPanel) && (
+                <div
+                  key="right-panel-container"
+                  inert={!showRightPanel}
+                  aria-hidden={!showRightPanel}
+                  className="flex flex-shrink-0 bg-background overflow-hidden"
+                  style={{
+                    width: !showRightPanel
+                      ? 0
+                      : resizing === "right"
+                        ? `calc(var(--right-panel-width) + 4px)`
+                        : rightPanelWidth + 4,
+                  }}
+                >
+                  <div className="relative group w-1 flex-shrink-0">
+                    <motion.div
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0}
+                      dragMomentum={false}
+                      onDragStart={() => startResize("right")}
+                      onDrag={(_event, info) => handleResizeDrag("right", info)}
+                      onDragEnd={endResize}
+                      className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize z-10"
+                      style={{ x: 0 }}
+                    />
+                    <div
+                      className={`w-full h-full transition-colors ${resizing === "right" ? "bg-foreground/20" : "group-hover:bg-foreground/20"}`}
+                    />
+                  </div>
+                  <aside
+                    style={{
+                      width: resizing === "right" ? "var(--right-panel-width)" : rightPanelWidth,
+                      willChange: resizing === "right" ? "width" : undefined,
+                    }}
+                    className="border-l border-border flex flex-col flex-shrink-0 overflow-hidden"
+                  >
+                    <ChatImageDirectory.Provider value={daemon.projectPath ?? undefined}>
+                      <HarnessWorkspace
+                        workspace={conversations}
+                        preferredBackend={agentBackend}
+                        visible={showRightPanel}
+                        onBackendChange={setAgentBackend}
+                        shared={{
+                          directory: daemon.projectPath ?? undefined,
+                          onFileClick: handleChatFileClick,
+                          editorSelection:
+                            editorSelection?.project === daemon.projectPath
+                              ? editorSelection
+                              : null,
+                          onClearSelection: () => setEditorSelection(null),
+                          onSelectionSent: (sent) =>
+                            setEditorSelection((current) =>
+                              sameEditorSelection(current, sent) ? null : current,
+                            ),
+                          onBeforeSend: prepareEditorMessage,
+                        }}
+                        opencode={{
+                          baseUrl: `http://localhost:${opencode.port}`,
+                          autoConnect: opencode.status === "running" && !!daemon.projectPath,
+                          daemonStatus: opencode.status,
+                          onRestartOpenCode: opencode.restart,
+                          onMaxReconnectFailed: opencode.showDisconnected,
+                        }}
+                      />
+                    </ChatImageDirectory.Provider>
+                  </aside>
+                </div>
+              )}
+            </AnimatePresence>
+          </main>
 
-        {git.publish.open && (
-          <GitHubPublishDialog
-            defaultRepoName={
-              daemon.projectPath ? pathSync.basename(daemon.projectPath) : "my-project"
-            }
-            onPublish={git.publish.submit}
-            onCancel={git.publish.cancel}
-            isCreating={daemon.isCreatingRepo}
-            error={git.publish.error}
+          <OpenCodeDisconnectedDialog
+            open={opencode.disconnected}
+            onClose={opencode.closeDisconnected}
+            onRestart={opencode.restartFromDisconnected}
           />
-        )}
-      </div>
+
+          <OpenCodeErrorDialog
+            open={!!opencode.error}
+            error={opencode.error ?? ""}
+            onClose={opencode.clearError}
+            onRetry={opencode.restart}
+            onKillPort={opencode.killPortAndRestart}
+          />
+
+          {createDialog && (
+            <InputDialog
+              title={createDialog.type === "file" ? t("page.newFile") : t("page.newFolder")}
+              placeholder={createDialog.type === "file" ? "file.tex" : "folder"}
+              onConfirm={handleCreateConfirm}
+              onCancel={() => setCreateDialog(null)}
+              validator={validateFileName}
+            />
+          )}
+
+          {showTemplateImport && (
+            <TemplateImportDialog
+              onClose={() => setShowTemplateImport(false)}
+              onImported={handleOpenRecentProject}
+            />
+          )}
+          {openFromServer !== false && (
+            <OpenFromServer
+              initial={openFromServer}
+              onClose={() => setOpenFromServer(false)}
+              onOpened={(path) => {
+                setOpenFromServer(false);
+                void handleOpenRecentProject(path);
+              }}
+            />
+          )}
+          <LaTeXSettingsDialog
+            initialTab={settingsTab}
+            open={showLatexSettings}
+            onClose={() => setShowLatexSettings(false)}
+            settings={latexSettings.settings}
+            onUpdateSettings={latexSettings.updateSettings}
+            editorSettings={editorSettings.settings}
+            onUpdateEditorSettings={editorSettings.updateSettings}
+            texFiles={texFiles}
+            buildSettings={
+              daemon.projectPath ? (
+                <BuildTargetsEditor
+                  project={daemon.projectPath}
+                  config={latexSettings.settings.config}
+                  texFiles={texFiles}
+                  onSave={latexSettings.saveConfig}
+                />
+              ) : undefined
+            }
+          />
+
+          <SynctexInstallDialog
+            open={showSynctexInstallDialog}
+            onClose={() => {
+              setShowSynctexInstallDialog(false);
+              pendingSynctexRetryRef.current = null;
+            }}
+            onInstallComplete={handleSynctexInstallComplete}
+          />
+
+          {git.publish.open && (
+            <GitHubPublishDialog
+              defaultRepoName={
+                daemon.projectPath ? pathSync.basename(daemon.projectPath) : "my-project"
+              }
+              onPublish={git.publish.submit}
+              onCancel={git.publish.cancel}
+              isCreating={daemon.isCreatingRepo}
+              error={git.publish.error}
+            />
+          )}
+        </div>
+      </TeamCommentsProvider>
     </AnnotationProvider>
   );
 }
