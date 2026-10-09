@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     "@lmms-lab/i18n",
     "@lmms-lab/latex-editor",
     "@lmms-lab/sync",
+    "@lmms-lab/workbench",
     "@lmms-lab/writer-shared",
     "@lmms-lab/writing",
   ],

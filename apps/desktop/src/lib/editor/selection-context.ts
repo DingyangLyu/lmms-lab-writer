@@ -1,5 +1,8 @@
 import type { Locale } from "@lmms-lab/i18n";
+import type { EditorTextRange } from "@lmms-lab/workbench";
 import { i18n } from "@/lib/i18n";
+
+export type { EditorTextRange };
 
 // The agent gets this context in the interface language; history parses either language back.
 const SELECTION_TEXT: Record<
@@ -25,16 +28,6 @@ const SELECTION_TEXT: Record<
     range: (index, label, range) =>
       `Selection ${index}: ${label}; from ${range.startLineNumber}:${range.startColumn} to ${range.endLineNumber}:${range.endColumn} (the end is not part of the selection)`,
   },
-};
-
-export type EditorTextRange = {
-  startLineNumber: number;
-  startColumn: number;
-  endLineNumber: number;
-  endColumn: number;
-  startOffset: number;
-  endOffset: number;
-  text: string;
 };
 
 export type EditorSelectionContext = {

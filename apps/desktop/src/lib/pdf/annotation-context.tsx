@@ -1,4 +1,5 @@
 "use client";
+import { PdfAnnotationContext } from "@lmms-lab/workbench";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -261,81 +262,81 @@ export function AnnotationProvider({
     setOpen(false);
     if (note.kind !== "text") void onPdf(note.pdf).catch((cause) => setError(String(cause)));
   };
-  return (
-    <AnnotationContext.Provider
-      value={{
-        project,
-        items,
-        open,
-        setOpen,
-        error,
-        busy,
-        draft,
-        setDraft,
-        beginDraft,
-        beginTextDraft: (selection, base, style = "highlight") => {
-          if (selection.project !== project || !selectionMatchesDocument(selection, base)) {
-            setError(i18n.t("msg.theSelectionDoesNotMatchTheCurrentManusc"));
-            setOpen(true);
-            return;
+  const value: Context = {
+    project,
+    items,
+    open,
+    setOpen,
+    error,
+    busy,
+    draft,
+    setDraft,
+    beginDraft,
+    beginTextDraft: (selection, base, style = "highlight") => {
+      if (selection.project !== project || !selectionMatchesDocument(selection, base)) {
+        setError(i18n.t("msg.theSelectionDoesNotMatchTheCurrentManusc"));
+        setOpen(true);
+        return;
+      }
+      beginDraft({
+        kind: "text",
+        file: selection.path,
+        base,
+        ranges: selection.ranges.map((r) => ({
+          start: r.startOffset,
+          end: r.endOffset,
+          text: r.text,
+        })),
+        pdf: "",
+        marks: [],
+        fingerprint: "",
+        quote: selection.ranges.map((r) => r.text).join("\n…\n"),
+        style,
+        comment: "",
+      });
+    },
+    focusAnnotation: (id) => {
+      setSelectedId(id);
+      setExpanded(new Set([id]));
+      setOpen(true);
+    },
+    saveDraft,
+    update,
+    submit,
+    conversations,
+    selectedId,
+    navigation,
+    expanded,
+    setExpanded,
+    showPdf,
+    showSource: (note) => {
+      if (!note.source || !project) return;
+      void manager
+        .synchronize(project, [note.source.file])
+        .then(() =>
+          invoke<{
+            annotations: Array<{
+              source?: { file: string; line: number };
+              currentRanges?: Array<{ line: number }>;
+            }>;
+          }>("writer_annotation_locations", { project, ids: [note.id] }),
+        )
+        .then((result) => {
+          const current = result.annotations[0];
+          const line = current?.currentRanges?.[0]?.line || note.source?.line;
+          if (note.source && line) {
+            setOpen(false);
+            onSource(note.source.file, line);
           }
-          beginDraft({
-            kind: "text",
-            file: selection.path,
-            base,
-            ranges: selection.ranges.map((r) => ({
-              start: r.startOffset,
-              end: r.endOffset,
-              text: r.text,
-            })),
-            pdf: "",
-            marks: [],
-            fingerprint: "",
-            quote: selection.ranges.map((r) => r.text).join("\n…\n"),
-            style,
-            comment: "",
-          });
-        },
-        focusAnnotation: (id) => {
-          setSelectedId(id);
-          setExpanded(new Set([id]));
-          setOpen(true);
-        },
-        saveDraft,
-        update,
-        submit,
-        conversations,
-        selectedId,
-        navigation,
-        expanded,
-        setExpanded,
-        showPdf,
-        showSource: (note) => {
-          if (!note.source || !project) return;
-          void manager
-            .synchronize(project, [note.source.file])
-            .then(() =>
-              invoke<{
-                annotations: Array<{
-                  source?: { file: string; line: number };
-                  currentRanges?: Array<{ line: number }>;
-                }>;
-              }>("writer_annotation_locations", { project, ids: [note.id] }),
-            )
-            .then((result) => {
-              const current = result.annotations[0];
-              const line = current?.currentRanges?.[0]?.line || note.source?.line;
-              if (note.source && line) {
-                setOpen(false);
-                onSource(note.source.file, line);
-              }
-            })
-            .catch((cause) => setError(String(cause)));
-        },
-        reload,
-      }}
-    >
-      {children}
+        })
+        .catch((cause) => setError(String(cause)));
+    },
+    reload,
+  };
+  return (
+    <AnnotationContext.Provider value={value}>
+      {/* The shared PDF preview reads comments through its own, narrower context. */}
+      <PdfAnnotationContext.Provider value={value}>{children}</PdfAnnotationContext.Provider>
     </AnnotationContext.Provider>
   );
 }

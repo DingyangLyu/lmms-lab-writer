@@ -28,6 +28,7 @@ lmms-lab-writer/
 │       └── src/              # React + CodeMirror + Yjs web client
 ├── packages/
 │   ├── shared/               # Types shared with the desktop app
+│   ├── workbench/            # UI shared by desktop and web: tabs, file tree, LaTeX editor, outline, PDF preview, theme.css
 │   ├── writing/              # Three-way merge, review hunks, bibliography
 │   └── latex-editor/         # CodeMirror LaTeX grammar and folding
 ├── docs/                     # Project documentation

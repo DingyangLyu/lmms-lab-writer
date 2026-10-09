@@ -1,0 +1,227 @@
+/**
+ * Interface text of the shared workbench. The host app passes its current language through
+ * <WorkbenchLocale>, so the workbench follows the app's language switch.
+ */
+import { format, type Locale, type Params } from "@lmms-lab/i18n";
+import { createContext, type ReactNode, useCallback, useContext } from "react";
+
+export const workbenchZh = {
+  "chat.dragToResizeTheInputArea": "拖动调整输入区高度",
+  "chat.labelUpToHalfTheScreenDoubleClickForTheD": "{label} · 最多半屏 · 双击恢复默认高度",
+  "common.cancel": "取消",
+  "common.close": "关闭",
+  "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+点击查看",
+  "editor.comments": "注释",
+  "editor.currentBlock": "当前块",
+  "editor.expand": " … 展开 ",
+  "editor.fold": "折叠",
+  "editor.foldTheSectionOrEnvironmentAtTheCursor": "折叠光标所在章节或环境（⌘⌥[）",
+  "editor.foldThisCommentSectionOrEnvironment": "折叠此注释、章节或环境",
+  "editor.latexEditor": "LaTeX 文稿编辑器",
+  "editor.multiLineAndLongSingleLineCommentsTheFil": "包括多行注释和单条长注释；不修改文件内容",
+  "editor.resolved": "已解决 · ",
+  "editor.unfold": "展开内容",
+  "editor.unfoldAll": "全部展开",
+  "editor.unfoldCurrent": "展开当前",
+  "editor.unfoldTheBlockAtTheCursor": "展开光标所在块（⌘⌥]）",
+  "msg.figure": "图",
+  "msg.lineNumber": "第 {line} 行",
+  "msg.table": "表",
+  "msg.untitledSection": "未命名章节",
+  "outline.documentOutline": "文档大纲",
+  "outline.dragToResizeTheOutline": "拖动调整大纲高度",
+  "outline.fold": "折叠",
+  "outline.foldAllSections": "折叠全部章节",
+  "outline.foldTitle": "折叠 {title}",
+  "outline.openATexDocumentToSeeItsSectionsAndFigur": "打开 TeX 文档查看章节与图表。",
+  "outline.outline": "大纲",
+  "outline.thisDocumentHasNoSectionsOrFiguresYet": "此文档还没有章节或图表。",
+  "outline.unfold": "展开",
+  "outline.unfoldAllSections": "展开全部章节",
+  "outline.unfoldTitle": "展开 {title}",
+  "pdf.adjustsToTheWindowScreenAndSidebarWidth": "随窗口、屏幕和侧栏宽度自动调整",
+  "pdf.checkingThePdfTextMapping": "正在检查 PDF 文字映射…",
+  "pdf.checkingThePdfTextMappingFailedError": "文字映射检查失败：{error}",
+  "pdf.countCommentsWereMadeOnAnEarlierBuild":
+    "{count} 条批注做在旧版 PDF 上，位置可能已变，未在页面上标出 · 点此打开批注",
+  "pdf.countCountPagePages": "{count} 页",
+  "pdf.dragOverTextToCommentManageThemUnderComm":
+    "拖选文字添加批注 · 顶部“批注”管理历史 · ⌘/Ctrl + 点击定位源码",
+  "pdf.fitWidth": "适应宽度",
+  "pdf.highlight": "高亮批注",
+  "pdf.howToCommentOnThePdf": "PDF 批注方式",
+  "pdf.loadingPdf": "正在加载 PDF…",
+  "pdf.loadingPdf2": "加载 PDF…",
+  "pdf.pdfDocumentSelectTextToComment": "PDF 文稿，可选择文字批注",
+  "pdf.pdfPagePage": "PDF 第 {page} 页",
+  "pdf.pdfPreviewFailed": "PDF 预览失败",
+  "pdf.readSelectText": "阅读／选择文字",
+  "pdf.restoredTheTextMappingOfCountCountFontFo": "已恢复 {count} 种字体的文字映射",
+  "pdf.retry": "重试",
+  "pdf.selectionTooLargeToComment":
+    "选区太大，无法存成一条批注（上限约 200 行或 20000 字节），请分段选择。",
+  "pdf.somePdfFontsLackAReliableTextMappingChec":
+    "部分 PDF 字体缺少可靠文字映射；添加批注前请核对或修正选文。",
+  "pdf.switchTo100ManualZoom": "切换为 100% 手动缩放",
+  "pdf.thePdfFailedToLoadError": "PDF 加载失败：{error}",
+  "pdf.underline": "下划线批注",
+  "pdf.zoomIn": "放大 PDF",
+  "pdf.zoomOut": "缩小 PDF",
+  "tree.aFileOrFolderNamedNameAlreadyExistsInThi":
+    "这里已经有名为“{name}”的文件或文件夹。\n要替换它吗？",
+  "tree.areYouSureYouWantToDeleteName": "确定删除“{name}”吗？",
+  "tree.cancel": "取消",
+  "tree.confirmDelete": "确认删除",
+  "tree.confirmReplace": "确认替换",
+  "tree.copyAbsolutePath": "复制绝对路径",
+  "tree.copyPath": "复制路径",
+  "tree.copyProjectPath": "复制项目路径",
+  "tree.delete": "删除",
+  "tree.duplicate": "创建副本",
+  "tree.failedToDeleteError": "删除失败：{error}",
+  "tree.failedToMoveNameError": "移动“{name}”失败：{error}",
+  "tree.fileExplorer": "文件浏览器",
+  "tree.newFile": "新建文件",
+  "tree.newFolder": "新建文件夹",
+  "tree.noFiles": "没有文件",
+  "tree.openInTerminal": "在终端中打开",
+  "tree.operationFailedError": "操作失败：{error}",
+  "tree.refresh": "刷新",
+  "tree.rename": "重命名",
+  "tree.replace": "替换",
+  "tree.revealInExplorer": "在资源管理器中显示",
+  "tree.revealInFileManager": "在文件管理器中显示",
+  "tree.revealInFinder": "在 Finder 中显示",
+  "tree.thisWillDeleteAllFilesInside": "\n里面的所有文件都会被删除。",
+  "ui.closeAll": "全部关闭",
+  "ui.closeOthers": "关闭其他",
+  "ui.closeTab": "关闭标签页",
+  "ui.closeToTheLeft": "关闭左侧",
+  "ui.closeToTheRight": "关闭右侧",
+  "ui.confirm": "确定",
+};
+export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
+  "chat.dragToResizeTheInputArea": "Drag to resize the input area",
+  "chat.labelUpToHalfTheScreenDoubleClickForTheD":
+    "{label} · up to half the screen · double-click for the default height",
+  "common.cancel": "Cancel",
+  "common.close": "Close",
+  "editor.commentCtrlClickToOpen": "{comment} · ⌘/Ctrl+click to open",
+  "editor.comments": "Comments",
+  "editor.currentBlock": "Current block",
+  "editor.expand": " … expand ",
+  "editor.fold": "Fold",
+  "editor.foldTheSectionOrEnvironmentAtTheCursor":
+    "Fold the section or environment at the cursor (⌘⌥[)",
+  "editor.foldThisCommentSectionOrEnvironment": "Fold this comment, section or environment",
+  "editor.latexEditor": "LaTeX editor",
+  "editor.multiLineAndLongSingleLineCommentsTheFil":
+    "Multi-line and long single-line comments; the file is not changed",
+  "editor.resolved": "Resolved · ",
+  "editor.unfold": "Unfold",
+  "editor.unfoldAll": "Unfold all",
+  "editor.unfoldCurrent": "Unfold current",
+  "editor.unfoldTheBlockAtTheCursor": "Unfold the block at the cursor (⌘⌥])",
+  "msg.figure": "Figure",
+  "msg.lineNumber": "Line {line}",
+  "msg.table": "Table",
+  "msg.untitledSection": "Untitled section",
+  "outline.documentOutline": "Document outline",
+  "outline.dragToResizeTheOutline": "Drag to resize the outline",
+  "outline.fold": "Fold",
+  "outline.foldAllSections": "Fold all sections",
+  "outline.foldTitle": "Fold {title}",
+  "outline.openATexDocumentToSeeItsSectionsAndFigur":
+    "Open a TeX document to see its sections and figures.",
+  "outline.outline": "Outline",
+  "outline.thisDocumentHasNoSectionsOrFiguresYet": "This document has no sections or figures yet.",
+  "outline.unfold": "Unfold",
+  "outline.unfoldAllSections": "Unfold all sections",
+  "outline.unfoldTitle": "Unfold {title}",
+  "pdf.adjustsToTheWindowScreenAndSidebarWidth": "Adjusts to the window, screen and sidebar width",
+  "pdf.checkingThePdfTextMapping": "Checking the PDF text mapping…",
+  "pdf.checkingThePdfTextMappingFailedError": "Checking the PDF text mapping failed: {error}",
+  "pdf.countCommentsWereMadeOnAnEarlierBuild":
+    "{count} {count|comment was|comments were} made on an earlier build of this PDF and may have moved, so {count|it is|they are} not drawn · open Comments",
+  "pdf.countCountPagePages": "{count} {count|page|pages}",
+  "pdf.dragOverTextToCommentManageThemUnderComm":
+    "Drag over text to comment · manage them under Comments · ⌘/Ctrl + click jumps to the source",
+  "pdf.fitWidth": "Fit width",
+  "pdf.highlight": "Highlight",
+  "pdf.howToCommentOnThePdf": "How to comment on the PDF",
+  "pdf.loadingPdf": "Loading PDF…",
+  "pdf.loadingPdf2": "Loading PDF…",
+  "pdf.pdfDocumentSelectTextToComment": "PDF document; select text to comment",
+  "pdf.pdfPagePage": "PDF page {page}",
+  "pdf.pdfPreviewFailed": "PDF preview failed",
+  "pdf.readSelectText": "Read / select text",
+  "pdf.restoredTheTextMappingOfCountCountFontFo":
+    "Restored the text mapping of {count} {count|font|fonts}",
+  "pdf.retry": "Retry",
+  "pdf.selectionTooLargeToComment":
+    "This selection is too large for one comment (about 200 lines or 20,000 bytes at most); select it in parts.",
+  "pdf.somePdfFontsLackAReliableTextMappingChec":
+    "Some PDF fonts lack a reliable text mapping; check or correct quoted text before commenting.",
+  "pdf.switchTo100ManualZoom": "Switch to 100% manual zoom",
+  "pdf.thePdfFailedToLoadError": "The PDF failed to load: {error}",
+  "pdf.underline": "Underline",
+  "pdf.zoomIn": "Zoom in",
+  "pdf.zoomOut": "Zoom out",
+  "tree.aFileOrFolderNamedNameAlreadyExistsInThi":
+    'A file or folder named "{name}" already exists in this location.\nDo you want to replace it?',
+  "tree.areYouSureYouWantToDeleteName": 'Are you sure you want to delete "{name}"?',
+  "tree.cancel": "Cancel",
+  "tree.confirmDelete": "Confirm Delete",
+  "tree.confirmReplace": "Confirm Replace",
+  "tree.copyAbsolutePath": "Copy Absolute Path",
+  "tree.copyPath": "Copy Path",
+  "tree.copyProjectPath": "Copy Project Path",
+  "tree.delete": "Delete",
+  "tree.duplicate": "Duplicate",
+  "tree.failedToDeleteError": "Failed to delete: {error}",
+  "tree.failedToMoveNameError": 'Failed to move "{name}": {error}',
+  "tree.fileExplorer": "File explorer",
+  "tree.newFile": "New File",
+  "tree.newFolder": "New Folder",
+  "tree.noFiles": "No files",
+  "tree.openInTerminal": "Open in Terminal",
+  "tree.operationFailedError": "Operation failed: {error}",
+  "tree.refresh": "Refresh",
+  "tree.rename": "Rename",
+  "tree.replace": "Replace",
+  "tree.revealInExplorer": "Reveal in Explorer",
+  "tree.revealInFileManager": "Reveal in File Manager",
+  "tree.revealInFinder": "Reveal in Finder",
+  "tree.thisWillDeleteAllFilesInside": "\nThis will delete all files inside.",
+  "ui.closeAll": "Close All",
+  "ui.closeOthers": "Close Others",
+  "ui.closeTab": "Close tab",
+  "ui.closeToTheLeft": "Close to the Left",
+  "ui.closeToTheRight": "Close to the Right",
+  "ui.confirm": "Confirm",
+};
+export type WorkbenchKey = keyof typeof workbenchZh;
+
+let current: Locale = "zh";
+const LocaleContext = createContext<Locale>("zh");
+const translate = (locale: Locale, key: WorkbenchKey, params?: Params) =>
+  format((locale === "en" ? workbenchEn : workbenchZh)[key] ?? workbenchZh[key] ?? key, params);
+
+/** The host app's interface language; every workbench component below follows it. */
+export function WorkbenchLocale({ locale, children }: { locale: Locale; children: ReactNode }) {
+  current = locale;
+  return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
+}
+export function useWorkbenchI18n() {
+  const locale = useContext(LocaleContext);
+  const t = useCallback(
+    (key: WorkbenchKey, params?: Params) => translate(locale, key, params),
+    [locale],
+  );
+  return { locale, t };
+}
+/** For code outside components, such as CodeMirror extensions built once per editor. */
+export const workbenchI18n = {
+  t: (key: WorkbenchKey, params?: Params) => translate(current, key, params),
+  getLocale: () => current,
+};

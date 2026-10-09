@@ -353,8 +353,6 @@ export const agentsZh = {
   "chat.removeAttachment": "移除附件",
   "chat.viewImage": "查看图片",
   "chat.tableInTheAnswerScrollSideways": "回答表格，可横向滚动",
-  "chat.labelUpToHalfTheScreenDoubleClickForTheD": "{label} · 最多半屏 · 双击恢复默认高度",
-  "chat.dragToResizeTheInputArea": "拖动调整输入区高度",
   "chat.theNameConversationCouldNotBeShownOtherC": "{name} 对话显示失败，其他对话仍可使用。",
   "chat.reloadThisConversation": "重新加载此对话",
   "chat.imagePathUnavailableName": "图片路径不可用：{name}",
@@ -745,9 +743,6 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "chat.removeAttachment": "Remove attachment",
   "chat.viewImage": "View image",
   "chat.tableInTheAnswerScrollSideways": "Table in the answer; scroll sideways",
-  "chat.labelUpToHalfTheScreenDoubleClickForTheD":
-    "{label} · up to half the screen · double-click for the default height",
-  "chat.dragToResizeTheInputArea": "Drag to resize the input area",
   "chat.theNameConversationCouldNotBeShownOtherC":
     "The {name} conversation could not be shown; other conversations still work.",
   "chat.reloadThisConversation": "Reload this conversation",

@@ -1,22 +1,10 @@
 "use client";
+import type { AnnotationRange, SourceMark } from "@lmms-lab/workbench";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { useAnnotations } from "@/lib/pdf/annotation-context";
-export type AnnotationRange = {
-  start: number;
-  end: number;
-  text: string;
-  state: string;
-  line: number;
-  endLine: number;
-};
-export type SourceMark = {
-  id: string;
-  comment: string;
-  style: "highlight" | "underline";
-  resolved: boolean;
-  ranges: AnnotationRange[];
-};
+
+export type { AnnotationRange, SourceMark };
 export function useSourceAnnotations(project?: string, path?: string, content = "") {
   const notes = useAnnotations();
   const [marked, setMarked] = useState<{ marks: SourceMark[]; content: string; key: string }>({

@@ -1,0 +1,343 @@
+/*
+ * Y-Writer workbench theme: the desktop's monochrome tokens (light and .dark), the button
+ * classes and the styles of shared components. Import after Tailwind in each app.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-border-dark: var(--border-dark);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-dark: var(--accent-dark);
+  --color-surface: var(--surface);
+  --color-surface-text: var(--surface-text);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-shadow: var(--shadow);
+
+  --font-family-sans:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    "Google Sans Text",
+    "Google Sans",
+    var(--font-geist-sans, system-ui),
+    Roboto,
+    system-ui,
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif;
+  --font-family-mono:
+    "SF Mono",
+    SFMono-Regular,
+    "SF Pro Mono",
+    "Google Sans Code",
+    "Roboto Mono",
+    var(--font-geist-mono, ui-monospace),
+    ui-monospace,
+    Menlo,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    "Maple Mono NF CN",
+    "Maple Mono SC NF",
+    "Sarasa Mono SC",
+    "LXGW WenKai Mono",
+    "Noto Sans Mono CJK SC",
+    "Source Han Mono SC",
+    "WenQuanYi Zen Hei Mono",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    monospace;
+}
+
+:root {
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --border: #e5e5e5;
+  --border-dark: #404040;
+  --muted: #737373;
+  --muted-foreground: #a3a3a3;
+  --accent: #0a0a0a;
+  --accent-hover: #f5f5f5;
+  --accent-muted: #404040;
+  --accent-dark: #000000;
+  --surface: #171717;
+  --surface-text: #fafafa;
+  --surface-secondary: #f5f5f5;
+  --surface-tertiary: #e5e5e5;
+  --foreground-secondary: #404040;
+  --success: #000000;
+  --error: #000000;
+  --shadow: #000000;
+}
+
+.dark {
+  --background: #2c323a;
+  --foreground: #b0b8c4;
+  --border: #3b4048;
+  --border-dark: #4e5662;
+  --muted: #8b949e;
+  --muted-foreground: #636e7b;
+  --accent: #b0b8c4;
+  --accent-hover: #2b3137;
+  --accent-muted: #4e5662;
+  --accent-dark: #f0883e;
+  --surface: #20252c;
+  --surface-text: #aab3be;
+  --surface-secondary: #2b3137;
+  --surface-tertiary: #3b4048;
+  --foreground-secondary: #9da7b3;
+  --success: #56d364;
+  --error: #f85149;
+  --shadow: #010409;
+}
+
+/* The workbench root: the desktop's colours and monospace interface type. */
+.wb {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-family-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn {
+  @apply px-6 py-3 font-mono text-sm uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-2;
+  @apply border border-foreground rounded-none;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 3px 3px 0 0 var(--foreground);
+}
+
+.btn:hover {
+  box-shadow: 2px 2px 0 0 var(--foreground);
+  transform: translate(1px, 1px);
+}
+
+.btn:active {
+  box-shadow: 0 0 0 0 var(--foreground);
+  transform: translate(3px, 3px);
+}
+
+.btn:disabled {
+  @apply opacity-50 cursor-not-allowed;
+  box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+
+.btn-primary {
+  @apply bg-background text-foreground;
+}
+
+.btn-primary:hover {
+  @apply bg-surface-secondary;
+}
+
+.btn-secondary {
+  @apply bg-background text-foreground;
+}
+
+.btn-secondary:hover {
+  @apply bg-surface-secondary;
+}
+
+/* Small button variant */
+.btn-sm {
+  @apply px-3 py-1.5 text-xs;
+  box-shadow: 2px 2px 0 0 var(--foreground);
+}
+
+.btn-sm:hover {
+  box-shadow: 1px 1px 0 0 var(--foreground);
+  transform: translate(1px, 1px);
+}
+
+.btn-sm:active {
+  box-shadow: 0 0 0 0 var(--foreground);
+  transform: translate(2px, 2px);
+}
+
+/* Icon-only button */
+.btn-icon {
+  @apply p-2;
+  box-shadow: 2px 2px 0 0 var(--foreground);
+}
+
+.btn-icon:hover {
+  box-shadow: 1px 1px 0 0 var(--foreground);
+  transform: translate(1px, 1px);
+}
+
+.btn-icon:active {
+  box-shadow: 0 0 0 0 var(--foreground);
+  transform: translate(2px, 2px);
+}
+
+/* Outline/ghost variant - no shadow, just border */
+.btn-outline {
+  @apply bg-transparent text-foreground border border-foreground;
+  box-shadow: none;
+}
+
+.btn-outline:hover {
+  @apply bg-surface-secondary;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-outline:active {
+  @apply bg-surface-tertiary;
+  box-shadow: none;
+  transform: none;
+}
+
+@keyframes modal-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-overlay {
+  animation: modal-overlay-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.modal-content {
+  animation: modal-content-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+/* File tree drag and drop styles */
+[data-react-arborist-dragging="true"] {
+  opacity: 0.5;
+}
+
+[data-react-arborist-drop-target="true"] {
+  background-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--foreground) 30%, transparent);
+  outline-offset: -2px;
+}
+
+[data-react-arborist-drop-target="true"][data-react-arborist-drop-position="inside"] {
+  background-color: color-mix(in srgb, var(--foreground) 12%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+/* Drop indicator line for reordering */
+[data-react-arborist-drop-target="true"][data-react-arborist-drop-position="before"]::before,
+[data-react-arborist-drop-target="true"][data-react-arborist-drop-position="after"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--foreground);
+  pointer-events: none;
+}
+
+[data-react-arborist-drop-target="true"][data-react-arborist-drop-position="before"]::before {
+  top: 0;
+}
+
+[data-react-arborist-drop-target="true"][data-react-arborist-drop-position="after"]::after {
+  bottom: 0;
+}
+
+/* File tree items - cursor managed by JS during drag */
+[role="treeitem"] {
+  cursor: default;
+}
+
+/* File tree highlight animation */
+@keyframes file-highlight {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  25%,
+  75% {
+    background-color: color-mix(in srgb, var(--foreground) 15%, transparent);
+  }
+}
+
+.animate-highlight {
+  animation: file-highlight 1.5s ease-in-out;
+}
+
+.synctex-line-highlight {
+  background-color: rgba(255, 200, 0, 0.3);
+  transition: background-color 0.3s ease;
+}
+
+.writer-height-handle {
+  flex-shrink: 0;
+  height: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.writer-height-handle > span {
+  width: 32px;
+  height: 3px;
+  background: var(--border);
+}
+.writer-height-handle:hover > span,
+.writer-height-handle:focus-visible > span {
+  background: var(--accent);
+}
+.writer-note-highlight {
+  background-color: rgba(255, 190, 35, 0.24);
+  box-shadow: inset 0 -1px rgba(210, 125, 20, 0.55);
+}
+.writer-note-underline {
+  text-decoration: underline;
+  text-decoration-color: #df8d27;
+  text-underline-offset: 3px;
+}
+.writer-note-highlight.writer-note-resolved {
+  background-color: rgba(28, 156, 99, 0.12);
+  box-shadow: inset 0 -1px rgba(28, 156, 99, 0.45);
+}
+.writer-note-underline.writer-note-resolved {
+  text-decoration-color: #27986a;
+}

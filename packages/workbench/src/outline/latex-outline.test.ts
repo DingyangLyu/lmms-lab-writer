@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { latexOutline } from "./outline";
+import { latexOutline } from "./latex-outline";
 
 it("keeps nested headings, multilingual titles and figure/table locations", () => {
   const source = String.raw`\section[Short]{中文 \textbf{引言}}

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import { ExternalLinkHandler } from "@/components/external-link-handler";
 import { ToastProvider } from "@/components/ui/toast";
+import { WorkbenchLocaleBridge } from "@/components/workbench-locale";
 import "./globals.css";
 
 // Bundled (SIL OFL 1.1, see ./fonts) so builds never fetch from Google Fonts.
@@ -30,10 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${modernSans.variable} ${modernMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
-          <ToastProvider>
-            <ExternalLinkHandler />
-            {children}
-          </ToastProvider>
+          <WorkbenchLocaleBridge>
+            <ToastProvider>
+              <ExternalLinkHandler />
+              {children}
+            </ToastProvider>
+          </WorkbenchLocaleBridge>
         </ThemeProvider>
       </body>
     </html>

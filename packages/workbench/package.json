@@ -1,0 +1,56 @@
+{
+  "name": "@lmms-lab/workbench",
+  "version": "0.1.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pdf-viewer": "./src/pdf/pdf-viewer.tsx",
+    "./theme.css": "./src/theme.css",
+    "./scoped-preflight.css": "./src/scoped-preflight.css"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lmms-lab/i18n": "workspace:*",
+    "@lmms-lab/latex-editor": "workspace:*",
+    "@lmms-lab/writing": "workspace:*"
+  },
+  "peerDependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/search": "^6.7.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@lmms-lab/writer-shared": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "framer-motion": "^12.40.0",
+    "react": "^19.2.6",
+    "react-arborist": "^3.8.0",
+    "react-dom": "^19.2.6",
+    "react-pdf": "^10.4.1"
+  },
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.2",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/search": "^6.7.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@lezer/highlight": "^1.2.3",
+    "@lmms-lab/writer-shared": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "framer-motion": "^12.40.0",
+    "react": "^19.2.6",
+    "react-arborist": "^3.8.0",
+    "react-dom": "^19.2.6",
+    "react-pdf": "^10.4.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}
