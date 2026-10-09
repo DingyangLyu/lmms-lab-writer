@@ -1,4 +1,5 @@
-import { readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as encoding from "lib0/encoding";
 import { describe, expect, it } from "vitest";
@@ -585,6 +586,26 @@ describe("real collaboration service", () => {
     ).toBe(200);
     expect((await f.call(`/projects/${f.project}`, undefined, f.owner)).status).toBe(403);
     expect((await f.call("/projects", undefined, f.owner)).data).toEqual([]);
+  });
+  it("serves the web entry point and keeps encoded traversal outside the static directory", async () => {
+    const base = await mkdtemp(join(tmpdir(), "writer-static-"));
+    await mkdir(join(base, "dist"));
+    await mkdir(join(base, "dist-other"));
+    await writeFile(join(base, "dist/index.html"), '<div id="root"></div>');
+    await writeFile(join(base, "dist-other/secret.json"), "{}");
+    await writeFile(join(base, "package.json"), "{}");
+    try {
+      const f = await fixture({ staticDirectory: join(base, "dist") });
+      const homepage = await fetch(`${f.app.origin}/`);
+      expect(homepage.status).toBe(200);
+      expect(homepage.headers.get("content-type")).toContain("text/html");
+      expect(await homepage.text()).toContain('<div id="root">');
+      expect((await fetch(`${f.app.origin}/..%2fpackage.json`)).status).toBe(403);
+      // A sibling whose name starts with the static directory's is still outside it.
+      expect((await fetch(`${f.app.origin}/..%2fdist-other%2fsecret.json`)).status).toBe(403);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
   });
   it("serves built module scripts as JavaScript so the pdf.js worker can load", async () => {
     const assets = await readdir(join(import.meta.dirname, "../dist/assets")).catch(() => []);

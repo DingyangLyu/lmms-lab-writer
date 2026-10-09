@@ -95,11 +95,12 @@ export async function executeJob(job: Job, work: string, heartbeat: () => Promis
     input = `You are editing a disposable snapshot for Writer collaboration. Follow this user task: ${job.prompt}\nEdit project text files only. Do not read credentials or unrelated directories. Your changes will be returned as proposals; reviewers choose whether to apply them. Do not publish or push anything.\n`;
     if (kind === "codex") {
       command = process.env.WRITER_CODEX_BIN || "codex";
+      // danger-full-access where Codex's own sandbox cannot run (e.g. a Windows service account).
       args = [
         "exec",
         "--skip-git-repo-check",
         "--sandbox",
-        "workspace-write",
+        process.env.WRITER_CODEX_SANDBOX || "workspace-write",
         "-c",
         'approval_policy="never"',
         "-",
