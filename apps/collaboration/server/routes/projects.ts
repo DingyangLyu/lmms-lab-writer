@@ -113,8 +113,8 @@ export const projectRoutes = [
     if (invited === "owner") fail(400, "邀请不能授予所有者角色");
     const token = randomBytes(32).toString("hex");
     await ctx.store.db.run(
-      sql`INSERT INTO invites(token, project, role, expires)
-          VALUES(${digest(token)}, ${ctx.project}, ${invited}, ${Date.now() + 7 * 86400000})`,
+      sql`INSERT INTO invites(token, project, role, expires, created_by)
+          VALUES(${digest(token)}, ${ctx.project}, ${invited}, ${Date.now() + 7 * 86400000}, ${ctx.user.id})`,
     );
     return { token, url: `${ctx.origin()}/?invite=${token}`, expiresInDays: 7 };
   }),

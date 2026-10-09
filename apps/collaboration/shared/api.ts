@@ -6,15 +6,35 @@ import type { ReviewHunk } from "@lmms-lab/writing";
 
 export type Role = "owner" | "editor" | "commenter" | "viewer";
 export type PublicUser = { id: string; name: string; admin: boolean; mustChange: boolean };
+/** Registration or invitation outcome: signed in, or waiting for an administrator. */
+export type Registered = { pending: true } | { pending: false; user: PublicUser };
+export type RegistrationMode = "approval" | "open" | "closed";
+export type RegistrationInfo = { mode: RegistrationMode; invite: boolean };
 export type Account = {
   id: string;
   username: string;
   admin: boolean;
   disabled: boolean;
   mustChange: boolean;
+  /** Registered and waiting for an administrator's approval. */
+  pending: boolean;
+  /** What the person wrote when registering. */
+  note: string;
   created: number;
   projects: number;
+  /** Projects this account owns alone; deleting it hands them to the deleting administrator. */
+  soleOwned: number;
 };
+export type SignupInvite = {
+  id: string;
+  note: string;
+  created: number;
+  expires: number;
+  uses: number;
+  used: number;
+  createdBy: string | null;
+};
+export type IssuedSignupInvite = SignupInvite & { token: string; url: string };
 export type IssuedPassword = { username?: string; password: string };
 /** Returned once when a desktop app signs in; sent as `Authorization: Bearer <token>`. */
 export type IssuedToken = { token: string; user: PublicUser };

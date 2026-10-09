@@ -245,6 +245,23 @@ export const migrations: string[] = [
   `ALTER TABLE sessions ADD COLUMN name TEXT;
    ALTER TABLE sessions ADD COLUMN created BIGINT;
    ALTER TABLE sessions ADD COLUMN used BIGINT;`,
+  // 5: self-registration awaiting approval, deleted accounts, site invitations and settings.
+  `ALTER TABLE users ADD COLUMN pending BOOLEAN NOT NULL DEFAULT false;
+   ALTER TABLE users ADD COLUMN note TEXT NOT NULL DEFAULT '';
+   ALTER TABLE users ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT false;
+   ALTER TABLE invites ADD COLUMN created_by TEXT;
+   CREATE TABLE signup_invites(
+     id TEXT PRIMARY KEY,
+     token TEXT NOT NULL UNIQUE,
+     note TEXT NOT NULL DEFAULT '',
+     created_by TEXT NOT NULL,
+     created BIGINT NOT NULL,
+     expires BIGINT NOT NULL,
+     uses INTEGER NOT NULL,
+     used INTEGER NOT NULL DEFAULT 0,
+     revoked BOOLEAN NOT NULL DEFAULT false
+   );
+   CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

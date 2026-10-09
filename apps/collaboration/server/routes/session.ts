@@ -1,9 +1,10 @@
 /** Sign-in, invitations and the current session. */
 import { randomBytes } from "node:crypto";
-import type { Device, IssuedToken, PublicUser } from "../../shared/api";
+import type { Device, IssuedToken, PublicUser, Registered } from "../../shared/api";
 import { bearer, cookie, deviceToken, passwordHash, session, verifyPassword } from "../auth";
 import { sql, uniqueViolation } from "../db";
 import { type Authed, type Context, route, str } from "../http";
+import { registrationMode, usableInvite } from "../registration";
 import { type User, userColumns } from "../store";
 import { digest, fail, type Role, uid } from "../util";
 import { validUsername } from "./accounts";
@@ -29,8 +30,8 @@ export async function sessionRoutes() {
       for (const [key, a] of attempts) if (Date.now() - a.at > 60000) attempts.delete(key);
   };
   const byName = (ctx: Context, username: string) =>
-    ctx.store.db.row<User & { disabled: boolean }>({
-      text: `SELECT ${userColumns}, disabled FROM users WHERE username=$1`,
+    ctx.store.db.row<User & { disabled: boolean; pending: boolean }>({
+      text: `SELECT ${userColumns}, disabled, pending FROM users WHERE username=$1 AND NOT deleted`,
       values: [username],
     });
   const signIn = async (ctx: Context) => {
@@ -42,6 +43,7 @@ export async function sessionRoutes() {
     const valid = await verifyPassword(password, user?.password ?? decoy);
     if (!user || !valid) fail(401, "用户名或密码错误");
     if (user.disabled) fail(403, "账号已停用，请联系管理员");
+    if (user.pending) fail(403, "账号正在等待管理员审核");
     return user;
   };
   return {
@@ -58,7 +60,53 @@ export async function sessionRoutes() {
         const name = str(await ctx.body(), "name", 80).trim() || "Writer Desktop";
         return { token: await deviceToken(ctx.store, user, name), user: publicUser(user) };
       }),
-      route<Context>("POST", /^\/api\/join$/, async (ctx) => {
+      /** What the sign-in page offers; `?invite=` checks a site invitation. */
+      route<Context>("GET", /^\/api\/registration$/, async (ctx) => {
+        const invite = ctx.url.searchParams.get("invite");
+        return {
+          mode: await registrationMode(ctx.store.db),
+          invite: invite ? !!(await ctx.store.db.row(usableInvite(digest(invite)))) : false,
+        };
+      }),
+      /** Self-registration: active at once with a site invitation or in open mode, else pending. */
+      route<Context>("POST", /^\/api\/register$/, async (ctx): Promise<Registered> => {
+        limit(ctx);
+        const body = await ctx.body(),
+          username = str(body, "username", 80).trim(),
+          password = str(body, "password", 200),
+          note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "",
+          invite = typeof body.invite === "string" ? body.invite : "";
+        if (!validUsername(username))
+          fail(400, "用户名需 2–80 个字符，只能含文字、数字、空格和 _ . -");
+        const mode = await registrationMode(ctx.store.db),
+          hash = await passwordHash(password),
+          id = uid();
+        let active = mode === "open";
+        try {
+          await ctx.store.db.transaction(async (tx) => {
+            if (invite) {
+              const claimed = await tx.run(
+                sql`UPDATE signup_invites SET used=used+1
+                    WHERE token=${digest(invite)} AND NOT revoked AND used<uses AND expires>${Date.now()}`,
+              );
+              if (!claimed) fail(410, "邀请已失效");
+              active = true;
+            } else if (mode === "closed") fail(403, "暂不开放注册，请联系管理员获取邀请");
+            await tx.run(
+              sql`INSERT INTO users(id, username, password, admin, created, pending, note)
+                  VALUES(${id}, ${username}, ${hash}, false, ${Date.now()}, ${!active}, ${note})`,
+            );
+          });
+        } catch (error) {
+          if (uniqueViolation(error)) fail(409, "用户名已存在");
+          throw error;
+        }
+        if (!active) return { pending: true };
+        const user: User = { id, username, password: hash, admin: false, mustChange: false };
+        await session(ctx.store, user, ctx.res, ctx.secure);
+        return { pending: false, user: publicUser(user) };
+      }),
+      route<Context>("POST", /^\/api\/join$/, async (ctx): Promise<Registered> => {
         limit(ctx);
         const { store } = ctx,
           db = store.db;
@@ -72,13 +120,24 @@ export async function sessionRoutes() {
           role: Role;
           expires: number;
           used: boolean;
-        }>(sql`SELECT project, role, expires, used FROM invites WHERE token=${digest(token)}`);
+          createdBy: string | null;
+        }>(
+          sql`SELECT project, role, expires, used, created_by AS "createdBy" FROM invites WHERE token=${digest(token)}`,
+        );
         if (!invitation || invitation.used || invitation.expires < Date.now())
           fail(410, "邀请已失效");
         const existing = await byName(ctx, username);
         if (existing && !(await verifyPassword(password, existing.password)))
           fail(401, "该用户名已存在，请使用原密码");
         if (existing?.disabled) fail(403, "账号已停用，请联系管理员");
+        if (existing?.pending) fail(403, "账号正在等待管理员审核");
+        // A new account from a project owner's invitation still needs an administrator's approval.
+        const fromAdmin =
+          !!invitation.createdBy &&
+          !!(await db.row(
+            sql`SELECT 1 FROM users WHERE id=${invitation.createdBy} AND admin AND NOT disabled`,
+          ));
+        const pending = !existing && !fromAdmin;
         const user: User = existing ?? {
           id: uid(),
           username,
@@ -94,8 +153,8 @@ export async function sessionRoutes() {
             if (!claimed) fail(410, "邀请已使用");
             if (!existing)
               await tx.run(
-                sql`INSERT INTO users(id, username, password, admin, created)
-                    VALUES(${user.id}, ${username}, ${user.password}, false, ${Date.now()})`,
+                sql`INSERT INTO users(id, username, password, admin, created, pending)
+                    VALUES(${user.id}, ${username}, ${user.password}, false, ${Date.now()}, ${pending})`,
               );
             await tx.run(
               sql`INSERT INTO members(project, user_id, role) VALUES(${invitation.project}, ${user.id}, ${invitation.role})
@@ -107,8 +166,9 @@ export async function sessionRoutes() {
           if (uniqueViolation(error)) fail(409, "该用户名刚被注册，请换一个");
           throw error;
         }
+        if (pending) return { pending: true };
         await session(store, user, ctx.res, ctx.secure);
-        return publicUser(user);
+        return { pending: false, user: publicUser(user) };
       }),
     ],
     /** Allowed even while the account must still replace a temporary password. */

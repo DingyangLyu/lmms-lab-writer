@@ -1,82 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary, PublicUser } from "../shared/api";
-import { AdminPanel, ChangePassword } from "./account";
+import { ChangePassword } from "./account";
+import { AdminConsole } from "./admin";
 import { api, errorText } from "./api";
+import { AuthPage } from "./auth";
 import { useI18n } from "./i18n";
 import { roleKey } from "./labels";
 import { LanguageSwitch } from "./language-switch";
 import { useAction } from "./use-action";
 import { Workspace } from "./workspace/workspace";
-
-function SignIn({
-  invite,
-  onSignedIn,
-}: {
-  invite: string | null;
-  onSignedIn: (user: PublicUser) => void;
-}) {
-  const { t } = useI18n();
-  const [username, setUsername] = useState(""),
-    [password, setPassword] = useState("");
-  const { busy, error, run } = useAction();
-  return (
-    <div className="auth">
-      <div className="row spread">
-        <span className="eyebrow">WRITER / COLLABORATION</span>
-        <LanguageSwitch />
-      </div>
-      <h1>{invite ? t("signIn.titleJoin") : t("signIn.title")}</h1>
-      <p>{t("signIn.lead")}</p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(async () => {
-            const me = await api<PublicUser>(invite ? "/join" : "/login", {
-              username,
-              password,
-              ...(invite ? { token: invite } : {}),
-            });
-            setPassword("");
-            if (invite) {
-              history.replaceState(null, "", "/");
-              location.reload();
-            } else onSignedIn(me);
-          });
-        }}
-      >
-        <label>
-          {t("signIn.username")}
-          <input
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          {t("signIn.password")}
-          <input
-            type="password"
-            autoComplete={invite ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={12}
-            required
-          />
-        </label>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <button className="primary" type="submit" disabled={busy}>
-          {busy ? t("common.working") : invite ? t("signIn.join") : t("signIn.submit")}
-        </button>
-      </form>
-      <p className="muted">{t("signIn.storage")}</p>
-    </div>
-  );
-}
 
 function Projects({
   user,
@@ -91,13 +23,20 @@ function Projects({
 }) {
   const { t } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[]>([]),
-    [name, setName] = useState("");
+    [name, setName] = useState(""),
+    [pending, setPending] = useState(0);
   const { busy, error, setError, run } = useAction();
   useEffect(() => {
     void api<ProjectSummary[]>("/projects")
       .then(setProjects)
       .catch((e) => setError(errorText(e)));
   }, [setError]);
+  useEffect(() => {
+    if (!user.admin) return;
+    void api<{ pending: number }>("/admin/summary")
+      .then((s) => setPending(s.pending))
+      .catch(() => {});
+  }, [user.admin]);
   return (
     <main className="dashboard">
       <header>
@@ -110,7 +49,8 @@ function Projects({
           <span>{user.name}</span>
           {user.admin && (
             <button type="button" onClick={() => onView("admin")}>
-              {t("projects.admin")}
+              {t("console.open")}
+              {pending > 0 && <span className="count">{pending}</span>}
             </button>
           )}
           <button type="button" onClick={() => onView("password")}>
@@ -175,7 +115,11 @@ export function App() {
     [ready, setReady] = useState(false),
     [project, setProject] = useState<ProjectSummary | null>(null),
     [view, setView] = useState<"projects" | "admin" | "password">("projects");
-  const [invite] = useState(() => new URL(location.href).searchParams.get("invite"));
+  // Invitation links show the sign-in page even when signed in, to join with any account.
+  const [link, setLink] = useState(() => {
+    const params = new URL(location.href).searchParams;
+    return params.has("invite") || params.has("signup");
+  });
   // `/?project=<id>` opens a project directly, e.g. from the desktop app.
   const [wanted] = useState(() => new URL(location.href).searchParams.get("project"));
   useEffect(() => {
@@ -205,14 +149,22 @@ export function App() {
         <p>{t("common.loading")}</p>
       </div>
     );
-  if (!user || invite) return <SignIn invite={invite} onSignedIn={setUser} />;
+  if (!user || link)
+    return (
+      <AuthPage
+        onSignedIn={(next) => {
+          setUser(next);
+          setLink(false);
+        }}
+      />
+    );
   if (user.mustChange)
     return (
       <div className="auth">
         <ChangePassword forced onDone={() => setUser({ ...user, mustChange: false })} />
       </div>
     );
-  if (view === "admin" && user.admin) return <AdminPanel me={user.id} onBack={back} />;
+  if (view === "admin" && user.admin) return <AdminConsole me={user.id} onBack={back} />;
   if (view === "password")
     return (
       <div className="auth">

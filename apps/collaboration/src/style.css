@@ -728,3 +728,130 @@ button.danger:hover:not(:disabled) {
   padding: 4px 6px;
   font-size: 12px;
 }
+/* Sign-in / registration and the administration console */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 20px 0 4px;
+  border-bottom: 1px solid #dce3e8;
+  overflow-x: auto;
+}
+.auth-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+.auth-tabs button.selected {
+  color: #22556e;
+  border-bottom-color: #2c7698;
+  font-weight: 600;
+}
+.console-tabs {
+  margin: 4px 0 16px;
+}
+.auth textarea {
+  min-height: 0;
+}
+.notice {
+  margin-top: 20px;
+  padding: 16px;
+  background: #ecf7ef;
+  border-left: 3px solid #87b995;
+}
+.notice h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+.count {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #b83b3b;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.pending-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #dee6eb;
+}
+.pending-card > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pending-card p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.small {
+  font-size: 12px;
+}
+input.narrow {
+  width: 72px;
+}
+.settings-form {
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dee6eb;
+  cursor: pointer;
+}
+.choice span {
+  display: grid;
+  gap: 4px;
+}
+.dashboard .banner {
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 14px;
+}
+.choice {
+  margin: 0;
+}
+.banner code {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .admin-users {
+    display: block;
+    overflow-x: auto;
+  }
+}
+label input[type="checkbox"],
+label input[type="radio"] {
+  display: inline-block;
+  width: auto;
+  margin: 2px 0 0;
+}
+.new-project label.row {
+  margin: 0;
+  white-space: nowrap;
+}
+.new-project label.row select,
+.new-project label.row input.narrow {
+  margin-top: 0;
+}

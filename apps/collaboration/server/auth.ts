@@ -60,7 +60,8 @@ export async function userFor(store: Store, req: IncomingMessage): Promise<User>
       sql`SELECT u.id, u.username, u.password, u.admin, u.must_change AS "mustChange",
                  s.name IS NOT NULL AS device, s.used
           FROM users u JOIN sessions s ON s.user_id=u.id
-          WHERE s.token=${digest(token)} AND s.expires>${now} AND NOT u.disabled`,
+          WHERE s.token=${digest(token)} AND s.expires>${now}
+            AND NOT u.disabled AND NOT u.pending AND NOT u.deleted`,
     )) ?? fail(401, "登录已过期");
   if (row.device && now - (row.used ?? 0) > 3600000)
     await store.db.run(

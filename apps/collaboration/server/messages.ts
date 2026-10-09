@@ -11,6 +11,18 @@ export const englishMessages: Record<string, string> = {
   "资源不存在，请先运行 pnpm build": "Not found; run pnpm build first",
   请求来源不匹配: "Request origin does not match",
   请先修改管理员给你的临时密码: "Change the temporary password from your administrator first",
+  // registration and account administration
+  该用户不在待审核状态: "This account is not waiting for approval",
+  不能注销自己的账号: "You cannot delete your own account",
+  "该用户是 {count} 个项目的唯一所有者，确认后这些项目会转给你":
+    "This account is the only owner of {count} {count|project|projects}; once you confirm, they pass to you",
+  "有效期需为 1–90 天": "Validity must be 1\u201390 days",
+  "可用次数需为 1–100 次": "Uses must be 1\u2013100",
+  无效的注册方式: "Invalid registration setting",
+  账号已注销: "The account has been deleted",
+  账号正在等待管理员审核: "The account is waiting for an administrator's approval",
+  "暂不开放注册，请联系管理员获取邀请":
+    "Registration is closed; ask an administrator for an invitation",
   接口不存在: "No such endpoint",
   "密码需要 12–200 个字符": "Passwords need 12–200 characters",
   请登录: "Please sign in",
