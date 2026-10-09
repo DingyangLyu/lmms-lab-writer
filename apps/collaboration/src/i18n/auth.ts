@@ -7,7 +7,7 @@ export const authZh = {
   "auth.brandLead":
     "实验室自己的 LaTeX 协作平台：网页和桌面端都能写，AI 帮忙改稿，每一处修改都由你决定。",
   "auth.feature.realtime": "多人实时编辑、批注与讨论",
-  "auth.feature.review": "AI 修改先审阅，再决定是否合并",
+  "auth.feature.review": "AI 对话直接修改正文，每轮前自动保存版本",
   "auth.feature.build": "服务器编译 PDF，源码与 PDF 互相跳转",
   "auth.feature.desktop": "桌面端与服务器双向同步",
   "auth.tab.login": "登录",
@@ -80,7 +80,7 @@ export const authEn: Record<keyof typeof authZh, string> = {
   "auth.brandLead":
     "Your lab's own LaTeX workspace: write in the browser or the desktop app, let AI help revise, and decide on every change yourself.",
   "auth.feature.realtime": "Edit, comment and discuss in real time",
-  "auth.feature.review": "Review AI edits before they are merged",
+  "auth.feature.review": "AI conversations edit the text, with a version saved before each turn",
   "auth.feature.build": "PDF builds on the server, with source ↔ PDF sync",
   "auth.feature.desktop": "Two-way sync with the desktop app",
   "auth.tab.login": "Sign in",

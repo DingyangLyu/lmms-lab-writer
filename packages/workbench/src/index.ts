@@ -20,6 +20,7 @@ export * from "./pdf/annotation-bridge";
 export * from "./pdf/annotations";
 export * from "./pdf/text-selection";
 export * from "./pdf/viewport";
+export * from "./random-id";
 export * from "./sidebar-file-panel";
 export * from "./ui/confirm-dialog";
 export * from "./ui/context-menu";

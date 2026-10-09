@@ -1,4 +1,5 @@
 import { workbenchI18n as i18n } from "../../i18n";
+import { randomId } from "../../random-id";
 import type { EditorSelectionContext } from "../selection-context";
 import type { ChatImageFile } from "./images";
 export type ChatDraft = {
@@ -111,7 +112,7 @@ export class ChatOutbox {
     if (!this.state.loaded) throw new Error(i18n.t("msg.theQueueIsNotReadyYetYourInputWasKept"));
     const message: QueuedMessage = {
       ...structuredClone(draft),
-      id: crypto.randomUUID(),
+      id: randomId(),
       createdAt: Date.now(),
       state: "queued",
     };

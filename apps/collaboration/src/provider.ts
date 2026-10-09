@@ -1,3 +1,4 @@
+import { randomId } from "@lmms-lab/workbench";
 import { IndexeddbPersistence } from "y-indexeddb";
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
 import * as Y from "yjs";
@@ -84,7 +85,7 @@ export class WriterProvider {
   }
   sendUpdate(update: Uint8Array) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const id = crypto.randomUUID();
+    const id = randomId();
     this.unsynced = true;
     this.pending.add(id);
     this.status("saving");

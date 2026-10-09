@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { workbenchI18n as i18n } from "../../i18n";
+import { randomId } from "../../random-id";
 import { pruneComposerDrafts } from "../chat/composer-drafts";
 import type {
   ConversationInfo,
@@ -196,10 +197,7 @@ export function useHarnessWorkspace(
       select(id);
       saveIncoming({
         ...pendingRef.current,
-        [id]: [
-          ...(pendingRef.current[id] || []),
-          { id: crypto.randomUUID(), text, state: "pending" },
-        ],
+        [id]: [...(pendingRef.current[id] || []), { id: randomId(), text, state: "pending" }],
       });
       return id;
     },
@@ -219,7 +217,7 @@ export function useHarnessWorkspace(
       saveIncoming({
         ...pendingRef.current,
         [tabId]: (pendingRef.current[tabId] || []).map((m, i) =>
-          i || m.state === "sending" ? m : { ...m, id: crypto.randomUUID(), state: "pending" },
+          i || m.state === "sending" ? m : { ...m, id: randomId(), state: "pending" },
         ),
       });
     },

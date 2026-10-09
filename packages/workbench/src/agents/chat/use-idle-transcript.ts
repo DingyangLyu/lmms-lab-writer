@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { randomId } from "../../random-id";
 import { IdleTranscript } from "./idle-transcript";
 import { transcriptCache } from "./transcript-cache";
 export const TRANSCRIPT_IDLE_MS = 60_000;
@@ -25,7 +26,7 @@ export function useIdleTranscript<T>({
   const control = useRef<IdleTranscript<T> | null>(null);
   useEffect(() => {
     const cache = new IdleTranscript<T>(
-      `${scope}:${crypto.randomUUID()}`,
+      `${scope}:${randomId()}`,
       transcriptCache,
       () => current.current,
       () => current.current.release(),

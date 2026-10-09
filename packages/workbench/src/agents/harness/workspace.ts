@@ -1,4 +1,5 @@
 import { workbenchI18n as i18n } from "../../i18n";
+import { randomId } from "../../random-id";
 import {
   type ConversationInfo,
   type ConversationTab,
@@ -21,7 +22,7 @@ export function newTab(
   title?: string,
 ): ConversationTab {
   return {
-    id: crypto.randomUUID(),
+    id: randomId(),
     backend,
     sessionId,
     title: title || i18n.t("msg.newNameConversation", { name: harnessLabel(backend) }),

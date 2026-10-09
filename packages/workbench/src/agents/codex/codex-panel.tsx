@@ -7,6 +7,7 @@ import {
   type WorkbenchKey as MessageKey,
   useWorkbenchI18n as useI18n,
 } from "../../i18n";
+import { randomId } from "../../random-id";
 import { ResizableComposer } from "../../ui/panel-height";
 import { AttachmentStrip } from "../chat/attachment-strip";
 import { useComposerDraft } from "../chat/composer-drafts";
@@ -425,7 +426,7 @@ export function CodexPanel({
         await bridge.register(id);
         const text = withEditorSelection(payload.text, draft.selection),
           images = payload.images.map((file) => file.url);
-        localId = `local-${crypto.randomUUID()}`;
+        localId = `local-${randomId()}`;
         setItems((current) => [
           ...current,
           {
