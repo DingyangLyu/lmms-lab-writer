@@ -514,7 +514,11 @@ function FileTreeInner({
   const arboristData = useMemo(() => convertToArboristData(files), [files]);
   const nodeMap = useMemo(() => buildNodeMap(files), [files]);
 
-  // Measure container for react-arborist width/height
+  // Measure container for react-arborist width/height. The container only exists once there
+  // are files, so measuring starts again when the first file appears (an empty folder or a
+  // list that loads after the tree).
+  const hasFiles = files.length > 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hasFiles decides whether the container is rendered.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -527,7 +531,7 @@ function FileTreeInner({
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [hasFiles]);
 
   // Highlight effect: open ancestors and scroll into view
   useEffect(() => {
