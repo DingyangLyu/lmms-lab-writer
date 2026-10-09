@@ -46,6 +46,27 @@
 - Codex 在 Windows 的后台任务里无法使用自身沙箱，所以设为 `danger-full-access`：组员的提示词能以 yuanbai 的权限访问这台电脑上的文件（包括上面的凭据）。只给信任的组员编辑权限。执行器不会把 `WRITER_*` 令牌、密码和数据库 URL 交给 AI。
 - 访问 OpenAI 需要本机代理（FlClash）可用；代理不通时 Codex 任务会失败，OpenCode 用的国内模型不受影响。
 
+## 账号和注册
+
+默认“注册后需管理员审核”：组员在登录页注册，管理员在“管理后台 → 待审核”批准后才能登录。管理后台还可以：
+
+- 生成邀请链接（有效期、可用次数），拿到链接的人注册后直接可用；
+- 改为“注册后直接可用”或“关闭注册”；
+- 注销账号：历史评论和版本保留，账号名释放，对方唯一拥有的项目转给执行注销的管理员。
+
+项目所有者发出的项目邀请，如果对方是新用户，账号同样要管理员审核（管理员自己发的项目邀请除外）。
+
+## 网络（洛杉矶线路）
+
+这台电脑不再用 FlClash 的机场订阅，而是用 mihomo（FlClash 的同一内核）作为系统服务，不登录也在运行：
+
+- 程序和配置：`D:\net\mihomo`（`config.yaml` 只有 SYSTEM、管理员和 yuanbai 能读），日志 `D:\net\logs`；
+- 任务计划程序 `\Network\Mihomo`（开机启动，退出后自动重启）和 `\Network\Mihomo Watchdog`（每 5 分钟经代理测试一次，连续 3 次失败就重启 mihomo）；
+- 境外流量走洛杉矶服务器（出口 IP 固定）；国内网站（GeoSite/GeoIP 中国列表）、B 站、ToDesk、百度网盘、微信、QQ、钉钉、飞书、Windows 更新等直连；局域网地址不进 TUN；
+- 本机代理端口仍是 `127.0.0.1:7890`，Writer 执行器经它访问 OpenAI；
+- 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `D:\net\mihomo\mihomo.exe -t -d D:\net\mihomo` 检查后重启 Mihomo 任务；
+- FlClash 仍安装着，但它的辅助服务已改为手动启动；不要同时打开 FlClash 的 TUN，否则两者会抢路由和 7890 端口。
+
 ## 更新
 
 ```powershell
