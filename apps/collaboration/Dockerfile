@@ -4,7 +4,7 @@ ARG WRITER_TEX=1
 RUN if [ "$WRITER_TEX" = "1" ]; then \
       apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
-        texlive-science texlive-bibtex-extra biber texlive-xetex texlive-luatex \
+        texlive-science texlive-bibtex-extra texlive-publishers biber texlive-xetex texlive-luatex \
         texlive-lang-chinese fonts-noto-cjk \
       && rm -rf /var/lib/apt/lists/*; \
     fi

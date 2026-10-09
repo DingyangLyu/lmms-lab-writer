@@ -20,6 +20,7 @@ import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
 import { Store } from "./store";
+import { loadTemplates, type Template } from "./templates";
 import { fail, HttpError } from "./util";
 
 export type Options = {
@@ -36,6 +37,8 @@ export type Options = {
   compile?: CompileOptions;
   /** A runner the server operator shares with every project (see routes/jobs.ts). */
   sharedRunner?: SharedRunner;
+  /** Extra project templates (a lab's thesis template…), added to the built-in ones. */
+  templatesDirectory?: string;
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -101,6 +104,7 @@ export async function createWriterServer(options: Options) {
   }
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
+  let templates: Promise<Map<string, Template>> | null = null;
   const services = {
     store,
     collab,
@@ -108,6 +112,14 @@ export async function createWriterServer(options: Options) {
     origin: () => origin,
     trustProxy: options.trustProxy ?? false,
     sharedRunner: options.sharedRunner,
+    templates: () => {
+      templates ??= loadTemplates(
+        [join(import.meta.dirname, "../templates"), options.templatesDirectory ?? ""].filter(
+          Boolean,
+        ),
+      );
+      return templates;
+    },
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();

@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "IEEE 会议论文", "en": "IEEE conference paper" },
+  "description": {
+    "zh": "IEEEtran 双栏会议格式，含作者单位块、关键词和 IEEE 参考文献格式。",
+    "en": "Two-column IEEEtran conference format with author blocks, keywords and IEEE-style references."
+  },
+  "category": "paper",
+  "main": "main.tex",
+  "engine": "pdflatex",
+  "order": 50
+}

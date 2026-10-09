@@ -262,6 +262,12 @@ export const migrations: string[] = [
      revoked BOOLEAN NOT NULL DEFAULT false
    );
    CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+  // 6: project dashboard — when a project last changed, and each member's archive and trash.
+  `ALTER TABLE projects ADD COLUMN updated BIGINT NOT NULL DEFAULT 0;
+   UPDATE projects p SET updated=GREATEST(p.created,
+     coalesce((SELECT max(a.created) FROM audit a WHERE a.project=p.id), 0));
+   ALTER TABLE members ADD COLUMN archived BOOLEAN NOT NULL DEFAULT false;
+   ALTER TABLE members ADD COLUMN trashed BIGINT;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

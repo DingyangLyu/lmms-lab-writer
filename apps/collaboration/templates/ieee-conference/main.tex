@@ -1,0 +1,62 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{cite}
+
+\begin{document}
+
+\title{Paper Title for an IEEE Conference}
+
+\author{
+  \IEEEauthorblockN{First Author}
+  \IEEEauthorblockA{Department, University\\
+    City, Country\\
+    first@example.edu}
+  \and
+  \IEEEauthorblockN{Second Author}
+  \IEEEauthorblockA{Department, University\\
+    City, Country\\
+    second@example.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+State the problem, the approach and the main results in one paragraph.
+\end{abstract}
+
+\begin{IEEEkeywords}
+keyword one, keyword two, keyword three
+\end{IEEEkeywords}
+
+\section{Introduction}
+Introduce the problem and summarise the contributions~\cite{knuth1984,lamport1994}.
+
+\section{Method}
+Describe the approach. Equations are numbered automatically:
+\begin{equation}
+  G = H - TS .
+\end{equation}
+
+\section{Experiments}
+\begin{table}[htbp]
+  \caption{An example table}
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Accuracy & Time (s) \\
+    \midrule
+    Baseline & 0.81 & 12 \\
+    Ours & 0.88 & 9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Conclusion}
+Summarise the findings.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}

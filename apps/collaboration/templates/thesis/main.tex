@@ -1,0 +1,40 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[numbers]{natbib}
+\usepackage[colorlinks=true,allcolors=black]{hyperref}
+
+\title{Thesis Title}
+\author{Your Name}
+\date{A thesis submitted for the degree of Doctor of Philosophy\\[1ex] \today}
+
+\begin{document}
+
+\pagenumbering{roman}
+\maketitle
+
+\begin{abstract}
+Summarise the thesis: the question, the approach, the main contributions and their significance.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\pagenumbering{arabic}
+
+% One file per chapter keeps the main file short; comment a line out to skip a chapter.
+\include{chapters/introduction}
+\include{chapters/background}
+\include{chapters/conclusion}
+
+\appendix
+\include{chapters/appendix}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

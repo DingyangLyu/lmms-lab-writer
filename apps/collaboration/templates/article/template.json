@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "英文期刊论文", "en": "Journal article" },
+  "description": {
+    "zh": "摘要、章节、图表、公式和 BibTeX 参考文献齐全的英文论文骨架。",
+    "en": "Abstract, sections, a figure, a table, equations and BibTeX references, ready to fill in."
+  },
+  "category": "paper",
+  "main": "main.tex",
+  "engine": "pdflatex",
+  "order": 10
+}

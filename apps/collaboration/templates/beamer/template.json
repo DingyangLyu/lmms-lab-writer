@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "学术报告幻灯片", "en": "Presentation slides" },
+  "description": {
+    "zh": "Beamer 幻灯片：标题页、目录、分栏、公式和重点框。",
+    "en": "Beamer slides with a title page, an outline, columns, equations and highlighted blocks."
+  },
+  "category": "presentation",
+  "main": "main.tex",
+  "engine": "pdflatex",
+  "order": 30
+}

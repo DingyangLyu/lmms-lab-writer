@@ -21,6 +21,7 @@ const app = await createWriterServer({
   port: Number(process.env.WRITER_PORT || 8787),
   origin: process.env.WRITER_ORIGIN,
   trustProxy: process.env.WRITER_TRUST_PROXY === "1",
+  templatesDirectory: process.env.WRITER_TEMPLATES_DIR || undefined,
   adminUser: process.env.WRITER_ADMIN_USER,
   adminPassword: process.env.WRITER_ADMIN_PASSWORD,
   sharedRunner: process.env.WRITER_SHARED_RUNNER_TOKEN

@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "空白项目", "en": "Blank project" },
+  "description": {
+    "zh": "只有一份最简单的 main.tex，从零开始写。",
+    "en": "A single minimal main.tex to start from scratch."
+  },
+  "category": "basic",
+  "main": "main.tex",
+  "engine": "pdflatex",
+  "order": 1
+}

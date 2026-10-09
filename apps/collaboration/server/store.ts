@@ -29,6 +29,8 @@ const merged = (state: Uint8Array, updates: Uint8Array[]) =>
   updates.length ? Y.mergeUpdates([state, ...updates]) : state;
 
 export class Store {
+  /** When each file last marked its project as changed; edits arrive many times a second. */
+  private touched = new Map<string, number>();
   constructor(public db: Database) {}
   static async open(url: string) {
     return new Store(await connect(url));
@@ -90,8 +92,14 @@ export class Store {
   }
   /** Every acknowledged edit is one small row; compaction folds them into `files.state`. */
   async appendUpdate(file: string, update: Uint8Array, q: Sql = this.db) {
+    const now = Date.now();
     await q.run(
-      sql`INSERT INTO file_updates(file, data, created) VALUES(${file}, ${update}, ${Date.now()})`,
+      sql`INSERT INTO file_updates(file, data, created) VALUES(${file}, ${update}, ${now})`,
+    );
+    if ((this.touched.get(file) ?? 0) > now - 30_000) return;
+    this.touched.set(file, now);
+    await q.run(
+      sql`UPDATE projects SET updated=${now} WHERE id=(SELECT project FROM files WHERE id=${file})`,
     );
   }
   async pending(file: string, q: Sql = this.db) {
@@ -143,11 +151,14 @@ export class Store {
       .filter((f) => !f.binary)
       .map((f) => ({ id: f.id, path: f.path, content: decodeText(f.state), revision: f.revision }));
   }
+  /** Every recorded action also counts as the project's latest change, for the dashboard. */
   async audit(project: string, actor: string, action: string, detail: unknown, q: Sql = this.db) {
+    const now = Date.now();
     await q.run(
       sql`INSERT INTO audit(id, project, actor, action, detail, created)
-          VALUES(${uid()}, ${project}, ${actor}, ${action}, ${JSON.stringify(detail)}, ${Date.now()})`,
+          VALUES(${uid()}, ${project}, ${actor}, ${action}, ${JSON.stringify(detail)}, ${now})`,
     );
+    await q.run(sql`UPDATE projects SET updated=${now} WHERE id=${project}`);
   }
   /** Automatic safety versions are bounded; manual versions are never pruned. */
   async snapshot(project: string, user: string, label: string, manual = false, q: Sql = this.db) {

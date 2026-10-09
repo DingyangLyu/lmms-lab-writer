@@ -7,7 +7,7 @@ import { type Body, created, handled, type InProject, number, route, str } from 
 import type { FileMeta } from "../store";
 import { decodeText, fail, isTextPath, safePath, textDoc, uid } from "../util";
 
-const PROJECT_FILES = 2000,
+export const PROJECT_FILES = 2000,
   PROJECT_BYTES = 100_000_000;
 
 /**
@@ -189,9 +189,13 @@ export const fileRoutes = [
         2,
       ),
     );
+    const name =
+      (await store.db.row<{ name: string }>(sql`SELECT name FROM projects WHERE id=${project}`))
+        ?.name ?? "writer-project";
     ctx.res.writeHead(200, {
       "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="writer-project.zip"',
+      // The ASCII name is for old clients; browsers use the UTF-8 project name.
+      "Content-Disposition": `attachment; filename="writer-project.zip"; filename*=UTF-8''${encodeURIComponent(`${name}.zip`)}`,
     });
     ctx.res.end(zipSync(entries));
     return handled;

@@ -40,7 +40,33 @@ export type IssuedPassword = { username?: string; password: string };
 export type IssuedToken = { token: string; user: PublicUser };
 export type Device = { id: string; name: string; created: number; used: number | null };
 
-export type ProjectSummary = { id: string; name: string; role: Role; created?: number };
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  role: Role;
+  created?: number;
+  /** Latest change to files, comments or settings. */
+  updated?: number;
+  /** An owner's username, for the dashboard's owner column. */
+  owner?: string;
+  /** Archive and trash are each member's own view; they hide nothing from the others. */
+  archived?: boolean;
+  trashed?: boolean;
+};
+/** A starting point for a new project (see server/templates.ts). */
+export type TemplateInfo = {
+  id: string;
+  name: { zh: string; en: string };
+  description: { zh: string; en: string };
+  category: string;
+  main: string;
+  engine: Engine;
+  order: number;
+  preview: boolean;
+  fileCount: number;
+};
+/** A project made from an uploaded zip, with the entries that were left out. */
+export type ImportedProject = ProjectSummary & { skipped: string[] };
 export type Member = { id: string; username: string; role: Role };
 export type Invite = { token: string; url: string; expiresInDays: number };
 

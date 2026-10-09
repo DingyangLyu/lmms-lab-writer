@@ -154,6 +154,11 @@ export const englishMessages: Record<string, string> = {
     "The project would exceed {count} files or 100 MB; the output was not saved",
   // projects and proposals
   请填写项目名: "Enter a project name",
+  "{path} 不是 UTF-8 编码，请转换后再上传": "{path} is not UTF-8 text; convert it and upload again",
+  压缩包中有重复的文件路径: "The zip contains the same path twice",
+  "无法读取压缩包，请上传 .zip 文件": "The upload could not be read; upload a .zip file",
+  压缩包里没有可用的文件: "The zip has no files that can be used",
+  模板不存在: "No such template",
   项目不存在: "Project not found",
   请输入完整项目名确认删除: "Type the full project name to confirm deletion",
   成员不存在: "Member not found",

@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "中文论文（ctex）", "en": "Chinese paper (ctex)" },
+  "description": {
+    "zh": "ctexart 文档类，用 XeLaTeX 编译，含摘要、图表、公式和参考文献。",
+    "en": "The ctexart class compiled with XeLaTeX, with an abstract, a figure, a table, equations and references."
+  },
+  "category": "paper",
+  "main": "main.tex",
+  "engine": "xelatex",
+  "order": 20
+}

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Collaboration } from "./collaboration";
 import type { Compiler } from "./compile";
 import type { Store, User } from "./store";
+import type { Template } from "./templates";
 import { type Access, fail, type Role, roles } from "./util";
 
 export type Body = Record<string, unknown>;
@@ -58,6 +59,8 @@ export type Services = {
   /** Behind a reverse proxy: take the client address from its X-Forwarded-For. */
   trustProxy: boolean;
   sharedRunner?: SharedRunner;
+  /** Project templates by id, read from disk once. */
+  templates: () => Promise<Map<string, Template>>;
 };
 export type Context = Services & {
   req: IncomingMessage;

@@ -1,0 +1,11 @@
+{
+  "name": { "zh": "学位论文（多章节）", "en": "Thesis with chapters" },
+  "description": {
+    "zh": "report 文档类，每章一个文件，含摘要、目录、附录和参考文献。",
+    "en": "The report class with one file per chapter, an abstract, a table of contents, appendices and references."
+  },
+  "category": "thesis",
+  "main": "main.tex",
+  "engine": "pdflatex",
+  "order": 40
+}
