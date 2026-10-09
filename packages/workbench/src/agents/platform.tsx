@@ -39,6 +39,10 @@ export type AgentPlatform = {
   importDocumentData?: (project: string, name: string, base64: string) => Promise<ChatImageFile>;
   validateDocuments?: (project: string, files: ChatImageFile[]) => Promise<void>;
   useBridge?: UseBridge;
+  /** Before an agent edits the project (desktop: the baseline its change review compares to). */
+  beforeAgentTurn?: (project: string, actor: string) => Promise<void>;
+  /** A conversation's history changed outside its panel (desktop: delegated turns). */
+  onConversationUpdated?: (handler: (id: string) => void) => Promise<() => void>;
 };
 
 const noBridge: UseBridge = () => ({ working: false, register: async () => {}, view: null });

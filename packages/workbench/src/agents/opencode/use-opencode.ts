@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { i18n } from "@/lib/i18n";
+import { workbenchI18n as i18n } from "../../i18n";
+import { agentPlatform } from "../platform";
 import {
   createOpenCodeClient,
   getOpenCodeErrorMessage,
   isAbortError,
   type OpenCodeClient,
+  type OpenCodeTransport,
   RECONNECT_GAVE_UP,
 } from "./client";
 import { isVariantSupported, selectInitialModel } from "./model-selection";
@@ -21,6 +23,8 @@ import type { Event, Message, Part, QuestionAsked, SessionInfo, SessionStatus } 
 
 export type UseOpenCodeOptions = {
   baseUrl?: string;
+  /** Relays requests and events instead of plain HTTP to `baseUrl` (the web app). */
+  transport?: OpenCodeTransport;
   directory?: string;
   autoConnect?: boolean;
   initialSessionId?: string | null;
@@ -128,7 +132,13 @@ function isUnsupportedModelError(message: string): boolean {
 }
 
 export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn {
-  const { baseUrl = DEFAULT_BASE_URL, directory, autoConnect = false, initialSessionId } = options;
+  const {
+    baseUrl = DEFAULT_BASE_URL,
+    directory,
+    autoConnect = false,
+    initialSessionId,
+    transport,
+  } = options;
 
   const clientRef = useRef<OpenCodeClient | null>(null);
   const initialSession = useRef(initialSessionId);
@@ -506,6 +516,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
   useEffect(() => {
     const client = createOpenCodeClient({
       baseUrl,
+      transport,
       directory,
       getSessionId: () => currentSessionIdRef.current,
       onEvent: (event) => handleEventRef.current(event),
@@ -540,7 +551,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
       client.disconnect();
       clientRef.current = null;
     };
-  }, [baseUrl, directory]);
+  }, [baseUrl, directory, transport]);
 
   useEffect(() => {
     if (autoConnect && !connected && !connecting) {
@@ -852,10 +863,8 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           sessionId,
           retriedUnsupportedModel: false,
         };
-        if (directory && !steer) {
-          const { invoke } = await import("@tauri-apps/api/core");
-          await invoke("review_begin", { project: directory, actor: `opencode:${sessionId}` });
-        }
+        if (directory && !steer)
+          await agentPlatform().beforeAgentTurn?.(directory, `opencode:${sessionId}`);
         await client.chat(sessionId, content, {
           agent: agentToUse,
           model: selectedModel

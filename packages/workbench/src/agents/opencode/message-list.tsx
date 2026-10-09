@@ -1,15 +1,17 @@
 "use client";
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
-import {
-  ChatImage,
-  splitEditorSelectionMessage,
-  stripWriterContext,
-  UserFileMessage,
-} from "@lmms-lab/workbench/agents";
 import { memo, useEffect, useMemo, useState } from "react";
-import { useI18n } from "@/lib/i18n";
-import { stripSearchFallbackHint } from "@/lib/opencode/search-fallback";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { ChatImage } from "../chat/chat-image";
+import { UserFileMessage } from "../chat/user-file-message";
+import { stripWriterContext } from "../context";
+import { splitEditorSelectionMessage } from "../selection-context";
+import { ChevronRightIcon } from "./icons";
+import { MarkdownText } from "./markdown-text";
+import { AskUserQuestionDisplay } from "./question-wizard";
+import { stripSearchFallbackHint } from "./search-fallback";
+import { ToolDisplay } from "./tool-display";
 import type {
   AssistantMessage,
   FilePart,
@@ -18,11 +20,7 @@ import type {
   ReasoningPart,
   TextPart,
   ToolPart,
-} from "@/lib/opencode/types";
-import { ChevronRightIcon } from "./icons";
-import { MarkdownText } from "./markdown-text";
-import { AskUserQuestionDisplay } from "./question-wizard";
-import { ToolDisplay } from "./tool-display";
+} from "./types";
 
 export const MessageList = memo(function MessageList({
   messages,

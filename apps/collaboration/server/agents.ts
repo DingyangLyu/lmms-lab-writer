@@ -24,6 +24,7 @@ import {
   CHANGES_EVENT,
   CLAUDE_EVENT,
   HARNESS_PERMISSIONS,
+  OPENCODE_EVENT,
   THREADS_EVENT,
 } from "../shared/agents";
 import { allowedOrigin, bearer, userFor } from "./auth";
@@ -90,8 +91,31 @@ const turnMarker = (event: AgentEvent): "start" | "end" | null => {
     const type = (event.params?.event as { type?: string } | undefined)?.type;
     return type === "writer_started" ? "start" : type === "writer_done" ? "end" : null;
   }
+  if (event.method === OPENCODE_EVENT) {
+    const inner = event.params?.event as
+      | { type?: string; properties?: { status?: { type?: string } } }
+      | undefined;
+    if (inner?.type === "session.idle") return "end";
+    if (inner?.type !== "session.status") return null;
+    return inner.properties?.status?.type === "idle" ? "end" : "start";
+  }
   return null;
 };
+/** The OpenCode calls the panel makes, by method and path. */
+const OPENCODE_ROUTES: Array<[string, RegExp, string]> = [
+  ["GET", /^\/session$/, "list"],
+  ["POST", /^\/session$/, "create"],
+  ["GET", /^\/session\/status$/, "status"],
+  ["GET", /^\/session\/([^/]+)$/, "read"],
+  ["PATCH", /^\/session\/([^/]+)$/, "rename"],
+  ["DELETE", /^\/session\/([^/]+)$/, "delete"],
+  ["GET", /^\/session\/([^/]+)\/message$/, "read"],
+  ["GET", /^\/session\/([^/]+)\/message\/[^/]+\/part$/, "read"],
+  ["POST", /^\/session\/([^/]+)\/prompt_async$/, "prompt"],
+  ["POST", /^\/session\/([^/]+)\/abort$/, "abort"],
+  ["POST", /^\/question\/([^/]+)\/reply$/, "answer"],
+  ["GET", /^\/(config|agent|provider)$/, "settings"],
+];
 /** Data URLs of at most six images and 24 MB, as the desktop accepts them. */
 function images(params: Params) {
   const value = params.images ?? [];
@@ -113,6 +137,8 @@ export class Agents {
   private calls = new Map<string, Call>();
   private turns = new Map<string, Turn>();
   private threads = new Map<string, ThreadRow>();
+  /** Which OpenCode session asked each open question, from the events relayed. */
+  private questions = new Map<string, string>();
   /** Events keep their order; a registry lookup must not let a later delta overtake. */
   private events: Promise<void> = Promise.resolve();
   private browserServer = new WebSocketServer({ noServer: true, maxPayload: 40_000_000 });
@@ -347,6 +373,14 @@ export class Agents {
     if (!id) return;
     const thread = await this.thread(id);
     if (!thread || (project && thread.project !== project)) return;
+    const inner = event.params?.event as
+      | { type?: string; properties?: { id?: unknown } }
+      | undefined;
+    if (event.method === OPENCODE_EVENT && inner?.type === "question.asked") {
+      if (this.questions.size > 1000) this.questions.clear();
+      if (typeof inner.properties?.id === "string")
+        this.questions.set(inner.properties.id, thread.id);
+    }
     const marker = turnMarker(event);
     if (marker === "start" && !this.turns.has(thread.project)) {
       const owner = await this.store.db.row<{ username: string }>(
@@ -536,6 +570,8 @@ export class Agents {
           answers: isObject(params.answers) ? params.answers : null,
         });
       }
+      case "opencode.fetch":
+        return this.opencodeFetch(browser, user, params);
       case "claude.stop": {
         const thread = await this.access(project, user, params);
         return this.call("claude.stop", { project, threadId: thread.id });
@@ -615,10 +651,6 @@ export class Agents {
         return fail(400, "未知消息");
     }
   }
-  /**
-   * One turn per project: the agent's working copy is the whole project. A version saved
-   * first makes the turn revertible from History.
-   */
   private async startTurn(browser: Browser, user: User, harness: string, params: Params) {
     const { project } = browser;
     const thread = await this.access(project, user, params);
@@ -639,7 +671,6 @@ export class Agents {
           : "{name} 的 AI 对话正在修改此项目，请等它完成",
         { name: running.userName },
       );
-    if (!this.runner) fail(503, "共享执行器未连接，AI 对话暂不可用");
     // Claude Code sessions are named after their first message, as on the desktop.
     const firstLine = message
       .split("\n")
@@ -652,6 +683,36 @@ export class Agents {
       );
       this.announceThreads(project);
     }
+    return this.runTurn(browser, user, thread, `${harness}.startTurn`, {
+      text: message,
+      images: pictures,
+      model,
+      effort,
+      permissionMode,
+    });
+  }
+  /**
+   * One turn per project: the agent's working copy is the whole project. A version saved
+   * first makes the turn revertible from History.
+   */
+  private async runTurn(
+    browser: Browser,
+    user: User,
+    thread: ThreadRow,
+    method: string,
+    payload: Params,
+  ) {
+    const { project } = browser;
+    const running = this.busy(project);
+    if (running)
+      fail(
+        409,
+        running.thread === thread.id
+          ? "这个对话还在运行"
+          : "{name} 的 AI 对话正在修改此项目，请等它完成",
+        { name: running.userName },
+      );
+    if (!this.runner) fail(503, "共享执行器未连接，AI 对话暂不可用");
     const turn: Turn = {
       thread: thread.id,
       user: user.id,
@@ -664,17 +725,8 @@ export class Agents {
       await this.store.snapshot(project, user.id, "AI 对话修改前");
       this.collab.changed(project);
       const result = await this.call(
-        `${harness}.startTurn`,
-        {
-          project,
-          threadId: thread.id,
-          files: await this.files(project),
-          text: message,
-          images: pictures,
-          model,
-          effort,
-          permissionMode,
-        },
+        method,
+        { project, threadId: thread.id, files: await this.files(project), ...payload },
         180_000,
       );
       await this.touch(thread);
@@ -686,6 +738,109 @@ export class Agents {
       }
       throw error;
     }
+  }
+  /**
+   * OpenCode's HTTP API, call by call: the session list and statuses only show conversations
+   * the member may see, a new session is registered as theirs, a prompt is a turn, and
+   * renaming or deleting is for whoever started it.
+   */
+  private async opencodeFetch(browser: Browser, user: User, params: Params) {
+    const { project } = browser;
+    const method = text(params, "method", 10).toUpperCase(),
+      path = text(params, "path", 300);
+    const route = OPENCODE_ROUTES.find(([m, pattern]) => m === method && pattern.test(path));
+    if (!route) fail(404, "接口不存在");
+    const [, pattern, kind] = route;
+    const body =
+      params.body === undefined || params.body === null
+        ? undefined
+        : text(params, "body", 40_000_000);
+    const limit =
+      typeof params.limit === "number" && params.limit > 0
+        ? Math.min(params.limit, 1000)
+        : undefined;
+    const forward = (extra: Params = {}) =>
+      this.call<{ status: number; body: string; type?: string }>(
+        "opencode.fetch",
+        { project, method, path, body, limit, ...extra },
+        120_000,
+      );
+    const visibleIds = async () =>
+      new Map((await this.list(project, user.id, "opencode")).map((t) => [t.id, t]));
+    if (kind === "list") {
+      const result = await forward();
+      if (result.status !== 200) return result;
+      const shown = await visibleIds();
+      const sessions = JSON.parse(result.body) as Array<{ id?: string }>;
+      return {
+        ...result,
+        body: JSON.stringify(
+          sessions
+            .filter((s) => typeof s.id === "string" && shown.has(s.id))
+            .map((s) => {
+              const t = shown.get(s.id as string);
+              return {
+                ...s,
+                writer: { mine: t?.mine, shared: t?.shared, ownerName: t?.ownerName },
+              };
+            }),
+        ),
+      };
+    }
+    if (kind === "create") {
+      const result = await forward();
+      if (result.status === 200) {
+        const created = JSON.parse(result.body) as { id?: unknown };
+        await this.register(project, user, "opencode", threadId(created.id));
+      }
+      return result;
+    }
+    if (kind === "status") {
+      const result = await forward();
+      if (result.status !== 200) return result;
+      const shown = await visibleIds();
+      const statuses = JSON.parse(result.body) as Record<string, unknown>;
+      return {
+        ...result,
+        body: JSON.stringify(
+          Object.fromEntries(Object.entries(statuses).filter(([id]) => shown.has(id))),
+        ),
+      };
+    }
+    if (kind === "settings") return forward();
+    const id =
+      kind === "answer"
+        ? this.questions.get(pattern.exec(path)?.[1] ?? "")
+        : pattern.exec(path)?.[1];
+    const thread = await this.access(project, user, { threadId: id });
+    if (thread.harness !== "opencode") fail(404, "对话不存在或未共享");
+    if ((kind === "rename" || kind === "delete") && thread.owner !== user.id)
+      fail(403, "只有对话的发起人可以重命名或共享");
+    if (kind === "prompt") {
+      const result = (await this.runTurn(browser, user, thread, "opencode.prompt", {
+        body: body ?? "{}",
+      })) as { status: number; body: string };
+      // OpenCode refused the prompt: no turn starts, so none will end.
+      if (result.status >= 300 && this.turns.get(project)?.thread === thread.id) {
+        this.turns.delete(project);
+        this.announceBusy(project);
+      }
+      return result;
+    }
+    const result = await forward();
+    if (kind === "rename" && result.status === 200) {
+      const title = (JSON.parse(result.body) as { title?: unknown }).title;
+      if (typeof title === "string") {
+        thread.title = title;
+        await this.store.db.run(sql`UPDATE agent_threads SET title=${title} WHERE id=${thread.id}`);
+      }
+    }
+    if (kind === "delete" && result.status === 200) {
+      await this.store.db.run(sql`DELETE FROM agent_threads WHERE id=${thread.id}`);
+      this.threads.delete(thread.id);
+      this.announceThreads(project);
+    }
+    return result;
   }
   private permission(harness: string, params: Params): string {
     const value = params.permissionMode ?? (harness === "claude" ? "default" : "askForApproval");

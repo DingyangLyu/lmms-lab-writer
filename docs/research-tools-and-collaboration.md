@@ -115,13 +115,13 @@ docker compose start writer
 
 ## 网页 AI 对话
 
-网页右侧是桌面端的 Codex 对话面板（同一份代码，`packages/workbench/src/agents`）：对话标签、历史对话、立即指导 / 排队发送、权限、模型和推理强度、图片附件（网页只能附加图片）、审批请求。Codex 跑在服务器的共享执行器上（`WRITER_SHARED_RUNNER_TOKEN`，能力含 `codex`），用执行器那台电脑的 Codex 登录。
+网页右侧是桌面端的 AI 对话面板（同一份代码，`packages/workbench/src/agents`）：Codex、Claude Code、OpenCode 三种对话，对话标签、历史对话、立即指导 / 排队发送、权限、模型和推理强度、图片附件（网页只能附加图片）、审批和提问。它们跑在服务器的共享执行器上（`WRITER_SHARED_RUNNER_TOKEN`，能力含 `codex`、`claude` 或 `opencode`），用执行器那台电脑上各自的登录和配置。
 
 - 服务器（`server/agents.ts`）在浏览器和执行器之间转发，登记每个对话的发起人以及是否共享；只有所有者和编辑者能连接；同一项目同时只运行一轮。
 - 执行器（`server/agent-host.ts`）为每个项目保留一份工作副本，每轮开始前与服务器同步；Codex 每完成一步文件修改或命令，改动就合并进共享正文（`mergeText`，以发起这一轮的成员名义记入审计），与他人重叠的部分转为待审阅建议，别人改过的文件不会被删除或覆盖。每轮开始前自动保存版本“AI 对话修改前”。
 - 对话默认只有发起人可见，发起人可以共享给项目成员；共享后其他成员能看到对话内容并继续对话，只有发起人能改名或取消共享。
 
-Claude Code 和 OpenCode 的网页对话尚未接入（计划按 Codex → Claude Code → OpenCode 的顺序）。
+- Codex 通过一个 `codex app-server`；Claude Code 每轮启动一次 stream-json CLI（和桌面端一样支持指导、审批和停止，对话记录保存在执行器上）；OpenCode 的客户端原样使用，请求和事件经服务器转发：服务器只放行面板用到的接口、逐个检查会话权限、过滤会话列表，执行器只把模型和智能体名称交给浏览器，不交出配置原文和密钥。
 
 ## 共享任务执行器（一次性任务队列）
 

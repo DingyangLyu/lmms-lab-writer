@@ -1,6 +1,6 @@
+import { extractTextParts } from "@lmms-lab/workbench/agents";
 import { describe, expect, it } from "vitest";
 import { getReadableErrorMessage, getSynctexLookupMessage } from "../errors";
-import { extractTextParts } from "../opencode/messages";
 import { buildAiCommitPrompt, sanitizeAiCommitMessage } from "./ai-commit-message";
 import { parseUnifiedDiffContent } from "./unified-diff";
 

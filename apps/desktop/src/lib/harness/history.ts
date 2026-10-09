@@ -3,10 +3,10 @@ import {
   type HarnessId,
   type HistoryAdapter,
   type HistoryPage,
+  OpenCodeClient,
 } from "@lmms-lab/workbench/agents";
 import { invoke } from "@tauri-apps/api/core";
 import { i18n } from "@/lib/i18n";
-import { OpenCodeClient } from "@/lib/opencode/client";
 
 type Scope = { project: string; baseUrl: string };
 type ScopedAdapter = {

@@ -8,6 +8,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -22,6 +23,7 @@ import {
   CLAUDE_EVENT,
   CLAUDE_PERMISSIONS,
   type ClaudePermission,
+  OPENCODE_EVENT,
 } from "../shared/agents";
 import { isTextPath } from "./util";
 
@@ -47,6 +49,7 @@ export type AgentHostOptions = {
   harnesses?: string[];
   codex?: string;
   claude?: string;
+  opencode?: string;
   permissions?: AgentPermission[];
   claudePermissions?: ClaudePermission[];
   log?: (message: string) => void;
@@ -109,6 +112,110 @@ function agentEnv() {
     if (/^WRITER_.*(TOKEN|PASSWORD|DATABASE_URL)/.test(key)) delete env[key];
   return env;
 }
+/** The OpenCode calls the web panel makes (the server checks who may make them). */
+const OPENCODE_CALLS: Array<[string, RegExp]> = [
+  ["GET", /^\/session$/],
+  ["POST", /^\/session$/],
+  ["GET", /^\/session\/status$/],
+  ["GET", /^\/session\/[^/]+$/],
+  ["PATCH", /^\/session\/[^/]+$/],
+  ["DELETE", /^\/session\/[^/]+$/],
+  ["GET", /^\/session\/[^/]+\/message$/],
+  ["GET", /^\/session\/[^/]+\/message\/[^/]+\/part$/],
+  ["POST", /^\/session\/[^/]+\/abort$/],
+  ["POST", /^\/question\/[^/]+\/reply$/],
+  ["GET", /^\/(config|agent|provider)$/],
+];
+/** Collaborators' prompts may edit the project; shell and other folders stay off unless configured. */
+const OPENCODE_PERMISSION = JSON.stringify({
+  external_directory: "deny",
+  bash: "deny",
+  edit: "allow",
+  read: "allow",
+  webfetch: "allow",
+});
+const OPENCODE_CONTEXT =
+  "Y-Writer shared project on the lab's runner: after each step the files you change here are merged into your collaborators' live text, and a version was saved before this turn. Edit only what the task needs; do not commit, push or publish anything.";
+/** What the panel needs from OpenCode's settings, without provider options or keys. */
+export function openCodeSettings(path: string, body: string) {
+  const data = JSON.parse(body) as Json;
+  if (path === "/config") return { model: data.model, default_agent: data.default_agent };
+  if (path === "/agent")
+    return (Array.isArray(data) ? data : Object.values(data)).map((raw) => {
+      const agent = (raw ?? {}) as Json;
+      return {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        mode: agent.mode,
+        hidden: agent.hidden,
+      };
+    });
+  const all = Array.isArray(data.all) ? (data.all as Json[]) : [];
+  return {
+    connected: Array.isArray(data.connected) ? data.connected : [],
+    all: all.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      models: Object.fromEntries(
+        Object.entries((provider.models ?? {}) as Record<string, Json>).map(([key, model]) => {
+          const capabilities = model.capabilities as { input?: { image?: boolean } } | undefined;
+          const options = (model.options ?? {}) as Json;
+          const variants = (model.variants ?? {}) as Record<string, Json>;
+          return [
+            key,
+            {
+              id: model.id,
+              name: model.name,
+              capabilities: { input: { image: capabilities?.input?.image } },
+              options: { max: options.max, reasoning: options.reasoning },
+              variants: Object.fromEntries(
+                Object.entries(variants).map(([name, v]) => [name, { disabled: v?.disabled }]),
+              ),
+            },
+          ];
+        }),
+      ),
+    })),
+  };
+}
+/**
+ * `opencode serve` does not exit with the runner (it reads no stdin), so a killed runner can
+ * leave one behind; the next runner stops it, if that process is still OpenCode.
+ */
+async function stopStaleOpenCode(pidFile: string) {
+  const pid = Number((await readFile(pidFile, "utf8").catch(() => "")).trim());
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  const command = await new Promise<string>((resolve) => {
+    const probe =
+      process.platform === "win32"
+        ? spawn("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { windowsHide: true })
+        : spawn("ps", ["-o", "command=", "-p", String(pid)]);
+    let out = "";
+    probe.stdout.on("data", (chunk) => {
+      out += String(chunk);
+    });
+    probe.on("close", () => resolve(out));
+    probe.on("error", () => resolve(""));
+  });
+  if (/opencode/i.test(command))
+    try {
+      process.kill(pid);
+    } catch {}
+}
+const freePort = () =>
+  new Promise<number>((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() =>
+        address && typeof address === "object"
+          ? resolve(address.port)
+          : reject(new Error("no port")),
+      );
+    });
+  });
 /** Starts a CLI in its own process group (Unix), so stopping it stops its tools too. */
 function spawnAgent(binary: string, args: string[], cwd: string) {
   const child = spawn(binary, args, {
@@ -320,6 +427,9 @@ export class AgentHost {
   readonly harnesses: string[];
   readonly claudePermissions: ClaudePermission[];
   private claudeRuns = new Map<string, ClaudeRun>();
+  private opencode: { port: number; kill: () => void; alive: boolean } | null = null;
+  private opencodeStarting: Promise<{ port: number }> | null = null;
+  private opencodeStreams = new Map<string, AbortController>();
   private claudeCatalog: { at: number; value: Json } | null = null;
   constructor(private options: AgentHostOptions) {
     this.root =
@@ -328,7 +438,7 @@ export class AgentHost {
       join(homedir(), ".writer-runner", "projects");
     this.sessions = options.sessions || join(dirname(this.root), "claude-sessions");
     this.harnesses = (options.harnesses ?? ["codex"]).filter((h) =>
-      ["codex", "claude"].includes(h),
+      ["codex", "claude", "opencode"].includes(h),
     );
     this.permissions = options.permissions ?? defaultPermissions();
     const claudeModes = process.env.WRITER_CLAUDE_PERMISSIONS?.split(",").map((p) => p.trim());
@@ -345,6 +455,8 @@ export class AgentHost {
     this.stopped = true;
     this.socket?.close();
     this.codex?.stop();
+    for (const stream of this.opencodeStreams.values()) stream.abort();
+    this.opencode?.kill();
   }
 
   private connect() {
@@ -364,7 +476,7 @@ export class AgentHost {
       this.send({
         status: {
           harnesses: this.harnesses,
-          permissions: { codex: this.permissions, claude: this.claudePermissions },
+          permissions: { codex: this.permissions, claude: this.claudePermissions, opencode: [] },
         },
       });
     });
@@ -574,6 +686,10 @@ export class AgentHost {
           const id = (request.params as Json | undefined)?.threadId;
           return typeof id === "string" && this.threadProject.get(id) === project;
         });
+      case "opencode.fetch":
+        return this.opencodeFetch(project, params);
+      case "opencode.prompt":
+        return this.opencodePrompt(project, threadId, params);
       case "claude.initialize":
         return this.claudeModels(project);
       case "claude.read":
@@ -766,6 +882,214 @@ export class AgentHost {
       size += bytes;
     }
     await flush();
+  }
+  /** One `opencode serve` for every project; requests name the project's folder. */
+  private ensureOpenCode(): Promise<{ port: number }> {
+    if (this.opencode?.alive) return Promise.resolve(this.opencode);
+    this.opencodeStarting ??= (async () => {
+      await mkdir(this.root, { recursive: true });
+      const pidFile = join(dirname(this.root), "opencode.pid");
+      await stopStaleOpenCode(pidFile);
+      const port = await freePort();
+      const binary = this.options.opencode || process.env.WRITER_OPENCODE_BIN || "opencode";
+      const child = spawn(binary, ["serve", "--hostname", "127.0.0.1", "--port", String(port)], {
+        cwd: this.root,
+        stdio: ["ignore", "ignore", "pipe"],
+        windowsHide: true,
+        detached: process.platform !== "win32",
+        env: {
+          ...agentEnv(),
+          OPENCODE_ENABLE_EXA: "1",
+          OPENCODE_PERMISSION: process.env.WRITER_OPENCODE_PERMISSION || OPENCODE_PERMISSION,
+        },
+      });
+      if (child.pid) await writeFile(pidFile, String(child.pid)).catch(() => {});
+      let stderr = "";
+      child.stderr.on("data", (chunk) => {
+        stderr = (stderr + String(chunk)).slice(-2000);
+      });
+      const server = {
+        port,
+        alive: true,
+        kill: () => {
+          try {
+            if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGTERM");
+            else child.kill();
+          } catch {}
+        },
+      };
+      const gone = () => {
+        server.alive = false;
+        if (this.opencode === server) this.opencode = null;
+      };
+      child.on("exit", gone);
+      child.on("error", gone);
+      for (let i = 0; i < 60 && server.alive; i++) {
+        try {
+          const response = await fetch(`http://127.0.0.1:${port}/config`, {
+            signal: AbortSignal.timeout(2000),
+          });
+          if (response.headers.get("content-type")?.includes("application/json")) {
+            this.opencode = server;
+            return server;
+          }
+        } catch {}
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      server.kill();
+      throw new Error(`OpenCode did not start. ${stderr.trim()}`.trim());
+    })().finally(() => {
+      this.opencodeStarting = null;
+    });
+    return this.opencodeStarting;
+  }
+  private async opencodeRequest(
+    project: string,
+    method: string,
+    path: string,
+    body?: string,
+    limit?: number,
+  ) {
+    const { port } = await this.ensureOpenCode();
+    const workspace = this.workspace(project);
+    await mkdir(workspace.dir, { recursive: true });
+    this.opencodeEvents(project);
+    const query = `directory=${encodeURIComponent(workspace.dir)}${limit ? `&limit=${limit}` : ""}`;
+    const response = await fetch(`http://127.0.0.1:${port}${path}?${query}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-opencode-directory": encodeURIComponent(workspace.dir),
+      },
+      body: method === "GET" ? undefined : (body ?? "{}"),
+      signal: AbortSignal.timeout(110_000),
+    });
+    return {
+      status: response.status,
+      type: response.headers.get("content-type") ?? "",
+      body: await response.text(),
+    };
+  }
+  private async opencodeFetch(project: string, params: Json) {
+    const method = String(params.method ?? "GET"),
+      path = String(params.path ?? "");
+    if (!OPENCODE_CALLS.some(([m, pattern]) => m === method && pattern.test(path)))
+      throw new Error("OpenCode request not allowed");
+    const result = await this.opencodeRequest(
+      project,
+      method,
+      path,
+      typeof params.body === "string" ? params.body : undefined,
+      typeof params.limit === "number" ? params.limit : undefined,
+    );
+    // Provider options and keys never leave the runner.
+    if (/^\/(config|agent|provider)$/.test(path) && result.status === 200)
+      return { ...result, body: JSON.stringify(openCodeSettings(path, result.body)) };
+    return result;
+  }
+  /** A prompt is a turn: the working copy comes up to date first; the end pushes changes. */
+  private async opencodePrompt(project: string, threadId: string, params: Json) {
+    const workspace = this.workspace(project);
+    if (workspace.thread) throw new Error("Another AI turn is still running in this project");
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(threadId)) throw new Error("Invalid OpenCode session");
+    workspace.thread = threadId;
+    try {
+      await this.sync(project, workspace, (params.files ?? []) as AgentFile[]);
+      const body = JSON.parse(String(params.body ?? "{}")) as { parts?: Json[] };
+      // The desktop's context line speaks of its delegation tools; the runner has none.
+      for (const part of body.parts ?? [])
+        if (part.type === "text" && typeof part.text === "string")
+          part.text = part.text.replace(
+            /^(\[Writer conversation ID: opencode:[^\]\n]+\]\n)[^\n]*\n\n/,
+            `$1${OPENCODE_CONTEXT}\n\n`,
+          );
+      const result = await this.opencodeRequest(
+        project,
+        "POST",
+        `/session/${threadId}/prompt_async`,
+        JSON.stringify(body),
+      );
+      if (result.status >= 300) workspace.thread = null;
+      return result;
+    } catch (error) {
+      workspace.thread = null;
+      throw error;
+    }
+  }
+  /** The project's event stream, kept open (and reopened) while the runner runs. */
+  private opencodeEvents(project: string) {
+    if (this.opencodeStreams.has(project)) return;
+    const controller = new AbortController();
+    this.opencodeStreams.set(project, controller);
+    const workspace = this.workspace(project);
+    void (async () => {
+      while (!controller.signal.aborted && !this.stopped) {
+        try {
+          const { port } = await this.ensureOpenCode();
+          const response = await fetch(
+            `http://127.0.0.1:${port}/event?directory=${encodeURIComponent(workspace.dir)}`,
+            { headers: { Accept: "text/event-stream" }, signal: controller.signal },
+          );
+          if (!response.body) throw new Error("no event stream");
+          const decoder = new TextDecoder();
+          let buffer = "";
+          for await (const chunk of response.body) {
+            buffer += decoder.decode(chunk as Uint8Array, { stream: true });
+            const blocks = buffer.split(/\r?\n\r?\n/);
+            buffer = blocks.pop() ?? "";
+            for (const block of blocks) {
+              const data = block
+                .split(/\r?\n/)
+                .filter((line) => line.startsWith("data:"))
+                .map((line) => line.slice(5).replace(/^ /, ""))
+                .join("\n");
+              if (!data) continue;
+              try {
+                this.fromOpenCode(project, workspace, JSON.parse(data) as Json);
+              } catch {}
+            }
+          }
+        } catch {}
+        if (!controller.signal.aborted) await new Promise((r) => setTimeout(r, 2000));
+      }
+    })();
+  }
+  /** Queued per project like Codex's events: a step's or a turn's changes go first. */
+  private fromOpenCode(project: string, workspace: Workspace, event: Json) {
+    const props = (event.properties ?? {}) as Json;
+    const part = props.part as Json | undefined;
+    const info = props.info as Json | undefined;
+    const type = String(event.type ?? "");
+    const session =
+      (typeof props.sessionID === "string" && props.sessionID) ||
+      (typeof part?.sessionID === "string" && part.sessionID) ||
+      (typeof info?.sessionID === "string" && info.sessionID) ||
+      (type.startsWith("session.") && typeof info?.id === "string" && info.id) ||
+      null;
+    if (!session) return;
+    const step =
+      type === "message.part.updated" &&
+      part?.type === "tool" &&
+      (part.state as Json | undefined)?.status === "completed";
+    const finished =
+      type === "session.idle" ||
+      (type === "session.status" && (props.status as Json | undefined)?.type === "idle");
+    workspace.queue = workspace.queue
+      .then(async () => {
+        if ((step || finished) && workspace.thread === session)
+          await this.push(project, workspace, session).catch((error) =>
+            this.log(
+              `Writer AI changes not sent: ${error instanceof Error ? error.message : error}`,
+            ),
+          );
+        if (finished && workspace.thread === session) workspace.thread = null;
+        this.send({
+          project,
+          event: { method: OPENCODE_EVENT, params: { threadId: session, event } },
+        });
+      })
+      .catch(() => {});
   }
   private claudeBinary() {
     return this.options.claude || process.env.WRITER_CLAUDE_BIN || "claude";

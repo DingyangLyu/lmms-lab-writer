@@ -1,4 +1,4 @@
-import { i18n } from "@/lib/i18n";
+import { workbenchI18n as i18n } from "../../i18n";
 // OpenCode SDK Types (subset for API integration)
 
 export type FileDiff = {

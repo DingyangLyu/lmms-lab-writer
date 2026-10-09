@@ -13,6 +13,7 @@ import {
   type CodexBackend,
   type CodexEvent,
   type CodexPermissionMode,
+  type OpenCodeTransport,
 } from "@lmms-lab/workbench/agents";
 import {
   type AgentBusy,
@@ -20,6 +21,7 @@ import {
   type AgentThread,
   CHANGES_EVENT,
   CLAUDE_EVENT,
+  OPENCODE_EVENT,
   THREADS_EVENT,
 } from "../../shared/agents";
 import { i18n } from "../i18n";
@@ -224,5 +226,63 @@ export function relayClaudeBackend(link: AgentLink): ClaudeBackend {
     permissions: () => (link.status.permissions.claude ?? []) as ClaudePermissionMode[],
     shareSession: (sessionId, shared) =>
       link.request("thread.share", { threadId: sessionId, shared }),
+  };
+}
+
+/** Stands in for the address of `opencode serve`; the relay carries every request. */
+export const OPENCODE_RELAY = "http://opencode.relay";
+/**
+ * OpenCode's client, unchanged, over the relay: its requests become `opencode.fetch` calls
+ * and its server-sent events arrive on the same socket.
+ */
+export function relayOpenCodeTransport(link: AgentLink): OpenCodeTransport {
+  return {
+    fetch: async (url, init) => {
+      const parsed = new URL(url);
+      const limit = Number(parsed.searchParams.get("limit")) || undefined;
+      const result = await link.request<{ status: number; body: string; type?: string }>(
+        "opencode.fetch",
+        {
+          method: init?.method ?? "GET",
+          path: parsed.pathname,
+          body: typeof init?.body === "string" ? init.body : undefined,
+          limit,
+        },
+        200_000,
+      );
+      const empty = result.status === 204 || result.status === 304;
+      return new Response(empty ? null : result.body, {
+        status: result.status,
+        headers: { "content-type": result.type || "application/json" },
+      });
+    },
+    openStream: () => {
+      type Stream = ReturnType<OpenCodeTransport["openStream"]>;
+      let stop = () => {};
+      const stream = {
+        onopen: null,
+        onmessage: null,
+        onerror: null,
+        close: () => stop(),
+      } as Stream;
+      const call = (handler: unknown, event: Event) =>
+        typeof handler === "function" && handler.call(stream, event);
+      stop = link.listen((event) => {
+        if (event.method === OPENCODE_EVENT)
+          call(
+            stream.onmessage,
+            new MessageEvent("message", {
+              data: JSON.stringify((event.params as { event?: unknown } | undefined)?.event),
+            }),
+          );
+        else if (event.method === "codex/connectionClosed")
+          call(stream.onerror, new Event("error"));
+      });
+      void link.connect().then(
+        () => call(stream.onopen, new Event("open")),
+        () => call(stream.onerror, new Event("error")),
+      );
+      return stream;
+    },
   };
 }

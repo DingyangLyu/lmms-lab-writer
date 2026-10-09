@@ -21,6 +21,7 @@
 | `D:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
 | `D:\writer\backups` | 每天 3 点的数据库备份，保留 14 天 |
 | `%USERPROFILE%\.writer-runner\projects` | AI 对话的项目工作副本（每个项目一份；可以删除，每轮开始前会从服务器重新同步） |
+| `%USERPROFILE%\.writer-runner\claude-sessions`、`opencode.pid` | Claude Code 对话记录；执行器启动的 `opencode serve` 的进程号（执行器重启时用来结束上一个） |
 
 任务计划程序里 `\Writer\` 下的三个任务都以 yuanbai 身份、“不管用户是否登录都运行”：
 
@@ -46,9 +47,11 @@
 - Codex 用这台电脑上 `~/.codex` 的登录（与 Codex 桌面版共用，不要复制 `auth.json`，ChatGPT 登录的刷新令牌会轮换，副本会互相作废）；OpenCode 用 `~/.local/share/opencode/auth.json` 和 `~/.config/opencode/opencode.json`。所有 AI 任务都消耗这个账号的额度。
 - Codex 在 Windows 的后台任务里无法使用自身沙箱，所以设为 `danger-full-access`：组员的提示词能以 yuanbai 的权限访问这台电脑上的文件（包括上面的凭据）。只给信任的组员编辑权限。执行器不会把 `WRITER_*` 令牌、密码和数据库 URL 交给 AI。
 - 访问 OpenAI 需要本机代理（FlClash）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
-- 网页 AI 对话：Writer Runner 启用了 `codex` 能力时，会再连一条 WebSocket 到服务器（`/api/runner/agents`，同一个共享执行器令牌），由一个 `codex app-server` 服务所有项目。每个项目在 `%USERPROFILE%\.writer-runner\projects\<项目 ID>` 有一份工作副本，每轮开始前和服务器同步；Codex 每改完一步，改动就合并进共享正文（以发起这一轮的成员名义），与他人同时改到同一处的部分转为待审阅建议。每轮开始前服务器自动保存一个版本“AI 对话修改前”，可在“版本”里恢复。
+- 网页 AI 对话：Writer Runner 启用了 `codex`、`claude` 或 `opencode` 能力时，会再连一条 WebSocket 到服务器（`/api/runner/agents`，同一个共享执行器令牌）。网页显示执行器启用、且服务器 `WRITER_SHARED_RUNNER_HARNESSES` 也列出的那些（按 Codex、Claude Code、OpenCode 排）。一个 `codex app-server` 和一个 `opencode serve`（只监听 127.0.0.1 的随机端口）服务所有项目，Claude Code 每轮启动一次 CLI。每个项目在 `%USERPROFILE%\.writer-runner\projects\<项目 ID>` 有一份工作副本，每轮开始前和服务器同步；AI 每改完一步，改动就合并进共享正文（以发起这一轮的成员名义），与他人同时改到同一处的部分转为待审阅建议。每轮开始前服务器自动保存一个版本“AI 对话修改前”，可在“版本”里恢复。
 - 只有项目的所有者和编辑者能用 AI 对话；对话默认只有发起人能看到，可在对话标题旁或“历史对话”里共享给项目成员。同一项目同时只运行一轮。
-- 因为 `WRITER_CODEX_SANDBOX=danger-full-access`，网页上的权限只提供“完全访问”；其他机器可用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview,fullAccess` 指定。工作副本位置可用 `WRITER_AGENT_WORKSPACES` 改；`WRITER_AGENT_HOST=0` 关闭网页 AI 对话。
+- 因为 `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 的权限只提供“完全访问”；其他机器可用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview,fullAccess` 指定。Claude Code 的四种权限都提供，可用 `WRITER_CLAUDE_PERMISSIONS` 限制。OpenCode 在网页上默认不能运行 shell、不能访问项目以外的文件夹，可改 `WRITER_OPENCODE_PERMISSION`（OpenCode 的权限 JSON）。浏览器拿不到 OpenCode 的配置原文和供应商密钥：执行器只转发模型和智能体名称。
+- 要在网页上用 Claude Code：在这台电脑装好 Claude Code 并 `claude auth login`，`runner.env` 设 `WRITER_CLAUDE_BIN`（指向 `claude.exe`），并把 `claude` 加进 `WRITER_ALLOWED_HARNESSES` 和 `server.env` 的 `WRITER_SHARED_RUNNER_HARNESSES`。
+- 工作副本位置可用 `WRITER_AGENT_WORKSPACES` 改；`WRITER_AGENT_HOST=0` 关闭网页 AI 对话。
 - 更新代码后要同时重启 Writer Server 和 Writer Runner（见下），网页 AI 对话才会用上新版本。
 
 ## 账号和注册

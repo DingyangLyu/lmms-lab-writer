@@ -46,7 +46,7 @@ Projects can live on both: the desktop app keeps a local folder in two-way sync 
 - **Real-time co-editing** (Yjs) with cursors, comments and replies, versions and comparisons, and a shared bibliography.
 - **PDF builds on the server** with error locations and source ↔ PDF jumps.
 - **Desktop sync** — open a server project in the desktop app as a local folder; edits flow both ways, conflicts become copies instead of lost work.
-- **AI conversations in the browser** — the desktop's Codex chat panel, running on a lab machine where Codex is signed in. Its edits go straight into the shared text, with a version saved before every turn and overlaps with collaborators kept as suggestions; conversations are private until shared with the project.
+- **AI conversations in the browser** — the desktop's chat panels (Codex, Claude Code, OpenCode), running on a lab machine where those tools are signed in. Its edits go straight into the shared text, with a version saved before every turn and overlaps with collaborators kept as suggestions; conversations are private until shared with the project.
 - **Accounts for a group** — people register and an administrator approves them; invitation links, an admin console, and per-project roles (owner, editor, commenter, viewer).
 - **Runs on your hardware** — PostgreSQL with daily backups; Docker, or natively on a Windows lab PC.
 

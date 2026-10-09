@@ -1,3 +1,4 @@
+import { runOpenCodePrompt } from "@lmms-lab/workbench/agents";
 import { useCallback, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { getReadableErrorMessage } from "@/lib/errors";
@@ -8,7 +9,6 @@ import {
   sanitizeAiCommitMessage,
 } from "@/lib/git/ai-commit-message";
 import { i18n } from "@/lib/i18n";
-import { runOpenCodePrompt } from "@/lib/opencode/run-prompt";
 import type { OpenCodeStatus } from "@/lib/opencode/use-opencode-daemon";
 import type { useTauriDaemon } from "@/lib/tauri";
 

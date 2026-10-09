@@ -1,4 +1,5 @@
-import { i18n, useI18n } from "@/lib/i18n";
+import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../../i18n";
+import { agentPlatform } from "../platform";
 export function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -36,9 +37,7 @@ export function ErrorMessage({ message }: { message: string }) {
     const parts = message.split(url);
 
     const handleClick = () => {
-      import("@tauri-apps/plugin-shell").then(({ open }) => {
-        open(url);
-      });
+      void agentPlatform().openExternal(url);
     };
 
     return (

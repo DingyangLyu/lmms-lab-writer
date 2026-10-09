@@ -1,10 +1,10 @@
 "use client";
 
+import { formatRelativeTime } from "@lmms-lab/workbench/agents";
 import { FolderIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import type { RecentProject } from "@/lib/recent-projects";
-import { formatRelativeTime } from "./opencode/utils";
 
 export function RecentProjects({
   projects,

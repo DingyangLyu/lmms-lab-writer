@@ -7,6 +7,7 @@ import {
   type UseBridge,
 } from "@lmms-lab/workbench/agents";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { open } from "@tauri-apps/plugin-shell";
@@ -51,5 +52,10 @@ export const desktopAgentPlatform: AgentPlatform = {
     invoke<ChatImageFile>("import_chat_file_data", { project, name, base64 }),
   validateDocuments: (project, files) => invoke("validate_chat_files", { project, files }),
   useBridge: useDesktopBridge,
+  beforeAgentTurn: async (project, actor) => {
+    await invoke("review_begin", { project, actor });
+  },
+  onConversationUpdated: (handler) =>
+    listen<{ id: string }>("writer://conversation-updated", ({ payload }) => handler(payload.id)),
 };
 setAgentPlatform(desktopAgentPlatform);

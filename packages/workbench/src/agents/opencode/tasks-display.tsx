@@ -2,10 +2,10 @@
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { useMemo, useState } from "react";
-import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/lib/i18n";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { Spinner } from "../../ui/spinner";
 import { CheckIcon, DisclosureTriangle } from "./icons";
-import type { TaskItem } from "./types";
+import type { TaskItem } from "./panel-types";
 
 export function parseTasks(data: unknown): TaskItem[] | null {
   if (!data) return null;

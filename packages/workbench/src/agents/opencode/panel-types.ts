@@ -1,8 +1,15 @@
-import type { EditorSelectionContext } from "@lmms-lab/workbench/agents";
+import type { ChatImageFile } from "../chat/images";
+import type { HarnessLifecycle } from "../harness/types";
+import type { EditorSelectionContext } from "../selection-context";
+import type { OpenCodeTransport } from "./client";
 
 export type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
 
-export type Props = import("@lmms-lab/workbench/agents").HarnessLifecycle & {
+export type Props = HarnessLifecycle & {
+  /** How the client reaches OpenCode; a local `opencode serve` at `baseUrl` when absent. */
+  transport?: OpenCodeTransport;
+  /** Shared runner: make the member's own conversation visible to the project, or private. */
+  onShare?: (sessionId: string, shared: boolean) => Promise<unknown>;
   active?: boolean;
   onWorkingChange?: (busy: boolean) => void;
   className?: string;
@@ -40,4 +47,4 @@ export type AskUserQuestion = {
   multiSelect?: boolean;
 };
 
-export type AttachedFile = import("@lmms-lab/workbench/agents").ChatImageFile;
+export type AttachedFile = ChatImageFile;

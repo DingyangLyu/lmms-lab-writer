@@ -11,7 +11,9 @@ export type OpenCodeStatus = {
   managed?: boolean;
   webSearchEnabled?: boolean;
 };
-export type OpenCodeDaemonStatus = "stopped" | "starting" | "running" | "unavailable";
+export type { OpenCodeDaemonStatus } from "@lmms-lab/workbench/agents";
+
+import type { OpenCodeDaemonStatus } from "@lmms-lab/workbench/agents";
 
 /**
  * The app-managed `opencode serve` process: one server for every open project, started on

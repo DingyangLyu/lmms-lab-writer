@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runOpenCodePrompt } from "./run-prompt";
 
-vi.mock("@/lib/timing", () => ({ sleep: () => Promise.resolve() }));
+vi.mock("./timing", () => ({ sleep: () => Promise.resolve() }));
 
 type Handler = (url: string, init: RequestInit) => unknown;
 function serve(handler: Handler) {

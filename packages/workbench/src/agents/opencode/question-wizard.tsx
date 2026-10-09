@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useI18n } from "@/lib/i18n";
-import type { ToolPart } from "@/lib/opencode/types";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
 import { CheckIcon } from "./icons";
-import type { AskUserQuestion } from "./types";
+import type { AskUserQuestion } from "./panel-types";
+import type { ToolPart } from "./types";
 
 export function parseAskUserQuestions(input: Record<string, unknown>): AskUserQuestion[] | null {
   let questions = input.questions;

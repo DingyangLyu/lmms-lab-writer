@@ -1,11 +1,11 @@
-import { i18n } from "@/lib/i18n";
+import { workbenchI18n as i18n } from "../../i18n";
 import {
   extractTextParts,
   type OpenCodeMessageItem,
   parseOpenCodeMessageResponse,
-} from "@/lib/opencode/messages";
-import { getPreferredOpenCodeConfig } from "@/lib/opencode/preferences";
-import { sleep } from "@/lib/timing";
+} from "./messages";
+import { getPreferredOpenCodeConfig } from "./preferences";
+import { sleep } from "./timing";
 
 function messageItems(data: unknown): OpenCodeMessageItem[] {
   if (Array.isArray(data)) return data as OpenCodeMessageItem[];

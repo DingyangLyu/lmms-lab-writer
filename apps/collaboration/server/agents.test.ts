@@ -412,3 +412,73 @@ describe.skipIf(process.platform === "win32")("Claude Code on the shared runner"
     expect(versions.filter((v: { label: string }) => v.label === "AI 对话修改前")).toHaveLength(2);
   });
 });
+
+describe.skipIf(process.platform === "win32")("OpenCode on the shared runner", () => {
+  it("relays its API per session, keeps keys on the runner and merges a prompt's edits", async () => {
+    const f = await setup(["codex", "opencode"]);
+    const dir = await mkdtemp(join(tmpdir(), "writer-opencode-"));
+    const opencode = join(dir, "opencode.sh");
+    await writeFile(
+      opencode,
+      `#!/bin/sh\nexec "${process.execPath}" "${join(import.meta.dirname, "fake-opencode.mjs")}" "$@"\n`,
+    );
+    await chmod(opencode, 0o755);
+    const host = new AgentHost({
+      server: f.origin,
+      token: TOKEN,
+      root: join(dir, "work"),
+      harnesses: ["opencode"],
+      opencode,
+      log: () => {},
+    }).start();
+    cleanups.push(async () => {
+      host.stop();
+      await rm(dir, { recursive: true, force: true });
+    });
+    const chapter = await f.file("chapter.tex", "Hello world\n");
+    const owner = await f.browser(f.owner);
+    await owner.until((m) => m.status?.online && m.status.harnesses.includes("opencode"));
+    const call = (method: string, path: string, body?: unknown, member = owner) =>
+      member.request("opencode.fetch", {
+        method,
+        path,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    const config = await call("GET", "/config");
+    expect(JSON.parse(config.body)).toEqual({ model: "fake/model" });
+    expect((await call("GET", "/provider")).body).not.toContain("sk-secret");
+    await expect(call("GET", "/file/content")).rejects.toThrow(/接口不存在/);
+
+    const session = JSON.parse((await call("POST", "/session", {})).body);
+    const prompt = await call("POST", `/session/${session.id}/prompt_async`, {
+      parts: [
+        {
+          type: "text",
+          text: `[Writer conversation ID: opencode:${session.id}]\nWriter MCP supports peer delegation.\n\nreplace chapter.tex world=>team`,
+        },
+      ],
+    });
+    expect(prompt.status).toBe(204);
+    await owner.until(
+      (m) => m.event?.method === "opencode/event" && m.event.params.event.type === "session.idle",
+    );
+    expect(await f.text(chapter)).toBe("Hello team\n");
+    expect(owner.messages.some((m) => m.event?.method === CHANGES_EVENT)).toBe(true);
+    expect(owner.messages.filter((m) => "busy" in m).at(-1).busy).toBeNull();
+    const versions = (await f.call(`/projects/${f.project}/snapshots`, undefined, f.owner)).data;
+    expect(versions.map((v: { label: string }) => v.label)).toContain("AI 对话修改前");
+
+    // Another editor sees nothing of a private session, then the shared one.
+    const editor = await f.browser(await f.invite("editor", "editor2"));
+    expect(JSON.parse((await call("GET", "/session", undefined, editor)).body)).toEqual([]);
+    await expect(call("GET", `/session/${session.id}/message`, undefined, editor)).rejects.toThrow(
+      /不存在或未共享/,
+    );
+    await owner.request("thread.share", { threadId: session.id, shared: true });
+    const listed = JSON.parse((await call("GET", "/session", undefined, editor)).body);
+    expect(listed).toMatchObject([{ id: session.id, writer: { mine: false, shared: true } }]);
+    await expect(
+      call("PATCH", `/session/${session.id}`, { title: "mine" }, editor),
+    ).rejects.toThrow(/发起人/);
+  });
+});

@@ -13,15 +13,26 @@ import {
   HarnessWorkspace,
   type HistoryAdapter,
   type HistoryEntry,
+  OpenCodeClient,
+  OpenCodePanel,
   parseChatLink,
   useHarnessWorkspace,
 } from "@lmms-lab/workbench/agents";
 import { useEffect, useMemo, useState } from "react";
 import type { PublicUser, Role } from "../../shared/api";
 import { i18n, useI18n } from "../i18n";
-import { AgentLink, relayClaudeBackend, relayCodexBackend } from "./agent-link";
+import {
+  AgentLink,
+  OPENCODE_RELAY,
+  relayClaudeBackend,
+  relayCodexBackend,
+  relayOpenCodeTransport,
+} from "./agent-link";
 
-const PANELS = { codex: CodexPanel, claude: ClaudePanel };
+const PANELS = { codex: CodexPanel, claude: ClaudePanel, opencode: OpenCodePanel };
+const WEB_ORDER: HarnessId[] = ["codex", "claude", "opencode"];
+/** What the server adds to OpenCode's session list: whose conversation it is. */
+type Shared = { writer?: { mine?: boolean; shared?: boolean; ownerName?: string } };
 /** How a conversation shows in the history: whose it is and whether it is shared. */
 const entry = (item: {
   id: string;
@@ -74,7 +85,12 @@ export function AgentsPanel({
   );
   useEffect(() => () => link?.close(), [link]);
   const backends = useMemo(
-    () => link && { codex: relayCodexBackend(link), claude: relayClaudeBackend(link) },
+    () =>
+      link && {
+        codex: relayCodexBackend(link),
+        claude: relayClaudeBackend(link),
+        opencode: relayOpenCodeTransport(link),
+      },
     [link],
   );
   const [offered, setOffered] = useState<string[]>([]);
@@ -84,9 +100,9 @@ export function AgentsPanel({
     void link.connect().catch(() => {});
     return stop;
   }, [link]);
-  // What the runner offers; Codex until it has said.
-  const harnesses = HARNESSES.filter((h) =>
-    offered.length ? offered.includes(h.id) && h.id in PANELS : h.id === "codex",
+  // What the runner offers, Codex first; Codex until it has said.
+  const harnesses = WEB_ORDER.flatMap((id) => HARNESSES.filter((h) => h.id === id)).filter((h) =>
+    offered.length ? offered.includes(h.id) : h.id === "codex",
   );
   const workspace = useHarnessWorkspace(allowed ? project : null);
   const first = harnesses[0]?.id;
@@ -96,32 +112,59 @@ export function AgentsPanel({
   }, [allowed, first, workspace]);
   if (!allowed || !backends)
     return <p className="p-4 text-sm text-muted">{t("agents.ownersAndEditorsOnly")}</p>;
+  const opencodeHistory = (): HistoryAdapter => {
+    const client = new OpenCodeClient({
+      baseUrl: OPENCODE_RELAY,
+      directory: project,
+      transport: backends.opencode,
+    });
+    return {
+      list: async () => ({
+        entries: (await client.listHistorySessions()).map((session) =>
+          entry({
+            id: session.id,
+            name: session.title,
+            updated: session.time.updated,
+            ...(session as Shared).writer,
+          }),
+        ),
+      }),
+      rename: async (id, title) => {
+        await client.renameSession(id, title);
+      },
+      share: async (id, shared) => {
+        await link?.request("thread.share", { threadId: id, shared });
+      },
+    };
+  };
   const history = (backend: HarnessId): HistoryAdapter =>
-    backend === "claude"
-      ? {
-          list: async () => ({
-            entries: (await backends.claude.listSessions(project)).map((s) =>
-              entry({ ...s, updated: s.updatedAt }),
-            ),
-          }),
-          rename: async (id, title) => {
-            await backends.claude.renameSession(project, id, title);
-          },
-          share: async (id, shared) => {
-            await backends.claude.shareSession?.(id, shared);
-          },
-        }
-      : {
-          list: async () => ({
-            entries: ((await backends.codex.listThreads(project)).data ?? []).map(entry),
-          }),
-          rename: async (id, title) => {
-            await backends.codex.renameThread(id, title);
-          },
-          share: async (id, shared) => {
-            await backends.codex.shareThread?.(id, shared);
-          },
-        };
+    backend === "opencode"
+      ? opencodeHistory()
+      : backend === "claude"
+        ? {
+            list: async () => ({
+              entries: (await backends.claude.listSessions(project)).map((s) =>
+                entry({ ...s, updated: s.updatedAt }),
+              ),
+            }),
+            rename: async (id, title) => {
+              await backends.claude.renameSession(project, id, title);
+            },
+            share: async (id, shared) => {
+              await backends.claude.shareSession?.(id, shared);
+            },
+          }
+        : {
+            list: async () => ({
+              entries: ((await backends.codex.listThreads(project)).data ?? []).map(entry),
+            }),
+            rename: async (id, title) => {
+              await backends.codex.renameThread(id, title);
+            },
+            share: async (id, shared) => {
+              await backends.codex.shareThread?.(id, shared);
+            },
+          };
   return (
     <div className="flex h-full min-h-0 flex-col">
       {harnesses.length > 1 && (
@@ -139,7 +182,18 @@ export function AgentsPanel({
         preferredBackend={first ?? "codex"}
         harnesses={harnesses}
         panels={PANELS}
-        panelProps={{ codex: { backend: backends.codex }, claude: { backend: backends.claude } }}
+        panelProps={{
+          codex: { backend: backends.codex },
+          claude: { backend: backends.claude },
+          opencode: {
+            transport: backends.opencode,
+            baseUrl: OPENCODE_RELAY,
+            autoConnect: true,
+            daemonStatus: "running",
+            onShare: (id: string, shared: boolean) =>
+              link?.request("thread.share", { threadId: id, shared }),
+          },
+        }}
         history={history}
         onBackendChange={() => {}}
         shared={{

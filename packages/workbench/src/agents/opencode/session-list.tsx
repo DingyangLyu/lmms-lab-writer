@@ -1,11 +1,11 @@
 "use client";
 
 import { useAutoAnimate } from "@formkit/auto-animate/react";
-import { RenameChat } from "@lmms-lab/workbench/agents";
 import { useMemo, useState } from "react";
-import { useI18n } from "@/lib/i18n";
-import type { SessionInfo } from "@/lib/opencode/types";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { RenameChat } from "../chat/rename-chat";
 import { TrashIcon } from "./icons";
+import type { SessionInfo } from "./types";
 import { formatRelativeTime } from "./utils";
 
 export function SessionList({

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/lib/i18n";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { Spinner } from "../../ui/spinner";
 import { CheckIcon, FolderIcon, TerminalIcon } from "./icons";
-import type { OpenCodeDaemonStatus } from "./types";
+import type { OpenCodeDaemonStatus } from "./panel-types";
 
 export function OnboardingState({
   connecting,

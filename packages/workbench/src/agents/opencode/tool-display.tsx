@@ -1,13 +1,13 @@
 "use client";
 
-import { ChatImage } from "@lmms-lab/workbench/agents";
 import { useMemo, useState } from "react";
-import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/lib/i18n";
-import type { ToolPart } from "@/lib/opencode/types";
-import { getToolInfo } from "@/lib/opencode/types";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { Spinner } from "../../ui/spinner";
+import { ChatImage } from "../chat/chat-image";
 import { ChevronIcon, ToolIcon } from "./icons";
 import { parseTasks, TasksDisplay } from "./tasks-display";
+import type { ToolPart } from "./types";
+import { getToolInfo } from "./types";
 import { formatValue } from "./utils";
 
 export function ToolDisplay({

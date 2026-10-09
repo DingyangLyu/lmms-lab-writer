@@ -1,38 +1,37 @@
 "use client";
 
-import type { ChatDraft, ChatImageFile, ChatOutbox } from "@lmms-lab/workbench/agents";
-import {
-  DeliveryControls,
-  type DeliveryMode,
-  prepareChatFiles,
-  useChatOutbox,
-  useComposerDraft,
-  useIdleTranscript,
-  usePanelLifecycle,
-  withEditorSelection,
-} from "@lmms-lab/workbench/agents";
-import { listen } from "@tauri-apps/api/event";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConversationBridge } from "@/components/bridge/conversation-bridge";
-import { ResizableComposer } from "@/components/ui/panel-height";
-import { useConversationBridge } from "@/lib/bridge/use-conversation-bridge";
-import { useI18n } from "@/lib/i18n";
-import { getOpenCodeErrorMessage } from "@/lib/opencode/client";
-import type { ToolPart } from "@/lib/opencode/types";
-import { useOpenCode } from "@/lib/opencode/use-opencode";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
+import { ResizableComposer } from "../../ui/panel-height";
+import { useComposerDraft } from "../chat/composer-drafts";
+import { DeliveryControls, type DeliveryMode } from "../chat/delivery-controls";
+import { prepareChatFiles } from "../chat/files";
+import type { ChatImageFile } from "../chat/images";
+import type { ChatDraft, ChatOutbox } from "../chat/outbox";
+import { ShareToggle } from "../chat/share-toggle";
+import { useChatOutbox } from "../chat/use-chat-outbox";
+import { useIdleTranscript } from "../chat/use-idle-transcript";
+import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
+import { agentPlatform, useBridge } from "../platform";
+import { withEditorSelection } from "../selection-context";
+import { getOpenCodeErrorMessage } from "./client";
 import { PlusIcon } from "./icons";
 import { InputArea } from "./input-area";
 import { MessageList } from "./message-list";
 import { OnboardingState } from "./onboarding";
+import type { Props } from "./panel-types";
 import { EmptyState, SessionList } from "./session-list";
 import { CollapsibleTasksBar, parseTasks } from "./tasks-display";
-import type { Props } from "./types";
+import type { ToolPart } from "./types";
+import { useOpenCode } from "./use-opencode";
 
 export const OpenCodePanel = memo(function OpenCodePanel({
   active = true,
   onWorkingChange,
   className = "",
   baseUrl,
+  transport,
+  onShare,
   directory,
   autoConnect = false,
   daemonStatus,
@@ -50,11 +49,31 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   const { t } = useI18n();
   const opencode = useOpenCode({
     baseUrl,
+    transport,
     directory,
     autoConnect,
     initialSessionId: lifecycle.initialSessionId,
   });
   const [attachmentLoading, setAttachmentLoading] = useState(false);
+  /**
+   * Shared runner: whose conversation this is. The server adds it to the session list, but
+   * OpenCode's own session updates do not carry it, so it is remembered per session; a session
+   * this member just created is theirs.
+   */
+  const owners = useRef(
+    new Map<string, { mine?: boolean; shared?: boolean; ownerName?: string }>(),
+  );
+  for (const session of opencode.sessions) {
+    const meta = (session as { writer?: { mine?: boolean; shared?: boolean; ownerName?: string } })
+      .writer;
+    if (meta) owners.current.set(session.id, meta);
+  }
+  const writer = opencode.currentSessionId
+    ? (owners.current.get(opencode.currentSessionId) ?? { mine: true, shared: false })
+    : undefined;
+  const [shared, setShared] = useState<boolean | undefined>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a different conversation starts from the list.
+  useEffect(() => setShared(undefined), [opencode.currentSessionId]);
   const [input, setInput] = useState("");
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("steer");
   const outboxRef = useRef<ChatOutbox | null>(null);
@@ -320,7 +339,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     opencode.status.type === "busy" ||
     opencode.status.type === "retry";
 
-  const bridge = useConversationBridge(
+  const bridge = useBridge(
     "opencode",
     opencode.currentSessionId,
     directory,
@@ -335,9 +354,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     },
   );
   registerRef.current = bridge.register;
-  const bridgeWorking = bridge.snapshot.conversations.some(
-    (session) => session.id === bridge.fullId && Boolean(session.activeJob),
-  );
+  const bridgeWorking = bridge.working;
   const outbox = useChatOutbox({
     scope:
       directory && opencode.currentSessionId
@@ -401,8 +418,10 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   useEffect(() => {
     let cancelled = false;
     let stop: (() => void) | undefined;
-    void listen<{ id: string }>("writer://conversation-updated", ({ payload }) => {
-      if (payload.id === bridge.fullId && opencode.currentSessionId)
+    const subscribe = agentPlatform().onConversationUpdated;
+    if (!subscribe) return;
+    void subscribe((id) => {
+      if (opencode.currentSessionId && id === `opencode:${opencode.currentSessionId}`)
         void opencode.selectSession(opencode.currentSessionId);
     }).then((unlisten) => {
       if (cancelled) unlisten();
@@ -412,7 +431,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       cancelled = true;
       stop?.();
     };
-  }, [bridge.fullId, opencode.currentSessionId, opencode.selectSession]);
+  }, [opencode.currentSessionId, opencode.selectSession]);
 
   usePanelLifecycle(
     lifecycle,
@@ -520,7 +539,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       data-chat-panel="opencode"
       className={`flex h-full min-h-0 flex-col overflow-hidden bg-accent-hover/50 ${className}`}
     >
-      <ConversationBridge bridge={bridge} />
+      {bridge.view}
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2 overflow-hidden">
@@ -551,7 +570,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
                     ? "busy"
                     : "ready"}
               </span>
-              {baseUrl && (
+              {baseUrl && !transport && (
                 <a
                   href={baseUrl}
                   target="_blank"
@@ -565,6 +584,20 @@ export const OpenCodePanel = memo(function OpenCodePanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onShare && opencode.currentSessionId && writer && (
+            <ShareToggle
+              mine={writer.mine}
+              shared={shared ?? writer.shared}
+              ownerName={writer.ownerName}
+              onError={() => {}}
+              onShare={async (next) => {
+                const id = opencode.currentSessionId as string;
+                await onShare(id, next);
+                owners.current.set(id, { ...writer, shared: next });
+                setShared(next);
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={handleNewSession}

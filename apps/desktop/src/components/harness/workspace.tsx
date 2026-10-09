@@ -4,20 +4,19 @@ import "@/lib/agent-platform";
 import {
   HarnessButtons,
   type HarnessId,
+  type OpenCodePanelProps as OpenCodeProps,
   HarnessWorkspace as SharedHarnessWorkspace,
 } from "@lmms-lab/workbench/agents";
 import dynamic from "next/dynamic";
 import type { ComponentProps } from "react";
-import type { Props as OpenCodeProps } from "@/components/opencode/types";
 import { desktopClaudeBackend } from "@/lib/claude/desktop-backend";
 import { desktopCodexBackend } from "@/lib/codex/desktop-backend";
 import { desktopHistory } from "@/lib/harness/history";
 
 const PANELS = {
-  opencode: dynamic(
-    () => import("@/components/opencode/opencode-panel").then((m) => m.OpenCodePanel),
-    { ssr: false },
-  ),
+  opencode: dynamic(() => import("@lmms-lab/workbench/agents").then((m) => m.OpenCodePanel), {
+    ssr: false,
+  }),
   codex: dynamic(() => import("@lmms-lab/workbench/agents").then((m) => m.CodexPanel), {
     ssr: false,
   }),

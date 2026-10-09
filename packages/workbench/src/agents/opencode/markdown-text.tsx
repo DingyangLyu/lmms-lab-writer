@@ -1,12 +1,14 @@
-import { ChatImage, ChatLink, chatUrlTransform } from "@lmms-lab/workbench/agents";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { ChatImage } from "../chat/chat-image";
+import { ChatLink } from "../chat/chat-link";
+import { chatUrlTransform } from "../chat/links";
 import "katex/dist/katex.min.css";
 import { useMemo } from "react";
-import { useI18n } from "@/lib/i18n";
+import { useWorkbenchI18n as useI18n } from "../../i18n";
 
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];

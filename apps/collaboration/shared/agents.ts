@@ -15,7 +15,10 @@
  * Server → runner: the same methods with the project and its files added.
  * Runner → server: `files.read` (binary contents) and `changes` (what the agent edited).
  * Claude Code's stream-json events travel as `{method: "claude/event", params: {threadId,
- * event}}`; `writer_started` / `writer_done` mark a turn.
+ * event}}`; `writer_started` / `writer_done` mark a turn. OpenCode's client keeps its HTTP API:
+ * `opencode.fetch {method, path, body}` covers the calls the panel makes (the server checks
+ * each session's access; the runner allows only those calls and strips configuration), and its
+ * events travel as `{method: "opencode/event", params: {threadId, event}}`.
  */
 
 /** The permission choices of each composer (as on the desktop). */
@@ -28,11 +31,15 @@ export const AGENT_PERMISSIONS: readonly AgentPermission[] = [
 ];
 export const CLAUDE_PERMISSIONS = ["default", "acceptEdits", "bypassPermissions", "plan"] as const;
 export type ClaudePermission = (typeof CLAUDE_PERMISSIONS)[number];
+/** OpenCode has no permission choice in its composer; the runner's configuration decides. */
 export const HARNESS_PERMISSIONS: Record<string, readonly string[]> = {
   codex: AGENT_PERMISSIONS,
   claude: CLAUDE_PERMISSIONS,
+  opencode: [],
 };
 export const CLAUDE_EVENT = "claude/event";
+/** OpenCode's own server-sent events, for one session: `{threadId, event}`. */
+export const OPENCODE_EVENT = "opencode/event";
 
 export type AgentStatus = {
   online: boolean;

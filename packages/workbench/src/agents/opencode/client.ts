@@ -1,5 +1,5 @@
-import { mergeById } from "@lmms-lab/workbench/agents";
-import { i18n } from "@/lib/i18n";
+import { workbenchI18n as i18n } from "../../i18n";
+import { mergeById } from "../chat/idle-transcript";
 import { openEventStream } from "./event-stream";
 import { appendSearchFallbackHint } from "./search-fallback";
 import type { Event, Message, Part, SessionInfo, SessionStatus } from "./types";
@@ -29,8 +29,17 @@ function isNetworkLoadFailure(error: unknown): boolean {
   );
 }
 
+/**
+ * How a client reaches OpenCode: plain HTTP and server-sent events to `opencode serve`, unless
+ * the host relays them (the web app, through its server to the lab runner).
+ */
+export type OpenCodeTransport = {
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+  openStream: (url: string) => Pick<EventSource, "onopen" | "onmessage" | "onerror" | "close">;
+};
 export type OpenCodeClientOptions = {
   baseUrl: string;
+  transport?: OpenCodeTransport;
   directory?: string;
   onEvent?: (event: Event) => void;
   getSessionId?: () => string | null;
@@ -54,7 +63,7 @@ export class OpenCodeClient {
   private statusRevision = new Map<string, number>();
   private eventSource: ReturnType<typeof openEventStream> | null = null;
   private options: OpenCodeClientOptions;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 1000;
@@ -70,7 +79,11 @@ export class OpenCodeClient {
     status: new Map(),
   };
 
+  private fetch: OpenCodeTransport["fetch"];
+  private openStream: OpenCodeTransport["openStream"];
   constructor(options: OpenCodeClientOptions) {
+    this.fetch = options.transport?.fetch ?? ((url, init) => fetch(url, init));
+    this.openStream = options.transport?.openStream ?? openEventStream;
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.directory = options.directory;
     this.options = options;
@@ -163,7 +176,7 @@ export class OpenCodeClient {
   async waitForApiReady(maxRetries = 5, initialDelay = 500): Promise<boolean> {
     for (let i = 0; i < maxRetries; i++) {
       try {
-        const response = await fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
+        const response = await this.fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
           headers: this.getHeaders(),
           signal: AbortSignal.timeout(2000),
         });
@@ -221,7 +234,7 @@ export class OpenCodeClient {
     }
 
     try {
-      this.eventSource = openEventStream(url);
+      this.eventSource = this.openStream(url);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : i18n.t("msg.couldNotOpenTheEventStream");
@@ -423,7 +436,7 @@ export class OpenCodeClient {
 
   async listSessions(strict = false): Promise<SessionInfo[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
+      const response = await this.fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
         headers: this.getHeaders(),
         signal: this.getSignal(),
       });
@@ -464,7 +477,7 @@ export class OpenCodeClient {
             session = sessions[index];
           if (!session) continue;
           const query = this.getQueryParams();
-          const response = await fetch(
+          const response = await this.fetch(
             `${this.baseUrl}/session/${encodeURIComponent(session.id)}/message${query}${query ? "&" : "?"}limit=1`,
             { headers: this.getHeaders(), signal: this.getSignal() },
           );
@@ -484,10 +497,13 @@ export class OpenCodeClient {
   }
 
   async getSession(sessionID: string): Promise<SessionInfo> {
-    const response = await fetch(`${this.baseUrl}/session/${sessionID}${this.getQueryParams()}`, {
-      headers: this.getHeaders(),
-      signal: this.getSignal(),
-    });
+    const response = await this.fetch(
+      `${this.baseUrl}/session/${sessionID}${this.getQueryParams()}`,
+      {
+        headers: this.getHeaders(),
+        signal: this.getSignal(),
+      },
+    );
     if (!response.ok)
       throw new Error(i18n.t("msg.couldNotLoadTheSessionStatus", { status: response.statusText }));
     const data = await this.safeParseJson<SessionInfo>(response, "getSession");
@@ -497,7 +513,7 @@ export class OpenCodeClient {
   }
 
   async createSession(): Promise<SessionInfo> {
-    const response = await fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
+    const response = await this.fetch(`${this.baseUrl}/session${this.getQueryParams()}`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({}),
@@ -513,11 +529,14 @@ export class OpenCodeClient {
   }
 
   async deleteSession(sessionID: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/session/${sessionID}${this.getQueryParams()}`, {
-      method: "DELETE",
-      headers: this.getHeaders(),
-      signal: this.getSignal(),
-    });
+    const response = await this.fetch(
+      `${this.baseUrl}/session/${sessionID}${this.getQueryParams()}`,
+      {
+        method: "DELETE",
+        headers: this.getHeaders(),
+        signal: this.getSignal(),
+      },
+    );
     if (!response.ok)
       throw new Error(
         i18n.t("msg.couldNotDeleteTheSessionStatus", { status: response.statusText }),
@@ -528,7 +547,7 @@ export class OpenCodeClient {
     title = title.trim();
     if (!title || title.length > 120)
       throw new Error(i18n.t("msg.conversationNamesMustBe1120Characters"));
-    const response = await fetch(
+    const response = await this.fetch(
       `${this.baseUrl}/session/${encodeURIComponent(sessionID)}${this.getQueryParams()}`,
       {
         method: "PATCH",
@@ -549,7 +568,7 @@ export class OpenCodeClient {
 
   async getSessionStatus(sessionID: string): Promise<SessionStatus> {
     const revision = this.statusRevision.get(sessionID) || 0;
-    const response = await fetch(`${this.baseUrl}/session/status${this.getQueryParams()}`, {
+    const response = await this.fetch(`${this.baseUrl}/session/status${this.getQueryParams()}`, {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
@@ -569,7 +588,7 @@ export class OpenCodeClient {
 
   async getMessages(sessionID: string): Promise<Message[]> {
     this.touchSession(sessionID);
-    const response = await fetch(
+    const response = await this.fetch(
       `${this.baseUrl}/session/${sessionID}/message${this.getQueryParams()}`,
       {
         headers: this.getHeaders(),
@@ -605,7 +624,7 @@ export class OpenCodeClient {
   }
 
   async getParts(sessionID: string, messageID: string): Promise<Part[]> {
-    const response = await fetch(
+    const response = await this.fetch(
       `${this.baseUrl}/session/${sessionID}/message/${messageID}/part${this.getQueryParams()}`,
       {
         headers: this.getHeaders(),
@@ -673,7 +692,7 @@ export class OpenCodeClient {
 
     const url = `${this.baseUrl}/session/${sessionID}/prompt_async${this.getQueryParams()}`;
 
-    const response = await fetch(url, {
+    const response = await this.fetch(url, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(body),
@@ -696,7 +715,7 @@ export class OpenCodeClient {
   }
 
   async abort(sessionID: string): Promise<void> {
-    const response = await fetch(
+    const response = await this.fetch(
       `${this.baseUrl}/session/${sessionID}/abort${this.getQueryParams()}`,
       {
         method: "POST",
@@ -709,7 +728,7 @@ export class OpenCodeClient {
   }
 
   async answerQuestion(requestID: string, answers: string[][]): Promise<void> {
-    const response = await fetch(
+    const response = await this.fetch(
       `${this.baseUrl}/question/${requestID}/reply${this.getQueryParams()}`,
       {
         method: "POST",
@@ -730,7 +749,7 @@ export class OpenCodeClient {
   }
 
   async getConfig(): Promise<{ model?: string; default_agent?: string }> {
-    const response = await fetch(`${this.baseUrl}/config${this.getQueryParams()}`, {
+    const response = await this.fetch(`${this.baseUrl}/config${this.getQueryParams()}`, {
       headers: this.getHeaders(),
       signal: this.getSignal(),
     });
@@ -749,7 +768,7 @@ export class OpenCodeClient {
   async getAgents(): Promise<{ id: string; name: string; description?: string }[]> {
     try {
       const url = `${this.baseUrl}/agent${this.getQueryParams()}`;
-      const response = await fetch(url, {
+      const response = await this.fetch(url, {
         headers: this.getHeaders(),
         signal: this.getSignal(),
       });
@@ -827,7 +846,7 @@ export class OpenCodeClient {
   > {
     try {
       const url = `${this.baseUrl}/provider${this.getQueryParams()}`;
-      const response = await fetch(url, {
+      const response = await this.fetch(url, {
         headers: this.getHeaders(),
         signal: this.getSignal(),
       });
