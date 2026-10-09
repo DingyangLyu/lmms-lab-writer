@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate DMG installer background image for LMMs-Lab Writer
+Generate DMG installer background image for Y-Writer
 Style: Neo-brutalism + Pixel Dot Matrix
 Colors: Monochrome only (black, white, grays)
 """
@@ -105,8 +105,8 @@ def generate_dmg_background(output_path):
     draw.text((text_x + shadow_offset, text_y + shadow_offset), main_text, fill=BORDER, font=font_large)
     draw.text((text_x, text_y), main_text, fill=BLACK, font=font_large)
 
-    # 6. BRAND ELEMENT - "LMMs-Lab Writer" at bottom
-    brand_text = "LMMs-Lab Writer"
+    # 6. BRAND ELEMENT - "Y-Writer" at bottom
+    brand_text = "Y-Writer"
     bbox = draw.textbbox((0, 0), brand_text, font=font_small)
     brand_width = bbox[2] - bbox[0]
     brand_x = (WIDTH - brand_width) // 2

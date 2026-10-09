@@ -598,7 +598,7 @@ pub async fn claude_start_turn(
         format!("--session-id={session_id}")
     });
     cmd.args(permission_args);
-    cmd.arg("--append-system-prompt").arg(format!("You are working in LMMs-Lab Writer, a local LaTeX writing app. Follow the user's requested scope. Preserve unrelated changes. Verify citations against primary sources and never invent bibliographic details. Use the project's configured LaTeX entry points. Link project files with relative Markdown links and line numbers when useful.\n{}", super::writer_bridge::context("claude", &session_id)));
+    cmd.arg("--append-system-prompt").arg(format!("You are working in Y-Writer, a local LaTeX writing app. Follow the user's requested scope. Preserve unrelated changes. Verify citations against primary sources and never invent bibliographic details. Use the project's configured LaTeX entry points. Link project files with relative Markdown links and line numbers when useful.\n{}", super::writer_bridge::context("claude", &session_id)));
     if let Some(model) = options.model.filter(|v| !v.is_empty() && v != "default") {
         cmd.arg(format!("--model={model}"));
     }

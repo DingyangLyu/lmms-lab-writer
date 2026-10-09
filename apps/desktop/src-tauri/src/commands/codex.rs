@@ -450,7 +450,7 @@ async fn connect(app: AppHandle) -> Result<Arc<CodexClient>, String> {
             "initialize",
             json!({"clientInfo": {
                 "name": "lmms_lab_writer",
-                "title": "LMMs-Lab Writer",
+                "title": "Y-Writer",
                 "version": env!("CARGO_PKG_VERSION")
             }}),
         )

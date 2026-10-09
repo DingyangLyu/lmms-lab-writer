@@ -52,9 +52,9 @@ async fn git(project: &str, args: &[&str], index: Option<&Path>) -> Result<Strin
         cmd.env("GIT_INDEX_FILE", index);
     }
     // Only this process uses a fallback identity; never alter the user's config.
-    cmd.env("GIT_AUTHOR_NAME", "LMMs-Lab Writer")
+    cmd.env("GIT_AUTHOR_NAME", "Y-Writer")
         .env("GIT_AUTHOR_EMAIL", "writer@localhost")
-        .env("GIT_COMMITTER_NAME", "LMMs-Lab Writer")
+        .env("GIT_COMMITTER_NAME", "Y-Writer")
         .env("GIT_COMMITTER_EMAIL", "writer@localhost");
     let output = cmd.output().await.map_err(|e| e.to_string())?;
     if !output.status.success() {

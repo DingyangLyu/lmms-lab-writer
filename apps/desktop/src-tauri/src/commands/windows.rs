@@ -32,7 +32,7 @@ pub fn create(app: &AppHandle, link: bool) -> tauri::Result<WebviewWindow> {
         WebviewUrl::App("index.html".into())
     };
     let mut builder = WebviewWindowBuilder::new(app, &label, url)
-        .title("LMMs-Lab Writer")
+        .title("Y-Writer")
         .inner_size(1400.0, 900.0)
         .min_inner_size(960.0, 640.0)
         .resizable(true);
@@ -175,9 +175,7 @@ pub fn relabel_menu(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Some(menu) = app.try_state::<NativeMenu>() {
         let _ = menu.new_window.set_text(tr!("新建窗口", "New Window"));
-        let _ = menu
-            .quit
-            .set_text(tr!("退出 LMMs-Lab Writer", "Quit LMMs-Lab Writer"));
+        let _ = menu.quit.set_text(tr!("退出 Y-Writer", "Quit Y-Writer"));
     }
     #[cfg(not(target_os = "macos"))]
     let _ = app;

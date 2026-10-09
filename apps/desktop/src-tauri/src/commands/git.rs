@@ -102,7 +102,7 @@ pub async fn protect_private_dirs(dir: &str) -> Result<(), String> {
     if !next.is_empty() && !next.ends_with('\n') {
         next.push('\n');
     }
-    next.push_str("# LMMs-Lab Writer private data (local only)\n");
+    next.push_str("# Y-Writer private data (local only)\n");
     for line in missing {
         next.push_str(&line);
         next.push('\n');

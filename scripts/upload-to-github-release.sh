@@ -5,7 +5,7 @@ REPO="${GITHUB_RELEASE_REPO:-EvolvingLMMs-Lab/lmms-lab-writer}"
 TAURI_DIR="apps/desktop/src-tauri"
 VERSION="$(node -p "require('./$TAURI_DIR/tauri.conf.json').version")"
 TAG="${GITHUB_RELEASE_TAG:-v$VERSION}"
-TITLE="${GITHUB_RELEASE_TITLE:-LMMs-Lab Writer v$VERSION}"
+TITLE="${GITHUB_RELEASE_TITLE:-Y-Writer v$VERSION}"
 CREATE_RELEASE=0
 PRERELEASE=0
 NOTES_FILE=""
@@ -79,7 +79,7 @@ else
   ARCH_SUFFIX="x64"
 fi
 
-DMG_PATH="$TAURI_DIR/target/release/bundle/dmg/LMMs-Lab Writer_${VERSION}_${ARCH_SUFFIX}.dmg"
+DMG_PATH="$TAURI_DIR/target/release/bundle/dmg/Y-Writer_${VERSION}_${ARCH_SUFFIX}.dmg"
 PKG_PATH="$TAURI_DIR/target/release/bundle/pkg/LMMs-Lab_Writer_${VERSION}_${ARCH_SUFFIX}.pkg"
 NPM_TGZ_PATH="dist/releases/npm/lmms-lab-writer-shared-${VERSION}.tgz"
 DMG_ASSET_NAME="LMMs-Lab.Writer_${VERSION}_${ARCH_SUFFIX}.dmg"

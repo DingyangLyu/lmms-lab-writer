@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build PKG installer for LMMs-Lab Writer
+# Build PKG installer for Y-Writer
 # Creates a PKG with post-install script that removes quarantine attribute
 
 set -euo pipefail
 
 # Configuration
-APP_NAME="LMMs-Lab Writer"
+APP_NAME="Y-Writer"
 BUNDLE_ID="com.lmms-lab.writer"
 
 # Paths

@@ -73,7 +73,7 @@ $projectRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
 $tauriDir = Join-Path $projectRoot "apps/desktop/src-tauri"
 
 Write-Host "=========================================="
-Write-Host "Building Windows bundles for LMMs-Lab Writer"
+Write-Host "Building Windows bundles for Y-Writer"
 Write-Host "=========================================="
 Write-Host ""
 Write-Host "Architectures: $($selectedArch -join ', ')"

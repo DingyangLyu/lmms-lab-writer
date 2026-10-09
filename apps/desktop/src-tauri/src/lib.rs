@@ -227,7 +227,7 @@ pub fn run() {
                 let quit = MenuItem::with_id(
                     app.handle(),
                     "writer-safe-quit",
-                    tr!("退出 LMMs-Lab Writer", "Quit LMMs-Lab Writer"),
+                    tr!("退出 Y-Writer", "Quit Y-Writer"),
                     true,
                     Some("CmdOrCtrl+Q"),
                 )?;

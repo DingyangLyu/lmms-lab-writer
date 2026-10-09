@@ -11,8 +11,8 @@ else
   ARCH_SUFFIX="x64"
 fi
 PKG_PATH="$TAURI_DIR/target/release/bundle/pkg/LMMs-Lab_Writer_${VERSION}_${ARCH_SUFFIX}.pkg"
-DMG_PATH="$TAURI_DIR/target/release/bundle/dmg/LMMs-Lab Writer_${VERSION}_${ARCH_SUFFIX}.dmg"
-APP_PATH="$TAURI_DIR/target/release/bundle/macos/LMMs-Lab Writer.app"
+DMG_PATH="$TAURI_DIR/target/release/bundle/dmg/Y-Writer_${VERSION}_${ARCH_SUFFIX}.dmg"
+APP_PATH="$TAURI_DIR/target/release/bundle/macos/Y-Writer.app"
 RELEASE_TAG="v${VERSION}"
 RELEASE_URL="https://github.com/EvolvingLMMs-Lab/lmms-lab-writer/releases/tag/${RELEASE_TAG}"
 DMG_ASSET_NAME="LMMs-Lab.Writer_${VERSION}_${ARCH_SUFFIX}.dmg"
@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
 done
 
 echo "=========================================="
-echo "LMMs-Lab Writer Release Script"
+echo "Y-Writer Release Script"
 echo "=========================================="
 echo ""
 

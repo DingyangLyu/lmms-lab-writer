@@ -1,8 +1,8 @@
 #!/bin/bash
-# Post-install script for LMMs-Lab Writer
+# Post-install script for Y-Writer
 # Removes quarantine attribute to prevent "damaged app" error on unsigned apps
 
-APP_PATH="/Applications/LMMs-Lab Writer.app"
+APP_PATH="/Applications/Y-Writer.app"
 
 if [ -d "$APP_PATH" ]; then
     /usr/bin/xattr -cr "$APP_PATH"

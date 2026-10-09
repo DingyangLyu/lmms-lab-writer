@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Y-Writer"><defs><linearGradient id="yw-bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#2f8099"/><stop offset="1" stop-color="#163d50"/></linearGradient></defs>
+<rect width="1024" height="1024" rx="228" fill="url(#yw-bg)"/>
+<g transform="translate(0 22)"><g fill="none" stroke="#fff" stroke-width="118" stroke-linecap="round" stroke-linejoin="round">
+<path d="M318 252 L512 486 L706 252"/></g>
+<path fill="#fff" d="M453 470 H571 V588 C571 640 552 690 528 742 L512 790 L496 742 C472 690 453 640 453 588 Z"/>
+<path stroke="#163d50" stroke-width="14" stroke-linecap="round" d="M512 612 V752"/>
+<circle cx="512" cy="590" r="30" fill="#f2b544"/></g></svg>

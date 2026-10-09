@@ -2019,14 +2019,14 @@ export default function EditorPage() {
                 <div className="flex items-center">
                   <Image
                     src="/logo-small-light.svg"
-                    alt="LMMs-Lab Writer"
+                    alt="Y-Writer"
                     width={140}
                     height={28}
                     className="h-7 w-auto dark:hidden"
                   />
                   <Image
                     src="/logo-small-dark.svg"
-                    alt="LMMs-Lab Writer"
+                    alt="Y-Writer"
                     width={140}
                     height={28}
                     className="h-7 w-auto hidden dark:block"
@@ -2035,7 +2035,7 @@ export default function EditorPage() {
                 <span className="text-border">/</span>
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="text-sm font-medium px-2 py-1 -ml-2 truncate">
-                    {daemon.projectPath ? pathSync.basename(daemon.projectPath) : "LMMs-Lab Writer"}
+                    {daemon.projectPath ? pathSync.basename(daemon.projectPath) : "Y-Writer"}
                   </div>
                 </div>
                 <button
@@ -2388,14 +2388,14 @@ export default function EditorPage() {
                   <div className="flex flex-col items-center justify-center text-center px-6">
                     <Image
                       src="/logo-light.svg"
-                      alt="LMMs-Lab Writer"
+                      alt="Y-Writer"
                       width={320}
                       height={96}
                       className="h-24 w-auto mb-10 dark:hidden"
                     />
                     <Image
                       src="/logo-dark.svg"
-                      alt="LMMs-Lab Writer"
+                      alt="Y-Writer"
                       width={320}
                       height={96}
                       className="h-24 w-auto mb-10 hidden dark:block"

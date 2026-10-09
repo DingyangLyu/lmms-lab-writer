@@ -17,7 +17,7 @@ The `dmg-background.png` file is used as the background image for the macOS DMG 
 2. **Neo-Brutalist Frame** - Bold black border with corner brackets
 3. **Arrow Guide** - Clear visual indicator showing drag direction
 4. **Text Instructions** - "DRAG TO APPLICATIONS" with offset shadow
-5. **Brand Element** - "LMMs-Lab Writer" text and barcode accent
+5. **Brand Element** - "Y-Writer" text and barcode accent
 6. **Icon Placeholders** - Subtle circles indicating icon positions
 
 ## Icon Positions

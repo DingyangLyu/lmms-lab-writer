@@ -1,10 +1,10 @@
 #!/bin/bash
-# Build DMG installer for LMMs-Lab Writer from the built .app bundle.
+# Build DMG installer for Y-Writer from the built .app bundle.
 # The app is ad-hoc signed to avoid broken-signature errors.
 
 set -euo pipefail
 
-APP_NAME="LMMs-Lab Writer"
+APP_NAME="Y-Writer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TAURI_DIR="$PROJECT_ROOT/apps/desktop/src-tauri"

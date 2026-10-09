@@ -166,7 +166,7 @@ pub async fn set_project_path(
         .insert(window.label().to_string(), canonical.clone());
     // The title names the project in the Dock, the taskbar and the Window menu.
     if let Some(name) = Path::new(&canonical).file_name() {
-        let _ = window.set_title(&format!("{} — LMMs-Lab Writer", name.to_string_lossy()));
+        let _ = window.set_title(&format!("{} — Y-Writer", name.to_string_lossy()));
     }
     Ok(canonical)
 }

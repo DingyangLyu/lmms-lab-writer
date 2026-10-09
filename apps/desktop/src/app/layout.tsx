@@ -20,7 +20,7 @@ const modernMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LMMs-Lab Writer",
+  title: "Y-Writer",
   description: "AI-native LaTeX editor",
 };
 

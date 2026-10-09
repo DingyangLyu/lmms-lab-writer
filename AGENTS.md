@@ -1,4 +1,4 @@
-# AGENTS.md - LMMs-Lab Writer
+# AGENTS.md - Y-Writer
 
 **Updated:** 2026-05-31 | **Branch:** main
 
@@ -246,10 +246,10 @@ taskkill /f /im "lmms-lab-writer.exe" 2>nul & taskkill /f /im "node.exe" /fi "WI
 ### Build Locations
 
 ```
-macOS:   apps/desktop/src-tauri/target/release/bundle/macos/LMMs-Lab Writer.app
-         apps/desktop/src-tauri/target/release/bundle/dmg/LMMs-Lab Writer_*.dmg
-Windows: apps/desktop/src-tauri/target/release/bundle/nsis/LMMs-Lab Writer_*-setup.exe
-Linux:   apps/desktop/src-tauri/target/release/bundle/appimage/LMMs-Lab Writer_*.AppImage
+macOS:   apps/desktop/src-tauri/target/release/bundle/macos/Y-Writer.app
+         apps/desktop/src-tauri/target/release/bundle/dmg/Y-Writer_*.dmg
+Windows: apps/desktop/src-tauri/target/release/bundle/nsis/Y-Writer_*-setup.exe
+Linux:   apps/desktop/src-tauri/target/release/bundle/appimage/Y-Writer_*.AppImage
          apps/desktop/src-tauri/target/release/bundle/deb/lmms-lab-writer_*.deb
 ```
 
