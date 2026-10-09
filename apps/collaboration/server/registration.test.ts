@@ -112,7 +112,14 @@ describe("registration and account administration", () => {
         (u: { username: string }) => u.username,
       ),
     ).toEqual(["owner"]);
-    // The name is free for someone new.
+    // The name is free for someone new; the deleted row's name can never be registered.
     expect((await register(f, "erin")).data).toEqual({ pending: true });
+    expect((await register(f, `已注销:${id}`)).status).toBe(400);
+    const gail = await f.invite("viewer", "gail");
+    expect((await f.call("/me", undefined, gail)).status).toBe(200);
+    expect(
+      (await f.call(`/admin/users/${await userId(f, "gail")}`, {}, f.owner, "DELETE")).status,
+    ).toBe(200);
+    expect((await f.call("/me", undefined, gail)).status).toBe(401);
   });
 });

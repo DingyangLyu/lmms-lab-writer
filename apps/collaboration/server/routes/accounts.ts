@@ -138,7 +138,10 @@ export const adminRoutes = [
     await account(ctx, id);
     const transfer = (await ctx.body()).transfer === true;
     const scrambled = await passwordHash(randomBytes(24).toString("hex"));
-    await ctx.store.db.transaction(async (tx) => {
+    const touched = await ctx.store.db.transaction(async (tx) => {
+      const memberOf = await tx.rows<{ project: string }>(
+        sql`SELECT project FROM members WHERE user_id=${id}`,
+      );
       const sole = await tx.rows<{ project: string }>(
         sql`SELECT m.project FROM members m WHERE m.user_id=${id} AND m.role='owner'
             AND NOT EXISTS (SELECT 1 FROM members o WHERE o.project=m.project
@@ -157,17 +160,21 @@ export const adminRoutes = [
       }
       await tx.run(sql`DELETE FROM members WHERE user_id=${id}`);
       await tx.run(sql`DELETE FROM sessions WHERE user_id=${id}`);
+      // ":" never passes validUsername, so no one can register (and block) a deleted name.
       await tx.run(
         sql`UPDATE users SET deleted=true, disabled=true, admin=false, pending=false, note='',
-              username=${`已注销-${id.slice(0, 8)}`}, password=${scrambled}
+              username=${`已注销:${id}`}, password=${scrambled}
             WHERE id=${id}`,
       );
       const active = await tx.row<{ n: number }>(
         sql`SELECT count(*) AS n FROM users WHERE admin AND NOT disabled`,
       );
       if (!active?.n) fail(409, "至少需要保留一名可用的管理员");
+      return memberOf.map((m) => m.project);
     });
     ctx.collab.disconnectUser(id, "账号已注销");
+    // Member lists in those projects change: the account left, or the administrator took over.
+    for (const project of touched) ctx.collab.changed(project);
     return { ok: true };
   }),
   route<Authed>("GET", /^\/api\/admin\/invites$/, async (ctx): Promise<SignupInvite[]> => {
