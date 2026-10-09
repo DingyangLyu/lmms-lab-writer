@@ -46,7 +46,7 @@ export function AdminConsole({ me, onBack }: { me: string; onBack: () => void })
     <main className="dashboard">
       <header>
         <div>
-          <span className="eyebrow">WRITER / ADMIN</span>
+          <span className="eyebrow">Y-WRITER / ADMIN</span>
           <h1>{t("console.title")}</h1>
         </div>
         <button type="button" onClick={onBack}>

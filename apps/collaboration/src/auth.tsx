@@ -131,16 +131,44 @@ export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => voi
         )}
       </>
     );
+  const heading = projectInvite
+    ? [t("signIn.titleJoin"), t("signIn.lead")]
+    : tab === "register" && canRegister && !waiting
+      ? [t("auth.createAccount"), t("auth.createLead")]
+      : [t("auth.welcome"), t("auth.welcomeLead")];
   return (
-    <div className="auth">
-      <div className="row spread">
-        <span className="eyebrow">WRITER / COLLABORATION</span>
-        <LanguageSwitch />
-      </div>
-      <h1>{projectInvite ? t("signIn.titleJoin") : t("signIn.title")}</h1>
-      <p>{t("signIn.lead")}</p>
-      {body}
-      <p className="muted">{t("signIn.storage")}</p>
+    <div className="auth-page">
+      <aside className="auth-brand">
+        <img className="auth-logo" src="/logo-dark.svg" alt="Y-Writer" />
+        <div className="auth-pitch">
+          <h2>{t("auth.brandTitle")}</h2>
+          <p>{t("auth.brandLead")}</p>
+          <ul>
+            {(
+              [
+                "auth.feature.realtime",
+                "auth.feature.review",
+                "auth.feature.build",
+                "auth.feature.desktop",
+              ] as const
+            ).map((key) => (
+              <li key={key}>{t(key)}</li>
+            ))}
+          </ul>
+        </div>
+        <p className="auth-foot">{t("signIn.storage")}</p>
+      </aside>
+      <main className="auth-panel">
+        <div className="auth-language">
+          <LanguageSwitch />
+        </div>
+        <div className="auth-card">
+          <img className="auth-mark" src="/favicon.svg" alt="" aria-hidden="true" />
+          <h1>{heading[0]}</h1>
+          <p className="muted">{heading[1]}</p>
+          {body}
+        </div>
+      </main>
     </div>
   );
 }

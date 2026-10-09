@@ -41,7 +41,7 @@ function Projects({
     <main className="dashboard">
       <header>
         <div>
-          <span className="eyebrow">WRITER / WORKSPACE</span>
+          <img className="brand-small" src="/logo-small-light.svg" alt="Y-Writer" />
           <h1>{t("projects.title")}</h1>
         </div>
         <div className="row">
@@ -145,7 +145,7 @@ export function App() {
   if (!ready)
     return (
       <div className="auth">
-        <h1>Writer</h1>
+        <h1>Y-Writer</h1>
         <p>{t("common.loading")}</p>
       </div>
     );

@@ -1,4 +1,15 @@
 export const authZh = {
+  "auth.welcome": "欢迎回来",
+  "auth.welcomeLead": "登录后继续你的论文。",
+  "auth.createAccount": "创建账号",
+  "auth.createLead": "填写信息，提交后即可申请使用。",
+  "auth.brandTitle": "和合作者一起，把论文写好",
+  "auth.brandLead":
+    "实验室自己的 LaTeX 协作平台：网页和桌面端都能写，AI 帮忙改稿，每一处修改都由你决定。",
+  "auth.feature.realtime": "多人实时编辑、批注与讨论",
+  "auth.feature.review": "AI 修改先审阅，再决定是否合并",
+  "auth.feature.build": "服务器编译 PDF，源码与 PDF 互相跳转",
+  "auth.feature.desktop": "桌面端与服务器双向同步",
   "auth.tab.login": "登录",
   "auth.tab.register": "注册",
   "auth.forgot": "忘记密码？请联系管理员重置。",
@@ -61,6 +72,17 @@ export const authZh = {
   "console.saved": "已保存",
 };
 export const authEn: Record<keyof typeof authZh, string> = {
+  "auth.welcome": "Welcome back",
+  "auth.welcomeLead": "Sign in to continue your papers.",
+  "auth.createAccount": "Create an account",
+  "auth.createLead": "Fill in a few details to request access.",
+  "auth.brandTitle": "Write better papers, together",
+  "auth.brandLead":
+    "Your lab's own LaTeX workspace: write in the browser or the desktop app, let AI help revise, and decide on every change yourself.",
+  "auth.feature.realtime": "Edit, comment and discuss in real time",
+  "auth.feature.review": "Review AI edits before they are merged",
+  "auth.feature.build": "PDF builds on the server, with source ↔ PDF sync",
+  "auth.feature.desktop": "Two-way sync with the desktop app",
   "auth.tab.login": "Sign in",
   "auth.tab.register": "Register",
   "auth.forgot": "Forgot your password? Ask an administrator to reset it.",
