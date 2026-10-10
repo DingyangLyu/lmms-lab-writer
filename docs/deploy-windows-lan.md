@@ -10,16 +10,18 @@
 
 ## 目录和后台任务
 
+程序和数据都在内置 NVMe 固态盘 C: 上。D:、F: 是 USB 机械移动硬盘，E: 是 USB 固态移动硬盘：USB 盘的写缓存不保证数据库提交真正落盘，拔出、休眠或掉线都会让服务出错，所以只用 D: 存放备份。（2026 年 10 月从 D: 迁到 C:，旧目录暂留为 `D:\writer.old`、`D:\texlive.old`。）
+
 | 位置 | 内容 |
 | --- | --- |
-| `D:\writer\app` | 本仓库（`git pull` 更新） |
-| `D:\writer\config\server.env` | 服务端配置：监听地址、`WRITER_ORIGIN`、数据库 URL、共享执行器令牌 |
-| `D:\writer\config\runner.env` | 执行器配置：只有执行器令牌、Codex/OpenCode 路径和代理 |
-| `D:\writer\config\secrets.json` | 首次生成的密码和令牌（数据库、管理员初始密码、执行器） |
-| `D:\writer\pgsql`、`D:\writer\pgdata` | PostgreSQL 17 程序和数据（服务 `postgresql-writer`，只监听 127.0.0.1） |
-| `D:\texlive\current` | TeX Live（服务端编译 PDF 用的 latexmk） |
-| `D:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
-| `D:\writer\backups` | 每天 3 点的数据库备份，保留 14 天 |
+| `C:\writer\app` | 本仓库（`git pull` 更新） |
+| `C:\writer\config\server.env` | 服务端配置：监听地址、`WRITER_ORIGIN`、数据库 URL、共享执行器令牌 |
+| `C:\writer\config\runner.env` | 执行器配置：只有执行器令牌、Codex/OpenCode 路径和代理 |
+| `C:\writer\config\secrets.json` | 首次生成的密码和令牌（数据库、管理员初始密码、执行器） |
+| `C:\writer\pgsql`、`C:\writer\pgdata` | PostgreSQL 17 程序和数据（服务 `postgresql-writer`，只监听 127.0.0.1） |
+| `C:\texlive\current` | TeX Live（服务端编译 PDF 用的 latexmk） |
+| `C:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
+| `D:\writer-backups` | 每天 3 点的数据库备份，保留 14 天（D: 没接上时写到 `C:\writer\backups`） |
 | `%USERPROFILE%\.writer-runner\projects` | AI 对话的项目工作副本（每个项目一份；可以删除，每轮开始前会从服务器重新同步） |
 | `%USERPROFILE%\.writer-runner\claude-sessions`、`opencode.pid` | Claude Code 对话记录；执行器启动的 `opencode serve` 的进程号（执行器重启时用来结束上一个） |
 
@@ -34,13 +36,13 @@
 ## 首次搭建要点
 
 1. Node LTS：`winget install OpenJS.NodeJS.LTS`，再 `npm.cmd install -g pnpm @openai/codex opencode-ai`。这台电脑的 PowerShell 执行策略是 `Restricted`，`.ps1` 脚本不能运行，所以这里一律用 `.cmd` 版本：`npm` 全局目录和 `C:\Program Files\nodejs` 里有 `.cmd` 同名文件的 `.ps1` 包装脚本已改名为 `*.ps1.disabled`，直接输入 `pnpm`、`npm`、`npx`、`codex`、`opencode` 也会走 `.cmd`。`npm.cmd install -g` 或升级 Node 后可能重新生成 `.ps1`，再改名即可；本文仍写 `pnpm.cmd` 等，两种情况都能用。
-2. PostgreSQL：这台电脑上 EnterpriseDB 安装器写不了临时 `.bat` 文件，所以用官方免安装包：解压到 `D:\writer\pgsql`，`initdb -D D:\writer\pgdata -U postgres -A scram-sha-256 -E UTF8 --locale=C`，给 `NT AUTHORITY\NetworkService` 授予数据目录权限，`pg_ctl register -N postgresql-writer -S auto -U "NT AUTHORITY\NetworkService"`，再建 `writer` 用户和数据库。
-3. TeX Live：从清华镜像下载 `install-tl.zip`，用 profile 安装 `scheme-full`（不装文档和源码）到 `D:\texlive\current`。
+2. PostgreSQL：这台电脑上 EnterpriseDB 安装器写不了临时 `.bat` 文件，所以用官方免安装包：解压到 `C:\writer\pgsql`，`initdb -D C:\writer\pgdata -U postgres -A scram-sha-256 -E UTF8 --locale=C`，给 `NT AUTHORITY\NetworkService` 授予数据目录权限，`pg_ctl register -N postgresql-writer -S auto -U "NT AUTHORITY\NetworkService"`，再建 `writer` 用户和数据库。
+3. TeX Live：从清华镜像下载 `install-tl.zip`，用 profile 安装 `scheme-full`（不装文档和源码）到 `C:\texlive\current`。整个目录可以原样搬到别的盘，之后只需把 `texmf-var\fonts\conf\fonts.conf` 里的绝对路径改掉并运行 `fc-cache -fs`。
 4. 代码：`pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."`，`pnpm.cmd --filter @lmms-lab/writer-collaboration build`。
-5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。可选 `WRITER_TEMPLATES_DIR=D:\writer\templates` 放实验室自己的项目模板。
+5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 放实验室自己的项目模板。
 6. `runner.env`：`WRITER_SERVER=http://127.0.0.1`、`WRITER_RUNNER_TOKEN`（同上）、`WRITER_ALLOWED_HARNESSES`、`WRITER_CODEX_BIN`/`WRITER_OPENCODE_BIN`（指向 npm 包里的 `codex.exe`、`opencode.exe`，避开 `.cmd`）、`WRITER_CODEX_SANDBOX=danger-full-access`、`HTTPS_PROXY`/`HTTP_PROXY`（本机代理）和 `NO_PROXY=127.0.0.1,localhost,::1`。
 7. 防火墙：只放行校园网访问 80 端口，例如 `New-NetFirewallRule -Name Writer-HTTP-LAN -Direction Inbound -Protocol TCP -LocalPort 80 -RemoteAddress 10.100.0.0/16 -Action Allow`。
-8. 接电源时不睡眠：`powercfg /change standby-timeout-ac 0`、`powercfg /change hibernate-timeout-ac 0`。
+8. 接电源时不睡眠：`powercfg /change standby-timeout-ac 0`、`powercfg /change hibernate-timeout-ac 0`；硬盘 20 分钟无访问才停转（`powercfg /change disk-timeout-ac 20`，原来是 30 秒，USB 机械盘会频繁起停），并关闭 USB 选择性暂停。
 
 ## AI 执行器
 
@@ -78,7 +80,7 @@
 ## 更新
 
 ```powershell
-cd D:\writer\app
+cd C:\writer\app
 git pull
 pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."
 pnpm.cmd --filter @lmms-lab/writer-collaboration build
@@ -90,4 +92,4 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 
 - **IP 变了，页面能打开但登录或保存报“请求来源不匹配”**：地址由 DHCP 分配。改 `server.env` 的 `WRITER_ORIGIN` 为新地址并重启 Writer Server；能管理路由器时为这台电脑做 DHCP 地址保留。
 - **AI 任务一直排队**：看 `runner.log` 和任务计划程序里 Writer Runner 是否在运行。
-- **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer\backups\<文件>.dump`，再启动。
+- **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。
