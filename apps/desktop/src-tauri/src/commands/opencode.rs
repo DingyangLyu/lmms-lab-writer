@@ -684,7 +684,7 @@ mod tests {
             .expect("OS fallback port");
         assert!(!(start..=start + 9).contains(&available));
         assert_ne!(available, 0);
-        let _free = TcpListener::bind(("127.0.0.1", available)).unwrap();
+        // Not bound again here: tests run in parallel, and another may take the port first.
         assert_eq!(listeners.len(), 10);
     }
 
