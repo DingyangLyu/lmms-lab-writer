@@ -8,6 +8,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -135,7 +136,7 @@ const OPENCODE_PERMISSION = JSON.stringify({
   webfetch: "allow",
 });
 const OPENCODE_CONTEXT =
-  "Y-Writer shared project on the lab's runner: after each step the files you change here are merged into your collaborators' live text, and a version was saved before this turn. Edit only what the task needs; do not commit, push or publish anything.";
+  "Y-Writer shared project on the lab's runner: after each step the files you change here are merged into your collaborators' live text, and a version was saved before this turn. Edit only what the task needs; do not commit, push or publish anything. Writer tools (MCP server writer): writer_list_conversations, writer_read_conversation, writer_delegate and writer_get_task show the project's other AI conversations, read what one did and hand one a task; pass your conversation ID from the first line. writer_delegate returns at once and its answer arrives after your turn; do not poll.";
 /** What the panel needs from OpenCode's settings, without provider options or keys. */
 export function openCodeSettings(path: string, body: string) {
   const data = JSON.parse(body) as Json;
@@ -273,8 +274,27 @@ const turnPolicy = (mode: AgentPermission) => {
   return { approvalPolicy, approvalsReviewer, sandboxPolicy };
 };
 /** One line, so the shared chat view hides it like the desktop's own conversation context. */
-const CONTEXT =
-  "You are working in a copy of a shared Y-Writer project on the lab's runner. After each step, the files you change here are merged into your collaborators' live text, and the project was saved as a version before this turn. Edit only what the task needs; do not commit, push or publish anything, and do not read credentials or files outside this folder.";
+/** How the agents learn about the Writer tools (writer-bridge.mjs, MCP server "writer"). */
+const TOOLS_HINT =
+  "Writer tools (MCP server writer): writer_list_conversations, writer_read_conversation, writer_delegate and writer_get_task show the project's other AI conversations, read what one did and hand one a task; pass your conversation ID from the first line. Use them when the user's task calls for another conversation's work; writer_delegate returns at once and its answer arrives as a new message after your turn, so do not poll.";
+const CONTEXT = `You are working in a copy of a shared Y-Writer project on the lab's runner. After each step, the files you change here are merged into your collaborators' live text, and the project was saved as a version before this turn. Edit only what the task needs; do not commit, push or publish anything, and do not read credentials or files outside this folder. ${TOOLS_HINT}`;
+const BRIDGE_SCRIPT = join(import.meta.dirname, "writer-bridge.mjs");
+type Bridge = { url: string; key: string };
+/** The Writer tools as an MCP server, for Claude Code's --mcp-config and OpenCode's config. */
+const bridgeServer = (bridge: Bridge) => ({
+  command: process.execPath,
+  args: [BRIDGE_SCRIPT],
+  env: { WRITER_BRIDGE_URL: bridge.url, WRITER_BRIDGE_KEY: bridge.key },
+});
+/** The same for Codex, as config overrides (TOML values). */
+const codexBridgeArgs = (bridge: Bridge) => [
+  "-c",
+  `mcp_servers.writer.command=${JSON.stringify(process.execPath)}`,
+  "-c",
+  `mcp_servers.writer.args=[${JSON.stringify(BRIDGE_SCRIPT)}]`,
+  "-c",
+  `mcp_servers.writer.env={ WRITER_BRIDGE_URL = ${JSON.stringify(bridge.url)}, WRITER_BRIDGE_KEY = ${JSON.stringify(bridge.key)} }`,
+];
 /** Folders that hold tools' output rather than the paper. */
 const SKIPPED = new Set(["node_modules", "__pycache__", "build", "build-output", "dist", "target"]);
 /** Figures an agent may create; other binary files only travel when the project has them. */
@@ -327,12 +347,17 @@ class AppServer {
     binary: string,
     private onMessage: (message: Json) => void,
     private onClose: () => void,
+    config: string[] = [],
   ) {
-    this.child = spawn(binary, ["-c", 'web_search="live"', "app-server", "--listen", "stdio://"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: agentEnv(),
-      windowsHide: true,
-    });
+    this.child = spawn(
+      binary,
+      ["-c", 'web_search="live"', ...config, "app-server", "--listen", "stdio://"],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: agentEnv(),
+        windowsHide: true,
+      },
+    );
     this.child.stderr.resume();
     this.child.on("error", () => this.close());
     this.child.on("exit", () => this.close());
@@ -431,6 +456,8 @@ export class AgentHost {
   private opencodeStarting: Promise<{ port: number }> | null = null;
   private opencodeStreams = new Map<string, AbortController>();
   private claudeCatalog: { at: number; value: Json } | null = null;
+  private bridgeServer: HttpServer | null = null;
+  private bridgeReady: Promise<Bridge> | null = null;
   constructor(private options: AgentHostOptions) {
     this.root =
       options.root ||
@@ -453,6 +480,7 @@ export class AgentHost {
   }
   stop() {
     this.stopped = true;
+    this.bridgeServer?.close();
     this.socket?.close();
     this.codex?.stop();
     for (const stream of this.opencodeStreams.values()) stream.abort();
@@ -497,6 +525,48 @@ export class AgentHost {
   }
   private send(message: unknown) {
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message));
+  }
+  /**
+   * The Writer tools' way in: an HTTP endpoint on 127.0.0.1 with a key only the agents get,
+   * forwarding each call to the server, which checks the conversation is the one running.
+   */
+  bridge(): Promise<Bridge> {
+    this.bridgeReady ??= new Promise<Bridge>((resolve, reject) => {
+      const key = randomUUID();
+      const server = createHttpServer(async (req, res) => {
+        const answer = (status: number, body: unknown) => {
+          res.writeHead(status, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(body));
+        };
+        if (req.method !== "POST" || req.headers["x-writer-bridge"] !== key)
+          return answer(403, { error: "Forbidden" });
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of req) {
+          size += (chunk as Buffer).length;
+          if (size > 100_000) return answer(413, { error: "Too large" });
+          chunks.push(chunk as Buffer);
+        }
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Json;
+          const method = String(body.method ?? "");
+          if (!["list", "read", "delegate", "task"].includes(method))
+            return answer(400, { error: "Unknown Writer tool" });
+          const result = await this.server(`bridge.${method}`, (body.params ?? {}) as Json, 90_000);
+          answer(200, { result });
+        } catch (error) {
+          answer(200, { error: error instanceof Error ? error.message : String(error) });
+        }
+      });
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        if (!address || typeof address !== "object") return reject(new Error("no port"));
+        this.bridgeServer = server;
+        resolve({ url: `http://127.0.0.1:${address.port}/`, key });
+      });
+    });
+    return this.bridgeReady;
   }
   private server(method: string, params: Json, timeout = 300_000): Promise<Json> {
     if (!this.socket) return Promise.reject(new Error("Writer server disconnected"));
@@ -555,6 +625,7 @@ export class AgentHost {
           for (const workspace of this.workspaces.values()) workspace.thread = null;
           this.send({ event: { method: "codex/connectionClosed", params: {} } });
         },
+        codexBridgeArgs(await this.bridge()),
       );
       try {
         this.codex = await codex.start();
@@ -891,6 +962,7 @@ export class AgentHost {
       const pidFile = join(dirname(this.root), "opencode.pid");
       await stopStaleOpenCode(pidFile);
       const port = await freePort();
+      const bridge = bridgeServer(await this.bridge());
       const binary = this.options.opencode || process.env.WRITER_OPENCODE_BIN || "opencode";
       const child = spawn(binary, ["serve", "--hostname", "127.0.0.1", "--port", String(port)], {
         cwd: this.root,
@@ -901,6 +973,16 @@ export class AgentHost {
           ...agentEnv(),
           OPENCODE_ENABLE_EXA: "1",
           OPENCODE_PERMISSION: process.env.WRITER_OPENCODE_PERMISSION || OPENCODE_PERMISSION,
+          OPENCODE_CONFIG_CONTENT: JSON.stringify({
+            mcp: {
+              writer: {
+                type: "local",
+                command: [bridge.command, ...bridge.args],
+                environment: bridge.env,
+                enabled: true,
+              },
+            },
+          }),
         },
       });
       if (child.pid) await writeFile(pidFile, String(child.pid)).catch(() => {});
@@ -1227,7 +1309,11 @@ export class AgentHost {
           native ? `--resume=${threadId}` : `--session-id=${threadId}`,
           ...claudePermissionArgs(mode),
           "--append-system-prompt",
-          CLAUDE_PROMPT,
+          `[Writer conversation ID: claude:${threadId}] ${CLAUDE_PROMPT} ${TOOLS_HINT.replace("from the first line", "given at the start of these instructions")}`,
+          "--mcp-config",
+          JSON.stringify({ mcpServers: { writer: bridgeServer(await this.bridge()) } }),
+          "--allowedTools",
+          "mcp__writer",
           ...(model ? [`--model=${model}`] : []),
           ...(effort ? ["--effort", effort] : []),
         ],

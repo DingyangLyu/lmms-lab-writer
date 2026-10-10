@@ -27,6 +27,7 @@ import {
   OPENCODE_EVENT,
   THREADS_EVENT,
 } from "../shared/agents";
+import { answerTo, delegatedPrompt, resultPrompt, transcript } from "./agent-bridge";
 import { allowedOrigin, bearer, userFor } from "./auth";
 import type { Collaboration } from "./collaboration";
 import { sql } from "./db";
@@ -63,6 +64,24 @@ type Call = {
   timer: ReturnType<typeof setTimeout>;
 };
 type Turn = { thread: string; user: string; userName: string; at: number };
+type Actor = { id: string; username: string };
+type TaskRow = {
+  id: string;
+  project: string;
+  source: string;
+  target: string;
+  actor: string;
+  prompt: string;
+  status: "queued" | "running" | "replying" | "done";
+  result: string | null;
+  failed: boolean;
+  created: number;
+};
+/** The permission a handed-on turn runs with: the most autonomous mode the runner offers. */
+const TASK_PERMISSIONS: Record<string, readonly string[]> = {
+  codex: ["fullAccess", "autoReview", "askForApproval", "readOnly"],
+  claude: ["bypassPermissions", "acceptEdits", "default", "plan"],
+};
 type ThreadRow = {
   id: string;
   project: string;
@@ -268,6 +287,7 @@ export class Agents {
   private endAll() {
     const busy = new Set(this.turns.keys());
     this.turns.clear();
+    void this.resumeTasks().catch(() => {});
     for (const b of this.browsers) {
       send(b.socket, { status: this.status() });
       send(b.socket, { event: { method: "codex/connectionClosed", params: {} } });
@@ -344,6 +364,7 @@ export class Agents {
         ),
       };
       for (const b of this.browsers) send(b.socket, { status: runner.status });
+      void this.resumeTasks().catch(() => {});
       return;
     }
     if (isObject(message.event)) {
@@ -413,11 +434,16 @@ export class Agents {
         this.announceBusy(thread.project);
       }
       await this.touch(thread);
+      // Not awaited: reading the answer asks the runner, and events must keep flowing.
+      void this.afterTurn(thread).catch((error) =>
+        console.error("Writer AI task failed:", error instanceof Error ? error.message : error),
+      );
     }
     for (const b of this.browsers)
       if (b.project === thread.project && visible(thread, b.user.id)) send(b.socket, { event });
   }
   private async runnerRequest(method: string, params: Params) {
+    if (method.startsWith("bridge.")) return this.bridge(method.slice(7), params);
     const project = text(params, "project", 80);
     if (method === "files.read") {
       if (!this.turns.has(project)) fail(409, "这一轮已经结束");
@@ -742,7 +768,7 @@ export class Agents {
       );
       this.announceThreads(project);
     }
-    return this.runTurn(browser, user, thread, `${harness}.startTurn`, {
+    return this.runTurn(project, user, thread, `${harness}.startTurn`, {
       text: message,
       images: pictures,
       model,
@@ -755,13 +781,12 @@ export class Agents {
    * first makes the turn revertible from History.
    */
   private async runTurn(
-    browser: Browser,
-    user: User,
+    project: string,
+    user: Actor,
     thread: ThreadRow,
     method: string,
     payload: Params,
   ) {
-    const { project } = browser;
     const running = this.busy(project);
     if (running)
       fail(
@@ -896,7 +921,7 @@ export class Agents {
     if ((kind === "rename" || kind === "delete") && thread.owner !== user.id)
       fail(403, "只有对话的发起人可以重命名或共享");
     if (kind === "prompt") {
-      const result = (await this.runTurn(browser, user, thread, "opencode.prompt", {
+      const result = (await this.runTurn(project, user, thread, "opencode.prompt", {
         body: body ?? "{}",
       })) as { status: number; body: string };
       // OpenCode refused the prompt: no turn starts, so none will end.
@@ -975,6 +1000,254 @@ export class Agents {
       ownerName: thread.ownerName,
       linkedFrom: thread.linkedFrom,
     };
+  }
+  /**
+   * The Writer tools of the agents on the runner (writer-bridge.mjs): the project's other
+   * conversations, what one of them did, and handing one a task. Only the conversation whose
+   * turn is running may speak for itself, and only about conversations its member may see.
+   */
+  private async bridge(kind: string, params: Params) {
+    const source =
+      (await this.thread(threadId(params.threadId))) ?? fail(404, "对话不存在或未共享");
+    const turn = this.turns.get(source.project);
+    if (turn?.thread !== source.id) fail(409, "只有正在运行的对话可以使用 Writer 工具");
+    const { project } = source,
+      actor = turn.user;
+    const other = async () => {
+      const target = await this.thread(threadId(params.target));
+      if (!target || target.project !== project || !visible(target, actor))
+        fail(404, "对话不存在或未共享");
+      return target;
+    };
+    switch (kind) {
+      case "list": {
+        const rows = await this.store.db.rows<ThreadRow & { ownerName: string }>(
+          sql`SELECT t.id, t.project, t.owner, t.harness, t.title, t.shared, t.updated,
+                     u.username AS "ownerName"
+              FROM agent_threads t JOIN users u ON u.id=t.owner
+              WHERE t.project=${project} AND (t.owner=${actor} OR t.shared)
+              ORDER BY t.updated DESC LIMIT 100`,
+        );
+        const offered = this.status().harnesses;
+        return rows.map((r) => ({
+          id: r.id,
+          harness: r.harness,
+          title: r.title || null,
+          owner: r.ownerName,
+          updated: Number(r.updated),
+          you: r.id === source.id,
+          running: r.id === turn.thread,
+          available: offered.includes(r.harness),
+        }));
+      }
+      case "read": {
+        const target = await other();
+        const last = typeof params.last === "number" ? params.last : 40;
+        return {
+          id: target.id,
+          harness: target.harness,
+          title: target.title || null,
+          text: transcript(target.harness, await this.record(target), last),
+        };
+      }
+      case "delegate": {
+        const target = await other();
+        if (target.id === source.id) fail(400, "不能把任务交给自己");
+        if (!this.status().harnesses.includes(target.harness))
+          fail(409, "执行器没有提供 {harness}", { harness: target.harness });
+        // A conversation doing a handed-on task does not hand it on again (no loops).
+        if (
+          await this.store.db.row(
+            sql`SELECT 1 FROM agent_tasks WHERE target=${source.id} AND status='running'`,
+          )
+        )
+          fail(409, "委派来的任务不能再委派");
+        const prompt = text(params, "message", 20_000).trim() || fail(400, "消息不能为空");
+        const id = uid(),
+          now = Date.now();
+        await this.store.db.run(
+          sql`INSERT INTO agent_tasks(id, project, source, target, actor, prompt, status, created, updated)
+              VALUES(${id}, ${project}, ${source.id}, ${target.id}, ${actor}, ${prompt}, 'queued', ${now}, ${now})`,
+        );
+        await this.store.audit(project, actor, "agent.delegate", {
+          task: id,
+          from: source.id,
+          to: target.id,
+        });
+        return { task: id, status: "queued" };
+      }
+      case "task": {
+        const task = await this.store.db.row<TaskRow>(
+          sql`SELECT * FROM agent_tasks WHERE id=${text(params, "task", 80)} AND project=${project}`,
+        );
+        if (!task) fail(404, "任务不存在");
+        return {
+          id: task.id,
+          from: task.source,
+          to: task.target,
+          status:
+            task.status === "replying" || task.status === "done"
+              ? task.failed
+                ? "failed"
+                : "done"
+              : task.status,
+          result: task.result,
+        };
+      }
+      default:
+        return fail(400, "未知消息");
+    }
+  }
+  /** A conversation's record on the runner, in its harness's own shape. */
+  private async record(thread: ThreadRow): Promise<Params> {
+    const where = { project: thread.project, threadId: thread.id };
+    if (thread.harness === "codex") return this.call<Params>("codex.read", where);
+    if (thread.harness === "claude") return this.call<Params>("claude.read", where);
+    const result = await this.call<{ status: number; body: string }>(
+      "opencode.fetch",
+      { project: thread.project, method: "GET", path: `/session/${thread.id}/message` },
+      60_000,
+    );
+    return { messages: result.status === 200 ? JSON.parse(result.body) : [] };
+  }
+  /** A turn ended: a handed-on task it finished goes back to who asked; then the next task. */
+  private async afterTurn(thread: ThreadRow) {
+    const task = await this.store.db.row<TaskRow>(
+      sql`SELECT * FROM agent_tasks WHERE target=${thread.id} AND status='running' ORDER BY created LIMIT 1`,
+    );
+    if (task) {
+      let answer: string | null = "",
+        failed = false;
+      try {
+        answer = answerTo(thread.harness, await this.record(thread), task.id);
+      } catch (error) {
+        answer = error instanceof Error ? error.message : String(error);
+        failed = true;
+      }
+      if (!failed && !answer) {
+        answer = "The conversation ended its turn without an answer";
+        failed = true;
+      }
+      await this.store.db.run(
+        sql`UPDATE agent_tasks SET status='replying', result=${answer}, failed=${failed}, updated=${Date.now()}
+            WHERE id=${task.id}`,
+      );
+    }
+    await this.schedule(thread.project);
+  }
+  private scheduling = new Set<string>();
+  /**
+   * While the project is idle: an answer waiting to go back first, else the oldest queued
+   * task, as a turn in the member's name who started the chain.
+   */
+  private async schedule(project: string) {
+    if (this.scheduling.has(project) || this.busy(project) || !this.runner) return;
+    this.scheduling.add(project);
+    let again = false;
+    try {
+      const task = await this.store.db.row<TaskRow>(
+        sql`SELECT * FROM agent_tasks WHERE project=${project} AND status IN ('replying', 'queued')
+            ORDER BY CASE status WHEN 'replying' THEN 0 ELSE 1 END, created LIMIT 1`,
+      );
+      if (!task) return;
+      const replying = task.status === "replying";
+      const thread = await this.thread(replying ? task.source : task.target);
+      const actor = await this.store.db.row<Actor>(
+        sql`SELECT id, username FROM users WHERE id=${task.actor}`,
+      );
+      const finish = (status: string, fields: { result?: string; failed?: boolean } = {}) =>
+        this.store.db.run(
+          sql`UPDATE agent_tasks SET status=${status}, result=${fields.result ?? task.result},
+              failed=${fields.failed ?? task.failed}, updated=${Date.now()} WHERE id=${task.id}`,
+        );
+      again = true;
+      if (!thread || !actor || !(await this.store.can(project, actor.id, "edit"))) {
+        await finish(replying ? "done" : "replying", {
+          result: "The conversation or its member is no longer available",
+          failed: true,
+        });
+        return;
+      }
+      // Marked first: a quick turn can end before the runner's reply to starting it arrives.
+      await finish(replying ? "done" : "running");
+      try {
+        await this.startFor(
+          thread,
+          actor,
+          replying
+            ? resultPrompt(task.id, task.target, task.result ?? "", task.failed)
+            : delegatedPrompt(task.id, task.source, task.prompt),
+        );
+        again = false;
+      } catch (error) {
+        const reason =
+          error instanceof HttpError ? say("en", error.template, error.params) : String(error);
+        // An answer that cannot be delivered stays readable with writer_get_task.
+        if (!replying) await finish("replying", { result: reason, failed: true });
+      }
+    } finally {
+      this.scheduling.delete(project);
+    }
+    if (again) await this.schedule(project);
+  }
+  /**
+   * Tasks whose turn the agents lost (the runner, its Codex or the server restarted): each
+   * goes back as failed, then the queue carries on once a runner is there.
+   */
+  private async resumeTasks() {
+    const running = [...this.turns.values()].map((t) => t.thread);
+    const lost = await this.store.db.rows<{ id: string; target: string }>(
+      sql`SELECT id, target FROM agent_tasks WHERE status='running'`,
+    );
+    for (const task of lost)
+      if (!running.includes(task.target))
+        await this.store.db.run(
+          sql`UPDATE agent_tasks SET status='replying', failed=true,
+              result='The runner restarted before the task finished', updated=${Date.now()}
+              WHERE id=${task.id} AND status='running'`,
+        );
+    const projects = await this.store.db.rows<{ project: string }>(
+      sql`SELECT DISTINCT project FROM agent_tasks WHERE status IN ('replying', 'queued')`,
+    );
+    for (const { project } of projects) await this.schedule(project);
+  }
+  /** A turn started by Writer itself (a handed-on task or its answer), not by a browser. */
+  private async startFor(thread: ThreadRow, actor: Actor, message: string) {
+    if (thread.harness === "opencode") {
+      const body = JSON.stringify({
+        parts: [
+          {
+            type: "text",
+            text: `[Writer conversation ID: opencode:${thread.id}]
+Writer
+
+${message}`,
+          },
+        ],
+      });
+      const result = (await this.runTurn(thread.project, actor, thread, "opencode.prompt", {
+        body,
+      })) as { status: number };
+      if (result.status >= 300) {
+        if (this.turns.get(thread.project)?.thread === thread.id) {
+          this.turns.delete(thread.project);
+          this.announceBusy(thread.project);
+        }
+        fail(502, "执行器：{error}", { error: `OpenCode ${result.status}` });
+      }
+      return;
+    }
+    const offered = this.status().permissions[thread.harness] ?? [];
+    const permissionMode =
+      (TASK_PERMISSIONS[thread.harness] ?? []).find((p) => offered.includes(p)) ??
+      fail(409, "执行器不支持这种权限模式");
+    await this.runTurn(thread.project, actor, thread, `${thread.harness}.startTurn`, {
+      text: message,
+      images: [],
+      model: null,
+      effort: null,
+      permissionMode,
+    });
   }
   private async thread(id: string): Promise<ThreadRow | null> {
     const cached = this.threads.get(id);

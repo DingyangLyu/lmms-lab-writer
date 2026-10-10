@@ -307,6 +307,21 @@ export const migrations: string[] = [
      PRIMARY KEY (thread, project)
    );
    CREATE INDEX agent_thread_links_project ON agent_thread_links(project);`,
+  // 11: tasks one AI conversation hands another in the same project, and their answers.
+  `CREATE TABLE agent_tasks(
+     id TEXT PRIMARY KEY,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     source TEXT NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+     target TEXT NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+     actor TEXT NOT NULL REFERENCES users(id),
+     prompt TEXT NOT NULL,
+     status TEXT NOT NULL,
+     result TEXT,
+     failed BOOLEAN NOT NULL DEFAULT false,
+     created BIGINT NOT NULL,
+     updated BIGINT NOT NULL
+   );
+   CREATE INDEX agent_tasks_project ON agent_tasks(project, status);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

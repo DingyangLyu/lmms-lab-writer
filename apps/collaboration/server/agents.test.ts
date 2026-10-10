@@ -114,6 +114,21 @@ describe("live AI conversations on the shared runner", () => {
     expect(await owner.request("codex.threads")).toMatchObject({
       data: [{ id: thread.id, mine: true, shared: true, ownerName: "owner" }],
     });
+    // The agents' Writer tools reach the server through the runner, with the runner's key.
+    const bridge = await host.bridge();
+    const post = async (key: string, body: unknown) => {
+      const r = await fetch(bridge.url, {
+        method: "POST",
+        headers: { "X-Writer-Bridge": key },
+        body: JSON.stringify(body),
+      });
+      return [r.status, await r.json()];
+    };
+    expect(await post("wrong", { method: "list" })).toEqual([403, { error: "Forbidden" }]);
+    expect(await post(bridge.key, { method: "list", params: { threadId: thread.id } })).toEqual([
+      200,
+      { error: "Only the conversation whose turn is running can use the Writer tools" },
+    ]);
 
     const { turn } = await owner.request("codex.startTurn", {
       threadId: thread.id,
@@ -336,6 +351,124 @@ describe("live AI conversations on the shared runner", () => {
     await expect(
       owner.request("thread.link", { threadId: thread.id, project: second }),
     ).rejects.toThrow(/先把对话共享/);
+  });
+
+  it("lets the running conversation read another and hand it a task whose answer comes back", async () => {
+    const f = await setup();
+    const runner = client(`${f.origin.replace("http:", "ws:")}/api/runner/agents`, {
+      Authorization: `Bearer ${TOKEN}`,
+    });
+    await runner.opened;
+    runner.ws.send(
+      JSON.stringify({ status: { harnesses: ["codex"], permissions: { codex: ["fullAccess"] } } }),
+    );
+    // A Codex that remembers what each conversation was told and answers "done: <message>".
+    const said = new Map<string, string[]>();
+    const turns: Array<{ threadId: string; text: string; permissionMode: string }> = [];
+    let threads = 0;
+    runner.ws.on("message", (raw) => {
+      const m = JSON.parse(String(raw));
+      if (!m.method) return;
+      let result: unknown = {};
+      if (m.method === "codex.startThread") result = { thread: { id: `thread-${++threads}` } };
+      if (m.method === "codex.startTurn") {
+        turns.push(m.params);
+        said.set(m.params.threadId, [...(said.get(m.params.threadId) ?? []), m.params.text]);
+      }
+      if (m.method === "codex.read")
+        result = {
+          thread: {
+            id: m.params.threadId,
+            turns: (said.get(m.params.threadId) ?? []).map((text, i) => ({
+              id: `t${i}`,
+              items: [
+                {
+                  type: "userMessage",
+                  content: [
+                    {
+                      type: "text",
+                      text: `[Writer conversation ID: codex:${m.params.threadId}]\ncontext\n\n${text}`,
+                    },
+                  ],
+                },
+                ...(i === 0 && m.params.threadId === "thread-2"
+                  ? []
+                  : [{ type: "agentMessage", text: `done: ${text.split("\n").at(-1)}` }]),
+              ],
+            })),
+          },
+        };
+      runner.ws.send(JSON.stringify({ id: m.id, result }));
+    });
+    const turnCount = async (count: number) => {
+      for (let i = 0; i < 200 && turns.length < count; i++)
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(turns).toHaveLength(count);
+    };
+    const event = (method: string, threadId: string) =>
+      runner.ws.send(
+        JSON.stringify({ project: f.project, event: { method, params: { threadId, turn: {} } } }),
+      );
+    const owner = await f.browser(f.owner);
+    await owner.until((m) => m.status?.online);
+    const writer = (await owner.request("codex.startThread", { permissionMode: "fullAccess" }))
+      .thread.id;
+    const checker = (await owner.request("codex.startThread", { permissionMode: "fullAccess" }))
+      .thread.id;
+    await owner.request("codex.rename", { threadId: checker, name: "Reference checker" });
+    // An earlier exchange of the checker that went unanswered.
+    said.set(checker, ["look at chapter 1"]);
+
+    // Only the conversation whose turn is running speaks through the tools.
+    await expect(runner.request("bridge.list", { threadId: writer })).rejects.toThrow(
+      /Only the conversation whose turn is running/,
+    );
+    await owner.request("codex.startTurn", {
+      threadId: writer,
+      text: "write the intro",
+      permissionMode: "fullAccess",
+    });
+    event("turn/started", writer);
+    const list = await runner.request("bridge.list", { threadId: writer });
+    expect(list.map((c: { id: string; you: boolean }) => [c.id, c.you])).toEqual([
+      [writer, true],
+      [checker, false],
+    ]);
+    expect(list[1]).toMatchObject({ harness: "codex", title: "Reference checker", owner: "owner" });
+    const read = await runner.request("bridge.read", { threadId: writer, target: checker });
+    expect(read.text).toBe("USER: look at chapter 1");
+    await expect(
+      runner.request("bridge.delegate", { threadId: writer, target: writer, message: "x" }),
+    ).rejects.toThrow(/itself/);
+    const { task } = await runner.request("bridge.delegate", {
+      threadId: writer,
+      target: checker,
+      message: "check the references",
+    });
+    expect(await runner.request("bridge.task", { threadId: writer, task })).toMatchObject({
+      status: "queued",
+    });
+
+    // The writer's turn ends: the checker gets the task, in the name of whoever started it.
+    event("turn/completed", writer);
+    await turnCount(2);
+    expect(turns.at(-1)).toMatchObject({ threadId: checker, permissionMode: "fullAccess" });
+    expect(turns.at(-1)?.text).toContain(
+      `[Writer delegated task ${task} from conversation ${writer}]`,
+    );
+    await expect(
+      runner.request("bridge.delegate", { threadId: checker, target: writer, message: "back" }),
+    ).rejects.toThrow(/cannot be handed on again/);
+    // Its answer goes back to the writer as a new message once the checker is done.
+    event("turn/completed", checker);
+    await turnCount(3);
+    expect(turns.at(-1)?.threadId).toBe(writer);
+    expect(turns.at(-1)?.text).toContain("done: check the references");
+    expect(turns.at(-1)?.text).not.toContain("look at chapter 1");
+    expect(await runner.request("bridge.task", { threadId: writer, task })).toMatchObject({
+      status: "done",
+      result: "done: check the references",
+    });
   });
 
   it("merges the agent's changes with collaborators' and keeps overlaps as suggestions", async () => {
