@@ -25,7 +25,7 @@ import {
   type ClaudePermission,
   OPENCODE_EVENT,
 } from "../shared/agents";
-import { isTextPath } from "./util";
+import { isTextPath, normalizeEol } from "./util";
 
 type Json = Record<string, unknown>;
 type Workspace = {
@@ -819,7 +819,7 @@ export class AgentHost {
       const full = local(workspace.dir, path);
       if (isTextPath(path)) {
         if ((await stat(full)).size > 2_000_000) continue;
-        const content = await readFile(full, "utf8");
+        const content = normalizeEol(await readFile(full, "utf8"));
         const base = workspace.text.get(path);
         if (base !== content) changes.push({ path, base: base ?? null, content });
         continue;

@@ -36,9 +36,14 @@ async function sha256(bytes: Uint8Array) {
   const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+/**
+ * A local text file as the shared document holds it: "\n" line endings only. The server keeps
+ * no "\r" (editors count "\r\n" as one character and Yjs as two), so a Windows file with "\r\n"
+ * that is otherwise unchanged is not a change.
+ */
 function decode(bytes: Uint8Array) {
   try {
-    return decoder.decode(bytes);
+    return decoder.decode(bytes).replace(/\r\n?/g, "\n");
   } catch {
     return null;
   }

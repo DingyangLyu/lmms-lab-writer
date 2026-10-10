@@ -64,6 +64,26 @@ async function setup(user = "owner") {
 }
 
 describe("desktop folder sync against the real server", () => {
+  it("keeps Windows line endings out of the shared text", async () => {
+    const s = await setup();
+    await s.api("/files", { path: "w.tex", content: "one\ntwo\n" });
+    const sync = await s.engine();
+    await until(async () => (await s.local("w.tex")) === "one\ntwo\n", "clone of w.tex");
+    const before = (await s.files()).find((x) => x.path === "w.tex")?.revision;
+    // An editor on Windows saves the same text with "\r\n": nothing to upload.
+    await s.put("w.tex", "one\r\ntwo\r\n");
+    sync.notifyLocal(["w.tex"]);
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await s.remote("w.tex"))?.content).toBe("one\ntwo\n");
+    expect((await s.files()).find((x) => x.path === "w.tex")?.revision).toBe(before);
+    // A real change goes up without the "\r"; so does a new file.
+    await s.put("w.tex", "one\r\ntwo!\r\n");
+    await s.put("n.tex", "new\r\nfile\r\n");
+    sync.notifyLocal(["w.tex", "n.tex"]);
+    await until(async () => (await s.remote("w.tex"))?.content === "one\ntwo!\n", "upload");
+    await until(async () => (await s.remote("n.tex"))?.content === "new\nfile\n", "new file");
+  });
+
   it("clones a project and merges concurrent edits from the web editor and the folder", async () => {
     const s = await setup();
     const a = (await s.api("/files", { path: "a.tex", content: "alpha\nbeta\n" })).data.id;

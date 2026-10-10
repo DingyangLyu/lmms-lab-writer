@@ -34,7 +34,17 @@ import type { SharedRunner } from "./http";
 import { requestLocale, say } from "./messages";
 import { createFile, PROJECT_BYTES } from "./routes/files";
 import type { Store, User } from "./store";
-import { checked, decodeText, digest, fail, HttpError, isTextPath, safePath, uid } from "./util";
+import {
+  checked,
+  decodeText,
+  digest,
+  fail,
+  HttpError,
+  isTextPath,
+  normalizeEol,
+  safePath,
+  uid,
+} from "./util";
 
 type Params = Record<string, unknown>;
 type Browser = {
@@ -978,7 +988,9 @@ export class Agents {
       sql`SELECT id, is_binary AS "binary", revision FROM files
           WHERE project=${project} AND path=${path} AND NOT deleted`,
     );
-    const base = typeof change.base === "string" ? change.base : null;
+    // An agent on Windows may write "\r\n"; the shared text has "\n" only.
+    const base = typeof change.base === "string" ? normalizeEol(change.base) : null;
+    if (typeof change.content === "string") change.content = normalizeEol(change.content);
     const revision = typeof change.revision === "number" ? change.revision : null;
     if (change.deleted === true) {
       if (!file) return { path, status: "applied" };

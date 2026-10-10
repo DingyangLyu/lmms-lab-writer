@@ -16,7 +16,7 @@ import { allowedOrigin, bearer, userFor } from "./auth";
 import { type Sql, sql } from "./db";
 import { requestLocale, say } from "./messages";
 import type { Store, User } from "./store";
-import { fail, HttpError } from "./util";
+import { fail, HttpError, normalizeEol } from "./util";
 
 type Peer = {
   socket: WebSocket;
@@ -152,7 +152,38 @@ export class Collaboration {
       pendingBytes: pending.bytes,
     };
     this.rooms.set(key, room);
+    await this.normalizeLineEndings(room);
     return room;
+  }
+  /**
+   * Turns "\r\n" and lone "\r" into "\n" as one stored edit, so documents created before line
+   * endings were normalized (or edited by an older client) line up with the editors again.
+   * Caller holds the document lock.
+   */
+  private async normalizeLineEndings(room: Room) {
+    const text = room.doc.getText("content").toString();
+    if (!text.includes("\r")) return;
+    const clone = new Y.Doc();
+    try {
+      Y.applyUpdate(clone, Y.encodeStateAsUpdate(room.doc));
+      const value = clone.getText("content");
+      const breaks = [...text.matchAll(/\r\n?/g)].reverse();
+      clone.transact(() => {
+        for (const found of breaks) {
+          const at = found.index ?? 0;
+          value.delete(at, 1);
+          if (found[0] === "\r") value.insert(at, "\n");
+        }
+      });
+      const update = Y.encodeStateAsUpdate(clone, Y.encodeStateVector(room.doc));
+      await this.store.appendUpdate(room.file, update);
+      room.pending++;
+      room.pendingBytes += update.length;
+      Y.applyUpdate(room.doc, update);
+      this.relay(room, null, base64(update));
+    } finally {
+      clone.destroy();
+    }
   }
   /** Caller holds the document lock. Failure keeps the appended rows, which stay readable. */
   private async compact(room: Room) {
@@ -434,6 +465,8 @@ export class Collaboration {
       room.pendingBytes += update.length;
       Y.applyUpdate(room.doc, update, peer);
       this.relay(room, peer, encoded);
+      // An older desktop sync may still send Windows line endings ("\r" is byte 13).
+      if (update.includes(13)) await this.normalizeLineEndings(room);
       if (room.pending >= COMPACT_UPDATES || room.pendingBytes >= COMPACT_BYTES)
         await this.compact(room).catch(logFailure("compaction"));
     });
@@ -511,8 +544,9 @@ export class Collaboration {
             const room = await this.open(project, plan.file);
             if (room.doc.getText("content").toString() !== plan.expected)
               fail(409, "文档已有新的修改，请刷新审阅");
-            if (Buffer.byteLength(plan.content) > 2_000_000) fail(413, "文档超过 2 MB");
-            const diff = diffChars(plan.expected, plan.content, { timeout: 500 });
+            const content = normalizeEol(plan.content);
+            if (Buffer.byteLength(content) > 2_000_000) fail(413, "文档超过 2 MB");
+            const diff = diffChars(plan.expected, content, { timeout: 500 });
             if (!diff) fail(413, "修改过大，请拆分后审阅");
             const edits: { at: number; remove: number; insert: string }[] = [];
             let offset = 0;

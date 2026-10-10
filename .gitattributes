@@ -1,0 +1,6 @@
+# Project templates become shared documents, whose text keeps "\n" line endings: a Windows
+# checkout (core.autocrlf) must not turn them into "\r\n".
+apps/collaboration/templates/**/*.tex text eol=lf
+apps/collaboration/templates/**/*.bib text eol=lf
+apps/collaboration/templates/**/*.cls text eol=lf
+apps/collaboration/templates/**/*.json text eol=lf

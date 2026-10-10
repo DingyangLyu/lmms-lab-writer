@@ -47,9 +47,15 @@ export function safePath(value: string) {
 }
 /** The same rules as the desktop folder sync, so both treat the same files as editable text. */
 export { isTextPath, textExtensions };
+/**
+ * Shared text keeps "\n" line endings only. CodeMirror counts "\r\n" as one character and
+ * Yjs as two, so a "\r" (a Windows checkout or upload) shifts every position after it: edits,
+ * comments and AI changes land in the wrong place.
+ */
+export const normalizeEol = (text: string) => text.replace(/\r\n?/g, "\n");
 export function textDoc(value: string) {
   const doc = new Y.Doc();
-  doc.getText("content").insert(0, value);
+  doc.getText("content").insert(0, normalizeEol(value));
   return doc;
 }
 export function decodeText(state: Uint8Array) {
