@@ -4,6 +4,7 @@ import type {
   Comment,
   FileInfo,
   Member,
+  ProjectOverview,
   ProjectSummary,
   Proposal,
   Role,
@@ -36,21 +37,14 @@ export function useProject(
     [sourcesLoaded, setSourcesLoaded] = useState(false);
   const { onRole, onError } = callbacks;
   const reload = useCallback(async () => {
-    const [f, c, m, s, p, b, summary] = await Promise.all([
-      api<FileInfo[]>(`${prefix}/files`),
-      api<Comment[]>(`${prefix}/comments`),
-      api<Member[]>(`${prefix}/members`),
-      api<Snapshot[]>(`${prefix}/snapshots`),
-      api<Proposal[]>(`${prefix}/proposals`),
-      api<Build | null>(`${prefix}/builds/latest`),
-      api<ProjectSummary>(prefix),
-    ]);
-    setSummary(summary);
-    setFiles(f);
-    setComments(c);
-    setMembers(m);
-    setSnapshots(s);
-    setProposals(p);
+    const all = await api<ProjectOverview>(`${prefix}/overview`);
+    setSummary(all.summary);
+    setFiles(all.files);
+    setComments(all.comments);
+    setMembers(all.members);
+    setSnapshots(all.snapshots);
+    setProposals(all.proposals);
+    const b = all.latestBuild;
     setLatestBuild((old) => (old?.id === b?.id ? old : b));
     setFilesLoaded(true);
   }, [prefix]);

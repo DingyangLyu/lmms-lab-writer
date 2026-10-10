@@ -10,7 +10,16 @@ import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
 import { sql } from "./db";
 import type { SharedRunner } from "./http";
-import { type Authed, type Context, context, dispatch, type InProject, json } from "./http";
+import {
+  type Authed,
+  type Context,
+  context,
+  dispatch,
+  type InProject,
+  json,
+  Reply,
+  route,
+} from "./http";
 import { requestLocale, say } from "./messages";
 import { adminRoutes, passwordRoute } from "./routes/accounts";
 import { bibliographyRoutes } from "./routes/bibliography";
@@ -205,6 +214,24 @@ export async function createWriterServer(options: Options) {
     ...buildRoutes,
     ...jobRoutes,
   ];
+  // What the workbench reads on opening and after each change, in one request: separately
+  // they cost an extra round trip over a slow link (a browser opens six at a time).
+  projectScoped.push(
+    route<InProject>("GET", /^overview$/, async (ctx) => {
+      const read = async (target: string) => {
+        const found = projectScoped.find((r) => r.method === "GET" && r.path.test(target));
+        if (!found) return fail(404, "接口不存在");
+        const params = (found.path.exec(target) ?? []).slice(1).map((p) => p ?? "");
+        const result = await found.run(ctx, params);
+        return result instanceof Reply ? result.body : (result ?? null);
+      };
+      const [files, comments, members, snapshots, proposals, latestBuild, summary] =
+        await Promise.all(
+          ["files", "comments", "members", "snapshots", "proposals", "builds/latest", ""].map(read),
+        );
+      return { files, comments, members, snapshots, proposals, latestBuild, summary };
+    }),
+  );
   const server = createServer(async (req, res) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     try {

@@ -7,7 +7,15 @@ import { isTextPath } from "@lmms-lab/sync";
 import { type FileOperations, FileSidebarPanel } from "@lmms-lab/workbench";
 import type { FileNode } from "@lmms-lab/writer-shared";
 import { FolderOpenIcon, UploadSimpleIcon } from "@phosphor-icons/react";
-import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { FileContent } from "../../shared/api";
 import { api, base64 } from "../api";
 import { useI18n } from "../i18n";
@@ -67,6 +75,16 @@ export function FilePanel({
   const { t } = useI18n();
   const { prefix, files, file, canEdit, run, reload } = ws;
   const [folders, setFolders] = useState<string[]>([]);
+  // The same function until the files change: the outline reads the file again whenever it does.
+  const readSource = useCallback(
+    async (path: string) => {
+      const target = files.find((f) => f.path === path);
+      if (!target || target.binary) return null;
+      const data = await api<FileContent>(`${prefix}/files/${target.id}`);
+      return "content" in data ? data.content : null;
+    },
+    [files, prefix],
+  );
   const uploads = useRef<HTMLInputElement>(null),
     folderInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -188,12 +206,7 @@ export function FilePanel({
         fileOperations={canEdit ? operations : undefined}
         outlinePath={outlinePath}
         outlineSource={outlineSource}
-        readSource={async (path) => {
-          const target = files.find((f) => f.path === path);
-          if (!target || target.binary) return null;
-          const data = await api<FileContent>(`${prefix}/files/${target.id}`);
-          return "content" in data ? data.content : null;
-        }}
+        readSource={readSource}
         onOutlineNavigate={onOutline}
         actions={
           canEdit && (

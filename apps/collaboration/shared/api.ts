@@ -283,3 +283,14 @@ export type AuditEntry = {
 };
 export type Created = { id: string };
 export type Ok = { ok: true };
+
+/** What the workbench reads on opening a project and after each change (`GET overview`). */
+export type ProjectOverview = {
+  files: FileInfo[];
+  comments: Comment[];
+  members: Member[];
+  snapshots: Snapshot[];
+  proposals: Proposal[];
+  latestBuild: Build | null;
+  summary: ProjectSummary;
+};
