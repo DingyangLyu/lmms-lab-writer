@@ -37,6 +37,7 @@ export * from "./harness/error-boundary";
 export * from "./harness/harness-workspace";
 export * from "./harness/history-dialog";
 export * from "./harness/types";
+export * from "./harness/use-auto-reconnect";
 export * from "./harness/use-panel-lifecycle";
 export * from "./harness/use-workspace";
 export * from "./harness/workspace";

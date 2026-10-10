@@ -26,6 +26,7 @@ import { useChatOutbox } from "../chat/use-chat-outbox";
 import { useIdleTranscript } from "../chat/use-idle-transcript";
 import { conversationTitle } from "../context";
 import type { HarnessLifecycle } from "../harness/types";
+import { useAutoReconnect } from "../harness/use-auto-reconnect";
 import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
 import { agentPlatform, useBridge } from "../platform";
 import {
@@ -114,6 +115,9 @@ export function CodexPanel({
   const initialSession = useRef(lifecycle.initialSessionId);
   const [ready, setReady] = useState(false);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const reconnectSoon = useAutoReconnect(backend.kind === "shared", () =>
+    setConnectionAttempt((value) => value + 1),
+  );
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<Model[]>([]);
   const [model, setModel] = useState("");
@@ -272,7 +276,12 @@ export function CodexPanel({
           if (payload.method === "codex/connectionClosed") {
             setReady(false);
             setBusy(false);
-            setError(t("codex.codexDisconnectedClickReconnect"));
+            setError(
+              backend.kind === "shared"
+                ? t("agentsCommon.lostTheServerReconnecting")
+                : t("codex.codexDisconnectedClickReconnect"),
+            );
+            reconnectSoon();
             return;
           }
           const params = payload.params;
@@ -373,7 +382,10 @@ export function CodexPanel({
         }
         if (!cancelled) setReady(true);
       } catch (cause) {
-        if (!cancelled) setError(String(cause));
+        if (!cancelled) {
+          setError(String(cause));
+          reconnectSoon(10_000);
+        }
       }
     };
     void boot();

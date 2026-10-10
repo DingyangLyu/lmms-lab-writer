@@ -20,6 +20,7 @@ import { useChatOutbox } from "../chat/use-chat-outbox";
 import { useIdleTranscript } from "../chat/use-idle-transcript";
 import { shouldSendOnEnter } from "../codex/composer-keys";
 import type { HarnessLifecycle } from "../harness/types";
+import { useAutoReconnect } from "../harness/use-auto-reconnect";
 import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
 import { useBridge } from "../platform";
 import {
@@ -91,6 +92,9 @@ export function ClaudePanel({
   const initialSession = useRef(lifecycle.initialSessionId);
   const [ready, setReady] = useState(false);
   const [retry, setRetry] = useState(0);
+  const reconnectSoon = useAutoReconnect(backend.kind === "shared", () =>
+    setRetry((value) => value + 1),
+  );
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(lifecycle.initialSessionId ?? null);
   const sessionRef = useRef<string | null>(lifecycle.initialSessionId ?? null);
@@ -201,7 +205,8 @@ export function ClaudePanel({
         if (payload.event.type === "writer_disconnected") {
           setReady(false);
           setBusy(false);
-          setError(t("claude.claudeCodeDisconnectedClickReconnect"));
+          setError(t("agentsCommon.lostTheServerReconnecting"));
+          reconnectSoon();
           return;
         }
         if (
@@ -273,7 +278,9 @@ export function ClaudePanel({
       }
       if (!disposed) setReady(true);
     })().catch((cause) => {
-      if (!disposed) setError(String(cause));
+      if (disposed) return;
+      setError(String(cause));
+      reconnectSoon(10_000);
     });
     return () => {
       disposed = true;
