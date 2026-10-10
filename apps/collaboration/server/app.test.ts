@@ -33,7 +33,8 @@ describe("real collaboration service", () => {
     const statuses: number[] = [];
     for (let i = 0; i < 13; i++) statuses.push(await attempt(direct, `203.0.113.${i}`));
     expect(statuses).toContain(429);
-  });
+    // Two services and 25 scrypt checks: well past 30 s while the other test files load the CPU.
+  }, 120_000);
   it("leases shared tasks only to scoped runners and submits AI changes as unapplied proposals", async () => {
     const f = await fixture();
     const file = (
