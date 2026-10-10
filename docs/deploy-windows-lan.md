@@ -10,7 +10,7 @@
 
 ## 目录和后台任务
 
-程序和数据都在内置 NVMe 固态盘 C: 上。D:、F: 是 USB 机械移动硬盘，E: 是 USB 固态移动硬盘：USB 盘的写缓存不保证数据库提交真正落盘，拔出、休眠或掉线都会让服务出错，所以只用 D: 存放备份。（2026 年 10 月从 D: 迁到 C:，旧目录暂留为 `D:\writer.old`、`D:\texlive.old`。）
+程序和数据都在内置 NVMe 固态盘 C: 上。D:、F: 是 USB 机械移动硬盘，E: 是 USB 固态移动硬盘：USB 盘的写缓存不保证数据库提交真正落盘，拔出、休眠或掉线都会让服务出错，所以只用 D: 存放备份。（2026 年 10 月从 D: 迁到 C:，旧目录暂留为 `D:\writer.old`、`D:\texlive.old`；网络代理 mihomo 同时从 `D:\net` 迁到 `C:\net`，旧目录为 `D:\net.old`。）
 
 | 位置 | 内容 |
 | --- | --- |
@@ -48,7 +48,7 @@
 
 - Codex 用这台电脑上 `~/.codex` 的登录（与 Codex 桌面版共用，不要复制 `auth.json`，ChatGPT 登录的刷新令牌会轮换，副本会互相作废）；OpenCode 用 `~/.local/share/opencode/auth.json` 和 `~/.config/opencode/opencode.json`。所有 AI 任务都消耗这个账号的额度。
 - Codex 在 Windows 的后台任务里无法使用自身沙箱，所以设为 `danger-full-access`：组员的提示词能以 yuanbai 的权限访问这台电脑上的文件（包括上面的凭据）。只给信任的组员编辑权限。执行器不会把 `WRITER_*` 令牌、密码和数据库 URL 交给 AI。
-- 访问 OpenAI 需要本机代理（FlClash）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
+- 访问 OpenAI 需要本机代理（mihomo，见下文“网络”）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
 - 网页 AI 对话：Writer Runner 启用了 `codex`、`claude` 或 `opencode` 能力时，会再连一条 WebSocket 到服务器（`/api/runner/agents`，同一个共享执行器令牌）。网页显示执行器启用、且服务器 `WRITER_SHARED_RUNNER_HARNESSES` 也列出的那些（按 Codex、Claude Code、OpenCode 排）。一个 `codex app-server` 和一个 `opencode serve`（只监听 127.0.0.1 的随机端口）服务所有项目，Claude Code 每轮启动一次 CLI。每个项目在 `%USERPROFILE%\.writer-runner\projects\<项目 ID>` 有一份工作副本，每轮开始前和服务器同步；AI 每改完一步，改动就合并进共享正文（以发起这一轮的成员名义），与他人同时改到同一处的部分转为待审阅建议。每轮开始前服务器自动保存一个版本“AI 对话修改前”，可在“版本”里恢复。
 - 只有项目的所有者和编辑者能用 AI 对话；对话默认只有发起人能看到，可在对话标题旁或“历史对话”里共享给项目成员。同一项目同时只运行一轮。
 - 因为 `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 的权限只提供“完全访问”；其他机器可用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview,fullAccess` 指定。Claude Code 的四种权限都提供，可用 `WRITER_CLAUDE_PERMISSIONS` 限制。OpenCode 在网页上默认不能运行 shell、不能访问项目以外的文件夹，可改 `WRITER_OPENCODE_PERMISSION`（OpenCode 的权限 JSON）。浏览器拿不到 OpenCode 的配置原文和供应商密钥：执行器只转发模型和智能体名称。
@@ -70,12 +70,12 @@
 
 这台电脑不再用 FlClash 的机场订阅，而是用 mihomo（FlClash 的同一内核）作为系统服务，不登录也在运行：
 
-- 程序和配置：`D:\net\mihomo`（`config.yaml` 只有 SYSTEM、管理员和 yuanbai 能读），日志 `D:\net\logs`；
-- 任务计划程序 `\Network\Mihomo`（开机启动，退出后自动重启）和 `\Network\Mihomo Watchdog`（每 5 分钟经代理测试一次，连续 3 次失败就重启 mihomo）；
+- 程序和配置：`C:\net\mihomo`（`config.yaml` 只有 SYSTEM、管理员和 yuanbai 能读；`C:\net` 的脚本以 SYSTEM 运行，所以整个目录只有这三者能改），日志 `C:\net\logs`；
+- 任务计划程序 `\Network\Mihomo`（开机启动，退出后自动重启）和 `\Network\Mihomo Watchdog`（每 5 分钟经代理测试一次，连续 3 次失败且直连正常时重启 mihomo；整个网络断开时只记日志）；
 - 境外流量走洛杉矶服务器（出口 IP 固定）；国内网站（GeoSite/GeoIP 中国列表）、B 站、ToDesk、百度网盘、微信、QQ、钉钉、飞书、Windows 更新等直连；局域网地址不进 TUN；
 - 本机代理端口仍是 `127.0.0.1:7890`，Writer 执行器经它访问 OpenAI；
-- 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `D:\net\mihomo\mihomo.exe -t -d D:\net\mihomo` 检查后重启 Mihomo 任务；
-- FlClash 仍安装着，但它的辅助服务已改为手动启动；不要同时打开 FlClash 的 TUN，否则两者会抢路由和 7890 端口。
+- 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `C:\net\mihomo\mihomo.exe -t -d C:\net\mihomo` 检查后重启 Mihomo 任务；
+- FlClash 仍安装着（打开它会把辅助服务重新装成自动启动，单独运行的辅助服务不影响网络）；不要在 FlClash 里打开 TUN 或系统代理，否则会和 mihomo 抢路由和 7890 端口。
 
 ## 更新
 
