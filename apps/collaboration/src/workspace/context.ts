@@ -2,6 +2,8 @@ import type { RefObject } from "react";
 import type { FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import type { EditorHandle } from "../editor";
 import type { SyncStatus } from "../provider";
+import type { AiChoice, AiConversations } from "./ai-target";
+import type { SentNotes } from "./notes";
 
 /** What every workspace panel needs from the page around it. */
 export type WorkspaceContext = {
@@ -22,6 +24,16 @@ export type WorkspaceContext = {
   files: FileInfo[];
   openFile: (file: FileInfo) => void;
   status: SyncStatus;
-  /** Hands work (comments to address, a build to fix) to the AI conversation; editors only. */
-  askAi: ((text: string) => void) | null;
+  /**
+   * Hands work (comments to address, a build to fix) to the AI conversation chosen in `ai`;
+   * editors only. Comments named in `notes` are remembered as sent there.
+   */
+  askAi: ((text: string, notes?: string[]) => void) | null;
+  /** Where work goes: the choice, the AI panel's conversations, and what was sent where. */
+  ai: {
+    choice: AiChoice;
+    setChoice: (choice: AiChoice) => void;
+    conversations: AiConversations;
+    sent: SentNotes;
+  };
 };

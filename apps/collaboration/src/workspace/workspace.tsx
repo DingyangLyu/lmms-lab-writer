@@ -37,7 +37,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
+import type { Comment, FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { api, download } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
 import { useEditorSettings } from "../editor-settings";
@@ -47,6 +47,14 @@ import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
 import { useAction } from "../use-action";
 import type { AiTask } from "./agents-panel";
+import {
+  type AiConversations,
+  choiceLabel,
+  NO_CONVERSATIONS,
+  resolveChoice,
+  useAiChoice,
+} from "./ai-target";
+import { commentsTask } from "./ai-tasks";
 import { BinaryPreview } from "./binary-preview";
 import { useBuild } from "./build";
 import { CommentsPanel } from "./comments-panel";
@@ -55,7 +63,8 @@ import { FilePanel } from "./file-panel";
 import { CompileButton, VersionStatus, WorkspaceMenu } from "./header";
 import { HistoryPanel } from "./history-panel";
 import { LogPanel } from "./log-panel";
-import { draftFromPdf, postDraft, useDraft } from "./notes";
+import { type BubbleState, NoteBubble, toggleBubble } from "./note-bubble";
+import { draftFromPdf, postDraft, useDraft, useSentNotes } from "./notes";
 import { OUTPUT_PDF, PdfPane } from "./pdf-pane";
 import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
@@ -265,7 +274,13 @@ export function Workspace({
     [pdfNavigation, setPdfNavigation] = useState(0);
   // The selection the next AI message quotes, and work handed to the AI from elsewhere.
   const [aiSelection, setAiSelection] = useState<EditorSelectionContext | null>(null),
-    [aiTask, setAiTask] = useState<AiTask | null>(null);
+    [aiTask, setAiTask] = useState<AiTask | null>(null),
+    [conversations, setConversations] = useState<AiConversations>(NO_CONVERSATIONS);
+  const [aiChoice, setAiChoice] = useAiChoice(project.id);
+  // The sticky note open beside the text or the PDF.
+  const [bubble, setBubble] = useState<BubbleState | null>(null);
+  const closeBubble = useCallback(() => setBubble(null), []);
+  const [sentNotes, markSent] = useSentNotes(project.id);
   const layout = useMemo<MarginLayout>(() => ({ view: null, events: new EventTarget() }), []);
   useEffect(() => {
     try {
@@ -364,11 +379,13 @@ export function Workspace({
     status,
     askAi:
       role === "owner" || role === "editor"
-        ? (text) => {
-            setAiTask({ id: Date.now(), text });
+        ? (text, notes) => {
+            setAiTask({ id: Date.now(), text, target: resolveChoice(aiChoice, conversations) });
+            if (notes?.length) markSent(notes, choiceLabel(aiChoice, conversations, t));
             setRightOpen(true);
           }
         : null,
+    ai: { choice: aiChoice, setChoice: setAiChoice, conversations, sent: sentNotes },
   };
   const b = useBuild(ws, data.latestBuild, data.sources, data.loaded);
   const [centerWidth, centerRef] = useWidth();
@@ -391,15 +408,24 @@ export function Workspace({
       return;
     }
     setDraft({ file: file.id, body: draft?.body ?? "", ...s });
-    showDraftPlace();
+    setBubble({ kind: "draft", where: "editor" });
   };
-  const submitDraft = () =>
+  /** Posts the comment being written; `andAsk` hands it to the chosen AI conversation too. */
+  const submitDraft = (andAsk = false) =>
     draft &&
     run(async () => {
-      const made = await postDraft(prefix, draft);
-      setDraft(null);
+      const { id } = (await postDraft(prefix, draft)) as { id: string };
       await data.reload();
-      setActiveComment((made as { id: string }).id);
+      // The note stays open, now on the posted comment.
+      setDraft(null);
+      setActiveComment(id);
+      setBubble((open) =>
+        open?.kind === "draft" ? { kind: "notes", ids: [id], where: open.where } : open,
+      );
+      if (andAsk && ws.askAi) {
+        const made = (await api<Comment[]>(`${prefix}/comments`)).find((c) => c.id === id);
+        if (made) ws.askAi(commentsTask([made], data.files, locale), [id]);
+      }
     });
   const locate = (c: { id: string; file: string; line: number | null }) => {
     const target = data.files.find((f) => f.id === c.file);
@@ -431,9 +457,16 @@ export function Workspace({
     selectedId: activeComment,
     navigation: pdfNavigation,
     setOpen: setCommentsOpen,
+    openNotes: (ids) => {
+      activate(ids[0] ?? null);
+      setBubble((open) => toggleBubble(open, { kind: "notes", ids, where: "pdf" }));
+    },
     beginDraft: (selection) => {
       const build = b.build;
       if (!build) return;
+      // The note opens where the words were selected on the PDF.
+      const chosen = document.getSelection();
+      const rect = chosen?.rangeCount ? chosen.getRangeAt(0).getBoundingClientRect() : null;
       run(async () => {
         const next = await draftFromPdf(prefix, build.id, data.files, selection, (f) =>
           f.id === file?.id ? (editor.current?.text() ?? null) : null,
@@ -442,7 +475,8 @@ export function Workspace({
         setDraft(next);
         const target = data.files.find((f) => f.id === next.file);
         if (target && target.id !== file?.id) ws.openFile(target);
-        showDraftPlace();
+        if (rect && rect.height > 0) setBubble({ kind: "draft", where: "pdf", rect });
+        else showDraftPlace();
       });
     },
   };
@@ -589,6 +623,7 @@ export function Workspace({
         }
         task={aiTask}
         onTaskTaken={(id) => setAiTask((current) => (current?.id === id ? null : current))}
+        onConversations={setConversations}
         onOpenFile={(path, line) => b.openLocation(path, line)}
         onError={setError}
       />
@@ -631,6 +666,18 @@ export function Workspace({
         onLayout={(view) => {
           layout.view = view;
           layout.events.dispatchEvent(new Event("layout"));
+        }}
+        draftAt={draft?.file === file.id ? draft.from : null}
+        onNoteIcon={(ids, isDraft) => {
+          if (!isDraft) activate(ids[0] ?? null);
+          setBubble((open) =>
+            toggleBubble(
+              open,
+              isDraft
+                ? { kind: "draft", where: "editor" }
+                : { kind: "notes", ids, where: "editor" },
+            ),
+          );
         }}
       />
     )
@@ -720,7 +767,7 @@ export function Workspace({
               draft={draft}
               setDraft={setDraft}
               onSubmit={submitDraft}
-              showDraft={!marginShown || draft?.file !== file?.id}
+              showDraft={bubble?.kind !== "draft" && (!marginShown || draft?.file !== file?.id)}
               onLocate={locate}
             />
             {pendingReview > 0 && (
@@ -870,7 +917,9 @@ export function Workspace({
                           comments={data.comments.filter((c) => c.file === file?.id)}
                           active={activeComment}
                           setActive={activate}
-                          draft={draft?.file === file?.id ? draft : null}
+                          draft={
+                            bubble?.kind !== "draft" && draft?.file === file?.id ? draft : null
+                          }
                           setDraft={setDraft}
                           onSubmit={submitDraft}
                           selection={selected}
@@ -933,6 +982,17 @@ export function Workspace({
               </>
             ))}
         </main>
+        {bubble && (
+          <NoteBubble
+            ws={ws}
+            state={bubble}
+            comments={data.comments}
+            draft={draft}
+            setDraft={setDraft}
+            onSubmit={submitDraft}
+            onClose={closeBubble}
+          />
+        )}
         {dialog === "share" && (
           <ShareDialog
             ws={ws}

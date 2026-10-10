@@ -8,6 +8,7 @@ import { workbenchI18n } from "@lmms-lab/workbench";
 import {
   ClaudePanel,
   CodexPanel,
+  type ConversationTarget,
   type EditorSelectionContext,
   HARNESSES,
   HarnessButtons,
@@ -20,7 +21,7 @@ import {
   parseChatLink,
   useHarnessWorkspace,
 } from "@lmms-lab/workbench/agents";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUser, Role } from "../../shared/api";
 import { i18n, useI18n } from "../i18n";
 import {
@@ -30,11 +31,13 @@ import {
   relayCodexBackend,
   relayOpenCodeTransport,
 } from "./agent-link";
+import type { AiConversations } from "./ai-target";
 
 const PANELS = { codex: CodexPanel, claude: ClaudePanel, opencode: OpenCodePanel };
 const WEB_ORDER: HarnessId[] = ["codex", "claude", "opencode"];
 /** Text for the conversation in front, from a button elsewhere on the page. */
-export type AiTask = { id: number; text: string };
+/** Work from the page for an AI conversation: a chosen one, else the one in front. */
+export type AiTask = { id: number; text: string; target?: ConversationTarget };
 /** What the server adds to OpenCode's session list: whose conversation it is. */
 type Linked = { id: string; name: string } | null;
 type Shared = {
@@ -81,6 +84,7 @@ export function AgentsPanel({
   onSelectionDone,
   task,
   onTaskTaken,
+  onConversations,
   onOpenFile,
   onError,
 }: {
@@ -95,6 +99,8 @@ export function AgentsPanel({
   /** Work from the page (comments to address, a build to fix) for the current conversation. */
   task: AiTask | null;
   onTaskTaken: (id: number) => void;
+  /** The open conversations, for choosing where work from the page goes. */
+  onConversations?: (conversations: AiConversations) => void;
   onOpenFile: (path: string, line: number) => void;
   onError: (message: string) => void;
 }) {
@@ -131,13 +137,34 @@ export function AgentsPanel({
   useEffect(() => {
     if (allowed && first && workspace.ready && !workspace.tabs.length) workspace.open(first);
   }, [allowed, first, workspace]);
-  // A task goes to the conversation in front (queued while it works), else a new one.
+  const reported = useRef("");
+  useEffect(() => {
+    if (!onConversations || !workspace.ready) return;
+    const next: AiConversations = {
+      tabs: workspace.tabs.map((tab) => ({ id: tab.id, backend: tab.backend, title: tab.title })),
+      harnesses: harnesses.map((h) => h.id),
+      active: workspace.activeId,
+    };
+    const key = JSON.stringify(next);
+    if (key === reported.current) return;
+    reported.current = key;
+    onConversations(next);
+  });
+  // A task goes to the conversation chosen for it, else the one in front (queued while it
+  // works), else a new one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per task, when the conversations are known.
   useEffect(() => {
     if (!task || !first || !workspace.ready) return;
     const active = workspace.tabs.find((tab) => tab.id === workspace.activeId);
+    const chosen = task.target;
+    const open = chosen?.tabId && workspace.tabs.find((tab) => tab.id === chosen.tabId);
+    const target = open
+      ? { backend: open.backend, tabId: open.id }
+      : chosen && !chosen.tabId && harnesses.some((h) => h.id === chosen.backend)
+        ? { backend: chosen.backend }
+        : { backend: active?.backend ?? first, tabId: active?.id };
     try {
-      workspace.dispatch({ backend: active?.backend ?? first, tabId: active?.id }, task.text);
+      workspace.dispatch(target, task.text);
     } catch (cause) {
       onError(String(cause));
     }

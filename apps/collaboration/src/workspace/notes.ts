@@ -110,3 +110,29 @@ export async function draftFromPdf(
     },
   };
 }
+
+/** Which conversation each comment was last handed to, and when (this browser). */
+export type SentNotes = Record<string, { to: string; at: number }>;
+export function useSentNotes(project: string) {
+  const key = `writer-note-sent:${project}`;
+  const [sent, setSent] = useState<SentNotes>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || "{}");
+      return saved && typeof saved === "object" ? saved : {};
+    } catch {
+      return {};
+    }
+  });
+  const mark = (ids: string[], to: string) =>
+    setSent((current) => {
+      const next = { ...current };
+      for (const id of ids) next[id] = { to, at: Date.now() };
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        /* Remembered for this visit only. */
+      }
+      return next;
+    });
+  return [sent, mark] as const;
+}

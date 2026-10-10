@@ -50,6 +50,12 @@ const ws: WorkspaceContext = {
   openFile: () => {},
   status: "saved",
   askAi: () => {},
+  ai: {
+    choice: "front",
+    setChoice: () => {},
+    conversations: { tabs: [], harnesses: ["codex"], active: null },
+    sent: {},
+  },
 };
 const comment: Comment = {
   id: "c1",
@@ -158,7 +164,9 @@ describe("client panels render", () => {
     ].join("");
     for (const text of [
       "请核对",
-      "已核对",
+      // The note column shows how many replies; the thread opens on demand.
+      "1 条回复",
+      "交给 AI（0）",
       "选中",
       "待审阅",
       "投稿前",

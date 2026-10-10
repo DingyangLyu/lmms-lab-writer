@@ -1,13 +1,21 @@
 import { autocompletion, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, indentWithTab, toggleLineComment } from "@codemirror/commands";
 import { bracketMatching, foldKeymap } from "@codemirror/language";
-import { gotoLine, highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { gotoLine, highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import {
+  Compartment,
+  EditorState,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
   drawSelection,
   EditorView,
+  GutterMarker,
+  gutter,
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
@@ -21,6 +29,7 @@ import {
   editorConfiguration,
   FoldToolbar,
   latexFoldExtensions,
+  writerSearch,
 } from "@lmms-lab/workbench";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -46,6 +55,121 @@ const commentMarks = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+/** Where the comment being written starts in this file, following edits. */
+const setDraftAt = StateEffect.define<number | null>();
+const draftAt = StateField.define<number | null>({
+  create: () => null,
+  update(at, transaction) {
+    for (const effect of transaction.effects) if (effect.is(setDraftAt)) return effect.value;
+    return at === null ? null : transaction.changes.mapPos(at);
+  },
+});
+const NOTE_ICON =
+  '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" opacity=".28" d="M3 2h10v8l-4 4H3z"/><path fill="currentColor" d="M3.5 1.5h9A1.5 1.5 0 0 1 14 3v7.2L9.7 14.5H3.5A1.5 1.5 0 0 1 2 13V3a1.5 1.5 0 0 1 1.5-1.5Zm0 1A.5.5 0 0 0 3 3v10a.5.5 0 0 0 .5.5H9v-3A1.5 1.5 0 0 1 10.5 9H13V3a.5.5 0 0 0-.5-.5Zm6.5 10.6 2.1-2.1h-1.6a.5.5 0 0 0-.5.5Z"/></svg>';
+/** A sticky note beside a line with comments (or the one being written); a click opens them. */
+class NoteMarker extends GutterMarker {
+  constructor(
+    readonly ids: string[],
+    readonly draft: boolean,
+    readonly active: boolean,
+  ) {
+    super();
+  }
+  eq(other: NoteMarker) {
+    return (
+      other.ids.join() === this.ids.join() &&
+      other.draft === this.draft &&
+      other.active === this.active
+    );
+  }
+  toDOM() {
+    const marker = document.createElement("span");
+    marker.className = `cm-note-marker${this.draft ? " cm-note-draft" : ""}${this.active ? " cm-note-active" : ""}`;
+    marker.setAttribute("data-note-ids", this.ids.join(" "));
+    if (this.draft) marker.setAttribute("data-note-draft", "");
+    marker.title = this.draft
+      ? i18n.t("notes.draftNote")
+      : this.ids.length > 1
+        ? i18n.t("notes.noteCount", { count: this.ids.length })
+        : i18n.t("notes.openNote");
+    marker.innerHTML = NOTE_ICON + (this.ids.length > 1 ? `<b>${this.ids.length}</b>` : "");
+    return marker;
+  }
+}
+const SPACER = new NoteMarker([], false, false);
+/** The notes gutter: comment markers come from the highlighted comments, plus the draft. */
+function noteGutter(onIcon: (ids: string[], draft: boolean) => void) {
+  return [
+    gutter({
+      class: "cm-note-gutter",
+      markers: (view) => {
+        const doc = view.state.doc;
+        const lines = new Map<number, { ids: string[]; active: boolean; draft: boolean }>();
+        const at = (pos: number) => {
+          const line = doc.lineAt(Math.min(pos, doc.length)).from;
+          const entry = lines.get(line) ?? { ids: [], active: false, draft: false };
+          lines.set(line, entry);
+          return entry;
+        };
+        view.state.field(commentMarks).between(0, doc.length, (from, _to, decoration) => {
+          const id = decoration.spec.attributes?.["data-comment"];
+          if (!id) return;
+          const entry = at(from);
+          if (!entry.ids.includes(id)) entry.ids.push(id);
+          if (String(decoration.spec.class).includes("writer-note-active")) entry.active = true;
+        });
+        const draft = view.state.field(draftAt);
+        if (draft !== null) at(draft).draft = true;
+        const builder = new RangeSetBuilder<GutterMarker>();
+        for (const [line, entry] of [...lines].sort(([a], [b]) => a - b))
+          builder.add(line, line, new NoteMarker(entry.ids, entry.draft, entry.active));
+        return builder.finish();
+      },
+      lineMarkerChange: (update) =>
+        update.transactions.some((transaction) =>
+          transaction.effects.some((effect) => effect.is(setMarks) || effect.is(setDraftAt)),
+        ),
+      initialSpacer: () => SPACER,
+      domEventHandlers: {
+        mousedown: (_view, _line, event) => {
+          const marker = (event.target as HTMLElement).closest?.(".cm-note-marker");
+          if (!marker) return false;
+          event.preventDefault();
+          onIcon(
+            (marker.getAttribute("data-note-ids") ?? "").split(" ").filter(Boolean),
+            marker.hasAttribute("data-note-draft"),
+          );
+          return true;
+        },
+      },
+    }),
+    EditorView.baseTheme({
+      ".cm-note-gutter": { width: "18px" },
+      ".cm-note-gutter .cm-gutterElement": { padding: "0 1px", display: "flex" },
+      ".cm-note-marker": {
+        position: "relative",
+        display: "inline-flex",
+        width: "15px",
+        height: "15px",
+        marginTop: "0.2em",
+        color: "#d97706",
+        cursor: "pointer",
+      },
+      ".cm-note-marker:hover": { color: "#b45309" },
+      ".cm-note-marker svg": { width: "15px", height: "15px" },
+      ".cm-note-marker b": {
+        position: "absolute",
+        right: "-3px",
+        top: "-5px",
+        fontSize: "9px",
+        fontWeight: "700",
+      },
+      ".cm-note-active": { color: "#b45309", background: "#fde68a" },
+      ".cm-note-draft": { color: "#ea580c", animation: "cm-note-pulse 1.6s ease-in-out infinite" },
+      "@keyframes cm-note-pulse": { "50%": { opacity: 0.45 } },
+    }),
+  ];
+}
 /** The desktop editor's theme, gutters, wrapping and brackets with the member's settings, read-only by role. */
 const configuration = (settings: Partial<EditorSettings>, role: Role) =>
   editorConfiguration(
@@ -83,6 +207,8 @@ export function Editor({
   onCommentClick,
   onSelect,
   onLayout,
+  draftAt: draftStart = null,
+  onNoteIcon,
   settings = DEFAULT_EDITOR_SETTINGS,
 }: {
   project: string;
@@ -110,6 +236,10 @@ export function Editor({
   onSelect?: (range: { from: number; to: number; range: EditorTextRange } | null) => void;
   /** The CodeMirror view and every scroll, resize or edit, for the review margin. */
   onLayout?: (view: EditorView | null) => void;
+  /** Where the comment being written starts in this file, for its note beside the line. */
+  draftAt?: number | null;
+  /** A click on a note beside the text: the comments on that line, or the draft. */
+  onNoteIcon?: (ids: string[], draft: boolean) => void;
   /** Text size, wrapping and the like, as the member chose them. */
   settings?: Partial<EditorSettings>;
 }) {
@@ -128,6 +258,7 @@ export function Editor({
     onCommentClick,
     onSelect,
     onLayout,
+    onNoteIcon,
   });
   callbacks.current = {
     onRole,
@@ -140,7 +271,10 @@ export function Editor({
     onCommentClick,
     onSelect,
     onLayout,
+    onNoteIcon,
   };
+  const draftRef = useRef(draftStart);
+  draftRef.current = draftStart;
   const readOnly = useRef(role);
   readOnly.current = role;
   const chosen = useRef(settings);
@@ -205,7 +339,7 @@ export function Editor({
           highlightActiveLineGutter(),
           highlightSelectionMatches(),
           highlightSpecialChars(),
-          search({ top: true }),
+          writerSearch(),
           autocompletion({ override: [latexCompletion(() => callbacks.current.hints())] }),
           keymap.of([
             { key: "Mod-/", run: toggleLineComment },
@@ -222,6 +356,8 @@ export function Editor({
           // The desktop editor's theme, gutters, wrapping and brackets, read-only by role.
           editability.current.of(configuration(chosen.current, readOnly.current)),
           commentMarks,
+          draftAt,
+          noteGutter((ids, draft) => callbacks.current.onNoteIcon?.(ids, draft)),
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.label"),
             spellcheck: "false",
@@ -296,6 +432,11 @@ export function Editor({
     };
     restore = () => {
       restored = true;
+      // The draft's place, set before the text arrived, is placed again in the real text.
+      if (draftRef.current !== null)
+        v.dispatch({
+          effects: setDraftAt.of(Math.min(draftRef.current, v.state.doc.length)),
+        });
       const saved = readPosition(project, file);
       if (!saved) return;
       const doc = v.state.doc,
@@ -428,6 +569,15 @@ export function Editor({
       p.doc.off("update", update);
     };
   }, [comments, file, activeComment]);
+  useEffect(() => {
+    const v = view.current;
+    if (v && v.state.field(draftAt) !== draftStart)
+      v.dispatch({
+        effects: setDraftAt.of(
+          draftStart === null ? null : Math.min(draftStart, v.state.doc.length),
+        ),
+      });
+  }, [draftStart]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <FoldToolbar view={() => view.current} actions={actions} />

@@ -20,7 +20,7 @@ import { useI18n } from "../i18n";
 
 const join = (...parts: Array<string | false | undefined>) => parts.filter(Boolean).join(" ");
 /** Above everything else on the page; inline where there is no page (server rendering). */
-const onTop = (node: ReactNode) =>
+export const onTop = (node: ReactNode) =>
   typeof document === "undefined" ? node : createPortal(node, document.body);
 
 /** The bordered button of the desktop status bar and panels. */

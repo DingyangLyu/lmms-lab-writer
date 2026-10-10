@@ -15,6 +15,7 @@ export function ThreadCard({
   onActivate,
   heading,
   footer,
+  noAi,
 }: {
   ws: WorkspaceContext;
   comment: Comment;
@@ -22,17 +23,19 @@ export function ThreadCard({
   onActivate?: () => void;
   heading?: ReactNode;
   footer?: ReactNode;
+  /** Where the AI is offered beside the thread instead (the note on the text). */
+  noAi?: boolean;
 }) {
   const { t, locale } = useI18n();
   const { prefix, user, role, canComment, canEdit, busy, run, reload, askAi } = ws;
   // An open comment can go to the AI as a change to make, as on the desktop.
-  const ai = askAi && !comment.resolved && (
+  const ai = askAi && !noAi && !comment.resolved && (
     <button
       type="button"
       title={t("comments.askAiTitle")}
       onClick={(event) => {
         event.stopPropagation();
-        askAi(commentsTask([comment], ws.files, locale));
+        askAi(commentsTask([comment], ws.files, locale), [comment.id]);
       }}
       className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted hover:text-foreground"
     >
