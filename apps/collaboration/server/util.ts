@@ -23,6 +23,29 @@ export class HttpError extends Error {
     super(format(template, params));
   }
 }
+/**
+ * Signed out, not a member, or gone — as opposed to a passing failure such as the database
+ * restarting, after which a connection should simply try again.
+ */
+export const accessDenied = (error: unknown) =>
+  error instanceof HttpError && [401, 403, 404].includes(error.status);
+/** Close code for a passing failure: the page reconnects instead of treating it as lost access. */
+export const RETRY_CLOSE = 1011;
+/**
+ * The database or the network failing for a moment (PostgreSQL restarting, a dropped
+ * connection), as opposed to a bad request: worth trying again rather than refusing.
+ */
+export function transientFailure(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = String((error as { code?: unknown }).code ?? "");
+  const message = error instanceof Error ? error.message : "";
+  return (
+    // SQLSTATE classes 08 (connection), 53 (resources), 57 (operator intervention, e.g. shutdown)
+    /^(08|53|57)[0-9A-Z]{3}$/.test(code) ||
+    ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTCONN"].includes(code) ||
+    /Connection terminated|connection (?:is )?closed|timeout exceeded/i.test(message)
+  );
+}
 export function fail(status: number, template: string, params?: Params): never {
   throw new HttpError(status, template, params);
 }

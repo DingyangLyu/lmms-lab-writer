@@ -35,6 +35,7 @@ import { requestLocale, say } from "./messages";
 import { createFile, PROJECT_BYTES, projectTooLarge } from "./routes/files";
 import type { Store, User } from "./store";
 import {
+  accessDenied,
   checked,
   decodeText,
   digest,
@@ -288,8 +289,9 @@ export class Agents {
         const user = await userFor(this.store, browser.req);
         await this.store.require(browser.project, user.id, "edit");
         browser.socket.ping();
-      } catch {
-        this.closeBrowser(browser);
+      } catch (error) {
+        // A failure to check (the database restarting) waits for the next round.
+        if (accessDenied(error)) this.closeBrowser(browser);
       }
   }
   private closeBrowser(browser: Browser) {
@@ -479,8 +481,13 @@ export class Agents {
     try {
       user = await userFor(this.store, browser.req);
       await this.store.require(browser.project, user.id, "edit");
-    } catch {
-      return this.closeBrowser(browser);
+    } catch (error) {
+      if (accessDenied(error)) return this.closeBrowser(browser);
+      send(browser.socket, {
+        id,
+        error: say(browser.locale, "AI 对话操作失败"),
+      });
+      return;
     }
     try {
       const params = isObject(message.params) ? message.params : {};

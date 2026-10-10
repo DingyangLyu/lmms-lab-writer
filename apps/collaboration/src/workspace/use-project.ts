@@ -97,11 +97,28 @@ export function useProject(
         if (m.type === "ready") onRole(m.role);
       };
       socket.onclose = (e) => {
-        if (!stopped && e.code !== 1008) retry = setTimeout(connect, 1500);
-        else if (!stopped) {
-          onRole("viewer");
-          onError(i18n.t("project.roleChanged"));
+        if (stopped) return;
+        if (e.code !== 1008) {
+          retry = setTimeout(connect, 1500);
+          return;
         }
+        // Closed for lost access: ask once more before believing it, so a server hiccup never
+        // turns a member into a viewer until they reload.
+        void fetch(`/api${prefix}`, { credentials: "same-origin" })
+          .then(async (response) => {
+            if (stopped) return;
+            if (response.ok) {
+              onRole(((await response.json()) as ProjectSummary).role);
+              retry = setTimeout(connect, 1500);
+            } else if ([401, 403, 404].includes(response.status)) {
+              onRole("viewer");
+              onError(i18n.t("project.roleChanged"));
+            } else retry = setTimeout(connect, 3000);
+          })
+          // The server is unreachable for now: try again, as for any dropped connection.
+          .catch(() => {
+            if (!stopped) retry = setTimeout(connect, 3000);
+          });
       };
     };
     connect();

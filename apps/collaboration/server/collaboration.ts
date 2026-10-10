@@ -16,7 +16,7 @@ import { allowedOrigin, bearer, userFor } from "./auth";
 import { type Sql, sql } from "./db";
 import { requestLocale, say } from "./messages";
 import type { Store, User } from "./store";
-import { fail, HttpError, normalizeEol } from "./util";
+import { accessDenied, fail, HttpError, normalizeEol, RETRY_CLOSE, transientFailure } from "./util";
 
 type Peer = {
   socket: WebSocket;
@@ -101,11 +101,22 @@ export class Collaboration {
     /** Origins whose pages may connect; see allowedOrigin. */
     private trusted: () => readonly string[] = () => [origin()],
   ) {
-    this.sweep = setInterval(() => {
-      for (const peer of this.peers)
-        void peer.authenticate().catch(() => closeWith(peer, 1008, "登录或项目权限已失效"));
-    }, 30000);
+    this.sweep = setInterval(() => void this.recheck(), 30000);
     this.sweep.unref();
+  }
+  /**
+   * Every open page's sign-in and membership, checked again. Only a real loss of access closes
+   * a page for good; a failure to check (the database restarting) waits for the next round.
+   */
+  async recheck() {
+    await Promise.all(
+      [...this.peers].map((peer) =>
+        peer.authenticate().catch((error) => {
+          if (accessDenied(error)) closeWith(peer, 1008, "登录或项目权限已失效");
+          else logFailure("access check")(error);
+        }),
+      ),
+    );
   }
   private async lock(key: string) {
     const previous = this.locks.get(key) ?? Promise.resolve();
@@ -300,8 +311,15 @@ export class Collaboration {
       void ready
         .then(() => this.message(peer, req, raw.toString()))
         .catch((e) => {
-          send(ws, { type: "error", message: wording(locale, e, "同步失败") });
-          ws.close(1008);
+          // The database failing for a moment is retried by reconnecting, which resends what
+          // the server has not acknowledged; a refused or malformed change is final.
+          if (transientFailure(e)) {
+            logFailure("document sync")(e);
+            closeWith(peer, RETRY_CLOSE, "同步失败");
+          } else {
+            send(ws, { type: "error", message: wording(locale, e, "同步失败") });
+            ws.close(1008);
+          }
         });
     });
     ws.on("close", () => {
@@ -339,7 +357,10 @@ export class Collaboration {
           sync,
         });
     } catch (e) {
-      closeWith(peer, 1008, e instanceof HttpError ? e.template : "文档不可用");
+      if (transientFailure(e)) {
+        logFailure("document open")(e);
+        closeWith(peer, RETRY_CLOSE, "文档不可用");
+      } else closeWith(peer, 1008, e instanceof HttpError ? e.template : "文档不可用");
       return;
     }
     this.peers.add(peer);
