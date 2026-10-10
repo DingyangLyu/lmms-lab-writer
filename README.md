@@ -47,7 +47,7 @@ Projects can live on both: the desktop app keeps a local folder in two-way sync 
 - **PDF builds on the server** with error locations and source ↔ PDF jumps.
 - **Template gallery** — the latest official templates of NeurIPS, ICML, ICLR, CVPR, ACL, AAAI and other AI conferences and journals, with rendered page previews; start a project in one click, or publish your own project as a template.
 - **Desktop sync** — open a server project in the desktop app as a local folder; edits flow both ways, conflicts become copies instead of lost work.
-- **AI conversations in the browser** — the desktop's chat panels (Codex, Claude Code, OpenCode), running on a lab machine where those tools are signed in. Its edits go straight into the shared text, with a version saved before every turn and overlaps with collaborators kept as suggestions; conversations are private until shared with the project.
+- **AI conversations in the browser** — the desktop's chat panels (Codex, Claude Code, OpenCode), running on a lab machine where those tools are signed in. Its edits go straight into the shared text, with a version saved before every turn and overlaps with collaborators kept as suggestions; conversations belong to the project (whoever started one can make it private), and can be shown read-only in another project.
 - **Accounts for a group** — people register and an administrator approves them; profile pictures and friends, who can be added to a project directly; invitation links, an admin console, and per-project roles (owner, editor, commenter, viewer).
 - **Runs on your hardware** — PostgreSQL with daily backups; Docker, or natively on a Windows lab PC.
 
