@@ -141,7 +141,7 @@ export function Dialog({
 }
 
 /**
- * A panel opened from a status-bar button and placed below it, like the desktop's comment
+ * A panel opened from a header button and placed below it, like the desktop's comment
  * history. Clicking elsewhere or Escape closes it.
  */
 export function Popover({
@@ -149,12 +149,18 @@ export function Popover({
   onClose,
   anchor,
   label,
+  width: widest = 800,
+  align = "start",
   children,
 }: {
   open: boolean;
   onClose: () => void;
   anchor: React.RefObject<HTMLElement | null>;
   label: string;
+  /** At most this wide, and never wider than the window. */
+  width?: number;
+  /** Which edge lines up with the button: its left ("start") or its right ("end"). */
+  align?: "start" | "end";
   children: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -164,10 +170,11 @@ export function Popover({
     const place = () => {
       const rect = anchor.current?.getBoundingClientRect();
       if (!rect) return;
-      const width = Math.min(800, window.innerWidth - 24);
+      const width = Math.min(widest, window.innerWidth - 24);
       const top = rect.bottom + 6;
+      const left = align === "end" ? rect.right - width : rect.left;
       setPosition({
-        left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
+        left: Math.max(12, Math.min(left, window.innerWidth - width - 12)),
         top,
         width,
         maxHeight: Math.max(160, Math.min(640, window.innerHeight - top - 16)),
@@ -193,7 +200,7 @@ export function Popover({
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, anchor, onClose]);
+  }, [open, anchor, onClose, widest, align]);
   if (!open) return null;
   return onTop(
     <div

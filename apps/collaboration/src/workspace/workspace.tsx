@@ -1,6 +1,6 @@
 /**
- * The project workbench in the browser, laid out like the desktop app: a header with panel
- * toggles and compiling, a status bar, Files and History in the left sidebar, open-file tabs
+ * The project workbench in the browser, laid out like the desktop app: one header row with the
+ * project, its save state, panel toggles, compiling and a menu, Files and History in the left sidebar, open-file tabs
  * with the editor and the PDF beside it, the build log below (the desktop's terminal) and AI
  * conversations on the right (the desktop's assistant). Phones get the side panels as overlays.
  */
@@ -20,10 +20,8 @@ import {
   DownloadSimpleIcon,
   FilePdfIcon,
   PencilSimpleIcon,
-  PlayCircleIcon,
   RobotIcon,
   SidebarSimpleIcon,
-  SquaresFourIcon,
   TerminalIcon,
   UsersIcon,
   XIcon,
@@ -38,7 +36,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Engine, FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
+import type { FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { api, download } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
 import { useI18n } from "../i18n";
@@ -51,6 +49,7 @@ import { useBuild } from "./build";
 import { CommentsPanel } from "./comments-panel";
 import type { WorkspaceContext } from "./context";
 import { FilePanel } from "./file-panel";
+import { CompileButton, VersionStatus, WorkspaceMenu } from "./header";
 import { HistoryPanel } from "./history-panel";
 import { LogPanel } from "./log-panel";
 import { draftFromPdf, postDraft, useDraft } from "./notes";
@@ -59,7 +58,7 @@ import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
 import { type MarginLayout, ReviewMargin } from "./review-margin";
 import { ShareDialog } from "./share-dialog";
-import { Btn, ResizeHandle, Select, ToggleButton, useStoredSize } from "./ui";
+import { Btn, ResizeHandle, ToggleButton, useStoredSize } from "./ui";
 import { useProject } from "./use-project";
 
 /** The chat panel (with its Markdown renderer) loads when the right column first opens. */
@@ -170,7 +169,7 @@ export function Workspace({
   user: PublicUser;
   onBack: () => void;
 }) {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
   const prefix = `/projects/${project.id}`;
   // The tabs and the file in front come back on the next visit (this browser only).
   const tabsKey = `writer-tabs:${project.id}`;
@@ -425,6 +424,7 @@ export function Workspace({
     (n, p) => n + p.hunks.filter((h) => h.status === "pending").length,
     0,
   );
+  const syncText = file && !file.binary ? t(statusKey[status]) : t("workspace.filePreview");
   const outlinePath = file?.path.endsWith(".tex") ? file.path : b.chosenMain || undefined;
   const pdfShown = b.open && !narrow;
   // The PDF shrinks, then the comment margin hides, before the editor gets too narrow to use.
@@ -577,140 +577,75 @@ export function Workspace({
   return (
     <WorkbenchLocale locale={locale}>
       <div className="flex h-dvh flex-col">
-        <header className="flex h-12 shrink-0 items-center border-b border-border">
-          <div className="flex w-full items-center justify-between gap-3 px-3 sm:px-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={onBack}
-                title={t("shell.backToProjects")}
-                className="shrink-0"
-              >
-                <img src="/logo-small-light.svg" alt="Y-Writer" className="h-7 w-auto" />
-              </button>
-              <span className="hidden text-border sm:inline">/</span>
-              <ProjectTitle
-                name={current.name}
-                canRename={role === "owner"}
-                onRename={(name) =>
-                  run(async () => {
-                    await api(prefix, { name }, "PATCH");
-                    await data.reload();
-                  })
-                }
-              />
-              <span className="hidden shrink-0 border border-border px-1.5 py-0.5 text-[10px] tracking-wider text-muted sm:inline">
-                {t(roleKey[role])}
-              </span>
-              <button
-                type="button"
-                onClick={onBack}
-                className="hidden h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:bg-accent-hover md:flex"
-              >
-                <SquaresFourIcon className="size-4" aria-hidden="true" />
-                {t("shell.projects")}
-              </button>
-            </div>
-            <div className="flex h-8 items-center gap-2 sm:gap-3">
-              <ToggleButton
-                pressed={sidebar}
-                label={t("shell.toggleSidebar")}
-                onClick={() => setSidebar((v) => !v)}
-              >
-                <SidebarSimpleIcon className="size-4" weight="bold" />
-              </ToggleButton>
-              <ToggleButton
-                pressed={logOpen}
-                label={t("shell.toggleLog")}
-                onClick={() => setLogOpen((v) => !v)}
-              >
-                <TerminalIcon className="size-4" weight="bold" />
-              </ToggleButton>
-              <ToggleButton
-                pressed={b.open}
-                label={t("shell.togglePdf")}
-                onClick={() => b.setOpen(!b.open)}
-              >
-                <FilePdfIcon className="size-4" weight="bold" />
-              </ToggleButton>
-              <ToggleButton
-                pressed={reviewOpen}
-                label={t("notes.toggleMargin")}
-                onClick={() => setReviewOpen((v) => !v)}
-                className="hidden md:flex"
-              >
-                <ChatsCircleIcon className="size-4" weight="bold" />
-              </ToggleButton>
-              <ToggleButton
-                pressed={rightOpen}
-                label={t("shell.toggleAi")}
-                onClick={() => setRightOpen((v) => !v)}
-              >
-                <RobotIcon className="size-4" weight="bold" />
-              </ToggleButton>
-              <span className="hidden select-none text-lg text-border sm:inline">/</span>
-              <Select
-                aria-label={t("build.main")}
-                value={b.chosenMain}
-                onChange={(e) => b.setMain(e.target.value)}
-                className="hidden max-w-40 truncate lg:block"
-              >
-                {b.texFiles.map((f) => (
-                  <option key={f.id} value={f.path}>
-                    {f.path}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                aria-label={t("build.engine")}
-                value={b.chosenEngine}
-                onChange={(e) => b.setEngine(e.target.value as Engine)}
-                className="hidden lg:block"
-              >
-                <option value="pdflatex">pdfLaTeX</option>
-                <option value="xelatex">XeLaTeX</option>
-                <option value="lualatex">LuaLaTeX</option>
-              </Select>
-              <ToggleButton
-                label={b.compiling ? t("build.compiling") : t("shell.compileShortcut")}
-                disabled={
-                  !ws.canComment || b.compiling || !b.texFiles.length || status === "saving"
-                }
-                onClick={b.compile}
-                className={b.compiling ? "animate-pulse" : ""}
-              >
-                <PlayCircleIcon className="size-4" />
-              </ToggleButton>
-              <button
-                type="button"
-                onClick={() => setDialog("share")}
-                className="flex h-8 shrink-0 items-center gap-1.5 border border-foreground bg-foreground px-2 text-xs text-background hover:opacity-90"
-              >
-                <UsersIcon className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">{t("shell.share")}</span>
-              </button>
-            </div>
-          </div>
-        </header>
-        <div className="shrink-0 border-b border-border bg-background text-xs" aria-live="polite">
-          <div className="flex flex-wrap items-center gap-3 px-3 py-1.5">
-            <span role="status" className={file && !file.binary ? SYNC_TONE[status] : "text-muted"}>
-              {file && !file.binary ? t(statusKey[status]) : t("workspace.filePreview")}
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 text-xs sm:gap-3 sm:px-4">
+          <button
+            type="button"
+            onClick={onBack}
+            title={t("shell.backToProjects")}
+            className="shrink-0"
+          >
+            <img src="/favicon.svg" alt="Y-Writer" className="size-7 lg:hidden" />
+            <img
+              src="/logo-small-light.svg"
+              alt="Y-Writer"
+              className="hidden h-7 w-auto lg:block"
+            />
+          </button>
+          <span className="hidden text-border sm:inline">/</span>
+          <ProjectTitle
+            name={current.name}
+            canRename={role === "owner"}
+            onRename={(name) =>
+              run(async () => {
+                await api(prefix, { name }, "PATCH");
+                await data.reload();
+              })
+            }
+          />
+          <span className="hidden shrink-0 border border-border px-1.5 py-0.5 text-[10px] tracking-wider text-muted 2xl:inline">
+            {t(roleKey[role])}
+          </span>
+          <span
+            role="status"
+            title={syncText}
+            className={`flex shrink-0 items-center gap-1.5 ${file && !file.binary ? SYNC_TONE[status] : "text-muted"}`}
+          >
+            <span className="size-2 bg-current" aria-hidden="true" />
+            {/* Saved is the quiet state; a problem is spelled out wherever there is room. */}
+            <span
+              className={status === "saved" ? "sr-only 2xl:not-sr-only" : "sr-only lg:not-sr-only"}
+            >
+              {syncText}
             </span>
-            {peers.length > 0 && (
-              <span className="flex items-center gap-1" title={peers.map((p) => p.name).join(", ")}>
-                {peers.slice(0, 5).map((p) => (
-                  <span
-                    key={p.name}
-                    className="flex h-5 w-5 items-center justify-center text-[10px] font-medium text-white"
-                    style={{ background: p.color }}
-                  >
-                    {p.name.slice(0, 1).toUpperCase()}
-                  </span>
-                ))}
-                <span className="text-muted">{t("shell.online", { count: peers.length })}</span>
-              </span>
-            )}
+          </span>
+          <span className="hidden sm:contents">
+            <VersionStatus
+              snapshots={data.snapshots}
+              members={data.members}
+              onOpen={() => {
+                setSidebarTab("history");
+                setSidebar(true);
+              }}
+            />
+          </span>
+          {peers.length > 0 && (
+            <span
+              className="hidden shrink-0 items-center gap-1 md:flex"
+              title={`${t("shell.online", { count: peers.length })}: ${peers.map((p) => p.name).join(", ")}`}
+            >
+              {peers.slice(0, 4).map((p) => (
+                <span
+                  key={p.name}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                  style={{ background: p.color }}
+                >
+                  {p.name.slice(0, 1).toUpperCase()}
+                </span>
+              ))}
+              {peers.length > 4 && <span className="text-muted">+{peers.length - 4}</span>}
+            </span>
+          )}
+          <div className="ml-auto flex h-8 shrink-0 items-center gap-1 sm:gap-2">
             <CommentsPanel
               ws={ws}
               comments={data.comments}
@@ -722,40 +657,80 @@ export function Workspace({
               showDraft={!marginShown || draft?.file !== file?.id}
               onLocate={locate}
             />
-            <Btn onClick={() => setDialog("references")}>{t("tab.bibliography")}</Btn>
-            <Btn onClick={() => setDialog("review")}>
-              {pendingReview ? t("shell.reviewCount", { count: pendingReview }) : t("tab.review")}
-            </Btn>
-            <a
-              href={`/api${prefix}/export`}
-              className="border border-border px-2 py-1 hover:border-foreground"
+            {pendingReview > 0 && (
+              <Btn className="hidden h-8 md:inline-flex" onClick={() => setDialog("review")}>
+                {t("shell.reviewCount", { count: pendingReview })}
+              </Btn>
+            )}
+            <span className="hidden select-none text-lg text-border sm:inline">/</span>
+            <ToggleButton
+              pressed={sidebar}
+              label={t("shell.toggleSidebar")}
+              onClick={() => setSidebar((v) => !v)}
             >
-              {t("workspace.export")}
-            </a>
-            <a
-              href={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
-              title={t("workspace.openDesktopTitle")}
-              className="hidden border border-border px-2 py-1 hover:border-foreground sm:inline"
+              <SidebarSimpleIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <ToggleButton
+              pressed={logOpen}
+              label={t("shell.toggleLog")}
+              onClick={() => setLogOpen((v) => !v)}
+              className="hidden sm:flex"
             >
-              {t("workspace.openDesktop")}
-            </a>
-            <div className="ml-auto flex items-center gap-3">
-              <Select
-                aria-label={t("language.label")}
-                value={locale}
-                onChange={(e) => setLocale(e.target.value === "en" ? "en" : "zh")}
-                className="h-7"
-              >
-                <option value="zh">中文</option>
-                <option value="en">English</option>
-              </Select>
-              <span className="hidden text-muted sm:inline">{user.name}</span>
-            </div>
+              <TerminalIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <ToggleButton
+              pressed={b.open}
+              label={t("shell.togglePdf")}
+              onClick={() => b.setOpen(!b.open)}
+            >
+              <FilePdfIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <ToggleButton
+              pressed={reviewOpen}
+              label={t("notes.toggleMargin")}
+              onClick={() => setReviewOpen((v) => !v)}
+              className="hidden md:flex"
+            >
+              <ChatsCircleIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <ToggleButton
+              pressed={rightOpen}
+              label={t("shell.toggleAi")}
+              onClick={() => setRightOpen((v) => !v)}
+            >
+              <RobotIcon className="size-4" weight="bold" />
+            </ToggleButton>
+            <span className="hidden select-none text-lg text-border sm:inline">/</span>
+            <CompileButton
+              b={b}
+              disabled={!ws.canComment || b.compiling || !b.texFiles.length || status === "saving"}
+            />
+            <WorkspaceMenu
+              user={user}
+              role={role}
+              pendingReview={pendingReview}
+              exportHref={`/api${prefix}/export`}
+              desktopHref={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
+              onProjects={onBack}
+              onReferences={() => setDialog("references")}
+              onReview={() => setDialog("review")}
+              onShare={() => setDialog("share")}
+            />
+            <button
+              type="button"
+              onClick={() => setDialog("share")}
+              className="hidden h-8 shrink-0 items-center gap-1.5 border border-border px-2 hover:bg-accent-hover sm:flex"
+            >
+              <UsersIcon className="size-4" aria-hidden="true" />
+              {t("shell.share")}
+            </button>
           </div>
+        </header>
+        <div className="shrink-0 bg-background text-xs" aria-live="polite">
           {(error || notice) && (
             <div
               role={error ? "alert" : "status"}
-              className={`flex items-start gap-2 border-t border-border px-3 py-1.5 ${error ? "text-red-600" : ""}`}
+              className={`flex items-start gap-2 border-b border-border px-3 py-1.5 ${error ? "text-red-600" : ""}`}
             >
               <span className="min-w-0 flex-1 whitespace-pre-wrap">{error || notice}</span>
               <button

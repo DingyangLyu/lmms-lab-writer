@@ -1,5 +1,4 @@
 export const shellZh = {
-  "shell.projects": "项目",
   "shell.renameProject": "点击修改项目名称",
   "shell.backToProjects": "返回项目列表",
   "shell.toggleSidebar": "显示或隐藏侧栏",
@@ -7,6 +6,15 @@ export const shellZh = {
   "shell.togglePdf": "显示或隐藏 PDF",
   "shell.toggleAi": "显示或隐藏 AI 对话",
   "shell.compileShortcut": "编译（⌘/Ctrl+S 或 ⌘/Ctrl+Enter）",
+  "shell.compile": "编译",
+  "shell.compileSettings": "编译设置",
+  "shell.menu": "菜单",
+  "shell.allProjects": "所有项目",
+  "shell.versionAgo": "版本 · {time}",
+  "shell.noVersion": "尚无版本",
+  "shell.versionTitle": "最近的版本：{detail}。点击查看、比较或恢复版本",
+  "shell.noVersionTitle":
+    "还没有保存过版本。有人编辑时每半小时会自动保存一个版本，也可以在“版本”中手动保存",
   "shell.share": "共享",
   "shell.files": "文件",
   "shell.history": "版本",
@@ -39,7 +47,6 @@ export const shellZh = {
   "shell.dismiss": "关闭提示",
 };
 export const shellEn: Record<keyof typeof shellZh, string> = {
-  "shell.projects": "Projects",
   "shell.renameProject": "Click to rename the project",
   "shell.backToProjects": "Back to projects",
   "shell.toggleSidebar": "Show or hide the sidebar",
@@ -47,6 +54,15 @@ export const shellEn: Record<keyof typeof shellZh, string> = {
   "shell.togglePdf": "Show or hide the PDF",
   "shell.toggleAi": "Show or hide AI conversations",
   "shell.compileShortcut": "Compile (⌘/Ctrl+S or ⌘/Ctrl+Enter)",
+  "shell.compile": "Compile",
+  "shell.compileSettings": "Compile settings",
+  "shell.menu": "Menu",
+  "shell.allProjects": "All projects",
+  "shell.versionAgo": "Version · {time}",
+  "shell.noVersion": "No versions yet",
+  "shell.versionTitle": "Latest version: {detail}. Click to see, compare or restore versions",
+  "shell.noVersionTitle":
+    "No versions saved yet. One is saved every half hour while people write, or save one under History",
   "shell.share": "Share",
   "shell.files": "Files",
   "shell.history": "History",

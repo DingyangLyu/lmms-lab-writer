@@ -1,9 +1,15 @@
 /**
- * Every comment of the project from the status bar, as the desktop's comment history: a
+ * Every comment of the project from the header, as the desktop's comment history: a
  * counter opening a panel with filters, search and each thread, plus the comment being written
  * when the review margin is not showing it.
  */
-import { CaretDownIcon, CheckCircleIcon, CrosshairIcon, XIcon } from "@phosphor-icons/react";
+import {
+  CaretDownIcon,
+  ChatCircleTextIcon,
+  CheckCircleIcon,
+  CrosshairIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import type { Comment } from "../../shared/api";
 import { useI18n } from "../i18n";
@@ -58,17 +64,23 @@ export function CommentsPanel({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="inline-flex shrink-0 items-center gap-1.5 border border-border px-2 py-1 hover:border-foreground"
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 border border-border px-2 text-xs hover:border-foreground hover:bg-accent-hover"
       >
-        <span>{t("shell.commentsCount", { count: pending.length })}</span>
+        <ChatCircleTextIcon className="size-4 sm:hidden" aria-hidden="true" />
+        <span className="sm:hidden">{pending.length}</span>
+        <span className="hidden sm:inline">
+          {t("shell.commentsCount", { count: pending.length })}
+        </span>
         {resolved.length > 0 && (
-          <span className="flex items-center gap-1 text-emerald-600">
+          <span className="hidden items-center gap-1 text-emerald-600 sm:flex">
             <CheckCircleIcon weight="fill" className="size-3.5" />
             {resolved.length}
           </span>
         )}
         {draft && <span className="text-orange-600">{t("shell.draft")}</span>}
-        <CaretDownIcon className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <CaretDownIcon
+          className={`hidden size-3 transition-transform sm:block ${open ? "rotate-180" : ""}`}
+        />
       </button>
       <Popover
         open={open}
