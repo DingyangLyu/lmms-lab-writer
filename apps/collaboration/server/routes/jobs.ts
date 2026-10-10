@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import type { RunnerInfo, SharedJob } from "../../shared/api";
 import { sql } from "../db";
 import { type Body, type Context, type InProject, route } from "../http";
+import { PROJECT_BYTES, PROJECT_FILES, sizeText } from "../limits";
 import { checked, decodeText, digest, fail, safePath, textDoc, uid } from "../util";
 
 type Job = {
@@ -38,8 +39,6 @@ type Snapshot = {
     deleted: boolean | number;
   }[];
 };
-const PROJECT_FILES = 2000,
-  PROJECT_BYTES = 100_000_000;
 const text = (body: Body, key: string, max = 10000) =>
   typeof body[key] === "string" && body[key].length <= max
     ? (body[key] as string)
@@ -197,7 +196,10 @@ async function runnerRequest(ctx: Context, action: string, body: Body) {
     usage.count + added.length > PROJECT_FILES ||
     usage.bytes + added.reduce((n, f) => n + (f.binary?.length ?? 0), 0) > PROJECT_BYTES
   )
-    fail(413, "项目超过 {count} 个文件或 100 MB，产物未保存", { count: PROJECT_FILES });
+    fail(413, "项目超过 {count} 个文件或 {size}，产物未保存", {
+      count: PROJECT_FILES,
+      size: sizeText(PROJECT_BYTES),
+    });
   const ids: string[] = [];
   await store.db.transaction(async (tx) => {
     // Cancellation can race with the result; only a still-running task may complete.

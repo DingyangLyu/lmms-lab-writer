@@ -4,11 +4,25 @@ import * as Y from "yjs";
 import type { FileContent, FileInfo, SourceFile } from "../../shared/api";
 import { sql, uniqueViolation } from "../db";
 import { type Body, created, handled, type InProject, number, route, str } from "../http";
+import {
+  BINARY_BYTES,
+  BINARY_JSON_BYTES,
+  PROJECT_BYTES,
+  PROJECT_FILES,
+  sizeText,
+  TEXT_BYTES,
+} from "../limits";
 import type { FileMeta, Store } from "../store";
 import { decodeText, fail, isTextPath, safePath, textDoc, uid } from "../util";
 
-export const PROJECT_FILES = 2000,
-  PROJECT_BYTES = 100_000_000;
+export { PROJECT_BYTES, PROJECT_FILES };
+export const fileTooLarge = () =>
+  fail(413, "单个文件超过 {size}", { size: sizeText(BINARY_BYTES) });
+export const projectTooLarge = () =>
+  fail(413, "项目超过 {count} 个文件或 {size}", {
+    count: PROJECT_FILES,
+    size: sizeText(PROJECT_BYTES),
+  });
 
 /**
  * New content for a figure or other binary file, guarded by the revision the client last saw.
@@ -17,16 +31,16 @@ export const PROJECT_FILES = 2000,
  */
 async function replaceBinary(ctx: InProject, file: FileMeta, body: Body) {
   const { store, project } = ctx;
-  const value = str(body, "base64", 14_000_000),
+  const value = str(body, "base64", BINARY_JSON_BYTES),
     revision = number(body, "revision");
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) fail(400, "无效文件编码");
   const bytes = Buffer.from(value, "base64");
-  if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
+  if (bytes.length > BINARY_BYTES) fileTooLarge();
   const saved = await store.db.transaction(async (tx) => {
     const size = await tx.row<{ bytes: number }>(
       sql`SELECT coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project} AND id<>${file.id}`,
     );
-    if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) fail(413, "项目超过 100 MB");
+    if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) projectTooLarge();
     const recent = await tx.row(
       sql`SELECT 1 FROM snapshots WHERE project=${project} AND NOT manual AND created>${Date.now() - 300_000}`,
     );
@@ -60,17 +74,17 @@ export async function createFile(
   if (binary) bytes = typeof data === "string" ? Buffer.from(data) : data;
   else {
     const text = typeof data === "string" ? data : Buffer.from(data).toString("utf8");
-    if (Buffer.byteLength(text) > 2_000_000) fail(413, "文本文件超过 2 MB");
+    if (Buffer.byteLength(text) > TEXT_BYTES) fail(413, "文本文件超过 2 MB");
     const d = textDoc(text);
     bytes = Y.encodeStateAsUpdate(d);
     d.destroy();
   }
-  if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
+  if (bytes.length > BINARY_BYTES) fileTooLarge();
   const limits = await store.db.row<{ count: number; bytes: number }>(
     sql`SELECT count(*) AS count, coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project}`,
   );
   if ((limits?.count ?? 0) >= PROJECT_FILES || (limits?.bytes ?? 0) + bytes.length > PROJECT_BYTES)
-    fail(413, "项目超过 2000 个文件或 100 MB");
+    projectTooLarge();
   const id = uid();
   try {
     await store.db.transaction(async (tx) => {
@@ -96,10 +110,10 @@ export const fileRoutes = [
   ),
   route<InProject>("POST", /^files$/, async (ctx) => {
     await ctx.need("edit");
-    const body = await ctx.body(),
+    const body = await ctx.body(BINARY_JSON_BYTES),
       path = safePath(str(body, "path", 240));
     const binary = !isTextPath(path);
-    const value = str(body, binary ? "base64" : "content", binary ? 14_000_000 : 2_000_000);
+    const value = str(body, binary ? "base64" : "content", binary ? BINARY_JSON_BYTES : TEXT_BYTES);
     if (binary && !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) fail(400, "无效文件编码");
     const info = await createFile(
       ctx.store,
@@ -127,7 +141,7 @@ export const fileRoutes = [
   route<InProject>("PUT", /^files\/([^/]+)$/, async (ctx, [id = ""]) => {
     await ctx.need("edit");
     const file = await ctx.store.fileMeta(ctx.project, id);
-    const body = await ctx.body();
+    const body = await ctx.body(file.binary ? BINARY_JSON_BYTES : undefined);
     if (file.binary) return replaceBinary(ctx, file, body);
     await ctx.collab.replace(
       ctx.project,

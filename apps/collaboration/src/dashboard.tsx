@@ -25,7 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImportedProject, ProjectSummary, PublicUser, TemplateInfo } from "../shared/api";
-import { api, base64, errorText } from "./api";
+import { api, errorText, upload } from "./api";
 import { type MessageKey, useI18n } from "./i18n";
 import { roleKey } from "./labels";
 import { LanguageSwitch } from "./language-switch";
@@ -47,8 +47,8 @@ const FILTERS: Array<[Filter, MessageKey, typeof FolderIcon]> = [
   ["archived", "dash.filter.archived", ArchiveIcon],
   ["trashed", "dash.filter.trashed", TrashIcon],
 ];
-/** The JSON body limit is 16 MB, and base64 grows a file by a third. */
-const MAX_ZIP = 12_000_000;
+/** The server's limit for an uploaded zip. */
+const MAX_ZIP = 500_000_000;
 
 export const inFilter = (p: ProjectSummary, filter: Filter) =>
   filter === "trashed"
@@ -260,11 +260,14 @@ function TemplateGallery({
 function UploadDialog({
   busy,
   error,
+  progress,
   onUpload,
   onClose,
 }: {
   busy: boolean;
   error: string;
+  /** The share of the zip sent so far, while uploading. */
+  progress: number | null;
   onUpload: (name: string, zip: File) => void;
   onClose: () => void;
 }) {
@@ -317,6 +320,16 @@ function UploadDialog({
             <input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
           </label>
         )}
+        {busy && progress !== null && (
+          <div className="dash-upload-progress">
+            <progress max={1} value={progress} />
+            <span className="muted">
+              {progress < 1
+                ? t("dash.dialogUploading", { percent: Math.floor(progress * 100) })
+                : t("dash.dialogUnpacking")}
+            </span>
+          </div>
+        )}
         {(problem || error) && (
           <p className="error" role="alert">
             {problem || error}
@@ -363,6 +376,7 @@ export function Dashboard({
     [pending, setPending] = useState(0);
   const { busy, error, setError, run } = useAction();
   const dialogAction = useAction();
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const reload = useCallback(
     () =>
@@ -816,14 +830,17 @@ export function Dashboard({
           busy={dialogAction.busy}
           error={dialogAction.error}
           onClose={close}
-          onUpload={(name, zip) =>
-            create(async () =>
-              api<ImportedProject>("/projects/import", {
-                name,
-                base64: base64(new Uint8Array(await zip.arrayBuffer())),
-              }),
-            )
-          }
+          progress={uploadProgress}
+          onUpload={(name, zip) => {
+            setUploadProgress(0);
+            create(() =>
+              upload<ImportedProject>(
+                `/projects/import?name=${encodeURIComponent(name.trim())}`,
+                zip,
+                setUploadProgress,
+              ),
+            );
+          }}
         />
       )}
       {dialog?.kind === "copy" && (

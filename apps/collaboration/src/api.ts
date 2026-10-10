@@ -18,6 +18,38 @@ export async function api<T>(
     throw new Error(data.error || i18n.t("common.requestFailed", { status: response.status }));
   return data as T;
 }
+/**
+ * A file sent as the raw request body (a zip of up to 500 MB), reporting the share uploaded so
+ * far: fetch cannot report upload progress, XMLHttpRequest can.
+ */
+export function upload<T>(
+  path: string,
+  file: Blob,
+  onProgress?: (share: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `/api${path}`);
+    request.setRequestHeader("X-Writer-Locale", i18n.getLocale());
+    request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    request.onerror = () => reject(new Error(i18n.t("common.requestFailed", { status: 0 })));
+    request.onload = () => {
+      let data: { error?: string } | null = null;
+      try {
+        data = JSON.parse(request.responseText);
+      } catch {}
+      if (request.status >= 200 && request.status < 300) resolve(data as T);
+      else
+        reject(
+          new Error(data?.error || i18n.t("common.requestFailed", { status: request.status })),
+        );
+    };
+    request.send(file);
+  });
+}
 /** What a user should read: the message, without the "Error:" prefix of String(error). */
 export const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error);

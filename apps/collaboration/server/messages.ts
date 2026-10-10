@@ -28,7 +28,8 @@ export const englishMessages: Record<string, string> = {
   请登录: "Please sign in",
   登录已过期: "Your sign-in has expired",
   无效角色: "Invalid role",
-  "请求超过 16 MB": "The request exceeds 16 MB",
+  "请求超过 {size}": "The request exceeds {size}",
+  上传未完成: "The upload did not finish",
   "无效 JSON": "Invalid JSON",
   "请求必须为 JSON 对象": "The request body must be a JSON object",
   "无效字段 {key}": "Invalid field {key}",
@@ -119,10 +120,11 @@ export const englishMessages: Record<string, string> = {
   // files
   无效文件编码: "Invalid file encoding",
   "单文件超过 10 MB": "The file exceeds 10 MB",
-  "项目超过 100 MB": "The project exceeds 100 MB",
+  "单个文件超过 {size}": "A file exceeds {size}",
+  "{path} 超过 {size}": "{path} exceeds {size}",
   "文件已被其他人更新，请先同步": "Someone else updated the file; sync first",
   "文本文件超过 2 MB": "The text file exceeds 2 MB",
-  "项目超过 2000 个文件或 100 MB": "The project exceeds 2000 files or 100 MB",
+  "项目超过 {count} 个文件或 {size}": "The project exceeds {count} files or {size}",
   "同名文件已存在，请在编辑器中更新": "A file with that name exists; update it in the editor",
   "重命名不能改变文本／二进制文件类型，请上传为新文件":
     "Renaming cannot turn a text file into a binary one or back; upload a new file",
@@ -175,8 +177,8 @@ export const englishMessages: Record<string, string> = {
   不支持的执行环境: "Unsupported runner",
   "请选择 .tex 入口": "Choose the main .tex file",
   "本项目最多 10 个排队/执行中的任务": "A project can have at most 10 queued or running tasks",
-  "项目超过 {count} 个文件或 100 MB，产物未保存":
-    "The project would exceed {count} files or 100 MB; the output was not saved",
+  "项目超过 {count} 个文件或 {size}，产物未保存":
+    "The project would exceed {count} files or {size}; the output was not saved",
   // projects and proposals
   请填写项目名: "Enter a project name",
   回复不存在: "Reply not found",
@@ -187,6 +189,7 @@ export const englishMessages: Record<string, string> = {
   只有作者或所有者可以删除回复: "Only the author or an owner can delete this reply",
   "{path} 不是 UTF-8 编码，请转换后再上传": "{path} is not UTF-8 text; convert it and upload again",
   压缩包中有重复的文件路径: "The zip contains the same path twice",
+  "压缩包超过 {size}": "The zip exceeds {size}",
   "无法读取压缩包，请上传 .zip 文件": "The upload could not be read; upload a .zip file",
   压缩包里没有可用的文件: "The zip has no files that can be used",
   模板不存在: "No such template",

@@ -32,7 +32,7 @@ import type { Collaboration } from "./collaboration";
 import { sql } from "./db";
 import type { SharedRunner } from "./http";
 import { requestLocale, say } from "./messages";
-import { createFile, PROJECT_BYTES } from "./routes/files";
+import { createFile, PROJECT_BYTES, projectTooLarge } from "./routes/files";
 import type { Store, User } from "./store";
 import {
   checked,
@@ -1058,7 +1058,7 @@ export class Agents {
         const size = await tx.row<{ bytes: number }>(
           sql`SELECT coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project} AND id<>${file.id}`,
         );
-        if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) fail(413, "项目超过 100 MB");
+        if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) projectTooLarge();
         const row =
           (await tx.row<{ revision: number }>(
             sql`UPDATE files SET state=${bytes}, revision=revision+1

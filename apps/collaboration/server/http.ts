@@ -2,6 +2,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Collaboration } from "./collaboration";
 import type { Compiler } from "./compile";
+import { sizeText } from "./limits";
 import type { Store, User } from "./store";
 import type { Template } from "./templates";
 import { type Access, fail, type Role, roles } from "./util";
@@ -19,24 +20,44 @@ export function roleInput(value: string): Role {
   if (!roles.includes(value as Role)) fail(400, "无效角色");
   return value as Role;
 }
-async function readJson(req: IncomingMessage): Promise<Body> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    const b = Buffer.from(chunk);
-    size += b.length;
-    if (size > 16_000_000) fail(413, "请求超过 16 MB");
-    chunks.push(b);
-  }
+/** Most requests; routes that carry a file allow more, after sign-in. */
+const JSON_BYTES = 16_000_000;
+async function readJson(req: IncomingMessage, limit: number): Promise<Body> {
+  const raw = await readBody(req, limit);
   let value: unknown;
   try {
-    value = JSON.parse(Buffer.concat(chunks).toString());
+    value = JSON.parse(raw.toString());
   } catch {
     fail(400, "无效 JSON");
   }
   if (!value || typeof value !== "object" || Array.isArray(value))
     fail(400, "请求必须为 JSON 对象");
   return value as Body;
+}
+/**
+ * The request body, at most `limit` bytes. With a Content-Length the buffer is allocated once,
+ * so a large upload is not held twice while it is put together.
+ */
+export async function readBody(
+  req: IncomingMessage,
+  limit: number,
+  message = "请求超过 {size}",
+): Promise<Buffer> {
+  const tooLarge = () => fail(413, message, { size: sizeText(limit) });
+  const declared = Number(req.headers["content-length"]);
+  if (Number.isFinite(declared) && declared > limit) tooLarge();
+  const whole = Number.isSafeInteger(declared) && declared >= 0 ? Buffer.alloc(declared) : null;
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const b = Buffer.from(chunk);
+    if (size + b.length > (whole ? whole.length : limit)) tooLarge();
+    if (whole) b.copy(whole, size);
+    else chunks.push(b);
+    size += b.length;
+  }
+  if (whole && size !== whole.length) fail(400, "上传未完成");
+  return whole ?? Buffer.concat(chunks);
 }
 export function json(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, {
@@ -67,8 +88,8 @@ export type Context = Services & {
   res: ServerResponse;
   url: URL;
   method: string;
-  /** JSON request body, read once on first use. */
-  body: () => Promise<Body>;
+  /** JSON request body, read once on first use; at most 16 MB unless a route allows more. */
+  body: (limit?: number) => Promise<Body>;
   secure: boolean;
   /** Client address, used to rate-limit sign-in attempts. */
   ip: string;
@@ -100,8 +121,8 @@ export function context(services: Services, req: IncomingMessage, res: ServerRes
     res,
     url: new URL(req.url ?? "/", services.origin()),
     method: req.method ?? "GET",
-    body: () => {
-      body ??= readJson(req);
+    body: (limit = JSON_BYTES) => {
+      body ??= readJson(req, limit);
       return body;
     },
     secure: services.origin().startsWith("https:"),

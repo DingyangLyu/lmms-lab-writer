@@ -50,7 +50,9 @@ export const dashboardZh = {
   "dash.dialogUploadLead":
     "选择 Overleaf 或其他工具导出的 .zip。压缩包只含一个文件夹时，会自动去掉这层文件夹。",
   "dash.dialogChooseZip": "选择或拖入 .zip 文件",
-  "dash.dialogZipTooLarge": "压缩包不能超过 12 MB",
+  "dash.dialogZipTooLarge": "压缩包不能超过 500 MB",
+  "dash.dialogUploading": "正在上传… {percent}%",
+  "dash.dialogUnpacking": "已上传，正在解压并创建项目…",
   "dash.dialogNotZip": "请选择 .zip 文件",
   "dash.dialogUpload": "上传并创建",
   "dash.dialogSkipped": "项目已创建，以下隐藏文件没有导入：",
@@ -120,7 +122,9 @@ export const dashboardEn: Record<keyof typeof dashboardZh, string> = {
   "dash.dialogUploadLead":
     "Choose a .zip exported from Overleaf or another tool. If the zip holds a single folder, that folder is removed.",
   "dash.dialogChooseZip": "Choose or drop a .zip file",
-  "dash.dialogZipTooLarge": "The zip must be 12 MB or smaller",
+  "dash.dialogZipTooLarge": "The zip must be 500 MB or smaller",
+  "dash.dialogUploading": "Uploading… {percent}%",
+  "dash.dialogUnpacking": "Uploaded; unpacking and creating the project…",
   "dash.dialogNotZip": "Choose a .zip file",
   "dash.dialogUpload": "Upload and create",
   "dash.dialogSkipped": "The project was created; these hidden entries were left out:",

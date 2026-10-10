@@ -13,14 +13,30 @@ import type {
   TemplateInfo,
 } from "../../shared/api";
 import { type Sql, sql } from "../db";
-import { type Authed, created, handled, type InProject, roleInput, route, str } from "../http";
+import {
+  type Authed,
+  created,
+  handled,
+  type InProject,
+  readBody,
+  roleInput,
+  route,
+  str,
+} from "../http";
+import {
+  BINARY_BYTES,
+  PROJECT_BYTES,
+  PROJECT_FILES,
+  sizeText,
+  TEXT_BYTES,
+  ZIP_BYTES,
+} from "../limits";
 import { templateInfo } from "../templates";
-import { decodeText, digest, fail, HttpError, isTextPath, safePath, textDoc, uid } from "../util";
-import { PROJECT_BYTES, PROJECT_FILES } from "./files";
+import { decodeText, digest, fail, isTextPath, safePath, textDoc, uid } from "../util";
+import { fileTooLarge, projectTooLarge } from "./files";
 
 type NewFile = { path: string; data: Uint8Array };
 const utf8 = new TextDecoder("utf-8", { fatal: true });
-const TOO_LARGE = "项目超过 2000 个文件或 100 MB";
 
 /** The dashboard's view of every project a user belongs to, or of one. */
 const summaries = (q: Sql, user: string, project?: string) =>
@@ -34,44 +50,50 @@ const summaries = (q: Sql, user: string, project?: string) =>
         ORDER BY p.updated DESC, p.created DESC`,
   );
 
-/** Validates new files against the same limits as uploads and stores text as Yjs state. */
-function prepare(files: NewFile[]) {
-  if (files.length > PROJECT_FILES) fail(413, TOO_LARGE);
-  let total = 0;
-  return files.map(({ path, data }) => {
-    safePath(path);
-    if (data.length > 10_000_000) fail(413, "单文件超过 10 MB");
-    const binary = !isTextPath(path);
-    let state = data;
-    if (!binary) {
-      if (data.length > 2_000_000) fail(413, "文本文件超过 2 MB");
-      let content = "";
-      try {
-        content = utf8.decode(data);
-      } catch {
-        fail(400, "{path} 不是 UTF-8 编码，请转换后再上传", { path });
+/** Checks files against the project's limits as they arrive, and stores text as Yjs state. */
+class Intake {
+  private count = 0;
+  private total = 0;
+  private paths = new Set<string>();
+  prepare(files: NewFile[]) {
+    return files.map(({ path, data }) => {
+      safePath(path);
+      if (this.paths.has(path)) fail(400, "压缩包中有重复的文件路径");
+      this.paths.add(path);
+      if (++this.count > PROJECT_FILES) projectTooLarge();
+      const binary = !isTextPath(path);
+      let state = data;
+      if (binary && data.length > BINARY_BYTES) fileTooLarge();
+      if (!binary) {
+        if (data.length > TEXT_BYTES) fail(413, "文本文件超过 2 MB");
+        let content = "";
+        try {
+          content = utf8.decode(data);
+        } catch {
+          fail(400, "{path} 不是 UTF-8 编码，请转换后再上传", { path });
+        }
+        const doc = textDoc(content);
+        state = Y.encodeStateAsUpdate(doc);
+        doc.destroy();
       }
-      const doc = textDoc(content);
-      state = Y.encodeStateAsUpdate(doc);
-      doc.destroy();
-    }
-    total += state.length;
-    if (total > PROJECT_BYTES) fail(413, TOO_LARGE);
-    return { path, binary, state };
-  });
+      this.total += state.length;
+      if (this.total > PROJECT_BYTES) projectTooLarge();
+      return { path, binary, state };
+    });
+  }
 }
 
+/** A new project owned by the user; `batches` are read one at a time, inside the transaction. */
 async function createProject(
   ctx: Authed,
   rawName: string,
-  files: NewFile[],
+  batches: Iterable<NewFile[]>,
   origin: Record<string, string>,
 ): Promise<ProjectSummary> {
   const name = rawName.trim();
   if (!name) fail(400, "请填写项目名");
-  if (new Set(files.map((f) => f.path)).size !== files.length)
-    fail(400, "压缩包中有重复的文件路径");
-  const prepared = prepare(files);
+  if ([...name].length > 120) fail(400, "无效字段 {key}", { key: "name" });
+  const intake = new Intake();
   const id = uid(),
     now = Date.now();
   await ctx.store.db.transaction(async (tx) => {
@@ -81,11 +103,12 @@ async function createProject(
     await tx.run(
       sql`INSERT INTO members(project, user_id, role) VALUES(${id}, ${ctx.user.id}, 'owner')`,
     );
-    for (const f of prepared)
-      await tx.run(
-        sql`INSERT INTO files(id, project, path, state, is_binary)
-            VALUES(${uid()}, ${id}, ${f.path}, ${f.state}, ${f.binary})`,
-      );
+    for (const batch of batches)
+      for (const f of intake.prepare(batch))
+        await tx.run(
+          sql`INSERT INTO files(id, project, path, state, is_binary)
+              VALUES(${uid()}, ${id}, ${f.path}, ${f.state}, ${f.binary})`,
+        );
     await ctx.store.audit(id, ctx.user.id, "project.create", origin, tx);
   });
   return {
@@ -101,44 +124,70 @@ async function createProject(
 }
 
 const JUNK = /(^|\/)(__MACOSX|\.DS_Store|Thumbs\.db|desktop\.ini)(\/|$)/i;
+/** How much an import unpacks at a time. */
+const BATCH_BYTES = 64_000_000;
+const unreadable = () => fail(400, "无法读取压缩包，请上传 .zip 文件");
 /**
- * Files of an uploaded zip. A zip of a single folder (how most tools export) loses that
- * folder; hidden entries such as .git are left out and reported.
+ * An uploaded zip, checked against the limits from its directory before anything is unpacked
+ * and then unpacked in batches, so a large archive is never held decompressed at once. A zip
+ * of a single folder (how most tools export) loses that folder; hidden entries such as .git
+ * are left out and reported.
  */
-export function unpackZip(zip: Uint8Array) {
-  let count = 0,
-    total = 0;
-  let entries: Record<string, Uint8Array> = {};
+export function readZip(zip: Uint8Array, batchBytes = BATCH_BYTES) {
+  const listed: Array<{ name: string; size: number }> = [];
   try {
-    entries = unzipSync(zip, {
+    unzipSync(zip, {
       filter: (file) => {
-        if (file.name.endsWith("/") || JUNK.test(file.name)) return false;
-        count++;
-        total += file.originalSize;
-        if (count > PROJECT_FILES || total > PROJECT_BYTES) fail(413, TOO_LARGE);
-        if (file.originalSize > 10_000_000) fail(413, "单文件超过 10 MB");
-        return true;
+        if (!file.name.endsWith("/") && !JUNK.test(file.name))
+          listed.push({ name: file.name, size: file.originalSize });
+        return false;
       },
     });
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    fail(400, "无法读取压缩包，请上传 .zip 文件");
+  } catch {
+    unreadable();
   }
-  const named = Object.entries(entries).map(([name, data]) => ({
-    name: name.replace(/\\/g, "/"),
-    data,
-  }));
-  const top = named[0]?.name.split("/")[0] ?? "";
-  const prefix = named.length && named.every((e) => e.name.startsWith(`${top}/`)) ? `${top}/` : "";
-  const files: NewFile[] = [],
+  const normal = (name: string) => name.replace(/\\/g, "/");
+  const top = normal(listed[0]?.name ?? "").split("/")[0] ?? "";
+  const prefix =
+    listed.length && listed.every((e) => normal(e.name).startsWith(`${top}/`)) ? `${top}/` : "";
+  const entries: Array<{ name: string; path: string; size: number }> = [],
     skipped: string[] = [];
-  for (const { name, data } of named) {
-    const path = name.slice(prefix.length);
-    if (validPath(path)) files.push({ path, data });
-    else skipped.push(name);
+  let total = 0;
+  for (const { name, size } of listed) {
+    const path = normal(name).slice(prefix.length);
+    if (!validPath(path)) {
+      skipped.push(name);
+      continue;
+    }
+    if (isTextPath(path) ? size > TEXT_BYTES : size > BINARY_BYTES)
+      fail(413, "{path} 超过 {size}", {
+        path,
+        size: sizeText(isTextPath(path) ? TEXT_BYTES : BINARY_BYTES),
+      });
+    total += size;
+    entries.push({ name, path, size });
   }
-  if (!files.length) fail(400, "压缩包里没有可用的文件");
-  return { files, skipped };
+  if (entries.length > PROJECT_FILES || total > PROJECT_BYTES) projectTooLarge();
+  if (!entries.length) fail(400, "压缩包里没有可用的文件");
+  function* batches(): Generator<NewFile[]> {
+    for (let i = 0; i < entries.length; ) {
+      const batch = new Map<string, string>();
+      for (let bytes = 0; i < entries.length; i++) {
+        const entry = entries[i] as (typeof entries)[number];
+        if (batch.size && bytes + entry.size > batchBytes) break;
+        batch.set(entry.name, entry.path);
+        bytes += entry.size;
+      }
+      let unpacked: Record<string, Uint8Array> = {};
+      try {
+        unpacked = unzipSync(zip, { filter: (file) => batch.has(file.name) });
+      } catch {
+        unreadable();
+      }
+      yield [...batch].map(([name, path]) => ({ path, data: unpacked[name] ?? unreadable() }));
+    }
+  }
+  return { skipped, batches };
 }
 
 export const projectListRoutes = [
@@ -150,15 +199,14 @@ export const projectListRoutes = [
       return created(await createProject(ctx, name, [], { from: "blank" }));
     const id = str(body, "template", 64);
     const template = (await ctx.templates()).get(id) ?? fail(404, "模板不存在");
-    return created(await createProject(ctx, name, template.files, { template: id }));
+    return created(await createProject(ctx, name, [template.files], { template: id }));
   }),
+  // The zip is the request body (up to 500 MB), the project's name a query parameter.
   route<Authed>("POST", /^\/api\/projects\/import$/, async (ctx): Promise<ImportedProject> => {
-    const body = await ctx.body(),
-      name = str(body, "name", 120),
-      zip = str(body, "base64", 16_000_000);
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(zip)) fail(400, "无效文件编码");
-    const { files, skipped } = unpackZip(Buffer.from(zip, "base64"));
-    return { ...(await createProject(ctx, name, files, { from: "zip" })), skipped };
+    const name = ctx.url.searchParams.get("name") ?? "";
+    const zip = await readBody(ctx.req, ZIP_BYTES, "压缩包超过 {size}");
+    const { skipped, batches } = readZip(zip);
+    return { ...(await createProject(ctx, name, batches(), { from: "zip" })), skipped };
   }),
   route<Authed>(
     "GET",
@@ -186,7 +234,7 @@ export const projectRoutes = [
       path: f.path,
       data: f.binary ? f.state : Buffer.from(decodeText(f.state)),
     }));
-    return created(await createProject(ctx, name, files, { copiedFrom: ctx.project }));
+    return created(await createProject(ctx, name, [files], { copiedFrom: ctx.project }));
   }),
   // Archive and trash exclude each other, as in Overleaf.
   route<InProject>("POST", /^archive$/, async (ctx) => {

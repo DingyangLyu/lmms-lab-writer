@@ -14,9 +14,9 @@ import {
   type Transport,
 } from "./types";
 
-/** The server's limits: 2 MB of text per document, 10 MB per binary file. */
+/** The server's limits: 2 MB of text per document, 100 MB per binary file. */
 const TEXT_LIMIT = 2_000_000,
-  BINARY_LIMIT = 10_000_000;
+  BINARY_LIMIT = 100_000_000;
 const encoder = new TextEncoder(),
   decoder = new TextDecoder("utf-8", { fatal: true });
 

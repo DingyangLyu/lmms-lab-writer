@@ -179,6 +179,8 @@ export async function createWriterServer(options: Options) {
       sendError(res, error, requestLocale(req.headers));
     }
   });
+  // A 500 MB zip over a slow link takes longer than Node's default five minutes.
+  server.requestTimeout = 30 * 60_000;
   server.on("upgrade", (req, socket, head) =>
     agents.handles(req) ? agents.upgrade(req, socket, head) : collab.upgrade(req, socket, head),
   );

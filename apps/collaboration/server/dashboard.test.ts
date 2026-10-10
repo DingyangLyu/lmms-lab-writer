@@ -1,10 +1,23 @@
+import { request } from "node:http";
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import type { FileContent, FileInfo, ProjectSummary, TemplateInfo } from "../shared/api";
+import { readZip } from "./routes/projects";
 import { fixture } from "./test-fixture";
 
-const zip = (entries: Record<string, Uint8Array>) =>
-  Buffer.from(zipSync(entries)).toString("base64");
+type Fixture = Awaited<ReturnType<typeof fixture>>;
+/** Posts a zip the way the dashboard does: the bytes as the body, the name in the query. */
+async function importZip(f: Fixture, name: string, body: Uint8Array) {
+  const response = await fetch(
+    `${f.app.origin}/api/projects/import?name=${encodeURIComponent(name)}`,
+    {
+      method: "POST",
+      headers: { Origin: f.app.origin, "Content-Type": "application/zip", Cookie: f.owner },
+      body: new Uint8Array(body),
+    },
+  );
+  return { status: response.status, data: await response.json() };
+}
 
 describe("project dashboard", () => {
   it("lists built-in templates and creates projects from them", async () => {
@@ -107,19 +120,16 @@ describe("project dashboard", () => {
 
   it("imports a zip, dropping its top folder and hidden entries", async () => {
     const f = await fixture();
-    const imported = await f.call(
-      "/projects/import",
-      {
-        name: "Uploaded",
-        base64: zip({
-          "paper/main.tex": strToU8("\\documentclass{article}"),
-          "paper/figs/a.png": new Uint8Array([137, 80, 78, 71]),
-          "paper/.git/config": strToU8("[core]"),
-          "paper/.DS_Store": new Uint8Array([0]),
-          "__MACOSX/paper/._main.tex": new Uint8Array([0]),
-        }),
-      },
-      f.owner,
+    const imported = await importZip(
+      f,
+      "Uploaded",
+      zipSync({
+        "paper/main.tex": strToU8("\\documentclass{article}"),
+        "paper/figs/a.png": new Uint8Array([137, 80, 78, 71]),
+        "paper/.git/config": strToU8("[core]"),
+        "paper/.DS_Store": new Uint8Array([0]),
+        "__MACOSX/paper/._main.tex": new Uint8Array([0]),
+      }),
     );
     expect(imported.status).toBe(200);
     expect(imported.data.skipped).toEqual(["paper/.git/config"]);
@@ -129,16 +139,64 @@ describe("project dashboard", () => {
       ["figs/a.png", true],
       ["main.tex", false],
     ]);
-    const gbk = await f.call(
-      "/projects/import",
-      { name: "Old", base64: zip({ "main.tex": new Uint8Array([0xc4, 0xe3, 0xba, 0xc3]) }) },
-      f.owner,
+    const gbk = await importZip(
+      f,
+      "Old",
+      zipSync({ "main.tex": new Uint8Array([0xc4, 0xe3, 0xba, 0xc3]) }),
     );
     expect(gbk.status).toBe(400);
     expect(gbk.data.error).toContain("main.tex");
-    expect(
-      (await f.call("/projects/import", { name: "Bad", base64: "bm90IGEgemlw" }, f.owner)).status,
-    ).toBe(400);
+    expect((await importZip(f, "Bad", strToU8("not a zip"))).status).toBe(400);
+    // Nothing of a failed import is left behind.
+    const names = (await f.call("/projects", undefined, f.owner)).data.map(
+      (p: ProjectSummary) => p.name,
+    );
+    expect(names).not.toContain("Old");
+  });
+
+  it("checks a zip's sizes before unpacking it, then unpacks it in batches", async () => {
+    const f = await fixture();
+    const big = await importZip(
+      f,
+      "Big",
+      zipSync({ "main.tex": strToU8("x".repeat(2_100_000)), "a.png": new Uint8Array([1]) }),
+    );
+    expect(big.status).toBe(413);
+    expect(big.data.error).toContain("main.tex");
+    expect((await importZip(f, "", zipSync({ "main.tex": strToU8("x") }))).status).toBe(400);
+
+    const files: Record<string, Uint8Array> = {};
+    for (let i = 0; i < 7; i++) files[`fig-${i}.png`] = new Uint8Array(1000).fill(i);
+    const { batches } = readZip(zipSync(files), 2500);
+    const unpacked = [...batches()];
+    expect(unpacked.map((b) => b.length)).toEqual([2, 2, 2, 1]);
+    expect(unpacked.flat().map((x) => [x.path, x.data[0]])).toEqual(
+      Object.keys(files).map((path, i) => [path, i]),
+    );
+  });
+
+  it("refuses an upload declared larger than 500 MB before reading it", async () => {
+    const f = await fixture();
+    const url = new URL(`${f.app.origin}/api/projects/import?name=Huge`);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(url, {
+        method: "POST",
+        headers: {
+          Origin: f.app.origin,
+          Cookie: f.owner,
+          "Content-Type": "application/zip",
+          "Content-Length": "600000000",
+        },
+      });
+      req.on("response", (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+        req.destroy();
+      });
+      req.on("error", reject);
+      req.flushHeaders();
+    });
+    expect(status).toBe(413);
   });
 
   it("names the exported zip after the project", async () => {

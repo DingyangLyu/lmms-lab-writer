@@ -118,7 +118,7 @@ export function FilePanel({
         if (input.webkitRelativePath) path = path.split("/").slice(1).join("/");
         if (path.split("/").some((p) => p.startsWith(".") || SKIPPED.includes(p))) continue;
         const text = isTextPath(path);
-        if (input.size > (text ? 2_000_000 : 10_000_000))
+        if (input.size > (text ? 2_000_000 : 100_000_000))
           throw new Error(t("files.tooLarge", { path, count }));
         await api(`${prefix}/files`, {
           path,
