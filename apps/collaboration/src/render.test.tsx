@@ -246,6 +246,7 @@ describe("project dashboard", () => {
         user={{ id: "u1", name: "lab", admin: false, mustChange: false }}
         onOpen={() => {}}
         onView={() => {}}
+        onTemplates={() => {}}
         onSignedOut={() => {}}
         initialProjects={projects}
       />,

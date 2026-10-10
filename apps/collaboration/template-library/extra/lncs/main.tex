@@ -1,0 +1,107 @@
+% Springer LNCS proceedings paper (MICCAI, ECML PKDD and other Springer conferences).
+% Uses Springer's llncs class and splncs04 bibliography style, as distributed on CTAN.
+% Check the conference's call for papers for its page limit and anonymisation rules.
+\documentclass[runningheads]{llncs}
+
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+% Coloured links help on screen; Springer removes them in print.
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\begin{document}
+
+\title{Contribution Title\thanks{Supported by organization x.}}
+\titlerunning{Abbreviated Title}
+
+% For a double-blind submission, replace the authors with "Anonymous Authors".
+\author{First Author\inst{1}\orcidID{0000-1111-2222-3333} \and
+Second Author\inst{2,3}\orcidID{1111-2222-3333-4444} \and
+Third Author\inst{3}\orcidID{2222-3333-4444-5555}}
+\authorrunning{F. Author et al.}
+
+\institute{Princeton University, Princeton NJ 08544, USA \and
+Springer Heidelberg, Tiergartenstr. 17, 69121 Heidelberg, Germany
+\email{lncs@springer.com}\\
+\url{https://www.springer.com/gp/computer-science/lncs} \and
+ABC Institute, Rupert-Karls-University Heidelberg, Heidelberg, Germany\\
+\email{\{abc,lncs\}@uni-heidelberg.de}}
+
+\maketitle
+
+\begin{abstract}
+The abstract should briefly summarize the contents of the paper in 150--250 words.
+
+\keywords{First keyword \and Second keyword \and Another keyword.}
+\end{abstract}
+
+\section{Introduction}
+Springer's LNCS format sets papers in a single column with running heads. Headings of the
+first and second level are numbered; the third level is run in, as below.
+
+\subsubsection{A run-in heading.}
+Run-in headings are followed by the text on the same line.
+
+\section{Method}
+Equations are numbered on the right:
+\begin{equation}
+  \mathcal{L}(\theta) = \frac{1}{N} \sum_{i=1}^{N} \ell\bigl(f_\theta(x_i), y_i\bigr).
+\end{equation}
+
+\begin{theorem}
+The class provides theorem-like environments such as theorem, lemma, proposition, definition,
+corollary, example and remark.
+\end{theorem}
+
+\begin{proof}
+Proofs, examples and remarks are set in plain type.
+\end{proof}
+
+\section{Experiments}
+Table captions go above the table (Table~\ref{tab:results}); figure captions go below the
+figure.
+
+\begin{table}
+  \caption{Table captions should be placed above the tables.}
+  \label{tab:results}
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Method & Accuracy (\%) & Time (s) \\
+    \midrule
+    Baseline & 81.2 & 12.4 \\
+    Ours & \textbf{85.7} & 10.1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Conclusion}
+For citations of references, we prefer the use of square brackets and consecutive numbers,
+e.g.\ \cite{ref_article1,ref_lncs1,ref_book1}.
+
+\begin{credits}
+\subsubsection{\ackname} A bold run-in heading in small font size at the end of the paper is
+used for general acknowledgments.
+
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are relevant to the content of this
+article.
+\end{credits}
+
+% Springer asks for splncs04 with BibTeX; the references are inline here so the sample builds
+% without a .bib file.
+\begin{thebibliography}{8}
+\bibitem{ref_article1}
+Author, F.: Article title. Journal \textbf{2}(5), 99--110 (2016)
+
+\bibitem{ref_lncs1}
+Author, F., Author, S.: Title of a proceedings paper. In: Editor, F., Editor, S. (eds.)
+CONFERENCE 2016, LNCS, vol. 9999, pp. 1--13. Springer, Heidelberg (2016).
+\doi{10.10007/1234567890}
+
+\bibitem{ref_book1}
+Author, F., Author, S., Author, T.: Book title. 2nd edn. Publisher, Location (1999)
+\end{thebibliography}
+
+\end{document}

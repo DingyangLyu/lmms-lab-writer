@@ -48,6 +48,84 @@ const flags: Record<Engine, string> = {
   lualatex: "-lualatex",
 };
 
+/**
+ * latexmk on `main` in `dir`, outputs in OUTPUT_DIR: shell escape off, TeX file access limited to
+ * the directory. Also builds the sample PDFs of templates.
+ */
+export function runLatexmk(dir: string, main: string, engine: Engine, options: CompileOptions) {
+  const latexmk = options.latexmk || "latexmk";
+  return new Promise<{ code: number | null; text: string; timedOut: boolean }>(
+    (resolve, reject) => {
+      const child = spawn(
+        latexmk,
+        [
+          "-norc",
+          "-interaction=nonstopmode",
+          "-file-line-error",
+          "-no-shell-escape",
+          "-synctex=1",
+          "-f",
+          flags[engine],
+          `-outdir=${OUTPUT_DIR}`,
+          main,
+        ],
+        {
+          cwd: dir,
+          detached: process.platform !== "win32",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            PATH: process.env.PATH ?? "",
+            HOME: dir,
+            TMPDIR: dir,
+            LANG: process.env.LANG ?? "C.UTF-8",
+            // TeX may only read and write inside the build directory (plus its own trees).
+            openin_any: "p",
+            openout_any: "p",
+            shell_escape: "f",
+            // A shared cache keeps LuaLaTeX from rebuilding its font database per build.
+            TEXMFVAR: process.env.WRITER_TEXMFVAR || join(dir, "texmf-var"),
+            ...(process.env.TEXMFHOME ? { TEXMFHOME: process.env.TEXMFHOME } : {}),
+          },
+        },
+      );
+      let text = "",
+        timedOut = false;
+      const append = (chunk: Buffer) => {
+        text = (text + chunk.toString()).slice(-40_000);
+      };
+      child.stdout.on("data", append);
+      child.stderr.on("data", append);
+      const kill = (signal: NodeJS.Signals) => {
+        try {
+          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+          else child.kill(signal);
+        } catch {}
+      };
+      const timer = setTimeout(() => {
+        timedOut = true;
+        kill("SIGTERM");
+        setTimeout(() => kill("SIGKILL"), 3000).unref();
+      }, options.timeoutMs ?? 120_000);
+      child.once("error", (error: NodeJS.ErrnoException) => {
+        clearTimeout(timer);
+        reject(
+          error.code === "ENOENT"
+            ? Object.assign(new Error("missing latexmk"), { status: 503 })
+            : error,
+        );
+      });
+      child.once("close", (code) => {
+        clearTimeout(timer);
+        resolve({ code, text, timedOut });
+      });
+    },
+  ).catch((error: Error & { status?: number }) =>
+    error.status === 503
+      ? fail(503, "服务器没有安装 TeX（latexmk），请管理员安装 TeX Live 或使用含 TeX 的镜像")
+      : Promise.reject(error),
+  );
+}
+
 /** file-line-error messages and LaTeX warnings from a TeX log. */
 export function parseLog(log: string, buildDir: string): Issue[] {
   const issues: Issue[] = [];
@@ -196,77 +274,7 @@ export class Compiler {
     }
   }
   private run(dir: string, main: string, engine: Engine) {
-    const latexmk = this.options.latexmk || "latexmk";
-    return new Promise<{ code: number | null; text: string; timedOut: boolean }>(
-      (resolve, reject) => {
-        const child = spawn(
-          latexmk,
-          [
-            "-norc",
-            "-interaction=nonstopmode",
-            "-file-line-error",
-            "-no-shell-escape",
-            "-synctex=1",
-            "-f",
-            flags[engine],
-            `-outdir=${OUTPUT_DIR}`,
-            main,
-          ],
-          {
-            cwd: dir,
-            detached: process.platform !== "win32",
-            stdio: ["ignore", "pipe", "pipe"],
-            env: {
-              PATH: process.env.PATH ?? "",
-              HOME: dir,
-              TMPDIR: dir,
-              LANG: process.env.LANG ?? "C.UTF-8",
-              // TeX may only read and write inside the build directory (plus its own trees).
-              openin_any: "p",
-              openout_any: "p",
-              shell_escape: "f",
-              // A shared cache keeps LuaLaTeX from rebuilding its font database per build.
-              TEXMFVAR: process.env.WRITER_TEXMFVAR || join(dir, "texmf-var"),
-              ...(process.env.TEXMFHOME ? { TEXMFHOME: process.env.TEXMFHOME } : {}),
-            },
-          },
-        );
-        let text = "",
-          timedOut = false;
-        const append = (chunk: Buffer) => {
-          text = (text + chunk.toString()).slice(-40_000);
-        };
-        child.stdout.on("data", append);
-        child.stderr.on("data", append);
-        const kill = (signal: NodeJS.Signals) => {
-          try {
-            if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
-            else child.kill(signal);
-          } catch {}
-        };
-        const timer = setTimeout(() => {
-          timedOut = true;
-          kill("SIGTERM");
-          setTimeout(() => kill("SIGKILL"), 3000).unref();
-        }, this.options.timeoutMs ?? 120_000);
-        child.once("error", (error: NodeJS.ErrnoException) => {
-          clearTimeout(timer);
-          reject(
-            error.code === "ENOENT"
-              ? Object.assign(new Error("missing latexmk"), { status: 503 })
-              : error,
-          );
-        });
-        child.once("close", (code) => {
-          clearTimeout(timer);
-          resolve({ code, text, timedOut });
-        });
-      },
-    ).catch((error: Error & { status?: number }) =>
-      error.status === 503
-        ? fail(503, "服务器没有安装 TeX（latexmk），请管理员安装 TeX Live 或使用含 TeX 的镜像")
-        : Promise.reject(error),
-    );
+    return runLatexmk(dir, main, engine, this.options);
   }
   async latest(project: string) {
     const row = await this.store.db.row<BuildSummary & { issues: string; pdf: boolean }>(

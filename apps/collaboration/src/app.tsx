@@ -6,6 +6,7 @@ import { api } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { useI18n } from "./i18n";
+import { TemplateGallery } from "./templates";
 
 // The workbench (editor, PDF preview, file tree) loads when a project is first opened.
 const Workspace = lazy(() =>
@@ -17,7 +18,14 @@ export function App() {
   const [user, setUser] = useState<PublicUser | null>(null),
     [ready, setReady] = useState(false),
     [project, setProject] = useState<ProjectSummary | null>(null),
-    [view, setView] = useState<"projects" | "admin" | "password">("projects");
+    [view, setView] = useState<"projects" | "admin" | "password" | "templates">(() => {
+      const params = new URL(location.href).searchParams;
+      return params.has("templates") || params.has("template") ? "templates" : "projects";
+    }),
+    // `/?template=<id>` shows one template in the gallery.
+    [template, setTemplate] = useState<string | null>(() =>
+      new URL(location.href).searchParams.get("template"),
+    );
   // Invitation links show the sign-in page even when signed in, to join with any account.
   const [link, setLink] = useState(() => {
     const params = new URL(location.href).searchParams;
@@ -44,7 +52,10 @@ export function App() {
     setProject(next);
     history.replaceState(null, "", next ? `/?project=${encodeURIComponent(next.id)}` : "/");
   }, []);
-  const back = useCallback(() => setView("projects"), []);
+  const back = useCallback(() => {
+    setView("projects");
+    history.replaceState(null, "", "/");
+  }, []);
   if (!ready)
     return (
       <div className="auth">
@@ -68,6 +79,18 @@ export function App() {
       </div>
     );
   if (view === "admin" && user.admin) return <AdminConsole me={user.id} onBack={back} />;
+  if (view === "templates" && !project)
+    return (
+      <TemplateGallery
+        user={user}
+        initial={template}
+        onBack={back}
+        onOpen={(next) => {
+          setView("projects");
+          openProject(next);
+        }}
+      />
+    );
   if (view === "password")
     return (
       <div className="auth">
@@ -91,6 +114,10 @@ export function App() {
       user={user}
       onOpen={openProject}
       onView={setView}
+      onTemplates={(id) => {
+        setTemplate(id ?? null);
+        setView("templates");
+      }}
       onSignedOut={() => setUser(null)}
     />
   );

@@ -6,6 +6,7 @@
 import {
   ArchiveIcon,
   ArrowCounterClockwiseIcon,
+  BookBookmarkIcon,
   CaretDownIcon,
   CopyIcon,
   DownloadSimpleIcon,
@@ -21,23 +22,23 @@ import {
   TrashIcon,
   TrayArrowUpIcon,
   UsersIcon,
-  XIcon,
 } from "@phosphor-icons/react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ImportedProject, ProjectSummary, PublicUser, TemplateInfo } from "../shared/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ImportedProject, ProjectSummary, PublicUser } from "../shared/api";
 import { api, errorText, upload } from "./api";
 import { type MessageKey, useI18n } from "./i18n";
 import { roleKey } from "./labels";
 import { LanguageSwitch } from "./language-switch";
+import { Modal } from "./modal";
+import { PublishTemplateDialog } from "./templates";
 import { useAction } from "./use-action";
 
 type Filter = "all" | "mine" | "shared" | "archived" | "trashed";
 type SortKey = "name" | "owner" | "updated";
 type Dialog =
   | { kind: "blank" }
-  | { kind: "templates" }
   | { kind: "upload" }
-  | { kind: "copy" | "rename" | "delete" | "leave"; project: ProjectSummary }
+  | { kind: "copy" | "rename" | "delete" | "leave" | "publish"; project: ProjectSummary }
   | { kind: "skipped"; project: ProjectSummary; skipped: string[] };
 
 const FILTERS: Array<[Filter, MessageKey, typeof FolderIcon]> = [
@@ -72,45 +73,6 @@ export function ago(time: number | undefined, locale: string, justNow: string, n
   const days = Math.round(hours / 24);
   if (days < 30) return format.format(-days, "day");
   return new Date(time).toLocaleDateString(tag);
-}
-
-function Modal({
-  title,
-  onClose,
-  wide,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  wide?: boolean;
-  children: ReactNode;
-}) {
-  const { t } = useI18n();
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div className="dash-backdrop">
-      <div
-        className={`dash-modal ${wide ? "wide" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        <header>
-          <h2>{title}</h2>
-          <button type="button" className="icon" onClick={onClose} aria-label={t("common.close")}>
-            <XIcon aria-hidden="true" />
-          </button>
-        </header>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 /** A dialog with one name field: new, copy, rename, or the typed confirmation to delete. */
@@ -173,86 +135,6 @@ function NameDialog({
           </button>
         </footer>
       </form>
-    </Modal>
-  );
-}
-
-function TemplateGallery({
-  busy,
-  error,
-  onCreate,
-  onClose,
-}: {
-  busy: boolean;
-  error: string;
-  onCreate: (template: TemplateInfo, name: string) => void;
-  onClose: () => void;
-}) {
-  const { t, locale } = useI18n();
-  const [templates, setTemplates] = useState<TemplateInfo[] | null>(null),
-    [chosen, setChosen] = useState<TemplateInfo | null>(null),
-    [name, setName] = useState(""),
-    [loadError, setLoadError] = useState("");
-  const lang = locale === "en" ? "en" : "zh";
-  useEffect(() => {
-    void api<TemplateInfo[]>("/templates")
-      .then(setTemplates)
-      .catch((e) => setLoadError(errorText(e)));
-  }, []);
-  return (
-    <Modal title={t("dash.dialogTemplatesTitle")} onClose={onClose} wide>
-      {(loadError || error) && (
-        <p className="error" role="alert">
-          {loadError || error}
-        </p>
-      )}
-      {templates && !templates.length && <p className="muted">{t("dash.dialogNoTemplates")}</p>}
-      {!templates && !loadError && <p className="muted">{t("common.loading")}</p>}
-      <div className="dash-templates">
-        {templates?.map((template) => (
-          <button
-            key={template.id}
-            type="button"
-            aria-pressed={chosen?.id === template.id}
-            className={`dash-template ${chosen?.id === template.id ? "chosen" : ""}`}
-            onClick={() => {
-              setChosen(template);
-              setName(template.name[lang]);
-            }}
-          >
-            <span className="dash-template-preview">
-              {template.preview ? (
-                <img src={`/api/templates/${template.id}/preview`} alt="" loading="lazy" />
-              ) : (
-                <FilesIcon aria-hidden="true" />
-              )}
-            </span>
-            <strong>{template.name[lang]}</strong>
-            <span className="muted">{template.description[lang]}</span>
-            <span className="dash-template-meta">
-              {t("dash.dialogEngine", { engine: template.engine })} ·{" "}
-              {t("dash.dialogTemplateFiles", { count: template.fileCount })}
-            </span>
-          </button>
-        ))}
-      </div>
-      {chosen && (
-        <form
-          className="dash-template-create"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (name.trim()) onCreate(chosen, name);
-          }}
-        >
-          <label>
-            {t("dash.dialogName")}
-            <input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <button className="primary" type="submit" disabled={busy || !name.trim()}>
-            {busy ? t("common.working") : t("dash.dialogUseTemplate")}
-          </button>
-        </form>
-      )}
     </Modal>
   );
 }
@@ -352,12 +234,15 @@ export function Dashboard({
   user,
   onOpen,
   onView,
+  onTemplates,
   onSignedOut,
   initialProjects,
 }: {
   user: PublicUser;
   onOpen: (project: ProjectSummary) => void;
   onView: (view: "admin" | "password") => void;
+  /** The template gallery, optionally showing one template. */
+  onTemplates: (template?: string) => void;
   onSignedOut: () => void;
   /** For rendering tests; the list is otherwise loaded from the server. */
   initialProjects?: ProjectSummary[];
@@ -527,6 +412,10 @@ export function Dashboard({
             setDialog({ kind: "rename", project: p }),
           )}
         {iconButton("dash.copy", CopyIcon, () => setDialog({ kind: "copy", project: p }))}
+        {(p.role === "owner" || p.role === "editor") &&
+          iconButton("tpl.publish", BookBookmarkIcon, () =>
+            setDialog({ kind: "publish", project: p }),
+          )}
         {iconButton("dash.download", DownloadSimpleIcon, () => download([p]))}
         {p.archived
           ? iconButton("dash.unarchive", ArchiveIcon, () =>
@@ -605,7 +494,8 @@ export function Dashboard({
                     role="menuitem"
                     onClick={() => {
                       setMenu(false);
-                      setDialog({ kind });
+                      if (kind === "templates") onTemplates();
+                      else setDialog({ kind });
                     }}
                   >
                     <Icon aria-hidden="true" />
@@ -630,6 +520,10 @@ export function Dashboard({
               </button>
             ))}
           </nav>
+          <button type="button" className="dash-templates-link" onClick={() => onTemplates()}>
+            <SquaresFourIcon aria-hidden="true" />
+            <span>{t("tpl.open")}</span>
+          </button>
         </aside>
         <main className="dash-main">
           {error && (
@@ -650,7 +544,7 @@ export function Dashboard({
                   <FilesIcon aria-hidden="true" />
                   {t("dash.blankProject")}
                 </button>
-                <button type="button" onClick={() => setDialog({ kind: "templates" })}>
+                <button type="button" onClick={() => onTemplates()}>
                   <SquaresFourIcon aria-hidden="true" />
                   {t("dash.fromTemplate")}
                 </button>
@@ -815,14 +709,14 @@ export function Dashboard({
           }
         />
       )}
-      {dialog?.kind === "templates" && (
-        <TemplateGallery
-          busy={dialogAction.busy}
-          error={dialogAction.error}
+      {dialog?.kind === "publish" && (
+        <PublishTemplateDialog
+          project={dialog.project}
           onClose={close}
-          onCreate={(template, name) =>
-            create(() => api<ProjectSummary>("/projects", { name, template: template.id }))
-          }
+          onDone={(template) => {
+            close();
+            onTemplates(template.id);
+          }}
         />
       )}
       {dialog?.kind === "upload" && (

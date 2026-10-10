@@ -190,6 +190,15 @@ export const englishMessages: Record<string, string> = {
   "{path} 不是 UTF-8 编码，请转换后再上传": "{path} is not UTF-8 text; convert it and upload again",
   压缩包中有重复的文件路径: "The zip contains the same path twice",
   "压缩包超过 {size}": "The zip exceeds {size}",
+  // templates
+  没有这个预览: "There is no such preview",
+  请填写模板名称: "Enter a name for the template",
+  模板所在的磁盘暂时不可用: "The disk that holds the templates is not available right now",
+  内置模板不能修改: "Built-in templates cannot be changed",
+  只有模板的发布者或管理员可以修改:
+    "Only whoever published the template or an administrator can change it",
+  服务器没有配置模板库: "The server has no template library configured",
+  "模板最多 {count} 个文件、100 MB": "A template can have at most {count} files and 100 MB",
   "无法读取压缩包，请上传 .zip 文件": "The upload could not be read; upload a .zip file",
   压缩包里没有可用的文件: "The zip has no files that can be used",
   模板不存在: "No such template",

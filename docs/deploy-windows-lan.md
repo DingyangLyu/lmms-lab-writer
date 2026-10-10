@@ -22,6 +22,7 @@
 | `C:\texlive\current` | TeX Live（服务端编译 PDF 用的 latexmk） |
 | `C:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
 | `D:\writer-backups` | 每天 3 点的数据库备份，保留 14 天（D: 没接上时写到 `C:\writer\backups`） |
+| `E:\writer-data\templates` | 模板库：官方会议/期刊模板和组员发布的模板，每个模板一个文件夹（`files/` 项目文件、`preview/` 预览图和示例 PDF）；`.cache` 是下载的官方作者包 |
 | `%USERPROFILE%\.writer-runner\projects` | AI 对话的项目工作副本（每个项目一份；可以删除，每轮开始前会从服务器重新同步） |
 | `%USERPROFILE%\.writer-runner\claude-sessions`、`opencode.pid` | Claude Code 对话记录；执行器启动的 `opencode serve` 的进程号（执行器重启时用来结束上一个） |
 
@@ -39,7 +40,7 @@
 2. PostgreSQL：这台电脑上 EnterpriseDB 安装器写不了临时 `.bat` 文件，所以用官方免安装包：解压到 `C:\writer\pgsql`，`initdb -D C:\writer\pgdata -U postgres -A scram-sha-256 -E UTF8 --locale=C`，给 `NT AUTHORITY\NetworkService` 授予数据目录权限，`pg_ctl register -N postgresql-writer -S auto -U "NT AUTHORITY\NetworkService"`，再建 `writer` 用户和数据库。
 3. TeX Live：从清华镜像下载 `install-tl.zip`，用 profile 安装 `scheme-full`（不装文档和源码）到 `C:\texlive\current`。整个目录可以原样搬到别的盘，之后只需把 `texmf-var\fonts\conf\fonts.conf` 里的绝对路径改掉并运行 `fc-cache -fs`。
 4. 代码：`pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."`，`pnpm.cmd --filter @lmms-lab/writer-collaboration build`。
-5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 放实验室自己的项目模板。
+5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。`WRITER_TEMPLATE_LIBRARY=E:\writer-data\templates`（模板库，放在 USB 固态盘 E: 上，节省 C: 空间；E: 暂时不可用时网页只显示内置模板）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 再加一个只读的实验室模板目录。
 6. `runner.env`：`WRITER_SERVER=http://127.0.0.1`、`WRITER_RUNNER_TOKEN`（同上）、`WRITER_ALLOWED_HARNESSES`、`WRITER_CODEX_BIN`/`WRITER_OPENCODE_BIN`（指向 npm 包里的 `codex.exe`、`opencode.exe`，避开 `.cmd`）、`WRITER_CODEX_SANDBOX=danger-full-access`、`HTTPS_PROXY`/`HTTP_PROXY`（本机代理）和 `NO_PROXY=127.0.0.1,localhost,::1`。
 7. 防火墙：只放行校园网访问 80 端口，例如 `New-NetFirewallRule -Name Writer-HTTP-LAN -Direction Inbound -Protocol TCP -LocalPort 80 -RemoteAddress 10.100.0.0/16 -Action Allow`。
 8. 接电源时不睡眠：`powercfg /change standby-timeout-ac 0`、`powercfg /change hibernate-timeout-ac 0`；硬盘 20 分钟无访问才停转（`powercfg /change disk-timeout-ac 20`，原来是 30 秒，USB 机械盘会频繁起停），并关闭 USB 选择性暂停。
@@ -55,6 +56,21 @@
 - 要在网页上用 Claude Code：在这台电脑装好 Claude Code 并 `claude auth login`，`runner.env` 设 `WRITER_CLAUDE_BIN`（指向 `claude.exe`），并把 `claude` 加进 `WRITER_ALLOWED_HARNESSES` 和 `server.env` 的 `WRITER_SHARED_RUNNER_HARNESSES`。
 - 工作副本位置可用 `WRITER_AGENT_WORKSPACES` 改；`WRITER_AGENT_HOST=0` 关闭网页 AI 对话。
 - 更新代码后要同时重启 Writer Server 和 Writer Runner（见下），网页 AI 对话才会用上新版本。
+
+## 模板库
+
+网页“模板库”里的官方模板来自各会议和期刊的作者包，清单在仓库的 `apps/collaboration/template-library/sources.json`（下载地址、哪一层文件夹是项目、去掉哪些文件、主文件、简介）。会议发布新一年的模板后，改清单里的地址和年份，然后在这台电脑上重新构建：
+
+```powershell
+cd C:\writer\app\apps\collaboration
+$env:WRITER_LATEXMK = "C:\texlive\current\bin\windows\latexmk.exe"
+..\..\node_modules\.bin\tsx.cmd server\template-build.ts --out E:\writer-data\templates            # 全部
+..\..\node_modules\.bin\tsx.cmd server\template-build.ts --out E:\writer-data\templates --only neurips-2026
+```
+
+脚本把作者包下载到 `E:\writer-data\templates\.cache`，整理成模板，用 latexmk 编译示例 PDF，再用 TeX Live 自带的 Ghostscript（`rungs.exe`）渲染前 4 页预览和缩略图；新模板完整生成后才替换旧的。AAAI 的下载页有人机验证，脚本拿不到时会提示，把 zip 手动放进 `.cache`（文件名见清单的 `archive`）再运行即可。网页最多 30 秒后显示更新。
+
+组员发布的模板同样在这个目录（`template.json` 里 `official: false`），每天随数据库备份一起镜像到 `D:\writer-backups\templates`。
 
 ## 账号和注册
 

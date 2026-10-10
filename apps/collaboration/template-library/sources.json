@@ -1,0 +1,525 @@
+[
+  {
+    "id": "neurips-2026",
+    "url": "https://media.neurips.cc/Conferences/NeurIPS2026/Formatting_Instructions_For_NeurIPS_2026.zip",
+    "archive": "neurips2026.zip",
+    "main": "neurips_2026.tex",
+    "meta": {
+      "name": { "zh": "NeurIPS 2026", "en": "NeurIPS 2026" },
+      "description": {
+        "zh": "NeurIPS 2026 官方模板（neurips_2026.sty），附论文清单 checklist.tex。默认生成匿名投稿版；录用后用 final 选项，arXiv 版用 preprint；position、eandd、creativeai 等选项对应其他投稿类型。",
+        "en": "The official NeurIPS 2026 style (neurips_2026.sty) with the paper checklist. It builds the anonymous submission by default; use the final option once accepted and preprint for arXiv. Options such as position, eandd and creativeai select the other tracks."
+      },
+      "category": "conference",
+      "venue": "NeurIPS",
+      "year": 2026,
+      "fields": ["ml"],
+      "tags": ["nips", "machine learning", "机器学习", "double-blind"],
+      "homepage": "https://neurips.cc/Conferences/2026/CallForPapers",
+      "order": 10
+    }
+  },
+  {
+    "id": "icml-2026",
+    "url": "https://media.icml.cc/Conferences/ICML2026/Styles/icml2026.zip",
+    "archive": "icml2026.zip",
+    "exclude": ["example_paper.pdf"],
+    "main": "example_paper.tex",
+    "meta": {
+      "name": { "zh": "ICML 2026", "en": "ICML 2026" },
+      "description": {
+        "zh": "ICML 2026 官方模板（icml2026.sty），含 algorithm 宏包和示例图表。默认匿名投稿；录用后用 accepted 选项，arXiv 版用 preprint。",
+        "en": "The official ICML 2026 style (icml2026.sty) with the algorithm packages and a sample figure. Anonymous submission by default; accepted for the camera-ready version, preprint for arXiv."
+      },
+      "category": "conference",
+      "venue": "ICML",
+      "year": 2026,
+      "fields": ["ml"],
+      "tags": ["machine learning", "机器学习", "double-blind"],
+      "homepage": "https://icml.cc/Conferences/2026/AuthorInstructions",
+      "order": 11
+    }
+  },
+  {
+    "id": "iclr-2027",
+    "url": "https://raw.githubusercontent.com/ICLR/Master-Template/master/iclr2027.zip",
+    "archive": "iclr2027.zip",
+    "main": "iclr2027_conference.tex",
+    "meta": {
+      "name": { "zh": "ICLR 2027", "en": "ICLR 2027" },
+      "description": {
+        "zh": "ICLR 2027 官方模板（ICLR/Master-Template），含常用数学记号 math_commands.tex。默认匿名投稿；终稿取消注释 \\iclrfinalcopy。",
+        "en": "The official ICLR 2027 template (ICLR/Master-Template) with math_commands.tex for common notation. Anonymous by default; uncomment \\iclrfinalcopy for the final version."
+      },
+      "category": "conference",
+      "venue": "ICLR",
+      "year": 2027,
+      "fields": ["ml"],
+      "tags": ["representation learning", "machine learning", "机器学习", "openreview"],
+      "homepage": "https://github.com/ICLR/Master-Template",
+      "order": 12
+    }
+  },
+  {
+    "id": "aaai-2027",
+    "url": "https://aaai.org/authorkit27/",
+    "archive": "aaai2027.zip",
+    "exclude": [
+      "Word/**",
+      "AnonymousSubmission2027.pdf",
+      "CameraReady2027.pdf",
+      "ReproducibilityChecklist.pdf"
+    ],
+    "main": "AnonymousSubmission2027.tex",
+    "meta": {
+      "name": { "zh": "AAAI-27", "en": "AAAI-27" },
+      "description": {
+        "zh": "AAAI-27 官方作者包（aaai2027.sty），双栏。AnonymousSubmission2027.tex 为匿名投稿稿（submission 选项），另附终稿样例 CameraReady2027.tex 和可复现性清单。",
+        "en": "The official AAAI-27 author kit (aaai2027.sty), two columns. AnonymousSubmission2027.tex is the anonymous submission (submission option); CameraReady2027.tex and the reproducibility checklist are included."
+      },
+      "category": "conference",
+      "venue": "AAAI",
+      "year": 2027,
+      "fields": ["ai", "ml"],
+      "tags": ["artificial intelligence", "人工智能", "double-blind"],
+      "homepage": "https://aaai.org/conference/aaai/aaai-27/submission-instructions/",
+      "order": 20
+    }
+  },
+  {
+    "id": "ijcai-ecai-2026",
+    "url": "https://www.ijcai.org/sites/default/files/Guidelines/FormattingGuidelines-IJCAI-ECAI-26.zip",
+    "archive": "ijcai2026.zip",
+    "exclude": ["*.docx"],
+    "main": "ijcai26.tex",
+    "meta": {
+      "name": { "zh": "IJCAI-ECAI 2026", "en": "IJCAI-ECAI 2026" },
+      "description": {
+        "zh": "IJCAI-ECAI 2026 官方格式包（ijcai26.sty，named.bst），双栏。",
+        "en": "The official IJCAI-ECAI 2026 formatting kit (ijcai26.sty, named.bst), two columns."
+      },
+      "category": "conference",
+      "venue": "IJCAI",
+      "year": 2026,
+      "venues": ["ECAI"],
+      "fields": ["ai"],
+      "tags": ["artificial intelligence", "人工智能"],
+      "homepage": "https://www.ijcai.org/authors_kit",
+      "order": 21
+    }
+  },
+  {
+    "id": "cvpr-2026",
+    "url": "https://api.github.com/repos/cvpr-org/author-kit/zipball/CVPR2026-v1(latex)",
+    "archive": "cvpr2026.zip",
+    "main": "main.tex",
+    "meta": {
+      "name": { "zh": "CVPR 2026", "en": "CVPR 2026" },
+      "description": {
+        "zh": "CVPR 2026 官方作者包（cvpr-org/author-kit），双栏，正文按 sec/ 分文件，含 rebuttal.tex。默认 review 匿名评审版；终稿去掉 review，arXiv 版用 pagenumbers。",
+        "en": "The official CVPR 2026 author kit (cvpr-org/author-kit): two columns, sections in sec/, and rebuttal.tex. The review option gives the anonymous version; drop it for the camera-ready, use pagenumbers for arXiv."
+      },
+      "category": "conference",
+      "venue": "CVPR",
+      "year": 2026,
+      "fields": ["cv"],
+      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "homepage": "https://github.com/cvpr-org/author-kit",
+      "order": 30
+    }
+  },
+  {
+    "id": "iccv-2025",
+    "url": "https://media.eventhosts.cc/Conferences/ICCV2025/ICCV2025-Author-Kit.zip",
+    "archive": "iccv2025.zip",
+    "main": "main.tex",
+    "meta": {
+      "name": { "zh": "ICCV 2025", "en": "ICCV 2025" },
+      "description": {
+        "zh": "ICCV 2025 官方作者包，与 CVPR 同一套格式（iccv.sty），含 rebuttal 模板。ICCV 每两年一届，这是最近一届的模板。",
+        "en": "The official ICCV 2025 author kit, the CVPR format with iccv.sty, plus a rebuttal template. ICCV is held every other year; this is the latest edition's kit."
+      },
+      "category": "conference",
+      "venue": "ICCV",
+      "year": 2025,
+      "fields": ["cv"],
+      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "homepage": null,
+      "order": 31
+    }
+  },
+  {
+    "id": "eccv-2026",
+    "url": "https://github.com/paolo-favaro/paper-template/archive/refs/tags/Latest.zip",
+    "archive": "eccv2026.zip",
+    "exclude": ["ECCV_2026_Paper_Template.pdf", "llncsdoc.pdf", "*.eps"],
+    "main": "main.tex",
+    "meta": {
+      "name": { "zh": "ECCV 2026", "en": "ECCV 2026" },
+      "description": {
+        "zh": "ECCV 2026 官方模板：Springer LNCS 格式（llncs.cls）加 eccv.sty，默认 review 匿名评审版。",
+        "en": "The official ECCV 2026 template: Springer's LNCS format (llncs.cls) with eccv.sty; the review option gives the anonymous version."
+      },
+      "category": "conference",
+      "venue": "ECCV",
+      "year": 2026,
+      "fields": ["cv"],
+      "tags": ["computer vision", "计算机视觉", "lncs", "springer"],
+      "homepage": "https://eccv.ecva.net/Conferences/2026/SubmissionPolicies",
+      "order": 32
+    }
+  },
+  {
+    "id": "wacv-2027",
+    "url": "https://wacv.thecvf.com/static/wacv-2027-author-kit-template.zip",
+    "archive": "wacv2027.zip",
+    "main": "main.tex",
+    "meta": {
+      "name": { "zh": "WACV 2027", "en": "WACV 2027" },
+      "description": {
+        "zh": "WACV 2027 官方作者包，双栏。按投稿方向选择 algorithms、applications 或 datasets 选项，含 rebuttal 模板。",
+        "en": "The official WACV 2027 author kit, two columns. Choose the algorithms, applications or datasets option for your track; a rebuttal template is included."
+      },
+      "category": "conference",
+      "venue": "WACV",
+      "year": 2027,
+      "fields": ["cv"],
+      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "homepage": "https://wacv.thecvf.com/Conferences/2027/AuthorGuides",
+      "order": 33
+    }
+  },
+  {
+    "id": "bmvc-2026",
+    "url": "https://github.com/BritishMachineVisionAssociation/BMVCTemplate/archive/refs/heads/master.zip",
+    "archive": "bmvc2026.zip",
+    "exclude": ["*.docx", "bmvc_final.pdf", "bmvc_review.pdf"],
+    "main": "bmvc_review.tex",
+    "meta": {
+      "name": { "zh": "BMVC 2026", "en": "BMVC 2026" },
+      "description": {
+        "zh": "BMVC 2026 官方模板（bmvc2k.cls）：bmvc_review.tex 为投稿版，bmvc_final.tex 为终稿。",
+        "en": "The official BMVC 2026 template (bmvc2k.cls): bmvc_review.tex for submission, bmvc_final.tex for the final paper."
+      },
+      "category": "conference",
+      "venue": "BMVC",
+      "year": 2026,
+      "fields": ["cv"],
+      "tags": ["computer vision", "计算机视觉"],
+      "homepage": "https://bmvc2026.bmva.org/authors/author-guidelines/",
+      "order": 34
+    }
+  },
+  {
+    "id": "acl-arr",
+    "url": "https://github.com/acl-org/acl-style-files/archive/refs/heads/master.zip",
+    "archive": "acl.zip",
+    "exclude": ["tests/**"],
+    "main": "acl_latex.tex",
+    "meta": {
+      "name": { "zh": "ACL / EMNLP / NAACL（ARR）", "en": "ACL / EMNLP / NAACL (ARR)" },
+      "description": {
+        "zh": "ACL 系列会议的官方样式（acl-org/acl-style-files），ACL、EMNLP、NAACL、EACL、AACL 和 ACL Rolling Review 通用。默认 review 匿名版；终稿去掉 review，arXiv 版用 preprint。另附 LuaLaTeX 版 acl_lualatex.tex。",
+        "en": "The official ACL style (acl-org/acl-style-files), shared by ACL, EMNLP, NAACL, EACL, AACL and ACL Rolling Review. The review option gives the anonymous version; drop it for the final paper, use preprint for arXiv. acl_lualatex.tex is the LuaLaTeX variant."
+      },
+      "category": "conference",
+      "venue": "ACL",
+      "year": null,
+      "venues": ["EMNLP", "NAACL", "EACL", "AACL", "ARR"],
+      "fields": ["nlp"],
+      "tags": ["natural language processing", "自然语言处理", "computational linguistics"],
+      "homepage": "https://github.com/acl-org/acl-style-files",
+      "order": 40
+    }
+  },
+  {
+    "id": "colm-2026",
+    "url": "https://github.com/COLM-org/Template/archive/refs/heads/master.zip",
+    "archive": "colm2026.zip",
+    "exclude": ["colm2026_conference.pdf"],
+    "main": "colm2026_conference.tex",
+    "meta": {
+      "name": { "zh": "COLM 2026", "en": "COLM 2026" },
+      "description": {
+        "zh": "COLM 2026（Conference on Language Modeling）官方模板。默认 submission 匿名版；终稿用 final，arXiv 版用 preprint。",
+        "en": "The official COLM 2026 (Conference on Language Modeling) template. submission by default; final for the camera-ready, preprint for arXiv."
+      },
+      "category": "conference",
+      "venue": "COLM",
+      "year": 2026,
+      "fields": ["nlp", "ml"],
+      "tags": ["language models", "llm", "大模型"],
+      "homepage": "https://github.com/COLM-org/Template",
+      "order": 41
+    }
+  },
+  {
+    "id": "aistats-2027",
+    "url": "https://aistats.org/aistats2027/AISTATS2027PaperPack.zip",
+    "archive": "aistats2027.zip",
+    "exclude": ["sample_paper.pdf"],
+    "main": "sample_paper.tex",
+    "meta": {
+      "name": { "zh": "AISTATS 2027", "en": "AISTATS 2027" },
+      "description": {
+        "zh": "AISTATS 2027 官方 Paper Pack（aistats2027.sty）。默认匿名投稿；录用后用 accepted 选项，arXiv 版用 preprint。",
+        "en": "The official AISTATS 2027 paper pack (aistats2027.sty). Anonymous by default; accepted once accepted, preprint for arXiv."
+      },
+      "category": "conference",
+      "venue": "AISTATS",
+      "year": 2027,
+      "fields": ["ml"],
+      "tags": ["statistics", "统计学习", "machine learning"],
+      "homepage": "https://virtual.aistats.org/Conferences/2027/CallForPapers",
+      "order": 50
+    }
+  },
+  {
+    "id": "uai-2026",
+    "url": "https://www.auai.org/uai2026/public/formatting/uai2026-template.zip",
+    "archive": "uai2026.zip",
+    "main": "uai2026-template.tex",
+    "meta": {
+      "name": { "zh": "UAI 2026", "en": "UAI 2026" },
+      "description": {
+        "zh": "UAI 2026 官方模板（uai2026.cls），默认投稿版；终稿用 accepted 选项。",
+        "en": "The official UAI 2026 class (uai2026.cls); submission by default, the accepted option for the final paper."
+      },
+      "category": "conference",
+      "venue": "UAI",
+      "year": 2026,
+      "fields": ["ml", "ai"],
+      "tags": ["uncertainty", "probabilistic", "machine learning"],
+      "homepage": "https://www.auai.org/uai2026/submission_instructions",
+      "order": 51
+    }
+  },
+  {
+    "id": "colt-2026",
+    "url": "https://learningtheory.org/colt2026/colt2026-style.zip",
+    "archive": "colt2026.zip",
+    "main": "colt2026-sample.tex",
+    "meta": {
+      "name": { "zh": "COLT 2026", "en": "COLT 2026" },
+      "description": {
+        "zh": "COLT 2026 官方样式（colt2026.cls，基于 JMLR 的 jmlr.cls），样例默认 anon 匿名投稿。",
+        "en": "The official COLT 2026 class (colt2026.cls, built on JMLR's jmlr.cls); the sample uses anon for an anonymous submission."
+      },
+      "category": "conference",
+      "venue": "COLT",
+      "year": 2026,
+      "fields": ["ml"],
+      "tags": ["learning theory", "学习理论", "pmlr"],
+      "homepage": "https://learningtheory.org/colt2026/cfp.html",
+      "order": 52
+    }
+  },
+  {
+    "id": "acm-sigconf",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/acmart.zip",
+    "archive": "acmart.zip",
+    "root": "acmart",
+    "generate": ["acmart.ins", "samples/samples.ins"],
+    "include": [
+      "acmart.cls",
+      "ACM-Reference-Format.bst",
+      "samples/sigconf.tex",
+      "samples/sample-base.bib",
+      "samples/sampleteaser.pdf",
+      "samples/sample-franklin.png"
+    ],
+    "rename": {
+      "samples/sigconf.tex": "sample-sigconf.tex",
+      "samples/sample-base.bib": "sample-base.bib",
+      "samples/sampleteaser.pdf": "sampleteaser.pdf",
+      "samples/sample-franklin.png": "sample-franklin.png"
+    },
+    "main": "sample-sigconf.tex",
+    "meta": {
+      "name": {
+        "zh": "ACM 会议论文（KDD / WWW / SIGIR / MM）",
+        "en": "ACM conference paper (KDD / WWW / SIGIR / MM)"
+      },
+      "description": {
+        "zh": "ACM 官方 acmart 的 sigconf 格式，KDD、WWW、SIGIR、CIKM、WSDM、ACM MM、CHI、RecSys 等会议使用。类文件和样例由 CTAN 上的 acmart 源码生成。投稿时按会议要求加 anonymous、review 等选项。",
+        "en": "ACM's official acmart class in the sigconf format, used by KDD, WWW, SIGIR, CIKM, WSDM, ACM MM, CHI, RecSys and others. The class and sample are generated from the acmart sources on CTAN. Add options such as anonymous and review as the venue asks."
+      },
+      "category": "conference",
+      "venue": "ACM",
+      "year": null,
+      "venues": ["KDD", "WWW", "SIGIR", "CIKM", "WSDM", "MM", "CHI", "RecSys"],
+      "fields": ["data", "ai"],
+      "tags": [
+        "acmart",
+        "data mining",
+        "数据挖掘",
+        "information retrieval",
+        "信息检索",
+        "multimedia"
+      ],
+      "homepage": "https://www.acm.org/publications/proceedings-template",
+      "order": 60
+    }
+  },
+  {
+    "id": "icassp-2027",
+    "url": "https://cmsworkshops.com/ICASSP2027/papers/PaperFormat/ICASSP2027_Paper_Templates.zip",
+    "archive": "icassp2027.zip",
+    "exclude": ["*.doc", "*.ps", "*.eps", "Template.pdf", "format.pdf", "Author-PDF-Guide-V32.pdf"],
+    "main": "Template.tex",
+    "meta": {
+      "name": { "zh": "ICASSP 2027", "en": "ICASSP 2027" },
+      "description": {
+        "zh": "ICASSP 2027 官方 Paper Kit（spconf.sty，IEEEbib.bst），双栏 IEEE 格式。",
+        "en": "The official ICASSP 2027 paper kit (spconf.sty, IEEEbib.bst), two-column IEEE format."
+      },
+      "category": "conference",
+      "venue": "ICASSP",
+      "year": 2027,
+      "fields": ["speech"],
+      "tags": ["signal processing", "信号处理", "speech", "语音", "audio", "ieee"],
+      "homepage": "https://cmsworkshops.com/ICASSP2027/papers/paper_kit.php",
+      "order": 70
+    }
+  },
+  {
+    "id": "ieee-ras-conference",
+    "url": "https://ras.papercept.net/conferences/support/files/ieeeconf.zip",
+    "archive": "ieeeconf.zip",
+    "exclude": ["root.pdf"],
+    "main": "root.tex",
+    "meta": {
+      "name": {
+        "zh": "IEEE 机器人会议（ICRA / IROS）",
+        "en": "IEEE robotics conference (ICRA / IROS)"
+      },
+      "description": {
+        "zh": "IEEE 机器人与自动化学会会议模板（ieeeconf.cls，由 PaperPlaza 提供），ICRA、IROS、CASE 等使用。",
+        "en": "The IEEE Robotics and Automation Society conference template (ieeeconf.cls from PaperPlaza), used by ICRA, IROS, CASE and others."
+      },
+      "category": "conference",
+      "venue": "ICRA",
+      "year": null,
+      "venues": ["IROS", "CASE"],
+      "fields": ["robotics"],
+      "tags": ["robotics", "机器人", "ieee", "papercept"],
+      "homepage": "https://ras.papercept.net/conferences/support/tex.php",
+      "order": 80
+    }
+  },
+  {
+    "id": "springer-lncs",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/llncs.zip",
+    "archive": "llncs.zip",
+    "include": ["llncs.cls", "splncs04.bst", "README.md"],
+    "add": { "main.tex": "extra/lncs/main.tex" },
+    "main": "main.tex",
+    "meta": {
+      "name": {
+        "zh": "Springer LNCS 会议论文（MICCAI 等）",
+        "en": "Springer LNCS paper (MICCAI and others)"
+      },
+      "description": {
+        "zh": "Springer LNCS 会议论文格式（llncs.cls，splncs04.bst），MICCAI、ECML PKDD 等会议使用。类文件来自 CTAN，示例正文由 Y-Writer 编写。",
+        "en": "Springer's LNCS proceedings format (llncs.cls, splncs04.bst), used by MICCAI, ECML PKDD and others. The class is from CTAN; the sample text is Y-Writer's."
+      },
+      "category": "conference",
+      "venue": "LNCS",
+      "year": null,
+      "venues": ["MICCAI", "ECML PKDD"],
+      "fields": ["cv", "ml"],
+      "tags": ["springer", "medical imaging", "医学影像"],
+      "homepage": "https://www.ctan.org/pkg/llncs",
+      "order": 85
+    }
+  },
+  {
+    "id": "tmlr",
+    "url": "https://github.com/JmlrOrg/tmlr-style-file/archive/refs/heads/main.zip",
+    "archive": "tmlr.zip",
+    "exclude": ["main.pdf", "main-accepted.pdf"],
+    "main": "main.tex",
+    "meta": {
+      "name": { "zh": "TMLR", "en": "TMLR" },
+      "description": {
+        "zh": "TMLR（Transactions on Machine Learning Research）官方样式。默认匿名投稿；录用后用 accepted，arXiv 版用 preprint。",
+        "en": "The official style of TMLR (Transactions on Machine Learning Research). Anonymous by default; accepted once accepted, preprint for arXiv."
+      },
+      "category": "journal",
+      "venue": "TMLR",
+      "year": null,
+      "fields": ["ml"],
+      "tags": ["journal", "期刊", "openreview", "machine learning"],
+      "homepage": "https://github.com/JmlrOrg/tmlr-style-file",
+      "order": 90
+    }
+  },
+  {
+    "id": "jmlr",
+    "url": "https://github.com/JmlrOrg/jmlr-style-file/archive/refs/heads/master.zip",
+    "archive": "jmlr.zip",
+    "exclude": ["sample.pdf"],
+    "main": "sample.tex",
+    "meta": {
+      "name": { "zh": "JMLR", "en": "JMLR" },
+      "description": {
+        "zh": "JMLR（Journal of Machine Learning Research）官方样式（jmlr2e.sty）及示例。",
+        "en": "The official style (jmlr2e.sty) and sample of JMLR, the Journal of Machine Learning Research."
+      },
+      "category": "journal",
+      "venue": "JMLR",
+      "year": null,
+      "fields": ["ml"],
+      "tags": ["journal", "期刊", "machine learning"],
+      "homepage": "https://www.jmlr.org/format/format.html",
+      "order": 91
+    }
+  },
+  {
+    "id": "ieee-tpami",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/IEEEtran.zip",
+    "archive": "ieeetran.zip",
+    "include": ["IEEEtran.cls", "bare_jrnl_compsoc.tex", "bibtex/IEEEtran.bst"],
+    "rename": { "bibtex/IEEEtran.bst": "IEEEtran.bst" },
+    "main": "bare_jrnl_compsoc.tex",
+    "meta": {
+      "name": {
+        "zh": "IEEE TPAMI 等 Computer Society 期刊",
+        "en": "IEEE TPAMI and other Computer Society journals"
+      },
+      "description": {
+        "zh": "IEEE Computer Society 期刊模板（IEEEtran.cls 的 compsoc 选项），TPAMI、TKDE 等 IEEE Transactions 使用。",
+        "en": "The IEEE Computer Society journal template (IEEEtran.cls with the compsoc option), used by TPAMI, TKDE and other IEEE Transactions."
+      },
+      "category": "journal",
+      "venue": "TPAMI",
+      "year": null,
+      "venues": ["TKDE", "IEEE Transactions"],
+      "fields": ["cv", "ml"],
+      "tags": ["ieee", "journal", "期刊", "ieeetran"],
+      "homepage": "https://www.ctan.org/pkg/ieeetran",
+      "order": 92
+    }
+  },
+  {
+    "id": "arxiv-preprint",
+    "url": "https://github.com/kourgeorge/arxiv-style/archive/refs/heads/master.zip",
+    "archive": "arxiv.zip",
+    "exclude": ["template.pdf"],
+    "main": "template.tex",
+    "meta": {
+      "name": { "zh": "arXiv 预印本", "en": "arXiv preprint" },
+      "description": {
+        "zh": "常用的 arXiv 预印本样式（kourgeorge/arxiv-style，MIT 许可），单栏，排版简洁。",
+        "en": "A widely used arXiv preprint style (kourgeorge/arxiv-style, MIT licence): one column, clean layout."
+      },
+      "category": "preprint",
+      "venue": "arXiv",
+      "year": null,
+      "fields": [],
+      "tags": ["preprint", "预印本"],
+      "homepage": "https://github.com/kourgeorge/arxiv-style",
+      "order": 95
+    }
+  }
+]

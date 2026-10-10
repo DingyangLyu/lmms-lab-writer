@@ -1,7 +1,7 @@
 import { request } from "node:http";
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import type { FileContent, FileInfo, ProjectSummary, TemplateInfo } from "../shared/api";
+import type { FileContent, FileInfo, ProjectSummary, TemplateList } from "../shared/api";
 import { readZip } from "./routes/projects";
 import { fixture } from "./test-fixture";
 
@@ -22,7 +22,8 @@ async function importZip(f: Fixture, name: string, body: Uint8Array) {
 describe("project dashboard", () => {
   it("lists built-in templates and creates projects from them", async () => {
     const f = await fixture();
-    const templates = (await f.call("/templates", undefined, f.owner)).data as TemplateInfo[];
+    const templates = ((await f.call("/templates", undefined, f.owner)).data as TemplateList)
+      .templates;
     expect(templates.map((t) => t.id)).toEqual([
       "blank",
       "article",

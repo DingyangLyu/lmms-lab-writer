@@ -20,8 +20,9 @@ import { jobRoutes, runnerRoute } from "./routes/jobs";
 import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
+import { publishTemplateRoute, templateRoutes } from "./routes/templates";
 import { Store } from "./store";
-import { loadTemplates, type Template } from "./templates";
+import { TemplateLibrary } from "./templates";
 import { fail, HttpError } from "./util";
 
 export type Options = {
@@ -40,6 +41,13 @@ export type Options = {
   sharedRunner?: SharedRunner;
   /** Extra project templates (a lab's thesis template…), added to the built-in ones. */
   templatesDirectory?: string;
+  /**
+   * The template library: official conference kits and members' templates, with previews. It
+   * may be on a data disk; while that is missing, only the other templates are listed.
+   */
+  templateLibrary?: string;
+  /** Ghostscript for template previews; default `rungs` beside latexmk. */
+  ghostscript?: string;
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -106,7 +114,6 @@ export async function createWriterServer(options: Options) {
   let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const collab = new Collaboration(store, () => origin);
   const agents = new Agents(store, collab, () => origin, options.sharedRunner);
-  let templates: Promise<Map<string, Template>> | null = null;
   const services = {
     store,
     collab,
@@ -114,23 +121,21 @@ export async function createWriterServer(options: Options) {
     origin: () => origin,
     trustProxy: options.trustProxy ?? false,
     sharedRunner: options.sharedRunner,
-    templates: () => {
-      templates ??= loadTemplates(
-        [join(import.meta.dirname, "../templates"), options.templatesDirectory ?? ""].filter(
-          Boolean,
-        ),
-      );
-      return templates;
-    },
+    templates: new TemplateLibrary(join(import.meta.dirname, "../templates"), {
+      lab: options.templatesDirectory,
+      library: options.templateLibrary,
+      render: { compile: options.compile, ghostscript: options.ghostscript },
+    }),
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
   const publicRoutes = [...session.public, runnerRoute];
   /** Still reachable while an account must replace a temporary password. */
   const accountRoutes = [...session.authed, passwordRoute];
-  const signedInRoutes = [...adminRoutes, ...projectListRoutes];
+  const signedInRoutes = [...adminRoutes, ...projectListRoutes, ...templateRoutes];
   const projectScoped = [
     ...projectRoutes,
+    publishTemplateRoute,
     ...fileRoutes,
     ...bibliographyRoutes,
     ...commentRoutes,
@@ -203,8 +208,10 @@ export async function createWriterServer(options: Options) {
     store,
     collab,
     agents,
+    templates: services.templates,
     origin,
     close: async () => {
+      await services.templates.idle();
       agents.close();
       collab.close();
       await new Promise<void>((resolve, reject) =>

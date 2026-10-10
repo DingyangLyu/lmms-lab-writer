@@ -1,28 +1,11 @@
 /** Projects, membership and the audit trail. */
 import { randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { validPath } from "@lmms-lab/sync";
 import { unzipSync } from "fflate";
 import * as Y from "yjs";
-import type {
-  AuditEntry,
-  ImportedProject,
-  Invite,
-  Member,
-  ProjectSummary,
-  TemplateInfo,
-} from "../../shared/api";
+import type { AuditEntry, ImportedProject, Invite, Member, ProjectSummary } from "../../shared/api";
 import { type Sql, sql } from "../db";
-import {
-  type Authed,
-  created,
-  handled,
-  type InProject,
-  readBody,
-  roleInput,
-  route,
-  str,
-} from "../http";
+import { type Authed, created, type InProject, readBody, roleInput, route, str } from "../http";
 import {
   BINARY_BYTES,
   PROJECT_BYTES,
@@ -31,7 +14,6 @@ import {
   TEXT_BYTES,
   ZIP_BYTES,
 } from "../limits";
-import { templateInfo } from "../templates";
 import { decodeText, digest, fail, isTextPath, safePath, textDoc, uid } from "../util";
 import { fileTooLarge, projectTooLarge } from "./files";
 
@@ -198,8 +180,8 @@ export const projectListRoutes = [
     if (body.template === undefined || body.template === null)
       return created(await createProject(ctx, name, [], { from: "blank" }));
     const id = str(body, "template", 64);
-    const template = (await ctx.templates()).get(id) ?? fail(404, "模板不存在");
-    return created(await createProject(ctx, name, [template.files], { template: id }));
+    const files = await ctx.templates.files(id);
+    return created(await createProject(ctx, name, [files], { template: id }));
   }),
   // The zip is the request body (up to 500 MB), the project's name a query parameter.
   route<Authed>("POST", /^\/api\/projects\/import$/, async (ctx): Promise<ImportedProject> => {
@@ -207,17 +189,6 @@ export const projectListRoutes = [
     const zip = await readBody(ctx.req, ZIP_BYTES, "压缩包超过 {size}");
     const { skipped, batches } = readZip(zip);
     return { ...(await createProject(ctx, name, batches(), { from: "zip" })), skipped };
-  }),
-  route<Authed>(
-    "GET",
-    /^\/api\/templates$/,
-    async (ctx): Promise<TemplateInfo[]> => [...(await ctx.templates()).values()].map(templateInfo),
-  ),
-  route<Authed>("GET", /^\/api\/templates\/([a-z0-9-]+)\/preview$/, async (ctx, [id = ""]) => {
-    const file = (await ctx.templates()).get(id)?.previewFile ?? fail(404, "模板不存在");
-    ctx.res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "max-age=3600" });
-    ctx.res.end(await readFile(file));
-    return handled;
   }),
 ];
 

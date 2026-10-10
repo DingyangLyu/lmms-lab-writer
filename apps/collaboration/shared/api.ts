@@ -54,16 +54,73 @@ export type ProjectSummary = {
   trashed?: boolean;
 };
 /** A starting point for a new project (see server/templates.ts). */
+/** Template categories, as the gallery groups them. */
+export const templateCategories = [
+  "conference",
+  "journal",
+  "preprint",
+  "paper",
+  "thesis",
+  "presentation",
+  "basic",
+  "other",
+] as const;
+/** Research fields a template is used in. */
+export const templateFields = ["ml", "cv", "nlp", "ai", "data", "robotics", "speech"] as const;
+export type Localized = { zh: string; en: string };
 export type TemplateInfo = {
   id: string;
-  name: { zh: string; en: string };
-  description: { zh: string; en: string };
+  name: Localized;
+  description: Localized;
   category: string;
   main: string;
   engine: Engine;
   order: number;
+  /** A preview image exists (`/api/templates/:id/preview`). */
   preview: boolean;
   fileCount: number;
+  /** Bytes of the template's files. */
+  bytes: number;
+  /** The conference or journal, e.g. "NeurIPS", and its year. */
+  venue: string | null;
+  year: number | null;
+  /** Other venues that use the same format, e.g. EMNLP for the ACL template. */
+  venues: string[];
+  fields: string[];
+  tags: string[];
+  /** The official author kit, and the venue's call for papers. */
+  source: string | null;
+  homepage: string | null;
+  /** Pages rendered from the sample PDF (`/api/templates/:id/pages/:n`), and the PDF itself. */
+  pages: number;
+  pdf: boolean;
+  /** "pending" while a member's new template is being built; "failed" when TeX gave up. */
+  previewStatus: "ready" | "pending" | "failed" | "none";
+  /** Shipped with Writer, from the official kits, or published by a member. */
+  origin: "builtin" | "official" | "member";
+  author: { id: string; name: string } | null;
+  /** When the files were last fetched or published (ms). */
+  updated: number | null;
+};
+export type TemplateList = {
+  templates: TemplateInfo[];
+  /** The template library's folder (it may be on a removable disk), and whether it can be written. */
+  library: { available: boolean; writable: boolean };
+};
+export type TemplateDetail = TemplateInfo & {
+  files: Array<{ path: string; bytes: number }>;
+  /** The end of the TeX log when the preview failed. */
+  previewLog: string | null;
+};
+/** What a member enters to publish a project as a template. */
+export type TemplateInput = {
+  name: Localized;
+  description: Localized;
+  category: string;
+  fields: string[];
+  tags: string[];
+  venue: string | null;
+  year: number | null;
 };
 /** A project made from an uploaded zip, with the entries that were left out. */
 export type ImportedProject = ProjectSummary & { skipped: string[] };
