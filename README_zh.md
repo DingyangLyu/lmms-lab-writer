@@ -66,6 +66,8 @@ Y-Writer 由两部分组成，可以配合使用：
 
 ## 快速开始
 
+只想使用桌面端：从 [Releases](https://github.com/DingyangLyu/lmms-lab-writer/releases) 或实验室服务器网页的“桌面端”页下载安装包。自己编译：
+
 需要 Node.js 24、`package.json` 中指定的 pnpm 版本，以及 Rust（编译桌面端时）。
 
 ```bash

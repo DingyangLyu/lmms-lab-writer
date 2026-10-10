@@ -66,6 +66,8 @@ Projects can live on both: the desktop app keeps a local folder in two-way sync 
 
 ## Getting started
 
+To just use the desktop app, download an installer from [Releases](https://github.com/DingyangLyu/lmms-lab-writer/releases) or from your lab server's **Desktop** page. To build it yourself:
+
 Requirements: Node.js 24, the pnpm version pinned in `package.json`, and Rust (for the desktop app).
 
 ```bash
