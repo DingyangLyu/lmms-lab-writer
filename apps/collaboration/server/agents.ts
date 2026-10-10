@@ -526,16 +526,16 @@ export class Agents {
         return result;
       }
       case "codex.resume": {
-        const thread = await this.access(project, user, params);
+        const thread = await this.readable(project, user, params);
         return this.call("codex.resume", {
-          project,
+          project: thread.project,
           threadId: thread.id,
           permissionMode: this.permission("codex", params),
         });
       }
       case "codex.read": {
-        const thread = await this.access(project, user, params);
-        return this.call("codex.read", { project, threadId: thread.id });
+        const thread = await this.readable(project, user, params);
+        return this.call("codex.read", { project: thread.project, threadId: thread.id });
       }
       case "codex.startTurn":
         return this.startTurn(browser, user, "codex", params);
@@ -546,13 +546,16 @@ export class Agents {
       case "claude.createSession": {
         const thread = await this.register(project, user, "claude", uid());
         return this.session(
-          { ...thread, name: null, ownerName: user.username, mine: true },
+          { ...thread, name: null, ownerName: user.username, mine: true, linkedFrom: null },
           project,
         );
       }
       case "claude.read": {
-        const thread = await this.access(project, user, params);
-        const saved = await this.call<Params>("claude.read", { project, threadId: thread.id });
+        const thread = await this.readable(project, user, params);
+        const saved = await this.call<Params>("claude.read", {
+          project: thread.project,
+          threadId: thread.id,
+        });
         const [summary] = (await this.list(project, user.id, "claude")).filter(
           (t) => t.id === thread.id,
         );
@@ -664,6 +667,44 @@ export class Agents {
         await this.store.audit(project, user.id, "agent.share", { thread: thread.id, shared });
         this.announceThreads(project);
         return { ok: true };
+      }
+      // Shows a conversation of this project in another one the member edits, read-only there.
+      case "thread.link": {
+        const thread = await this.access(project, user, params);
+        if (!thread.shared) fail(409, "请先把对话共享给项目成员");
+        const target = text(params, "project", 80);
+        if (target === project) fail(400, "无效字段 {key}", { key: "project" });
+        await this.store.require(target, user.id, "edit");
+        await this.store.db.run(
+          sql`INSERT INTO agent_thread_links(thread, project, linked_by, created)
+              VALUES(${thread.id}, ${target}, ${user.id}, ${Date.now()}) ON CONFLICT DO NOTHING`,
+        );
+        await this.store.audit(project, user.id, "agent.link", {
+          thread: thread.id,
+          project: target,
+        });
+        this.announceThreads(target);
+        return { ok: true };
+      }
+      case "thread.unlink": {
+        const id = threadId(params.threadId);
+        const target = text(params, "project", 80);
+        const thread = (await this.thread(id)) ?? fail(404, "对话不存在或未共享");
+        // From the project it was linked into, or by whoever started it.
+        if (thread.owner !== user.id) await this.store.require(target, user.id, "edit");
+        await this.store.db.run(
+          sql`DELETE FROM agent_thread_links WHERE thread=${id} AND project=${target}`,
+        );
+        this.announceThreads(target);
+        return { ok: true };
+      }
+      case "thread.links": {
+        const thread = await this.access(project, user, params);
+        return this.store.db.rows<{ id: string; name: string }>(
+          sql`SELECT p.id, p.name FROM agent_thread_links l JOIN projects p ON p.id=l.project
+              JOIN members m ON m.project=p.id AND m.user_id=${user.id}
+              WHERE l.thread=${thread.id} ORDER BY p.name`,
+        );
       }
       default:
         return fail(400, "未知消息");
@@ -790,6 +831,17 @@ export class Agents {
       if (result.status !== 200) return result;
       const shown = await visibleIds();
       const sessions = JSON.parse(result.body) as Array<{ id?: string }>;
+      // Conversations another project shows here live in that project's copy on the runner.
+      const sources = new Set([...shown.values()].flatMap((t) => t.linkedFrom?.id ?? []));
+      for (const source of sources) {
+        const other = await forward({ project: source });
+        if (other.status === 200)
+          sessions.push(
+            ...(JSON.parse(other.body) as Array<{ id?: string }>).filter(
+              (s) => typeof s.id === "string" && shown.get(s.id)?.linkedFrom?.id === source,
+            ),
+          );
+      }
       return {
         ...result,
         body: JSON.stringify(
@@ -799,7 +851,12 @@ export class Agents {
               const t = shown.get(s.id as string);
               return {
                 ...s,
-                writer: { mine: t?.mine, shared: t?.shared, ownerName: t?.ownerName },
+                writer: {
+                  mine: t?.mine,
+                  shared: t?.shared,
+                  ownerName: t?.ownerName,
+                  linkedFrom: t?.linkedFrom,
+                },
               };
             }),
         ),
@@ -830,8 +887,12 @@ export class Agents {
       kind === "answer"
         ? this.questions.get(pattern.exec(path)?.[1] ?? "")
         : pattern.exec(path)?.[1];
-    const thread = await this.access(project, user, { threadId: id });
+    const thread =
+      kind === "read"
+        ? await this.readable(project, user, { threadId: id })
+        : await this.access(project, user, { threadId: id });
     if (thread.harness !== "opencode") fail(404, "对话不存在或未共享");
+    if (thread.project !== project) return forward({ project: thread.project });
     if ((kind === "rename" || kind === "delete") && thread.owner !== user.id)
       fail(403, "只有对话的发起人可以重命名或共享");
     if (kind === "prompt") {
@@ -867,12 +928,12 @@ export class Agents {
     if (!this.status().permissions[harness]?.includes(value)) fail(400, "执行器不支持这种权限模式");
     return value;
   }
-  /** A new conversation: private to whoever started it. */
+  /** A new conversation: shared with the project's editors; whoever started it may hide it. */
   private async register(project: string, user: User, harness: string, id: string) {
     const now = Date.now();
     await this.store.db.run(
       sql`INSERT INTO agent_threads(id, project, owner, harness, title, shared, created, updated)
-          VALUES(${id}, ${project}, ${user.id}, ${harness}, '', false, ${now}, ${now})`,
+          VALUES(${id}, ${project}, ${user.id}, ${harness}, '', true, ${now}, ${now})`,
     );
     const thread: ThreadRow = {
       id,
@@ -880,7 +941,7 @@ export class Agents {
       owner: user.id,
       harness,
       title: "",
-      shared: false,
+      shared: true,
       updated: now,
     };
     this.threads.set(id, thread);
@@ -898,7 +959,10 @@ export class Agents {
   }
   /** A Claude Code session as the panel lists it. */
   private session(
-    thread: Pick<AgentThread, "id" | "name" | "updated" | "mine" | "shared" | "ownerName">,
+    thread: Pick<
+      AgentThread,
+      "id" | "name" | "updated" | "mine" | "shared" | "ownerName" | "linkedFrom"
+    >,
     project: string,
   ) {
     return {
@@ -909,6 +973,7 @@ export class Agents {
       mine: thread.mine,
       shared: thread.shared,
       ownerName: thread.ownerName,
+      linkedFrom: thread.linkedFrom,
     };
   }
   private async thread(id: string): Promise<ThreadRow | null> {
@@ -923,11 +988,28 @@ export class Agents {
     this.threads.set(id, thread);
     return thread;
   }
+  /** A conversation of this project the member may use: their own, or shared. */
   private async access(project: string, user: User, params: Params) {
     const thread = await this.thread(threadId(params.threadId));
+    if (thread && thread.project !== project && (await this.linked(thread, project)))
+      fail(409, "这是从其他项目关联来的对话，只能查看；请回到原项目继续");
     if (!thread || thread.project !== project || !visible(thread, user.id))
       fail(404, "对话不存在或未共享");
     return thread;
+  }
+  /** As access(), and also a shared conversation another project linked here, to read. */
+  private async readable(project: string, user: User, params: Params) {
+    const thread = await this.thread(threadId(params.threadId));
+    if (thread && thread.project !== project && (await this.linked(thread, project))) return thread;
+    return this.access(project, user, params);
+  }
+  private async linked(thread: ThreadRow, project: string) {
+    return (
+      thread.shared &&
+      !!(await this.store.db.row(
+        sql`SELECT 1 FROM agent_thread_links WHERE thread=${thread.id} AND project=${project}`,
+      ))
+    );
   }
   private async touch(thread: ThreadRow) {
     thread.updated = Date.now();
@@ -936,11 +1018,20 @@ export class Agents {
     );
   }
   private async list(project: string, user: string, harness: string): Promise<AgentThread[]> {
-    const rows = await this.store.db.rows<ThreadRow & { ownerName: string }>(
-      sql`SELECT t.id, t.project, t.owner, t.harness, t.title, t.shared, t.updated, u.username AS "ownerName"
+    const rows = await this.store.db.rows<
+      ThreadRow & { ownerName: string; fromId: string | null; fromName: string | null }
+    >(
+      sql`SELECT t.id, t.project, t.owner, t.harness, t.title, t.shared, t.updated,
+                 u.username AS "ownerName", NULL AS "fromId", NULL AS "fromName"
           FROM agent_threads t JOIN users u ON u.id=t.owner
           WHERE t.project=${project} AND t.harness=${harness} AND (t.owner=${user} OR t.shared)
-          ORDER BY t.updated DESC LIMIT 200`,
+          UNION ALL
+          SELECT t.id, t.project, t.owner, t.harness, t.title, t.shared, t.updated,
+                 u.username AS "ownerName", p.id AS "fromId", p.name AS "fromName"
+          FROM agent_thread_links l JOIN agent_threads t ON t.id=l.thread
+          JOIN users u ON u.id=t.owner JOIN projects p ON p.id=t.project
+          WHERE l.project=${project} AND t.harness=${harness} AND t.shared
+          ORDER BY updated DESC LIMIT 200`,
     );
     return rows.map((r) => ({
       id: r.id,
@@ -948,9 +1039,10 @@ export class Agents {
       name: r.title || null,
       owner: r.owner,
       ownerName: r.ownerName,
-      mine: r.owner === user,
+      mine: r.owner === user && !r.fromId,
       shared: !!r.shared,
       updated: Number(r.updated),
+      linkedFrom: r.fromId && r.fromName ? { id: r.fromId, name: r.fromName } : null,
     }));
   }
   private announceThreads(project: string) {

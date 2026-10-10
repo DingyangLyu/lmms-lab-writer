@@ -296,6 +296,17 @@ export const migrations: string[] = [
      PRIMARY KEY (requester, addressee)
    );
    CREATE INDEX friendships_addressee ON friendships(addressee);`,
+  // 10: AI conversations belong to the whole project by default, and can be shown (read-only)
+  // in other projects.
+  `UPDATE agent_threads SET shared = true;
+   CREATE TABLE agent_thread_links(
+     thread TEXT NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     linked_by TEXT NOT NULL REFERENCES users(id),
+     created BIGINT NOT NULL,
+     PRIMARY KEY (thread, project)
+   );
+   CREATE INDEX agent_thread_links_project ON agent_thread_links(project);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

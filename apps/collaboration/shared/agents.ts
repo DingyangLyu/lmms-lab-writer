@@ -57,9 +57,12 @@ export type AgentThread = {
   name: string | null;
   owner: string;
   ownerName: string;
+  /** Started by this member in this project: they may rename it or hide it. */
   mine: boolean;
   shared: boolean;
   updated: number;
+  /** A conversation of another project shown here read-only, and that project. */
+  linkedFrom: { id: string; name: string } | null;
 };
 
 /** Who is running an AI turn in the project; one turn at a time per project. */

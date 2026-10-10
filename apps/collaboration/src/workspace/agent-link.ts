@@ -162,6 +162,7 @@ export function relayCodexBackend(link: AgentLink): CodexBackend {
           shared: thread.shared,
           ownerName: thread.ownerName,
           updated: thread.updated,
+          linkedFrom: thread.linkedFrom,
         })),
       };
     },

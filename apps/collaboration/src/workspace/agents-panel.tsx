@@ -1,7 +1,8 @@
 /**
  * The right column: the desktop's AI conversation panels, with the agents running on the lab's
- * shared runner. Conversations are private to whoever starts them unless shared; their edits
- * land in the shared text (a version is saved before every turn).
+ * shared runner. Conversations belong to the whole project unless whoever started one hides it;
+ * their edits land in the shared text (a version is saved before every turn). Conversations
+ * another project shows here are read-only.
  */
 import { workbenchI18n } from "@lmms-lab/workbench";
 import {
@@ -32,7 +33,10 @@ import {
 const PANELS = { codex: CodexPanel, claude: ClaudePanel, opencode: OpenCodePanel };
 const WEB_ORDER: HarnessId[] = ["codex", "claude", "opencode"];
 /** What the server adds to OpenCode's session list: whose conversation it is. */
-type Shared = { writer?: { mine?: boolean; shared?: boolean; ownerName?: string } };
+type Linked = { id: string; name: string } | null;
+type Shared = {
+  writer?: { mine?: boolean; shared?: boolean; ownerName?: string; linkedFrom?: Linked };
+};
 /** How a conversation shows in the history: whose it is and whether it is shared. */
 const entry = (item: {
   id: string;
@@ -41,13 +45,16 @@ const entry = (item: {
   mine?: boolean;
   shared?: boolean;
   ownerName?: string;
+  linkedFrom?: Linked;
 }): HistoryEntry => ({
   id: item.id,
   title: item.name || workbenchI18n.t("codex.untitledConversation"),
   updatedAt: item.updated,
-  detail: item.mine
-    ? workbenchI18n.t(item.shared ? "harness.shared" : "harness.private")
-    : workbenchI18n.t("codex.sharedByName", { name: item.ownerName ?? "" }),
+  detail: item.linkedFrom
+    ? i18n.t("agents.linkedFrom", { project: item.linkedFrom.name, name: item.ownerName ?? "" })
+    : item.mine
+      ? workbenchI18n.t(item.shared ? "harness.shared" : "harness.private")
+      : workbenchI18n.t("codex.sharedByName", { name: item.ownerName ?? "" }),
   shared: item.shared,
   mine: item.mine,
 });

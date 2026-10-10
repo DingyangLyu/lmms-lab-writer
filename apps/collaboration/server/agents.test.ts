@@ -112,7 +112,7 @@ describe("live AI conversations on the shared runner", () => {
     expect((await owner.request("codex.models")).data[0].model).toBe("fake-model");
     const { thread } = await owner.request("codex.startThread", { permissionMode: "fullAccess" });
     expect(await owner.request("codex.threads")).toMatchObject({
-      data: [{ id: thread.id, mine: true, shared: false, ownerName: "owner" }],
+      data: [{ id: thread.id, mine: true, shared: true, ownerName: "owner" }],
     });
 
     const { turn } = await owner.request("codex.startTurn", {
@@ -179,7 +179,7 @@ describe("live AI conversations on the shared runner", () => {
     expect(await readFile(join(dir, "work", f.project, "chapter.tex"), "utf8")).toBe("Hello lab\n");
   });
 
-  it("keeps conversations private unless shared, and admits only owners and editors", async () => {
+  it("shares conversations with the project unless hidden, and admits only owners and editors", async () => {
     const f = await setup();
     const runner = client(`${f.origin.replace("http:", "ws:")}/api/runner/agents`, {
       Authorization: `Bearer ${TOKEN}`,
@@ -218,10 +218,16 @@ describe("live AI conversations on the shared runner", () => {
     ).rejects.toThrow(/权限模式/);
     const { thread } = await owner.request("codex.startThread", { permissionMode: "fullAccess" });
 
+    // New conversations are the project's; whoever started one may hide it again.
+    expect((await editor.request("codex.threads")).data).toMatchObject([
+      { id: thread.id, mine: false, shared: true },
+    ]);
+    await owner.request("thread.share", { threadId: thread.id, shared: false });
     expect((await editor.request("codex.threads")).data).toEqual([]);
     await expect(editor.request("codex.read", { threadId: thread.id })).rejects.toThrow(
       /不存在或未共享/,
     );
+    editor.messages.length = 0;
     await owner.request("thread.share", { threadId: thread.id, shared: true });
     await editor.until((m) => m.event?.method === THREADS_EVENT);
     expect((await editor.request("codex.threads")).data).toMatchObject([
@@ -250,6 +256,86 @@ describe("live AI conversations on the shared runner", () => {
       Authorization: `Bearer ${"b".repeat(64)}`,
     });
     await expect(intruder.opened).rejects.toThrow(/403/);
+  });
+
+  it("shows a conversation in another project read-only, for members of both", async () => {
+    const f = await setup();
+    const runner = client(`${f.origin.replace("http:", "ws:")}/api/runner/agents`, {
+      Authorization: `Bearer ${TOKEN}`,
+    });
+    await runner.opened;
+    runner.ws.send(
+      JSON.stringify({ status: { harnesses: ["codex"], permissions: { codex: ["fullAccess"] } } }),
+    );
+    const asked: Message[] = [];
+    runner.ws.on("message", (raw) => {
+      const m = JSON.parse(String(raw));
+      if (!m.method) return;
+      asked.push(m);
+      const result =
+        m.method === "codex.startThread"
+          ? { thread: { id: "thread-linked" } }
+          : m.method === "codex.read"
+            ? { thread: { id: m.params.threadId, turns: [] } }
+            : {};
+      runner.ws.send(JSON.stringify({ id: m.id, result }));
+    });
+    const second = (await f.call("/projects", { name: "second-paper" }, f.owner)).data.id as string;
+    const owner = await f.browser(f.owner);
+    await owner.until((m) => m.status?.online);
+    const { thread } = await owner.request("codex.startThread", { permissionMode: "fullAccess" });
+    const there = client(`${f.origin.replace("http:", "ws:")}/api/projects/${second}/agents`, {
+      Cookie: f.owner,
+      Origin: f.origin,
+    });
+    await there.opened;
+    expect((await there.request("codex.threads")).data).toEqual([]);
+
+    // An editor of this project alone cannot place it in a project they do not edit.
+    const editor = await f.browser(await f.invite("editor", "editor-only"));
+    await expect(
+      editor.request("thread.link", { threadId: thread.id, project: second }),
+    ).rejects.toThrow(/无权访问/);
+    await expect(
+      owner.request("thread.link", { threadId: thread.id, project: f.project }),
+    ).rejects.toThrow(/无效字段/);
+    await owner.request("thread.link", { threadId: thread.id, project: second });
+    await there.until((m) => m.event?.method === THREADS_EVENT);
+    expect(await owner.request("thread.links", { threadId: thread.id })).toEqual([
+      { id: second, name: "second-paper" },
+    ]);
+    expect((await there.request("codex.threads")).data).toMatchObject([
+      { id: thread.id, mine: false, linkedFrom: { id: f.project, name: "test-paper" } },
+    ]);
+    expect((await owner.request("codex.threads")).data[0].linkedFrom).toBeNull();
+    // Read from the project it belongs to; continued only there.
+    await there.request("codex.read", { threadId: thread.id });
+    expect(asked.findLast((m) => m.method === "codex.read").params.project).toBe(f.project);
+    await expect(
+      there.request("codex.startTurn", {
+        threadId: thread.id,
+        text: "hello",
+        permissionMode: "fullAccess",
+      }),
+    ).rejects.toThrow(/只能查看/);
+    await expect(there.request("codex.rename", { threadId: thread.id, name: "x" })).rejects.toThrow(
+      /只能查看/,
+    );
+
+    // Hidden again, it leaves the other project too, and cannot be linked while hidden.
+    await owner.request("thread.share", { threadId: thread.id, shared: false });
+    expect((await there.request("codex.threads")).data).toEqual([]);
+    await expect(there.request("codex.read", { threadId: thread.id })).rejects.toThrow(
+      /不存在或未共享/,
+    );
+    await owner.request("thread.share", { threadId: thread.id, shared: true });
+    expect((await there.request("codex.threads")).data).toHaveLength(1);
+    await there.request("thread.unlink", { threadId: thread.id, project: second });
+    expect((await there.request("codex.threads")).data).toEqual([]);
+    await owner.request("thread.share", { threadId: thread.id, shared: false });
+    await expect(
+      owner.request("thread.link", { threadId: thread.id, project: second }),
+    ).rejects.toThrow(/先把对话共享/);
   });
 
   it("merges the agent's changes with collaborators' and keeps overlaps as suggestions", async () => {
@@ -359,7 +445,7 @@ describe.skipIf(process.platform === "win32")("Claude Code on the shared runner"
     ]);
     expect((await owner.request("claude.initialize")).models[0].value).toBe("default");
     const session = await owner.request("claude.createSession");
-    expect(session).toMatchObject({ directory: f.project, mine: true, shared: false });
+    expect(session).toMatchObject({ directory: f.project, mine: true, shared: true });
 
     const options = { model: "default", effort: "high", permissionMode: "acceptEdits" };
     await owner.request("claude.startTurn", {
@@ -468,7 +554,8 @@ describe.skipIf(process.platform === "win32")("OpenCode on the shared runner", (
     const versions = (await f.call(`/projects/${f.project}/snapshots`, undefined, f.owner)).data;
     expect(versions.map((v: { label: string }) => v.label)).toContain("AI 对话修改前");
 
-    // Another editor sees nothing of a private session, then the shared one.
+    // Another editor sees nothing of a hidden session, then the shared one.
+    await owner.request("thread.share", { threadId: session.id, shared: false });
     const editor = await f.browser(await f.invite("editor", "editor2"));
     expect(JSON.parse((await call("GET", "/session", undefined, editor)).body)).toEqual([]);
     await expect(call("GET", `/session/${session.id}/message`, undefined, editor)).rejects.toThrow(
@@ -480,5 +567,26 @@ describe.skipIf(process.platform === "win32")("OpenCode on the shared runner", (
     await expect(
       call("PATCH", `/session/${session.id}`, { title: "mine" }, editor),
     ).rejects.toThrow(/发起人/);
+
+    // Shown in another project: listed and read from its own project's copy, continued only there.
+    const second = (await f.call("/projects", { name: "second-paper" }, f.owner)).data.id as string;
+    await owner.request("thread.link", { threadId: session.id, project: second });
+    const there = client(`${f.origin.replace("http:", "ws:")}/api/projects/${second}/agents`, {
+      Cookie: f.owner,
+      Origin: f.origin,
+    });
+    await there.opened;
+    expect(JSON.parse((await call("GET", "/session", undefined, there)).body)).toMatchObject([
+      {
+        id: session.id,
+        writer: { mine: false, linkedFrom: { id: f.project, name: "test-paper" } },
+      },
+    ]);
+    expect((await call("GET", `/session/${session.id}/message`, undefined, there)).status).toBe(
+      200,
+    );
+    await expect(
+      call("POST", `/session/${session.id}/prompt_async`, { parts: [] }, there),
+    ).rejects.toThrow(/只能查看/);
   });
 });
