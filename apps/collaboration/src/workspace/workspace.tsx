@@ -114,11 +114,26 @@ export function Workspace({
 }) {
   const { t, locale, setLocale } = useI18n();
   const prefix = `/projects/${project.id}`;
+  // The tabs and the file in front come back on the next visit (this browser only).
+  const tabsKey = `writer-tabs:${project.id}`;
+  const [savedTabs] = useState<{ open: string[]; active: string | null }>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(tabsKey) || "null");
+      if (saved && Array.isArray(saved.open))
+        return {
+          open: saved.open.filter((id: unknown): id is string => typeof id === "string"),
+          active: typeof saved.active === "string" ? saved.active : null,
+        };
+    } catch {
+      /* Start with the main file. */
+    }
+    return { open: [], active: null };
+  });
   const [role, setRole] = useState<Role>(project.role),
     [status, setStatus] = useState<SyncStatus>("connecting"),
     [notice, setNotice] = useState(""),
-    [openIds, setOpenIds] = useState<string[]>([]),
-    [activeId, setActiveId] = useState<string | null>(null),
+    [openIds, setOpenIds] = useState<string[]>(savedTabs.open),
+    [activeId, setActiveId] = useState<string | null>(savedTabs.active),
     [peers, setPeers] = useState<Peer[]>([]),
     [text, setText] = useState<{ file: string; value: string } | null>(null);
   const narrow = useNarrow();
@@ -140,11 +155,14 @@ export function Workspace({
     setError,
     t("workspace.draftNotSaved"),
   );
-  const [reviewOpen, setReviewOpen] = useState(() => {
+  // The review margin follows the file (shown when it has comments) until the member opens or
+  // closes it themselves; that choice is remembered.
+  const [reviewChoice, setReviewChoice] = useState<boolean | null>(() => {
     try {
-      return localStorage.getItem("writer-web-review") !== "closed";
+      const saved = localStorage.getItem("writer-web-review-choice");
+      return saved === "open" ? true : saved === "closed" ? false : null;
     } catch {
-      return true;
+      return null;
     }
   });
   const [activeComment, setActiveComment] = useState<string | null>(null),
@@ -153,11 +171,12 @@ export function Workspace({
   const layout = useMemo<MarginLayout>(() => ({ view: null, events: new EventTarget() }), []);
   useEffect(() => {
     try {
-      localStorage.setItem("writer-web-review", reviewOpen ? "open" : "closed");
+      if (reviewChoice !== null)
+        localStorage.setItem("writer-web-review-choice", reviewChoice ? "open" : "closed");
     } catch {
       /* The choice lasts for this visit only. */
     }
-  }, [reviewOpen]);
+  }, [reviewChoice]);
   // The whole page is the workbench while a project is open, so menus and dialogs that the
   // shared components portal to <body> get its styles too.
   useEffect(() => {
@@ -172,6 +191,8 @@ export function Workspace({
   }, [narrow]);
   // Tabs follow the file list (renames, deletions); the first visit opens the main file.
   useEffect(() => {
+    // Until the list has loaded, the tabs remembered from the last visit stay as they are.
+    if (!data.loaded) return;
     const ids = new Set(data.files.map((f) => f.id));
     setOpenIds((list) => list.filter((id) => ids.has(id)));
     setActiveId((old) => {
@@ -182,11 +203,30 @@ export function Workspace({
         data.files[0];
       return first?.id ?? null;
     });
-  }, [data.files]);
+  }, [data.files, data.loaded]);
   useEffect(() => {
     if (activeId) setOpenIds((list) => (list.includes(activeId) ? list : [...list, activeId]));
   }, [activeId]);
+  useEffect(() => {
+    // Before the file list has loaded, the saved tabs are not known to be gone yet.
+    if (!data.loaded) return;
+    try {
+      localStorage.setItem(tabsKey, JSON.stringify({ open: openIds, active: activeId }));
+    } catch {
+      /* Remembered for this visit only. */
+    }
+  }, [tabsKey, openIds, activeId, data.loaded]);
   const file = data.files.find((f) => f.id === activeId) ?? null;
+  const fileNoted =
+    draft?.file === file?.id ||
+    data.comments.some((c) => c.file === file?.id && !c.resolved && !c.pdf);
+  const reviewOpen = reviewChoice ?? fileNoted;
+  const setReviewOpen = (next: boolean | ((open: boolean) => boolean)) =>
+    setReviewChoice(typeof next === "function" ? next(reviewOpen) : next);
+  /** Working with a comment brings the margin back if the member had closed it. */
+  const showReview = () => {
+    if (reviewChoice === false) setReviewChoice(true);
+  };
   const hints = useMemo(() => projectHints(data.sources, parseBib), [data.sources]);
   const hintsRef = useRef(hints);
   hintsRef.current = hints;
@@ -212,7 +252,7 @@ export function Workspace({
     },
     status,
   };
-  const b = useBuild(ws, data.latestBuild, data.sources);
+  const b = useBuild(ws, data.latestBuild, data.sources, data.loaded);
   const [centerWidth, centerRef] = useWidth();
   const activate = (id: string | null) => {
     setActiveComment(id);
@@ -226,7 +266,7 @@ export function Workspace({
     }
     setDraft({ file: file.id, body: draft?.body ?? "", ...s });
     if (narrow) setCommentsOpen(true);
-    else setReviewOpen(true);
+    else showReview();
   };
   const submitDraft = () =>
     draft &&
@@ -240,7 +280,7 @@ export function Workspace({
     const target = data.files.find((f) => f.id === c.file);
     if (target && c.line) b.openLocation(target.path, c.line);
     activate(c.id);
-    if (!narrow) setReviewOpen(true);
+    if (!narrow) showReview();
   };
   // Comments made on the PDF are drawn on it again while it is the same build.
   const pdfNotes: PdfAnnotationHost = {
@@ -278,7 +318,7 @@ export function Workspace({
         const target = data.files.find((f) => f.id === next.file);
         if (target && target.id !== file?.id) ws.openFile(target);
         if (narrow) setCommentsOpen(true);
-        else setReviewOpen(true);
+        else showReview();
       });
     },
   };
@@ -450,7 +490,7 @@ export function Workspace({
         onCommentClick={(id) => {
           activate(id);
           if (narrow) setCommentsOpen(true);
-          else setReviewOpen(true);
+          else showReview();
         }}
         onSelect={setSelected}
         onLayout={(view) => {

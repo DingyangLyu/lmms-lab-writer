@@ -27,6 +27,44 @@ type Props = {
   onSynctexClick?: (page: number, x: number, y: number) => void;
 };
 export type PdfRegionBox = { page: number; x: number; y: number; width: number; height: number };
+/** Where a reader was in a project's PDF, and at what zoom: a new build opens at the same place. */
+type ReadingPosition = {
+  page: number;
+  fraction: number;
+  zoomMode: "fit" | "manual";
+  manualScale: number;
+};
+const positions = new Map<string, ReadingPosition>();
+function readPosition(key: string | null): ReadingPosition | null {
+  if (!key) return null;
+  const cached = positions.get(key);
+  if (cached) return cached;
+  try {
+    const saved = JSON.parse(localStorage.getItem(`writer-pdf-position:${key}`) || "null");
+    if (
+      saved &&
+      Number.isInteger(saved.page) &&
+      saved.page >= 1 &&
+      typeof saved.fraction === "number" &&
+      (saved.zoomMode === "fit" || saved.zoomMode === "manual") &&
+      typeof saved.manualScale === "number"
+    ) {
+      positions.set(key, saved);
+      return saved;
+    }
+  } catch {
+    /* No stored position. */
+  }
+  return null;
+}
+function writePosition(key: string, position: ReadingPosition) {
+  positions.set(key, position);
+  try {
+    localStorage.setItem(`writer-pdf-position:${key}`, JSON.stringify(position));
+  } catch {
+    /* Remembered for this visit only. */
+  }
+}
 export function PdfViewer(props: Props) {
   return <PdfPreview key={`${props.src}:${props.refreshKey ?? 0}`} {...props} />;
 }
@@ -80,11 +118,18 @@ function PdfPreview({
       cancelled = true;
     };
   }, [src, project, pdfPath, retry]);
+  const positionKey = project && pdfPath ? `${project}:${pdfPath}` : null;
+  const [saved] = useState(() => readPosition(positionKey));
   const [numPages, setNumPages] = useState(0);
   const [fingerprint, setFingerprint] = useState("");
   const [availableWidth, setAvailableWidth] = useState(0);
-  const [zoomMode, setZoomMode] = useState<"fit" | "manual">("fit");
-  const [manualScale, setManualScale] = useState(1);
+  const [zoomMode, setZoomMode] = useState<"fit" | "manual">(saved?.zoomMode ?? "fit");
+  const [manualScale, setManualScale] = useState(saved?.manualScale ?? 1);
+  /** Every page's size, read when the document loads, so the placeholders are exact. */
+  const [pageSizes, setPageSizes] = useState<Map<number, { width: number; height: number }> | null>(
+    null,
+  );
+  const restoredRef = useRef(false);
   const [firstWidth, setFirstWidth] = useState(612);
   const [pixelRatio, setPixelRatio] = useState(1);
   const [mode, setMode] = useState<"read" | "highlight" | "underline">("highlight");
@@ -234,6 +279,54 @@ function PdfPreview({
       ?.querySelector(`[data-pdf-page="${Math.min(numPages, goToPage)}"]`)
       ?.scrollIntoView({ block: "start" });
   }, [goToPage, numPages, availableWidth]);
+  // Back to where the reader was in the previous build, once every page has its real size.
+  // A jump the host asked for (SyncTeX, a page) wins.
+  useLayoutEffect(() => {
+    if (restoredRef.current || !pageSizes || !numPages || availableWidth <= 0) return;
+    restoredRef.current = true;
+    const container = containerRef.current;
+    if (!saved || !container || highlight || goToPage) return;
+    const page = container.querySelector<HTMLElement>(
+      `[data-pdf-page="${Math.min(saved.page, numPages)}"]`,
+    );
+    if (!page) return;
+    container.scrollTop +=
+      page.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      page.getBoundingClientRect().height * saved.fraction;
+  }, [pageSizes, numPages, availableWidth, saved, highlight, goToPage]);
+  // Remember the place as the reader scrolls or zooms.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!positionKey || !container) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const save = () => {
+      timer = null;
+      if (!restoredRef.current) return;
+      const rect = container.getBoundingClientRect();
+      for (const page of container.querySelectorAll<HTMLElement>("[data-pdf-page]")) {
+        const bounds = page.getBoundingClientRect();
+        if (bounds.bottom > rect.top) {
+          writePosition(positionKey, {
+            page: Number(page.dataset.pdfPage),
+            fraction: viewportAnchor(rect.top, bounds.top, bounds.height),
+            zoomMode,
+            manualScale,
+          });
+          return;
+        }
+      }
+    };
+    const schedule = () => {
+      timer ??= setTimeout(save, 250);
+    };
+    container.addEventListener("scroll", schedule, { passive: true });
+    schedule();
+    return () => {
+      container.removeEventListener("scroll", schedule);
+      if (timer) clearTimeout(timer);
+    };
+  }, [positionKey, zoomMode, manualScale]);
   const capture = () => {
     if (!project || !pdfPath || !notes || mode === "read") return;
     if (selectionTimer.current) clearTimeout(selectionTimer.current);
@@ -387,8 +480,16 @@ function PdfPreview({
               try {
                 const page = await pdf.getPage(1);
                 setFirstWidth(page.getViewport({ scale: 1 }).width);
+                const sizes = new Map<number, { width: number; height: number }>();
+                for (let n = 1; n <= Math.min(pdf.numPages, 1000); n++) {
+                  const size = (await pdf.getPage(n)).getViewport({ scale: 1 });
+                  sizes.set(n, { width: size.width, height: size.height });
+                }
+                for (const [n, size] of sizes) pagesRef.current.set(n, size);
+                setPageSizes(sizes);
               } catch {
                 /* Each page still receives its own measured width. */
+                setPageSizes(new Map());
               }
             }}
             onLoadError={(error) => {
@@ -427,6 +528,7 @@ function PdfPreview({
                 highlight={highlight}
                 containerRef={containerRef}
                 pagesRef={pagesRef}
+                sizes={pageSizes}
                 onSynctexClick={onSynctexClick}
               />
             )}
@@ -450,6 +552,7 @@ function VirtualPdfPages({
   highlight,
   containerRef,
   pagesRef,
+  sizes,
   onSynctexClick,
 }: {
   numPages: number;
@@ -464,6 +567,7 @@ function VirtualPdfPages({
   highlight?: PdfRegionBox | null;
   containerRef: React.RefObject<HTMLElement | null>;
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
+  sizes: Map<number, { width: number; height: number }> | null;
   onSynctexClick?: (page: number, x: number, y: number) => void;
 }) {
   return (
@@ -483,6 +587,7 @@ function VirtualPdfPages({
           highlight={highlight?.page === page ? highlight : null}
           containerRef={containerRef}
           pagesRef={pagesRef}
+          size={sizes?.get(page)}
           onSynctexClick={onSynctexClick}
         />
       ))}
@@ -503,6 +608,7 @@ function VirtualPdfPage({
   highlight,
   containerRef,
   pagesRef,
+  size,
   onSynctexClick,
 }: {
   page: number;
@@ -517,12 +623,15 @@ function VirtualPdfPage({
   highlight?: PdfRegionBox | null;
   containerRef: React.RefObject<HTMLElement | null>;
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
+  /** The page's size from the document, before the page itself has rendered. */
+  size?: { width: number; height: number };
   onSynctexClick?: (page: number, x: number, y: number) => void;
 }) {
   const { t } = useI18n();
   const pageRef = useRef<HTMLElement>(null);
   const [render, setRender] = useState(page <= 2);
-  const [natural, setNatural] = useState(pagesRef.current.get(page));
+  const [measured, setNatural] = useState(pagesRef.current.get(page));
+  const natural = measured ?? size;
   useEffect(() => {
     const element = pageRef.current;
     const root = containerRef.current;

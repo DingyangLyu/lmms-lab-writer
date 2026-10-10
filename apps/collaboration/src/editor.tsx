@@ -28,6 +28,7 @@ import type { Comment, Role } from "../shared/api";
 import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
+import { type FilePosition, readPosition, writePosition } from "./positions";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
 export type Selection = { quote: string; start: string; end: string; from: number; to: number };
 /** A collaborator in the same file, as their cursor shows them. */
@@ -132,11 +133,21 @@ export function Editor({
   readOnly.current = role;
   useEffect(() => {
     if (!host.current) return;
+    // The member's place in this file comes back once its text has arrived from the server,
+    // and is saved as they scroll or move the cursor.
+    let restored = false,
+      restore = () => {},
+      remember = () => {},
+      latest: FilePosition | null = null,
+      saveTimer: ReturnType<typeof setTimeout> | null = null;
     const p = new WriterProvider(
       project,
       file,
       user,
-      (s) => callbacks.current.onStatus(s),
+      (s) => {
+        callbacks.current.onStatus(s);
+        if (s === "saved" && !restored) restore();
+      },
       (r) => callbacks.current.onRole(r),
       (e) => callbacks.current.onError(e),
     );
@@ -209,6 +220,7 @@ export function Editor({
               const main = update.state.selection.main;
               callbacks.current.onSelect?.(main.empty ? null : { from: main.from, to: main.to });
             }
+            if (update.selectionSet) remember();
             if (update.docChanged || update.geometryChanged || update.viewportChanged)
               callbacks.current.onLayout?.(update.view);
             if (!update.docChanged || !callbacks.current.onText) return;
@@ -227,12 +239,41 @@ export function Editor({
             },
             scroll: (_event, view) => {
               callbacks.current.onLayout?.(view);
+              remember();
             },
           }),
         ],
       }),
     });
     view.current = v;
+    // Measured while the editor is on screen (once removed, its scroll reads as 0), stored a
+    // moment later, and written once more when the file closes.
+    remember = () => {
+      if (!restored || !v.dom.isConnected) return;
+      const doc = v.state.doc,
+        head = doc.lineAt(v.state.selection.main.head);
+      latest = {
+        top: doc.lineAt(v.lineBlockAtHeight(v.scrollDOM.scrollTop).from).number,
+        line: head.number,
+        ch: v.state.selection.main.head - head.from,
+      };
+      saveTimer ??= setTimeout(() => {
+        saveTimer = null;
+        if (latest) writePosition(project, file, latest);
+      }, 300);
+    };
+    restore = () => {
+      restored = true;
+      const saved = readPosition(project, file);
+      if (!saved) return;
+      const doc = v.state.doc,
+        clamp = (line: number) => doc.line(Math.min(Math.max(line, 1), doc.lines));
+      const line = clamp(saved.line);
+      v.dispatch({
+        selection: { anchor: Math.min(line.from + saved.ch, line.to) },
+        effects: EditorView.scrollIntoView(clamp(saved.top).from, { y: "start" }),
+      });
+    };
     callbacks.current.onLayout?.(v);
     callbacks.current.onText?.(v.state.doc.toString());
     reportPeers();
@@ -292,6 +333,8 @@ export function Editor({
     });
     return () => {
       if (textTimer) clearTimeout(textTimer);
+      if (saveTimer) clearTimeout(saveTimer);
+      if (latest) writePosition(project, file, latest);
       p.awareness.off("change", reportPeers);
       callbacks.current.onPeers?.([]);
       callbacks.current.onLayout?.(null);

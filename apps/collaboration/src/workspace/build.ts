@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Build, Engine, PdfRegion, SourceFile, SourceLocation } from "../../shared/api";
 import { api } from "../api";
 import { useI18n } from "../i18n";
@@ -12,7 +12,13 @@ const needsXeLaTeX = (sources: SourceFile[]) =>
   );
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
-export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: SourceFile[]) {
+export function useBuild(
+  ws: WorkspaceContext,
+  latest: Build | null,
+  sources: SourceFile[],
+  /** The project's files, latest build and sources have been read. */
+  loaded = true,
+) {
   const { t } = useI18n();
   const [build, setBuild] = useState<Build | null>(null),
     [compiling, setCompiling] = useState(false),
@@ -66,6 +72,15 @@ export function useBuild(ws: WorkspaceContext, latest: Build | null, sources: So
         setCompiling(false);
       }
     });
+  // A project that was never built gets a PDF on opening, as on Overleaf.
+  const autoCompiled = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening, when everything it needs is known.
+  useEffect(() => {
+    if (autoCompiled.current || !loaded || latest || build || compiling) return;
+    if (!chosenMain || !ws.canComment) return;
+    autoCompiled.current = true;
+    compile();
+  }, [loaded, latest, build, chosenMain, ws.canComment]);
   const showCursorInPdf = () =>
     build &&
     file &&

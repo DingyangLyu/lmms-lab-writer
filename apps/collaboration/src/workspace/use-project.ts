@@ -27,7 +27,10 @@ export function useProject(
     [snapshots, setSnapshots] = useState<Snapshot[]>([]),
     [proposals, setProposals] = useState<Proposal[]>([]),
     [latestBuild, setLatestBuild] = useState<Build | null>(null),
-    [sources, setSources] = useState<SourceFile[]>([]);
+    [sources, setSources] = useState<SourceFile[]>([]),
+    // Files, the latest build and the sources have all been read once.
+    [filesLoaded, setFilesLoaded] = useState(false),
+    [sourcesLoaded, setSourcesLoaded] = useState(false);
   const { onRole, onError } = callbacks;
   const reload = useCallback(async () => {
     const [f, c, m, s, p, b] = await Promise.all([
@@ -44,6 +47,7 @@ export function useProject(
     setSnapshots(s);
     setProposals(p);
     setLatestBuild((old) => (old?.id === b?.id ? old : b));
+    setFilesLoaded(true);
   }, [prefix]);
   /** Project text for citation and label completion and the bibliography tab. */
   const refreshSources = useCallback(async () => {
@@ -74,7 +78,9 @@ export function useProject(
         });
     };
     refresh();
-    void refreshSources().catch(() => {});
+    void refreshSources()
+      .catch(() => {})
+      .finally(() => setSourcesLoaded(true));
     const connect = () => {
       if (stopped) return;
       socket = new WebSocket(
@@ -101,6 +107,7 @@ export function useProject(
     };
   }, [prefix, reload, refreshSources, onRole, onError]);
   return {
+    loaded: filesLoaded && sourcesLoaded,
     files,
     comments,
     members,
