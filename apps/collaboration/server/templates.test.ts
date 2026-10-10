@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { strToU8, zipSync } from "fflate";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FileInfo, TemplateDetail, TemplateInfo, TemplateList } from "../shared/api";
-import { buildTemplate, glob, type Source, unpackKit } from "./template-build";
+import { buildTemplate, decodeLegacy, glob, type Source, unpackKit } from "./template-build";
 import { fixture } from "./test-fixture";
 
 let dir = "";
@@ -218,6 +218,17 @@ describe("official template kits", () => {
     expect(glob("**/.git*").test(".gitignore")).toBe(true);
   });
 
+  it("reads 8-bit kits as MacRoman or Windows-1252, whichever fits", () => {
+    // “Radio noise” — written on a Mac (IEEE RAS's sample); “quoted” and Müller from Windows.
+    expect(
+      decodeLegacy(new Uint8Array([0xd2, 0x52, 0x61, 0x64, 0x69, 0x6f, 0xd3, 0x20, 0xd1])),
+    ).toBe("“Radio” —");
+    expect(decodeLegacy(new Uint8Array([0x93, 0x71, 0x75, 0x6f, 0x74, 0x65, 0x94]))).toBe(
+      "“quote”",
+    );
+    expect(decodeLegacy(new Uint8Array([0x4d, 0xfc, 0x6c, 0x6c, 0x65, 0x72]))).toBe("Müller");
+  });
+
   it("unpacks a kit's single top folder and builds it into the library", async () => {
     const source: Source = {
       id: "demo-2026",
@@ -229,7 +240,12 @@ describe("official template kits", () => {
       meta: { name: { zh: "Demo", en: "Demo" }, category: "conference", venue: "Demo", year: 2026 },
     };
     const zip = zipSync({
-      "kit/sample.tex": strToU8("\\documentclass{article}"),
+      // "Müller" in Latin-1, as some kits still ship their samples.
+      "kit/sample.tex": new Uint8Array([
+        ...strToU8("\\documentclass{article} M"),
+        0xfc,
+        ...strToU8("ller"),
+      ]),
       "kit/demo.sty": strToU8("% style"),
       "kit/example.pdf": strToU8("%PDF"),
       "kit/Word/demo.docx": strToU8("doc"),
@@ -251,6 +267,9 @@ describe("official template kits", () => {
     const meta = JSON.parse(await readFile(join(out, "demo-2026", "template.json"), "utf8"));
     expect(meta).toMatchObject({ main: "main.tex", official: true, venue: "Demo", fileCount: 2 });
     expect(await readFile(join(out, "demo-2026", "files", "demo.sty"), "utf8")).toBe("% style");
+    expect(await readFile(join(out, "demo-2026", "files", "main.tex"), "utf8")).toBe(
+      "\\documentclass{article} Müller",
+    );
     // Building again replaces the template in place.
     await buildTemplate(source, { out, cache, render: false });
     expect(await stat(join(out, "demo-2026.old")).catch(() => null)).toBeNull();

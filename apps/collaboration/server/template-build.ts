@@ -16,7 +16,7 @@ import { realpathSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { validPath } from "@lmms-lab/sync";
+import { isTextPath, validPath } from "@lmms-lab/sync";
 import { unzipSync } from "fflate";
 import type { Engine } from "../shared/api";
 import { renderPreview } from "./template-render";
@@ -165,6 +165,8 @@ export async function buildTemplate(
     await copyFile(join(LIBRARY_SOURCES, ...from.split("/")), join(files, ...to.split("/")));
   }
   await removeEmpty(files);
+  for (const path of await walk(files))
+    if (isTextPath(path)) await toUtf8(join(files, ...path.split("/")));
   const paths = await walk(files);
   if (!paths.includes(source.main)) throw new Error(`${source.id}: no ${source.main} in the kit`);
   let bytes = 0;
@@ -195,6 +197,31 @@ export async function buildTemplate(
   await rename(dir, final);
   await rm(old, { recursive: true, force: true });
   return { id: source.id, files: paths.length, bytes, preview };
+}
+/**
+ * Shared documents must be UTF-8. Some kits still carry 8-bit text, written on a Mac (MacRoman)
+ * or on Windows (Windows-1252); the reading with more typographic punctuation and fewer stray
+ * capitals wins: MacRoman's quotes are Ò and Ó in Windows-1252, and the reverse.
+ */
+export function decodeLegacy(bytes: Uint8Array) {
+  const score = (text: string) =>
+    2 * (text.match(/[“”‘’–—…]/g)?.length ?? 0) +
+    (text.match(/[a-z][éèêëáàâäãåçíóòôöõúùûüñß]|[éèêëáàâäãåçíóòôöõúùûüñß][a-z]/g)?.length ?? 0) -
+    2 * (text.match(/[ÒÓÔÕÐ¥∂∑∏π∫Ω√≈∆«»Œœ]/g)?.length ?? 0);
+  const candidates = ["macintosh", "windows-1252"].map((label) =>
+    new TextDecoder(label).decode(bytes),
+  );
+  return candidates.reduce((best, next) => (score(next) > score(best) ? next : best));
+}
+export async function toUtf8(path: string) {
+  const bytes = await readFile(path);
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return false;
+  } catch {
+    await writeFile(path, decodeLegacy(bytes));
+    return true;
+  }
 }
 async function removeEmpty(dir: string): Promise<boolean> {
   let empty = true;
