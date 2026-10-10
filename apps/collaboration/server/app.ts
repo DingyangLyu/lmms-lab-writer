@@ -111,14 +111,21 @@ export async function createWriterServer(options: Options) {
     await store.close();
     throw error;
   }
-  let origin = options.origin ?? `http://127.0.0.1:${options.port ?? 8787}`;
-  const collab = new Collaboration(store, () => origin);
-  const agents = new Agents(store, collab, () => origin, options.sharedRunner);
+  // WRITER_ORIGIN may list several addresses; the first is the one links are made with.
+  const configured = (options.origin ?? "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  let origin = configured[0] ?? `http://127.0.0.1:${options.port ?? 8787}`;
+  const trusted = () => (configured.length ? configured : [origin]);
+  const collab = new Collaboration(store, () => origin, trusted);
+  const agents = new Agents(store, collab, () => origin, options.sharedRunner, trusted);
   const services = {
     store,
     collab,
     compiler: new Compiler(store, options.compile),
     origin: () => origin,
+    trusted,
     trustProxy: options.trustProxy ?? false,
     sharedRunner: options.sharedRunner,
     templates: new TemplateLibrary(join(import.meta.dirname, "../templates"), {
@@ -155,7 +162,7 @@ export async function createWriterServer(options: Options) {
         !["GET", "HEAD"].includes(ctx.method) &&
         !bearer(req) &&
         !(ctx.method === "POST" && path === "/api/tokens") &&
-        !allowedOrigin(req.headers.origin, origin)
+        !allowedOrigin(req.headers.origin, trusted(), req.headers.host)
       )
         fail(403, "请求来源不匹配");
       if (path === "/api/health") {
@@ -201,7 +208,7 @@ export async function createWriterServer(options: Options) {
     throw error;
   }
   const address = server.address();
-  if (!options.origin && address && typeof address !== "string")
+  if (!configured.length && address && typeof address !== "string")
     origin = `http://127.0.0.1:${address.port}`;
   return {
     server,

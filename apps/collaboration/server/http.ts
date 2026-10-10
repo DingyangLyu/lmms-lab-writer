@@ -1,5 +1,6 @@
 /** Request context, body parsing and a small method + path router for the HTTP API. */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { allowedOrigin } from "./auth";
 import type { Collaboration } from "./collaboration";
 import type { Compiler } from "./compile";
 import { sizeText } from "./limits";
@@ -77,6 +78,8 @@ export type Services = {
   collab: Collaboration;
   compiler: Compiler;
   origin: () => string;
+  /** Origins whose pages may send requests (WRITER_ORIGIN, which may list several). */
+  trusted: () => readonly string[];
   /** Behind a reverse proxy: take the client address from its X-Forwarded-For. */
   trustProxy: boolean;
   sharedRunner?: SharedRunner;
@@ -91,6 +94,8 @@ export type Context = Services & {
   /** JSON request body, read once on first use; at most 16 MB unless a route allows more. */
   body: (limit?: number) => Promise<Body>;
   secure: boolean;
+  /** Where links (invitations) should point: the address the member is using, if it is Writer's. */
+  linkOrigin: () => string;
   /** Client address, used to rate-limit sign-in attempts. */
   ip: string;
 };
@@ -126,6 +131,12 @@ export function context(services: Services, req: IncomingMessage, res: ServerRes
       return body;
     },
     secure: services.origin().startsWith("https:"),
+    linkOrigin: () => {
+      const used = req.headers.origin;
+      return used && allowedOrigin(used, services.trusted(), req.headers.host)
+        ? used
+        : services.origin();
+    },
     ip: clientAddress(req, services.trustProxy),
   };
 }

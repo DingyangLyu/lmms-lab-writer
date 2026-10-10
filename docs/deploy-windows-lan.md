@@ -40,7 +40,7 @@
 2. PostgreSQL：这台电脑上 EnterpriseDB 安装器写不了临时 `.bat` 文件，所以用官方免安装包：解压到 `C:\writer\pgsql`，`initdb -D C:\writer\pgdata -U postgres -A scram-sha-256 -E UTF8 --locale=C`，给 `NT AUTHORITY\NetworkService` 授予数据目录权限，`pg_ctl register -N postgresql-writer -S auto -U "NT AUTHORITY\NetworkService"`，再建 `writer` 用户和数据库。
 3. TeX Live：从清华镜像下载 `install-tl.zip`，用 profile 安装 `scheme-full`（不装文档和源码）到 `C:\texlive\current`。整个目录可以原样搬到别的盘，之后只需把 `texmf-var\fonts\conf\fonts.conf` 里的绝对路径改掉并运行 `fc-cache -fs`。
 4. 代码：`pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."`，`pnpm.cmd --filter @lmms-lab/writer-collaboration build`。
-5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。`WRITER_TEMPLATE_LIBRARY=E:\writer-data\templates`（模板库，放在 USB 固态盘 E: 上，节省 C: 空间；E: 暂时不可用时网页只显示内置模板）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 再加一个只读的实验室模板目录。
+5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`（可用逗号写多个地址，第一个用于邀请链接；用 IP 打开网页时，浏览器访问的那个地址本身也被认可，所以有线、Wi-Fi 两个地址都能登录）、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。`WRITER_TEMPLATE_LIBRARY=E:\writer-data\templates`（模板库，放在 USB 固态盘 E: 上，节省 C: 空间；E: 暂时不可用时网页只显示内置模板）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 再加一个只读的实验室模板目录。
 6. `runner.env`：`WRITER_SERVER=http://127.0.0.1`、`WRITER_RUNNER_TOKEN`（同上）、`WRITER_ALLOWED_HARNESSES`、`WRITER_CODEX_BIN`/`WRITER_OPENCODE_BIN`（指向 npm 包里的 `codex.exe`、`opencode.exe`，避开 `.cmd`）、`WRITER_CODEX_SANDBOX=danger-full-access`、`HTTPS_PROXY`/`HTTP_PROXY`（本机代理）和 `NO_PROXY=127.0.0.1,localhost,::1`。
 7. 防火墙：只放行校园网访问 80 端口，例如 `New-NetFirewallRule -Name Writer-HTTP-LAN -Direction Inbound -Protocol TCP -LocalPort 80 -RemoteAddress 10.100.0.0/16 -Action Allow`。
 8. 接电源时不睡眠：`powercfg /change standby-timeout-ac 0`、`powercfg /change hibernate-timeout-ac 0`；硬盘 20 分钟无访问才停转（`powercfg /change disk-timeout-ac 20`，原来是 30 秒，USB 机械盘会频繁起停），并关闭 USB 选择性暂停。
@@ -91,7 +91,7 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 - 境外流量走洛杉矶服务器（出口 IP 固定）；国内网站（GeoSite/GeoIP 中国列表）、B 站、ToDesk、百度网盘、微信、QQ、钉钉、飞书、Windows 更新等直连；局域网地址不进 TUN；
 - 本机代理端口仍是 `127.0.0.1:7890`，Writer 执行器经它访问 OpenAI；
 - 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `C:\net\mihomo\mihomo.exe -t -d C:\net\mihomo` 检查后重启 Mihomo 任务；
-- 这台电脑同时接了网线（以太网，10.100.144.0/20 网段）和 Wi-Fi（BJZGCA-Dorm，10.100.128.0/20，`WRITER_ORIGIN` 用的是 Wi-Fi 地址）。有线网会对 HTTPS 做中间人拦截（连洛杉矶节点时拿到伪造的证书并被重置），所以 Wi-Fi 必须是首选出口：两张网卡的接口跃点数分别设为 WLAN 35、以太网 75（`Set-NetIPInterface -InterfaceAlias 以太网 -AddressFamily IPv4 -InterfaceMetric 75`）。Wi-Fi 断开时流量自动改走网线，国内网站和内网仍可用，境外代理不可用。重装网卡驱动或网线换口后跃点可能恢复自动，代理报 `certificate signed by unknown authority` 时先检查这一项；
+- 这台电脑接了网线（以太网，10.100.144.0/20 网段，目前 10.100.147.57）和 Wi-Fi（BJZGCA-Dorm，10.100.128.0/20，目前 10.100.131.101），两个地址都由 DHCP 分配。网线是首选出口（接口跃点 以太网 10、WLAN 35），Wi-Fi 连着时作为备用。有线网刚接上时曾对 HTTPS 做中间人拦截（连洛杉矶节点拿到伪造的证书），处理好之后恢复正常；代理日志再出现 `certificate signed by unknown authority`，先用浏览器在这台电脑上确认有线网是否需要重新认证，必要时把以太网跃点调到 75 临时改走 Wi-Fi；
 - FlClash 仍安装着（打开它会把辅助服务重新装成自动启动，单独运行的辅助服务不影响网络）；不要在 FlClash 里打开 TUN 或系统代理，否则会和 mihomo 抢路由和 7890 端口。
 
 ## 更新
@@ -107,6 +107,6 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 
 ## 常见问题
 
-- **IP 变了，页面能打开但登录或保存报“请求来源不匹配”**：地址由 DHCP 分配。改 `server.env` 的 `WRITER_ORIGIN` 为新地址并重启 Writer Server；能管理路由器时为这台电脑做 DHCP 地址保留。
+- **IP 变了**：地址由 DHCP 分配。用新 IP 打开网页可以直接登录；邀请链接用的是 `WRITER_ORIGIN` 的第一个地址，改成新地址并重启 Writer Server 即可。能管理路由器时为这台电脑做 DHCP 地址保留。用域名访问（经反向代理）时必须把域名写进 `WRITER_ORIGIN`。
 - **AI 任务一直排队**：看 `runner.log` 和任务计划程序里 Writer Runner 是否在运行。
 - **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。

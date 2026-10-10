@@ -98,6 +98,8 @@ export class Collaboration {
   constructor(
     public store: Store,
     private origin: () => string,
+    /** Origins whose pages may connect; see allowedOrigin. */
+    private trusted: () => readonly string[] = () => [origin()],
   ) {
     this.sweep = setInterval(() => {
       for (const peer of this.peers)
@@ -250,7 +252,7 @@ export class Collaboration {
     });
   }
   private async accept(req: IncomingMessage, socket: Duplex, head: Buffer) {
-    if (!bearer(req) && !allowedOrigin(req.headers.origin, this.origin()))
+    if (!bearer(req) && !allowedOrigin(req.headers.origin, this.trusted(), req.headers.host))
       fail(403, "Origin 不匹配");
     const url = new URL(req.url ?? "", this.origin());
     const match = /^\/api\/projects\/([^/]+)\/socket$/.exec(url.pathname);

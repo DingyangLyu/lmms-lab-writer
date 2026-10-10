@@ -318,7 +318,7 @@ export const projectRoutes = [
       sql`INSERT INTO invites(token, project, role, expires, created_by)
           VALUES(${digest(token)}, ${ctx.project}, ${invited}, ${Date.now() + 7 * 86400000}, ${ctx.user.id})`,
     );
-    return { token, url: `${ctx.origin()}/?invite=${token}`, expiresInDays: 7 };
+    return { token, url: `${ctx.linkOrigin()}/?invite=${token}`, expiresInDays: 7 };
   }),
   route<InProject>("GET", /^audit$/, (ctx) =>
     ctx.store.db.rows<AuditEntry>(

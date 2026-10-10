@@ -205,7 +205,7 @@ export const adminRoutes = [
     return {
       id,
       token,
-      url: `${ctx.origin()}/?signup=${token}`,
+      url: `${ctx.linkOrigin()}/?signup=${token}`,
       note,
       created,
       expires,

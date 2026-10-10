@@ -159,6 +159,7 @@ export class Agents {
     private collab: Collaboration,
     private origin: () => string,
     private shared?: SharedRunner,
+    private trusted: () => readonly string[] = () => [origin()],
   ) {
     this.sweep = setInterval(() => void this.check(), 30_000);
     this.sweep.unref();
@@ -199,7 +200,7 @@ export class Agents {
   private async accept(req: IncomingMessage, socket: Duplex, head: Buffer) {
     const url = new URL(req.url ?? "", this.origin());
     if (url.pathname === RUNNER_PATH) return this.acceptRunner(req, socket, head);
-    if (!bearer(req) && !allowedOrigin(req.headers.origin, this.origin()))
+    if (!bearer(req) && !allowedOrigin(req.headers.origin, this.trusted(), req.headers.host))
       fail(403, "Origin 不匹配");
     const project = BROWSER_PATH.exec(url.pathname)?.[1] ?? fail(404, "连接不存在");
     const user = await userFor(this.store, req);

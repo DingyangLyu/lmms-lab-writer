@@ -1,9 +1,11 @@
 import { randomBytes, scrypt as rawScrypt, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isIP } from "node:net";
 import { sql } from "./db";
 import type { Store, User } from "./store";
 import { digest, fail, uid } from "./util";
-export function allowedOrigin(received: string | undefined, configured: string) {
+
+function sameOrigin(received: string | undefined, configured: string) {
   if (received === configured) return true;
   try {
     const a = new URL(received || ""),
@@ -14,6 +16,35 @@ export function allowedOrigin(received: string | undefined, configured: string) 
       a.port === b.port &&
       ["localhost", "127.0.0.1", "[::1]"].includes(a.hostname) &&
       ["localhost", "127.0.0.1", "[::1]"].includes(b.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+/**
+ * Whether a cookie-authenticated request comes from Writer's own pages: an origin from
+ * WRITER_ORIGIN, or, for a browser that opened the server by IP address, the very address it
+ * sent the request to. A lab PC has a wired and a Wi-Fi address, both from DHCP; a page on
+ * another site always sends its own origin, and an IP address cannot be rebound like a name.
+ */
+export function allowedOrigin(
+  received: string | undefined,
+  configured: string | readonly string[],
+  host?: string,
+) {
+  if (
+    (typeof configured === "string" ? [configured] : configured).some((c) =>
+      sameOrigin(received, c),
+    )
+  )
+    return true;
+  if (!received || !host) return false;
+  try {
+    const url = new URL(received);
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.host === host.toLowerCase() &&
+      isIP(url.hostname.replace(/^\[|\]$/g, "")) !== 0
     );
   } catch {
     return false;
