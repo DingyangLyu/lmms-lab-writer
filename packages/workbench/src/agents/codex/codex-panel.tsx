@@ -12,6 +12,7 @@ import { ResizableComposer } from "../../ui/panel-height";
 import { AttachmentStrip } from "../chat/attachment-strip";
 import { useComposerDraft } from "../chat/composer-drafts";
 import { DeliveryControls, type DeliveryMode } from "../chat/delivery-controls";
+import { preferredEffort } from "../chat/effort";
 import { prepareChatFiles } from "../chat/files";
 import { GrowingTextarea } from "../chat/growing-textarea";
 import { ChatHistoryItems } from "../chat/history-items";
@@ -347,7 +348,12 @@ export function CodexPanel({
         const defaultModel =
           catalog.data?.find((candidate) => candidate.isDefault) ?? catalog.data?.[0];
         setModel(defaultModel?.model ?? defaultModel?.id ?? "");
-        setEffort(defaultModel?.defaultReasoningEffort ?? "");
+        setEffort(
+          preferredEffort(
+            defaultModel?.supportedReasoningEfforts?.map((option) => option.reasoningEffort),
+            defaultModel?.defaultReasoningEffort ?? "",
+          ),
+        );
         setThreads(history.data ?? []);
         const remembered =
           threadIdRef.current ||
@@ -995,8 +1001,8 @@ export function CodexPanel({
             aria-label={t("codex.messageToCodex")}
           />
           <div className="writer-composer-toolbar">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs text-muted">
-              <label htmlFor={permissionSelectId} className="shrink-0">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 whitespace-nowrap text-xs text-muted">
+              <label htmlFor={permissionSelectId} className="sr-only">
                 {t("codex.permissions")}
               </label>
               <select
@@ -1016,7 +1022,6 @@ export function CodexPanel({
                   ),
                 )}
               </select>
-              <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-border" />
               <select
                 value={model}
                 onChange={(event) => {
@@ -1025,10 +1030,15 @@ export function CodexPanel({
                   const entry = models.find(
                     (candidate) => (candidate.model ?? candidate.id) === next,
                   );
-                  setEffort(entry?.defaultReasoningEffort ?? "");
+                  setEffort(
+                    preferredEffort(
+                      entry?.supportedReasoningEfforts?.map((option) => option.reasoningEffort),
+                      entry?.defaultReasoningEffort ?? "",
+                    ),
+                  );
                 }}
                 aria-label={t("codex.codexModel")}
-                className="min-w-24 max-w-36 flex-1 truncate border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
+                className="min-w-24 max-w-48 flex-1 truncate border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
               >
                 <option value="">{t("codex.defaultModel")}</option>
                 {models.map((entry) => (
@@ -1042,7 +1052,7 @@ export function CodexPanel({
                   value={effort}
                   onChange={(event) => setEffort(event.target.value)}
                   aria-label={t("codex.reasoningEffort")}
-                  className="w-20 shrink-0 border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
+                  className="shrink-0 border border-border bg-background px-1.5 py-1 text-foreground outline-none focus-visible:border-foreground"
                 >
                   <option value="">{t("codex.defaultEffort")}</option>
                   {efforts.map((option) => (

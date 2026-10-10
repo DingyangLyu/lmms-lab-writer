@@ -11,7 +11,7 @@ import {
   type OpenCodeTransport,
   RECONNECT_GAVE_UP,
 } from "./client";
-import { isVariantSupported, selectInitialModel } from "./model-selection";
+import { isVariantSupported, preferredVariant, selectInitialModel } from "./model-selection";
 import { STORAGE_KEY_AGENT, STORAGE_KEY_MODEL } from "./preferences";
 import {
   buildWebsearchFallbackPrompt,
@@ -392,7 +392,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
                 modelId: fallbackModel.id,
                 variant: isVariantSupported(fallbackModel, selected.variant)
                   ? selected.variant
-                  : undefined,
+                  : preferredVariant(fallbackModel),
               };
               selectedModelRef.current = fallbackSelection;
               setSelectedModel(fallbackSelection);

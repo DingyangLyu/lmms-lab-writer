@@ -46,6 +46,25 @@ describe("initial model selection", () => {
       })?.variant,
     ).toBeUndefined();
   });
+  it("starts at high reasoning effort where the model offers it, and keeps a saved choice", () => {
+    const withEfforts: Provider[] = [
+      {
+        id: "openai",
+        name: "OpenAI",
+        models: [{ id: "gpt", name: "GPT", variants: { low: {}, high: {}, xhigh: {} } }],
+      },
+    ];
+    expect(selectInitialModel(withEfforts)?.variant).toBe("high");
+    expect(selectInitialModel(withEfforts, "openai/gpt")?.variant).toBe("high");
+    expect(
+      selectInitialModel(withEfforts, undefined, {
+        providerId: "openai",
+        modelId: "gpt",
+        variant: "low",
+      })?.variant,
+    ).toBe("low");
+    expect(selectInitialModel(providers, "anthropic/k3")?.variant).toBeUndefined();
+  });
   it("handles a stale default or an empty provider list", () => {
     expect(selectInitialModel(providers, "missing/model")).toMatchObject({ providerId: "openai" });
     expect(selectInitialModel([], "anthropic/k3")).toBeNull();

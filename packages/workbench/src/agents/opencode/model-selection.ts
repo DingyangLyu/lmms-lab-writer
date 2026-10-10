@@ -1,3 +1,4 @@
+import { PREFERRED_EFFORT } from "../chat/effort";
 import type { Model, Provider, SelectedModel } from "./use-opencode";
 
 export function findSelectedModel(providers: Provider[], selection: SelectedModel | null) {
@@ -11,6 +12,11 @@ export function isVariantSupported(model: Model | undefined, variant: string | u
   if (!model || !variant) return false;
   const config = model.variants?.[variant];
   return Boolean(config && config.disabled !== true);
+}
+
+/** High reasoning effort when the model offers it; otherwise OpenCode's own default. */
+export function preferredVariant(model: Model | undefined): string | undefined {
+  return isVariantSupported(model, PREFERRED_EFFORT) ? PREFERRED_EFFORT : undefined;
 }
 
 /** Preserve an explicit choice, then honor the daemon's configured default. */
@@ -28,7 +34,9 @@ export function selectInitialModel(
     return {
       providerId: selection.providerId,
       modelId: selection.modelId,
-      variant: isVariantSupported(model, selection.variant) ? selection.variant : undefined,
+      variant: isVariantSupported(model, selection.variant)
+        ? selection.variant
+        : preferredVariant(model),
     };
   };
 
@@ -46,5 +54,7 @@ export function selectInitialModel(
 
   const provider = providers.find((provider) => provider.models.length > 0);
   const model = provider?.models[0];
-  return provider && model ? { providerId: provider.id, modelId: model.id } : null;
+  return provider && model
+    ? { providerId: provider.id, modelId: model.id, variant: preferredVariant(model) }
+    : null;
 }

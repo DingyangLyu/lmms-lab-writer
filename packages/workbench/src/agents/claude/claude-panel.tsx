@@ -6,6 +6,7 @@ import { ResizableComposer } from "../../ui/panel-height";
 import { AttachmentStrip } from "../chat/attachment-strip";
 import { useComposerDraft } from "../chat/composer-drafts";
 import { DeliveryControls, type DeliveryMode } from "../chat/delivery-controls";
+import { PREFERRED_EFFORT, preferredEffort } from "../chat/effort";
 import { prepareChatFiles } from "../chat/files";
 import { GrowingTextarea } from "../chat/growing-textarea";
 import { ChatHistoryItems } from "../chat/history-items";
@@ -115,7 +116,7 @@ export function ClaudePanel({
   const [error, setError] = useState("");
   const [models, setModels] = useState<Model[]>([]);
   const [model, setModel] = useState("default");
-  const [effort, setEffort] = useState("high");
+  const [effort, setEffort] = useState(PREFERRED_EFFORT);
   const [permission, setPermission] = useState<PermissionMode>("default");
   const [history, setHistory] = useState(false);
   const [approvals, setApprovals] = useState<ClaudeEvent[]>([]);
@@ -766,7 +767,7 @@ export function ClaudePanel({
             className="writer-composer-input"
           />
           <div className="writer-composer-toolbar">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 whitespace-nowrap text-xs">
               <select
                 aria-label={t("claude.claudeCodePermissions")}
                 value={permission}
@@ -799,9 +800,10 @@ export function ClaudePanel({
                   const next = models.find(
                     (m) => m.value === e.target.value,
                   )?.supportedEffortLevels;
-                  if (next && !next.includes(effort)) setEffort(next[0] || "");
+                  if (next && !next.includes(effort))
+                    setEffort(preferredEffort(next, next[0] || ""));
                 }}
-                className="min-w-20 max-w-40 flex-1 truncate border border-border bg-background px-1.5 py-1"
+                className="min-w-24 max-w-48 flex-1 truncate border border-border bg-background px-1.5 py-1"
               >
                 {!models.length && (
                   <option value="default">
@@ -825,7 +827,7 @@ export function ClaudePanel({
                 value={effort}
                 disabled={busy}
                 onChange={(e) => setEffort(e.target.value)}
-                className="w-20 shrink-0 border border-border bg-background px-1.5 py-1"
+                className="shrink-0 border border-border bg-background px-1.5 py-1"
               >
                 {efforts.map((value) => (
                   <option key={value}>{value}</option>

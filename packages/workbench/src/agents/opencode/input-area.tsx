@@ -15,7 +15,7 @@ import { GrowingTextarea } from "../chat/growing-textarea";
 import { useChatAttachments } from "../chat/use-chat-attachments";
 import { type EditorSelectionContext, selectionRangeLabel } from "../selection-context";
 import { ChevronIcon, StopIcon } from "./icons";
-import { findSelectedModel } from "./model-selection";
+import { findSelectedModel, preferredVariant } from "./model-selection";
 import type { AttachedFile } from "./panel-types";
 
 interface SelectOption {
@@ -549,7 +549,7 @@ export function InputArea({
           onChange={(v) => onSelectAgent(v || null)}
         />
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <GroupedSelect
             value={selectedModel ? `${selectedModel.providerId}:${selectedModel.modelId}` : ""}
             displayLabel={
@@ -575,7 +575,7 @@ export function InputArea({
                 const model = provider?.models.find((m) => m.id === modelId);
                 const variant = isVariantEnabled(model?.variants, selectedModel?.variant)
                   ? selectedModel?.variant
-                  : undefined;
+                  : preferredVariant(model);
                 onSelectModel({ providerId, modelId, variant });
               } else {
                 onSelectModel(null);
