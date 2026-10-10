@@ -19,6 +19,7 @@ import {
   CrosshairIcon,
   DownloadSimpleIcon,
   FilePdfIcon,
+  PencilSimpleIcon,
   PlayCircleIcon,
   RobotIcon,
   SidebarSimpleIcon,
@@ -38,7 +39,7 @@ import {
   useState,
 } from "react";
 import type { Engine, FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
-import { download } from "../api";
+import { api, download } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
 import { useI18n } from "../i18n";
 import { roleKey, statusKey } from "../labels";
@@ -95,6 +96,63 @@ function useNarrow() {
   return narrow;
 }
 
+/** The project's name in the header; its owner clicks it to rename the project, as on Overleaf. */
+function ProjectTitle({
+  name,
+  canRename,
+  onRename,
+}: {
+  name: string;
+  canRename: boolean;
+  onRename: (name: string) => void;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState<string | null>(null);
+  if (!canRename)
+    return (
+      <div className="truncate text-sm font-medium" title={name}>
+        {name}
+      </div>
+    );
+  if (editing === null)
+    return (
+      <button
+        type="button"
+        className="group flex min-w-0 items-center gap-1 px-1 py-0.5 text-sm font-medium hover:bg-accent-hover"
+        title={t("shell.renameProject")}
+        onClick={() => setEditing(name)}
+      >
+        <span className="truncate">{name}</span>
+        <PencilSimpleIcon
+          className="size-3.5 shrink-0 text-muted opacity-0 group-hover:opacity-100"
+          aria-hidden="true"
+        />
+      </button>
+    );
+  const finish = (save: boolean) => {
+    const next = editing.trim();
+    setEditing(null);
+    if (save && next && next !== name) onRename(next);
+  };
+  return (
+    <input
+      // biome-ignore lint/a11y/noAutofocus: the field appears because the owner asked to rename.
+      autoFocus
+      aria-label={t("shell.renameProject")}
+      className="h-7 w-64 min-w-0 border border-border px-1.5 text-sm font-medium outline-none focus:border-foreground"
+      value={editing}
+      maxLength={120}
+      onChange={(event) => setEditing(event.target.value)}
+      onFocus={(event) => event.currentTarget.select()}
+      onBlur={() => finish(true)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") finish(true);
+        if (event.key === "Escape") finish(false);
+      }}
+    />
+  );
+}
+
 const SYNC_TONE: Record<SyncStatus, string> = {
   connecting: "text-muted animate-pulse",
   saved: "text-emerald-700",
@@ -139,7 +197,9 @@ export function Workspace({
   const narrow = useNarrow();
   const [sidebar, setSidebar] = useState(!narrow),
     [sidebarTab, setSidebarTab] = useState<"files" | "history">("files"),
-    [rightOpen, setRightOpen] = useState(false),
+    // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
+    // where to write, what it gives, and whom to ask.
+    [rightOpen, setRightOpen] = useState(!narrow),
     [logOpen, setLogOpen] = useState(false),
     [commentsOpen, setCommentsOpen] = useState(false),
     [dialog, setDialog] = useState<"share" | "references" | "review" | null>(null);
@@ -230,9 +290,18 @@ export function Workspace({
   const hints = useMemo(() => projectHints(data.sources, parseBib), [data.sources]);
   const hintsRef = useRef(hints);
   hintsRef.current = hints;
+  // The name as it is now; a rename by anyone reaches every open page with the project data.
+  const current = data.summary ? { ...project, name: data.summary.name } : project;
+  useEffect(() => {
+    const before = document.title;
+    document.title = `${current.name} · Y-Writer`;
+    return () => {
+      document.title = before;
+    };
+  }, [current.name]);
   const ws: WorkspaceContext = {
     prefix,
-    project,
+    project: current,
     user,
     role,
     canEdit: role === "owner" || role === "editor",
@@ -520,9 +589,16 @@ export function Workspace({
                 <img src="/logo-small-light.svg" alt="Y-Writer" className="h-7 w-auto" />
               </button>
               <span className="hidden text-border sm:inline">/</span>
-              <div className="truncate text-sm font-medium" title={project.name}>
-                {project.name}
-              </div>
+              <ProjectTitle
+                name={current.name}
+                canRename={role === "owner"}
+                onRename={(name) =>
+                  run(async () => {
+                    await api(prefix, { name }, "PATCH");
+                    await data.reload();
+                  })
+                }
+              />
               <span className="hidden shrink-0 border border-border px-1.5 py-0.5 text-[10px] tracking-wider text-muted sm:inline">
                 {t(roleKey[role])}
               </span>

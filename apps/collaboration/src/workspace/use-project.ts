@@ -4,6 +4,7 @@ import type {
   Comment,
   FileInfo,
   Member,
+  ProjectSummary,
   Proposal,
   Role,
   Snapshot,
@@ -27,20 +28,24 @@ export function useProject(
     [snapshots, setSnapshots] = useState<Snapshot[]>([]),
     [proposals, setProposals] = useState<Proposal[]>([]),
     [latestBuild, setLatestBuild] = useState<Build | null>(null),
+    // The project's current name and settings: anyone may rename it while it is open.
+    [summary, setSummary] = useState<ProjectSummary | null>(null),
     [sources, setSources] = useState<SourceFile[]>([]),
     // Files, the latest build and the sources have all been read once.
     [filesLoaded, setFilesLoaded] = useState(false),
     [sourcesLoaded, setSourcesLoaded] = useState(false);
   const { onRole, onError } = callbacks;
   const reload = useCallback(async () => {
-    const [f, c, m, s, p, b] = await Promise.all([
+    const [f, c, m, s, p, b, summary] = await Promise.all([
       api<FileInfo[]>(`${prefix}/files`),
       api<Comment[]>(`${prefix}/comments`),
       api<Member[]>(`${prefix}/members`),
       api<Snapshot[]>(`${prefix}/snapshots`),
       api<Proposal[]>(`${prefix}/proposals`),
       api<Build | null>(`${prefix}/builds/latest`),
+      api<ProjectSummary>(prefix),
     ]);
+    setSummary(summary);
     setFiles(f);
     setComments(c);
     setMembers(m);
@@ -108,6 +113,7 @@ export function useProject(
   }, [prefix, reload, refreshSources, onRole, onError]);
   return {
     loaded: filesLoaded && sourcesLoaded,
+    summary,
     files,
     comments,
     members,

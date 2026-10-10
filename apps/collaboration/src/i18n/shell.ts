@@ -1,5 +1,6 @@
 export const shellZh = {
   "shell.projects": "项目",
+  "shell.renameProject": "点击修改项目名称",
   "shell.backToProjects": "返回项目列表",
   "shell.toggleSidebar": "显示或隐藏侧栏",
   "shell.toggleLog": "显示或隐藏编译日志",
@@ -39,6 +40,7 @@ export const shellZh = {
 };
 export const shellEn: Record<keyof typeof shellZh, string> = {
   "shell.projects": "Projects",
+  "shell.renameProject": "Click to rename the project",
   "shell.backToProjects": "Back to projects",
   "shell.toggleSidebar": "Show or hide the sidebar",
   "shell.toggleLog": "Show or hide the build log",

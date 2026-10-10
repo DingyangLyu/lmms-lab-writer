@@ -190,6 +190,7 @@ export function ShareDialog({
                 const next = new FormData(e.currentTarget).get("name");
                 run(async () => {
                   await api(prefix, { name: next }, "PATCH");
+                  await reload();
                   ws.notify(t("members.renamed"));
                 });
               }}
