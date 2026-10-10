@@ -387,243 +387,11 @@ label input[type="radio"]:where(:not(.wb, .wb *)) {
   margin: 0;
   white-space: nowrap;
 }
-/* Sign-in page: brand panel beside the form; one column on phones */
-.auth-page {
-  position: relative;
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(360px, 44%) 1fr;
-  background: #f3f6f8;
-}
-.auth-brand {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 40px;
-  padding: 44px 56px;
-  overflow: hidden;
-  color: #e9f3f7;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(124, 196, 216, 0.32), transparent 45%),
-    radial-gradient(circle at 100% 100%, rgba(242, 181, 68, 0.16), transparent 42%),
-    linear-gradient(160deg, #1f5d74 0%, #163d50 55%, #0f2e3c 100%);
-}
-.auth-brand::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
-}
-.auth-logo {
-  position: relative;
-  z-index: 1;
-  align-self: flex-start;
-  height: 42px;
-  width: auto;
-}
-.auth-pitch {
-  position: relative;
-  z-index: 1;
-  max-width: 460px;
-}
-.auth-pitch h2 {
-  margin: 0 0 16px;
-  color: #fff;
-  font-size: 34px;
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.auth-pitch p {
-  margin: 0 0 28px;
-  color: #c6dce5;
-  font-size: 15px;
-  line-height: 1.7;
-}
-.auth-pitch ul {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.auth-pitch li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-}
-.auth-pitch li::before {
-  content: "";
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background:
-    rgba(242, 181, 68, 0.16)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='%23f2b544' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    center / 13px no-repeat;
-}
-.auth-foot {
-  position: relative;
-  z-index: 1;
-  margin: 0;
-  color: #9dbccb;
-  font-size: 12px;
-}
-.auth-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 72px 24px 48px;
-}
-.auth-language {
-  position: absolute;
-  top: 20px;
-  right: 24px;
-  z-index: 2;
-}
-.auth-language select {
-  border-radius: 8px;
-}
-.auth-card {
-  width: 100%;
-  max-width: 400px;
-  padding: 36px 32px 30px;
-  background: #fff;
-  border: 1px solid #e2e9ee;
-  border-radius: 16px;
-  box-shadow:
-    0 1px 2px rgba(16, 48, 63, 0.04),
-    0 14px 44px rgba(16, 48, 63, 0.09);
-}
-.auth-mark {
-  display: block;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 18px;
-}
-.auth-card h1 {
-  margin: 0 0 6px;
-  color: #18313d;
-  font-size: 24px;
-}
-.auth-card > .muted {
-  margin: 0;
-  line-height: 1.6;
-}
-.auth-card form {
-  margin-top: 16px;
-}
-.auth-card label {
-  margin: 14px 0;
-  color: #34485b;
-  font-size: 13px;
-  font-weight: 500;
-}
-.auth-card input,
-.auth-card textarea {
-  padding: 10px 12px;
-  background: #fbfcfd;
-  border-color: #d5dfe6;
-  border-radius: 8px;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-.auth-card input:focus,
-.auth-card textarea:focus {
-  outline: none;
-  background: #fff;
-  border-color: #2f8099;
-  box-shadow: 0 0 0 3px rgba(47, 128, 153, 0.18);
-}
-.auth-card .primary {
-  width: 100%;
-  margin-top: 8px;
-  padding: 11px;
-  border: 0;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #2b7189, #1d5468);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-.auth-card .primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #31809a, #215e74);
-}
-.auth-card .auth-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin: 20px 0 6px;
-  padding: 4px;
-  background: #eef3f6;
-  border: 0;
-  border-radius: 10px;
-}
-.auth-card .auth-tabs button {
-  padding: 8px;
-  color: #557083;
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  font-weight: 500;
-}
-.auth-card .auth-tabs button.selected {
-  color: #18313d;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(16, 48, 63, 0.12);
-}
-.auth-card .error {
-  border-radius: 8px;
-}
-.auth-card .notice {
-  margin-top: 18px;
-  background: #edf7f0;
-  border: 1px solid #cfe6d6;
-  border-radius: 10px;
-}
-.auth-card .notice button {
-  border-radius: 8px;
-}
-@media (max-width: 860px) {
-  .auth-page {
-    grid-template-columns: 1fr;
-    align-content: start;
-  }
-  .auth-brand {
-    padding: 20px;
-  }
-  .auth-pitch,
-  .auth-foot {
-    display: none;
-  }
-  .auth-logo {
-    height: 32px;
-  }
-  .auth-language {
-    top: 18px;
-    right: 16px;
-  }
-  .auth-panel {
-    padding: 24px 16px 40px;
-  }
-  .auth-card {
-    padding: 28px 22px 24px;
-  }
-}
 .brand-small {
   display: block;
   height: 26px;
   width: auto;
   margin-bottom: 6px;
-}
-.auth-card form + .muted,
-.auth-card form ~ .muted {
-  margin-top: 14px;
 }
 /* Project dashboard: a side menu with filters beside a sortable project table (Overleaf-style) */
 .dash {
@@ -636,30 +404,6 @@ label input[type="radio"]:where(:not(.wb, .wb *)) {
   flex: none;
   width: 1.15em;
   height: 1.15em;
-}
-.dash-top {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 20px;
-  background: #fff;
-  border-bottom: 1px solid #dce3e8;
-}
-.dash-logo {
-  height: 28px;
-  width: auto;
-}
-.dash-top button,
-.dash-top select {
-  border-radius: 8px;
-}
-.dash-user {
-  font-size: 13px;
-  color: #34485b;
-  padding-left: 10px;
-  border-left: 1px solid #dce3e8;
 }
 .dash-body {
   flex: 1;
@@ -1005,10 +749,6 @@ button.danger:hover:not(:disabled) {
   font-size: 12px;
 }
 @media (max-width: 760px) {
-  .dash-top {
-    flex-wrap: wrap;
-    padding: 8px 12px;
-  }
   .dash-body {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1052,12 +792,6 @@ button.danger:hover:not(:disabled) {
   margin-top: 0;
 }
 
-/* Template gallery */
-.dash-top .row button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .dash-templates-link {
   display: flex;
   align-items: center;

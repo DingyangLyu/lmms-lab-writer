@@ -4,6 +4,7 @@
  */
 @layer legacy, theme, base, components, utilities;
 @import "./style.css" layer(legacy);
+@import "./chrome.css" layer(legacy);
 @import "tailwindcss/theme.css" layer(theme);
 @import "@lmms-lab/workbench/scoped-preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);

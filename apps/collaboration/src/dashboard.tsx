@@ -26,9 +26,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImportedProject, ProjectSummary, PublicUser } from "../shared/api";
 import { api, errorText, upload } from "./api";
+import { Avatar } from "./avatar";
 import { type MessageKey, useI18n } from "./i18n";
 import { roleKey } from "./labels";
-import { LanguageSwitch } from "./language-switch";
 import { Modal } from "./modal";
 import { PublishTemplateDialog } from "./templates";
 import { useAction } from "./use-action";
@@ -233,17 +233,13 @@ function UploadDialog({
 export function Dashboard({
   user,
   onOpen,
-  onView,
   onTemplates,
-  onSignedOut,
   initialProjects,
 }: {
   user: PublicUser;
   onOpen: (project: ProjectSummary) => void;
-  onView: (view: "admin" | "password") => void;
   /** The template gallery, optionally showing one template. */
   onTemplates: (template?: string) => void;
-  onSignedOut: () => void;
   /** For rendering tests; the list is otherwise loaded from the server. */
   initialProjects?: ProjectSummary[];
 }) {
@@ -257,8 +253,7 @@ export function Dashboard({
     }),
     [selected, setSelected] = useState<Set<string>>(new Set()),
     [menu, setMenu] = useState(false),
-    [dialog, setDialog] = useState<Dialog | null>(null),
-    [pending, setPending] = useState(0);
+    [dialog, setDialog] = useState<Dialog | null>(null);
   const { busy, error, setError, run } = useAction();
   const dialogAction = useAction();
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -273,12 +268,6 @@ export function Dashboard({
   useEffect(() => {
     if (!initialProjects) void reload();
   }, [reload, initialProjects]);
-  useEffect(() => {
-    if (!user.admin) return;
-    void api<{ pending: number }>("/admin/summary")
-      .then((s) => setPending(s.pending))
-      .catch(() => {});
-  }, [user.admin]);
   useEffect(() => {
     if (!menu) return;
     const outside = (event: PointerEvent) => {
@@ -436,35 +425,6 @@ export function Dashboard({
 
   return (
     <div className="dash">
-      <header className="dash-top">
-        <img className="dash-logo" src="/logo-light.svg" alt="Y-Writer" />
-        <div className="row">
-          <LanguageSwitch />
-          {user.admin && (
-            <button type="button" onClick={() => onView("admin")}>
-              {t("console.open")}
-              {pending > 0 && <span className="count">{pending}</span>}
-            </button>
-          )}
-          <span className="dash-user" title={t("dash.account")}>
-            {user.name}
-          </span>
-          <button type="button" onClick={() => onView("password")}>
-            {t("projects.changePassword")}
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              run(async () => {
-                await api("/logout", {});
-                onSignedOut();
-              })
-            }
-          >
-            {t("projects.signOut")}
-          </button>
-        </div>
-      </header>
       <div className="dash-body">
         <aside className="dash-side">
           <div className="dash-new" ref={menuRef}>
@@ -679,7 +639,21 @@ export function Dashboard({
                             {ago(p.updated ?? p.created, locale, t("dash.justNow"))}
                           </span>
                         </td>
-                        <td className="dash-owner">{ownerName(p)}</td>
+                        <td className="dash-owner">
+                          <span className="dash-person">
+                            {p.ownerId && (
+                              <Avatar
+                                person={{
+                                  id: p.ownerId,
+                                  name: p.role === "owner" ? user.name : (p.owner ?? ""),
+                                  avatar: p.role === "owner" ? user.avatar : p.ownerAvatar,
+                                }}
+                                size={24}
+                              />
+                            )}
+                            {ownerName(p)}
+                          </span>
+                        </td>
                         <td
                           className="dash-updated"
                           title={p.updated ? new Date(p.updated).toLocaleString() : undefined}

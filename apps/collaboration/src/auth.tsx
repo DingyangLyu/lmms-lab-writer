@@ -68,107 +68,85 @@ export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => voi
       </>
     );
   else
-    body = (
-      <>
-        {canRegister && (
-          <div className="auth-tabs" role="tablist">
-            {(["login", "register"] as const).map((name) => (
-              <button
-                key={name}
-                type="button"
-                role="tab"
-                aria-selected={tab === name}
-                className={tab === name ? "selected" : ""}
-                onClick={() => setTab(name)}
-              >
-                {t(name === "login" ? "auth.tab.login" : "auth.tab.register")}
+    body =
+      tab === "login" || !canRegister ? (
+        <>
+          <Credentials
+            submit={t("signIn.submit")}
+            onSubmit={async (username, password) =>
+              onSignedIn(await api<PublicUser>("/login", { username, password }))
+            }
+          />
+          {canRegister && (
+            <p className="signin-switch">
+              {t("auth.noAccount")}{" "}
+              <button type="button" className="link" onClick={() => setTab("register")}>
+                {t("auth.tab.register")}
               </button>
-            ))}
-          </div>
-        )}
-        {tab === "login" || !canRegister ? (
-          <>
-            <Credentials
-              submit={t("signIn.submit")}
-              onSubmit={async (username, password) =>
-                onSignedIn(await api<PublicUser>("/login", { username, password }))
-              }
-            />
-            <p className="muted">{t("auth.forgot")}</p>
-            {info?.mode === "closed" && !info.invite && <p className="muted">{t("auth.closed")}</p>}
-          </>
-        ) : (
-          <>
-            {signup && info && !info.invite ? (
-              <p className="error">{t("auth.inviteInvalid")}</p>
-            ) : (
-              <p className="muted">
-                {info?.invite
-                  ? t("auth.inviteHint")
-                  : info?.mode === "open"
-                    ? t("auth.openHint")
-                    : t("auth.approvalHint")}
-              </p>
-            )}
-            <Credentials
-              submit={t("auth.register")}
-              newPassword
-              repeat
-              note
-              onSubmit={async (username, password, note) =>
-                finish(
-                  await api<Registered>("/register", {
-                    username,
-                    password,
-                    note,
-                    ...(signup && info?.invite ? { invite: signup } : {}),
-                  }),
-                  "register",
-                )
-              }
-            />
-          </>
-        )}
-      </>
-    );
+            </p>
+          )}
+          <p className="signin-note">{t("auth.forgot")}</p>
+          {info?.mode === "closed" && !info.invite && (
+            <p className="signin-note">{t("auth.closed")}</p>
+          )}
+        </>
+      ) : (
+        <>
+          {signup && info && !info.invite ? (
+            <p className="error">{t("auth.inviteInvalid")}</p>
+          ) : (
+            <p className="muted">
+              {info?.invite
+                ? t("auth.inviteHint")
+                : info?.mode === "open"
+                  ? t("auth.openHint")
+                  : t("auth.approvalHint")}
+            </p>
+          )}
+          <Credentials
+            submit={t("auth.register")}
+            newPassword
+            repeat
+            note
+            onSubmit={async (username, password, note) =>
+              finish(
+                await api<Registered>("/register", {
+                  username,
+                  password,
+                  note,
+                  ...(signup && info?.invite ? { invite: signup } : {}),
+                }),
+                "register",
+              )
+            }
+          />
+          <p className="signin-switch">
+            {t("auth.haveAccount")}{" "}
+            <button type="button" className="link" onClick={() => setTab("login")}>
+              {t("auth.tab.login")}
+            </button>
+          </p>
+        </>
+      );
   const heading = projectInvite
     ? [t("signIn.titleJoin"), t("signIn.lead")]
     : tab === "register" && canRegister && !waiting
       ? [t("auth.createAccount"), t("auth.createLead")]
       : [t("auth.welcome"), t("auth.welcomeLead")];
   return (
-    <div className="auth-page">
-      <aside className="auth-brand">
-        <img className="auth-logo" src="/logo-dark.svg" alt="Y-Writer" />
-        <div className="auth-pitch">
-          <h2>{t("auth.brandTitle")}</h2>
-          <p>{t("auth.brandLead")}</p>
-          <ul>
-            {(
-              [
-                "auth.feature.realtime",
-                "auth.feature.review",
-                "auth.feature.build",
-                "auth.feature.desktop",
-              ] as const
-            ).map((key) => (
-              <li key={key}>{t(key)}</li>
-            ))}
-          </ul>
-        </div>
-        <p className="auth-foot">{t("signIn.storage")}</p>
-      </aside>
-      <main className="auth-panel">
-        <div className="auth-language">
-          <LanguageSwitch />
-        </div>
-        <div className="auth-card">
-          <img className="auth-mark" src="/favicon.svg" alt="" aria-hidden="true" />
+    <div className="signin">
+      <header className="signin-top">
+        <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
+        <LanguageSwitch />
+      </header>
+      <main className="signin-main">
+        <div className="signin-box">
           <h1>{heading[0]}</h1>
-          <p className="muted">{heading[1]}</p>
+          <p className="signin-lead">{heading[1]}</p>
           {body}
         </div>
       </main>
+      <footer className="signin-foot">{t("signIn.storage")}</footer>
     </div>
   );
 }

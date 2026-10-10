@@ -13,7 +13,7 @@ import { useI18n } from "./i18n";
 type Tab = "pending" | "users" | "invites" | "settings";
 
 /** Administration: approve registrations, manage accounts and invitations, set registration. */
-export function AdminConsole({ me, onBack }: { me: string; onBack: () => void }) {
+export function AdminConsole({ me }: { me: string }) {
   const { t } = useI18n();
   const [users, setUsers] = useState<Account[]>([]),
     [tab, setTab] = useState<Tab>("pending"),
@@ -43,16 +43,11 @@ export function AdminConsole({ me, onBack }: { me: string; onBack: () => void })
     ["settings", t("console.tab.settings")],
   ];
   return (
-    <main className="dashboard">
-      <header>
-        <div>
-          <span className="eyebrow">Y-WRITER / ADMIN</span>
-          <h1>{t("console.title")}</h1>
-        </div>
-        <button type="button" onClick={onBack}>
-          {t("admin.back")}
-        </button>
-      </header>
+    <main className="dashboard page">
+      <div className="page-head">
+        <h1>{t("console.title")}</h1>
+        <p className="muted">{t("console.lead")}</p>
+      </div>
       <div className="auth-tabs console-tabs" role="tablist">
         {tabs.map(([name, label]) => (
           <button

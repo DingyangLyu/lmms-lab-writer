@@ -24,7 +24,6 @@ export const appZh = {
   "signIn.join": "加入项目",
   "signIn.submit": "登录",
   "signIn.storage": "账号和文件都保存在实验室自己的 Y-Writer 服务器上。",
-  "projects.changePassword": "修改密码",
   "projects.signOut": "退出登录",
 };
 export const appEn: Record<keyof typeof appZh, string> = {
@@ -54,6 +53,5 @@ export const appEn: Record<keyof typeof appZh, string> = {
   "signIn.join": "Join project",
   "signIn.submit": "Sign in",
   "signIn.storage": "Accounts and files stay on your lab's own Y-Writer server.",
-  "projects.changePassword": "Change password",
   "projects.signOut": "Sign out",
 };

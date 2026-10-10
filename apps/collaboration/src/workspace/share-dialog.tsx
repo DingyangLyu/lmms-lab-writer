@@ -1,7 +1,8 @@
 /** Members, invitations and project settings, opened from the header's Share button. */
-import { useState } from "react";
-import type { Invite, Member, Role } from "../../shared/api";
+import { useEffect, useState } from "react";
+import type { Friends, Invite, Member, Person, Role } from "../../shared/api";
 import { api } from "../api";
+import { Avatar } from "../avatar";
 import { copyText } from "../clipboard";
 import { useI18n } from "../i18n";
 import { roleKey } from "../labels";
@@ -24,9 +25,65 @@ export function ShareDialog({
     [inviteLink, setInviteLink] = useState("");
   const { prefix, project, busy, run, reload } = ws,
     owner = ws.role === "owner";
+  const [friends, setFriends] = useState<Person[] | null>(null),
+    [friendRoles, setFriendRoles] = useState<Record<string, Role>>({});
+  useEffect(() => {
+    if (owner)
+      void api<Friends>("/friends")
+        .then((f) => setFriends(f.friends))
+        .catch(() => setFriends([]));
+  }, [owner]);
+  const addable = (friends ?? []).filter((f) => !members.some((m) => m.id === f.id));
   return (
     <Dialog title={t("members.title")} onClose={onClose}>
       <div className="space-y-4">
+        {owner && (
+          <section className="space-y-2">
+            <h3 className="font-medium">{t("share.friends")}</h3>
+            <p className="text-xs text-muted">{t("share.friendsLead")}</p>
+            {friends && !addable.length ? (
+              <p className="text-xs text-muted">{t("share.noFriends")}</p>
+            ) : (
+              <ul className="border border-border">
+                {addable.map((f) => (
+                  <li
+                    key={f.id}
+                    className="flex items-center gap-2 border-b border-border px-2 py-1.5 last:border-b-0"
+                  >
+                    <Avatar person={{ id: f.id, name: f.username, avatar: f.avatar }} size={24} />
+                    <span className="min-w-0 flex-1 truncate">{f.username}</span>
+                    <Select
+                      aria-label={t("members.roleOf", { name: f.username })}
+                      value={friendRoles[f.id] ?? "editor"}
+                      onChange={(e) =>
+                        setFriendRoles((roles) => ({ ...roles, [f.id]: e.target.value as Role }))
+                      }
+                    >
+                      <option value="editor">{t("role.editor")}</option>
+                      <option value="commenter">{t("role.commenter")}</option>
+                      <option value="viewer">{t("role.viewer")}</option>
+                    </Select>
+                    <Btn
+                      tone="solid"
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          await api(`${prefix}/members`, {
+                            user: f.id,
+                            role: friendRoles[f.id] ?? "editor",
+                          });
+                          await reload();
+                        })
+                      }
+                    >
+                      {t("share.addFriend")}
+                    </Btn>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
         {owner && (
           <section className="space-y-2">
             <h3 className="font-medium">{t("shell.inviteHeading")}</h3>
@@ -78,6 +135,7 @@ export function ShareDialog({
                 key={m.id}
                 className="flex items-center gap-2 border-b border-border px-2 py-1.5 last:border-b-0"
               >
+                <Avatar person={{ id: m.id, name: m.username, avatar: m.avatar }} size={24} />
                 <span className="min-w-0 flex-1 truncate">
                   {m.username}
                   {m.id === ws.user.id && <span className="text-muted"> · {t("shell.you")}</span>}

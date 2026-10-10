@@ -5,7 +5,6 @@
  */
 import {
   ArrowClockwiseIcon,
-  ArrowLeftIcon,
   ArrowSquareOutIcon,
   FilePdfIcon,
   FileTextIcon,
@@ -29,7 +28,6 @@ import {
 } from "../shared/api";
 import { api, errorText } from "./api";
 import { type MessageKey, useI18n } from "./i18n";
-import { LanguageSwitch } from "./language-switch";
 import { Modal } from "./modal";
 import { useAction } from "./use-action";
 
@@ -64,13 +62,11 @@ const canManage = (t: TemplateInfo, user: PublicUser) =>
 export function TemplateGallery({
   user,
   initial,
-  onBack,
   onOpen,
 }: {
   user: PublicUser;
   /** A template to show first, from a `/?template=` link. */
   initial: string | null;
-  onBack: () => void;
   onOpen: (project: ProjectSummary) => void;
 }) {
   const { t, locale: lang } = useI18n();
@@ -126,16 +122,6 @@ export function TemplateGallery({
 
   return (
     <div className="dash">
-      <header className="dash-top">
-        <img className="dash-logo" src="/logo-light.svg" alt="Y-Writer" />
-        <div className="row">
-          <LanguageSwitch />
-          <button type="button" onClick={onBack}>
-            <ArrowLeftIcon aria-hidden="true" />
-            {t("tpl.back")}
-          </button>
-        </div>
-      </header>
       <div className="dash-body">
         <aside className="dash-side">
           <nav aria-label={t("tpl.categories")}>

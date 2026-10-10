@@ -6,7 +6,9 @@ import { api } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { useI18n } from "./i18n";
+import { ProfilePage } from "./profile";
 import { TemplateGallery } from "./templates";
+import { type Page, TopNav } from "./top-nav";
 
 // The workbench (editor, PDF preview, file tree) loads when a project is first opened.
 const Workspace = lazy(() =>
@@ -18,9 +20,10 @@ export function App() {
   const [user, setUser] = useState<PublicUser | null>(null),
     [ready, setReady] = useState(false),
     [project, setProject] = useState<ProjectSummary | null>(null),
-    [view, setView] = useState<"projects" | "admin" | "password" | "templates">(() => {
+    [view, setView] = useState<Page>(() => {
       const params = new URL(location.href).searchParams;
-      return params.has("templates") || params.has("template") ? "templates" : "projects";
+      if (params.has("templates") || params.has("template")) return "templates";
+      return params.has("profile") ? "profile" : "projects";
     }),
     // `/?template=<id>` shows one template in the gallery.
     [template, setTemplate] = useState<string | null>(() =>
@@ -52,9 +55,14 @@ export function App() {
     setProject(next);
     history.replaceState(null, "", next ? `/?project=${encodeURIComponent(next.id)}` : "/");
   }, []);
-  const back = useCallback(() => {
-    setView("projects");
-    history.replaceState(null, "", "/");
+  const navigate = useCallback((next: Page) => {
+    setView(next);
+    if (next === "templates") setTemplate(null);
+    history.replaceState(
+      null,
+      "",
+      next === "templates" ? "/?templates" : next === "profile" ? "/?profile" : "/",
+    );
   }, []);
   if (!ready)
     return (
@@ -78,25 +86,6 @@ export function App() {
         <ChangePassword forced onDone={() => setUser({ ...user, mustChange: false })} />
       </div>
     );
-  if (view === "admin" && user.admin) return <AdminConsole me={user.id} onBack={back} />;
-  if (view === "templates" && !project)
-    return (
-      <TemplateGallery
-        user={user}
-        initial={template}
-        onBack={back}
-        onOpen={(next) => {
-          setView("projects");
-          openProject(next);
-        }}
-      />
-    );
-  if (view === "password")
-    return (
-      <div className="auth">
-        <ChangePassword onDone={back} onCancel={back} />
-      </div>
-    );
   if (project)
     return (
       <Suspense
@@ -109,16 +98,38 @@ export function App() {
         <Workspace project={project} user={user} onBack={() => openProject(null)} />
       </Suspense>
     );
+  const page = view === "admin" && !user.admin ? "projects" : view;
   return (
-    <Dashboard
-      user={user}
-      onOpen={openProject}
-      onView={setView}
-      onTemplates={(id) => {
-        setTemplate(id ?? null);
-        setView("templates");
-      }}
-      onSignedOut={() => setUser(null)}
-    />
+    <div className="app-shell">
+      <TopNav
+        user={user}
+        page={page}
+        onNavigate={navigate}
+        onSignOut={() => void api("/logout", {}).finally(() => setUser(null))}
+      />
+      {page === "admin" ? (
+        <AdminConsole me={user.id} />
+      ) : page === "templates" ? (
+        <TemplateGallery
+          user={user}
+          initial={template}
+          onOpen={(next) => {
+            setView("projects");
+            openProject(next);
+          }}
+        />
+      ) : page === "profile" ? (
+        <ProfilePage user={user} onUser={setUser} />
+      ) : (
+        <Dashboard
+          user={user}
+          onOpen={openProject}
+          onTemplates={(id) => {
+            setTemplate(id ?? null);
+            setView("templates");
+          }}
+        />
+      )}
+    </div>
   );
 }

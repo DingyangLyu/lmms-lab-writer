@@ -3,7 +3,6 @@ export const templatesZh = {
   "tpl.title": "模板库",
   "tpl.lead":
     "各大会议和期刊的官方 LaTeX 模板、Writer 自带模板，以及组员发布的模板。选一个就能新建项目，不用再自己上传。",
-  "tpl.back": "返回项目",
   "tpl.search": "搜索会议、期刊、年份或关键词",
   "tpl.sortLabel": "排序",
   "tpl.sort.recommended": "推荐",
@@ -80,7 +79,6 @@ export const templatesEn: Record<keyof typeof templatesZh, string> = {
   "tpl.title": "Templates",
   "tpl.lead":
     "Official LaTeX templates of the major conferences and journals, Writer's own templates, and those your group publishes. Pick one to start a project; no more uploading templates.",
-  "tpl.back": "Back to projects",
   "tpl.search": "Search venues, journals, years or keywords",
   "tpl.sortLabel": "Sort",
   "tpl.sort.recommended": "Recommended",

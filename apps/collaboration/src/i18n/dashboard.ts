@@ -37,7 +37,6 @@ export const dashboardZh = {
   "dash.welcomeTitle": "开始你的第一篇文稿",
   "dash.welcomeLead": "从空白项目、模板或已有的 LaTeX 压缩包开始；也可以打开合作者发来的邀请链接。",
   "dash.justNow": "刚刚",
-  "dash.account": "账号",
   "dash.dialogNewTitle": "新建空白项目",
   "dash.dialogName": "项目名称",
   "dash.dialogCreate": "创建",
@@ -109,7 +108,6 @@ export const dashboardEn: Record<keyof typeof dashboardZh, string> = {
   "dash.welcomeLead":
     "Start from a blank project, a template or an existing LaTeX zip, or open an invitation link from a co-author.",
   "dash.justNow": "just now",
-  "dash.account": "Account",
   "dash.dialogNewTitle": "New blank project",
   "dash.dialogName": "Project name",
   "dash.dialogCreate": "Create",
