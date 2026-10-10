@@ -64,8 +64,8 @@
 ```powershell
 cd C:\writer\app\apps\collaboration
 $env:WRITER_LATEXMK = "C:\texlive\current\bin\windows\latexmk.exe"
-..\..\node_modules\.bin\tsx.cmd server\template-build.ts --out E:\writer-data\templates            # 全部
-..\..\node_modules\.bin\tsx.cmd server\template-build.ts --out E:\writer-data\templates --only neurips-2026
+node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data\templates                      # 全部
+node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data\templates --only neurips-2026
 ```
 
 脚本把作者包下载到 `E:\writer-data\templates\.cache`，整理成模板，用 latexmk 编译示例 PDF，再用 TeX Live 自带的 Ghostscript（`rungs.exe`）渲染前 4 页预览和缩略图；新模板完整生成后才替换旧的。AAAI 的下载页有人机验证，脚本拿不到时会提示，把 zip 手动放进 `.cache`（文件名见清单的 `archive`）再运行即可。网页最多 30 秒后显示更新。
@@ -91,6 +91,7 @@ $env:WRITER_LATEXMK = "C:\texlive\current\bin\windows\latexmk.exe"
 - 境外流量走洛杉矶服务器（出口 IP 固定）；国内网站（GeoSite/GeoIP 中国列表）、B 站、ToDesk、百度网盘、微信、QQ、钉钉、飞书、Windows 更新等直连；局域网地址不进 TUN；
 - 本机代理端口仍是 `127.0.0.1:7890`，Writer 执行器经它访问 OpenAI；
 - 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `C:\net\mihomo\mihomo.exe -t -d C:\net\mihomo` 检查后重启 Mihomo 任务；
+- 这台电脑同时接了网线（以太网，10.100.144.0/20 网段）和 Wi-Fi（BJZGCA-Dorm，10.100.128.0/20，`WRITER_ORIGIN` 用的是 Wi-Fi 地址）。有线网会对 HTTPS 做中间人拦截（连洛杉矶节点时拿到伪造的证书并被重置），所以 Wi-Fi 必须是首选出口：两张网卡的接口跃点数分别设为 WLAN 35、以太网 75（`Set-NetIPInterface -InterfaceAlias 以太网 -AddressFamily IPv4 -InterfaceMetric 75`）。Wi-Fi 断开时流量自动改走网线，国内网站和内网仍可用，境外代理不可用。重装网卡驱动或网线换口后跃点可能恢复自动，代理报 `certificate signed by unknown authority` 时先检查这一项；
 - FlClash 仍安装着（打开它会把辅助服务重新装成自动启动，单独运行的辅助服务不影响网络）；不要在 FlClash 里打开 TUN 或系统代理，否则会和 mihomo 抢路由和 7890 端口。
 
 ## 更新

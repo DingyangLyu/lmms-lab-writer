@@ -1053,6 +1053,11 @@ button.danger:hover:not(:disabled) {
 }
 
 /* Template gallery */
+.dash-top .row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .dash-templates-link {
   display: flex;
   align-items: center;
