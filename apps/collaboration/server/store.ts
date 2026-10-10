@@ -9,9 +9,11 @@ export type User = {
   admin: boolean;
   /** Set by an administrator's password reset; the account must choose a new password. */
   mustChange: boolean;
+  /** When the profile picture last changed (its version), or null without one. */
+  avatar: number | null;
 };
 /** Column list for `User`; disabled accounts are filtered by the callers. */
-export const userColumns = `id, username, password, admin, must_change AS "mustChange"`;
+export const userColumns = `id, username, password, admin, must_change AS "mustChange", avatar_updated AS avatar`;
 export type FileMeta = {
   id: string;
   project: string;

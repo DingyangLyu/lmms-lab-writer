@@ -190,6 +190,16 @@ export const englishMessages: Record<string, string> = {
   "{path} 不是 UTF-8 编码，请转换后再上传": "{path} is not UTF-8 text; convert it and upload again",
   压缩包中有重复的文件路径: "The zip contains the same path twice",
   "压缩包超过 {size}": "The zip exceeds {size}",
+  // people
+  没有头像: "No profile picture",
+  "头像图片超过 {size}": "The picture exceeds {size}",
+  "头像须为 PNG、JPEG 或 WebP 图片": "The picture must be a PNG, JPEG or WebP image",
+  不能添加自己为好友: "You cannot add yourself as a friend",
+  你们已经是好友: "You are friends already",
+  好友申请不存在: "There is no such friend request",
+  "只能直接添加好友，其他人请发送邀请链接":
+    "Only friends can be added directly; send others an invitation link",
+  对方已经是项目成员: "They are a member of the project already",
   // templates
   没有这个预览: "There is no such preview",
   请填写模板名称: "Enter a name for the template",

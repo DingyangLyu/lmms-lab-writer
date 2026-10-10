@@ -14,6 +14,7 @@ export const publicUser = (u: User): PublicUser => ({
   name: u.username,
   admin: !!u.admin,
   mustChange: !!u.mustChange,
+  avatar: u.avatar === null || u.avatar === undefined ? null : Number(u.avatar),
 });
 
 export async function sessionRoutes() {
@@ -102,7 +103,14 @@ export async function sessionRoutes() {
           throw error;
         }
         if (!active) return { pending: true };
-        const user: User = { id, username, password: hash, admin: false, mustChange: false };
+        const user: User = {
+          id,
+          username,
+          password: hash,
+          admin: false,
+          mustChange: false,
+          avatar: null,
+        };
         await session(ctx.store, user, ctx.res, ctx.secure);
         return { pending: false, user: publicUser(user) };
       }),
@@ -144,6 +152,7 @@ export async function sessionRoutes() {
           password: await passwordHash(password),
           admin: false,
           mustChange: false,
+          avatar: null,
         };
         try {
           await db.transaction(async (tx) => {

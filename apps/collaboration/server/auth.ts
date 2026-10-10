@@ -89,7 +89,7 @@ export async function userFor(store: Store, req: IncomingMessage): Promise<User>
   const row =
     (await store.db.row<User & { device: boolean; used: number | null }>(
       sql`SELECT u.id, u.username, u.password, u.admin, u.must_change AS "mustChange",
-                 s.name IS NOT NULL AS device, s.used
+                 u.avatar_updated AS avatar, s.name IS NOT NULL AS device, s.used
           FROM users u JOIN sessions s ON s.user_id=u.id
           WHERE s.token=${digest(token)} AND s.expires>${now}
             AND NOT u.disabled AND NOT u.pending AND NOT u.deleted`,
@@ -99,7 +99,7 @@ export async function userFor(store: Store, req: IncomingMessage): Promise<User>
       sql`UPDATE sessions SET used=${now}, expires=${now + DEVICE_LIFETIME} WHERE token=${digest(token)}`,
     );
   const { device: _device, used: _used, ...user } = row;
-  return user;
+  return { ...user, avatar: user.avatar === null ? null : Number(user.avatar) };
 }
 /** A named token for one device; returned once, stored only as a digest. */
 export async function deviceToken(store: Store, user: User, name: string) {

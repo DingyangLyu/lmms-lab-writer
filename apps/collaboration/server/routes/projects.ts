@@ -26,7 +26,11 @@ const summaries = (q: Sql, user: string, project?: string) =>
     sql`SELECT p.id, p.name, p.created, p.updated, m.role, m.archived,
                m.trashed IS NOT NULL AS trashed,
                (SELECT u.username FROM members o JOIN users u ON u.id=o.user_id
-                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS owner
+                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS owner,
+               (SELECT u.id FROM members o JOIN users u ON u.id=o.user_id
+                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS "ownerId",
+               (SELECT u.avatar_updated FROM members o JOIN users u ON u.id=o.user_id
+                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS "ownerAvatar"
         FROM projects p JOIN members m ON p.id=m.project
         WHERE m.user_id=${user} AND (${project ?? null}::text IS NULL OR p.id=${project ?? null})
         ORDER BY p.updated DESC, p.created DESC`,
@@ -269,7 +273,8 @@ export const projectRoutes = [
   }),
   route<InProject>("GET", /^members$/, (ctx) =>
     ctx.store.db.rows<Member>(
-      sql`SELECT u.id, u.username, m.role FROM members m JOIN users u ON u.id=m.user_id
+      sql`SELECT u.id, u.username, m.role, u.avatar_updated AS avatar
+          FROM members m JOIN users u ON u.id=m.user_id
           WHERE m.project=${ctx.project} ORDER BY u.username`,
     ),
   ),

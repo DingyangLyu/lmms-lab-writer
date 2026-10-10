@@ -5,7 +5,20 @@
 import type { ReviewHunk } from "@lmms-lab/writing";
 
 export type Role = "owner" | "editor" | "commenter" | "viewer";
-export type PublicUser = { id: string; name: string; admin: boolean; mustChange: boolean };
+export type PublicUser = {
+  id: string;
+  name: string;
+  admin: boolean;
+  mustChange: boolean;
+  /** The profile picture's version (`/api/users/:id/avatar?v=`), or null without one. */
+  avatar: number | null;
+};
+/** Someone as lists show them: name and picture. */
+export type Person = { id: string; username: string; avatar: number | null };
+/** Friends, and requests waiting on either side. */
+export type Friends = { friends: Person[]; incoming: Person[]; outgoing: Person[] };
+/** A user found by name, with where they stand with the one searching. */
+export type FoundUser = Person & { relation: "friend" | "incoming" | "outgoing" | "none" };
 /** Registration or invitation outcome: signed in, or waiting for an administrator. */
 export type Registered = { pending: true } | { pending: false; user: PublicUser };
 export type RegistrationMode = "approval" | "open" | "closed";
@@ -49,6 +62,8 @@ export type ProjectSummary = {
   updated?: number;
   /** An owner's username, for the dashboard's owner column. */
   owner?: string;
+  ownerId?: string;
+  ownerAvatar?: number | null;
   /** Archive and trash are each member's own view; they hide nothing from the others. */
   archived?: boolean;
   trashed?: boolean;
@@ -124,7 +139,7 @@ export type TemplateInput = {
 };
 /** A project made from an uploaded zip, with the entries that were left out. */
 export type ImportedProject = ProjectSummary & { skipped: string[] };
-export type Member = { id: string; username: string; role: Role };
+export type Member = { id: string; username: string; role: Role; avatar: number | null };
 export type Invite = { token: string; url: string; expiresInDays: number };
 
 export type FileInfo = { id: string; path: string; binary: boolean; revision: number };

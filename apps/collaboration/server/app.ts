@@ -17,6 +17,7 @@ import { commentRoutes } from "./routes/comments";
 import { fileRoutes } from "./routes/files";
 import { historyRoutes } from "./routes/history";
 import { jobRoutes, runnerRoute } from "./routes/jobs";
+import { addMemberRoute, peopleRoutes } from "./routes/people";
 import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
@@ -139,10 +140,11 @@ export async function createWriterServer(options: Options) {
   const publicRoutes = [...session.public, runnerRoute];
   /** Still reachable while an account must replace a temporary password. */
   const accountRoutes = [...session.authed, passwordRoute];
-  const signedInRoutes = [...adminRoutes, ...projectListRoutes, ...templateRoutes];
+  const signedInRoutes = [...adminRoutes, ...projectListRoutes, ...templateRoutes, ...peopleRoutes];
   const projectScoped = [
     ...projectRoutes,
     publishTemplateRoute,
+    addMemberRoute,
     ...fileRoutes,
     ...bibliographyRoutes,
     ...commentRoutes,

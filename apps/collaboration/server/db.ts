@@ -284,6 +284,18 @@ export const migrations: string[] = [
      updated BIGINT NOT NULL
    );
    CREATE INDEX agent_threads_project ON agent_threads(project, updated);`,
+  // 9: profile pictures, and friends to share projects with in one step.
+  `ALTER TABLE users ADD COLUMN avatar BYTEA;
+   ALTER TABLE users ADD COLUMN avatar_type TEXT;
+   ALTER TABLE users ADD COLUMN avatar_updated BIGINT;
+   CREATE TABLE friendships(
+     requester TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     addressee TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     accepted BOOLEAN NOT NULL DEFAULT false,
+     created BIGINT NOT NULL,
+     PRIMARY KEY (requester, addressee)
+   );
+   CREATE INDEX friendships_addressee ON friendships(addressee);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

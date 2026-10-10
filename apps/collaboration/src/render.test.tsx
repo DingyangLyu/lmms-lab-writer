@@ -35,7 +35,7 @@ const file = { id: "f1", path: "main.tex", binary: false, revision: 1 };
 const ws: WorkspaceContext = {
   prefix: "/projects/p1",
   project: { id: "p1", name: "论文", role: "owner" },
-  user: { id: "u1", name: "lab", admin: true, mustChange: false },
+  user: { id: "u1", name: "lab", admin: true, mustChange: false, avatar: null },
   role: "owner",
   canEdit: true,
   canComment: true,
@@ -92,7 +92,7 @@ const proposal: Proposal = {
   created: 1,
 };
 const snapshot: Snapshot = { id: "s", label: "投稿前", author: "u1", created: 1, manual: false };
-const member: Member = { id: "u2", username: "coauthor", role: "editor" };
+const member: Member = { id: "u2", username: "coauthor", role: "editor", avatar: null };
 const sources: SourceFile[] = [
   { id: "b", path: "refs.bib", content: "@article{k1,title={Paper},author={A}}", revision: 1 },
   { id: "f1", path: "main.tex", content: "\\cite{k1}", revision: 1 },
@@ -243,7 +243,7 @@ describe("project dashboard", () => {
   it("lists the active projects with owners, filters and actions", () => {
     const page = html(
       <Dashboard
-        user={{ id: "u1", name: "lab", admin: false, mustChange: false }}
+        user={{ id: "u1", name: "lab", admin: false, mustChange: false, avatar: null }}
         onOpen={() => {}}
         onView={() => {}}
         onTemplates={() => {}}
