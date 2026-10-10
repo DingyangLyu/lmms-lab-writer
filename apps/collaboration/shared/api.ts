@@ -67,6 +67,8 @@ export type ProjectSummary = {
   /** Archive and trash are each member's own view; they hide nothing from the others. */
   archived?: boolean;
   trashed?: boolean;
+  /** Track changes is on for every member (see shared/tracked.ts). */
+  trackAll?: boolean;
 };
 /** A starting point for a new project (see server/templates.ts). */
 /** Template categories, as the gallery groups them. */
@@ -150,7 +152,14 @@ export type TemplateInput = {
 };
 /** A project made from an uploaded zip, with the entries that were left out. */
 export type ImportedProject = ProjectSummary & { skipped: string[] };
-export type Member = { id: string; username: string; role: Role; avatar: number | null };
+export type Member = {
+  id: string;
+  username: string;
+  role: Role;
+  avatar: number | null;
+  /** Track changes is on for this member's edits, whatever the project's setting. */
+  tracking?: boolean;
+};
 export type Invite = { token: string; url: string; expiresInDays: number };
 
 export type FileInfo = { id: string; path: string; binary: boolean; revision: number };

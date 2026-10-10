@@ -58,6 +58,20 @@ export class Store {
     );
     return !!row && allows(row.role, minimum);
   }
+  /**
+   * The author `user`'s edits are tracked as (shared/tracked.ts), or undefined when track
+   * changes is off for them: off for the project and for the member. `agent` names an AI
+   * editing on their behalf.
+   */
+  async tracking(project: string, user: string, agent?: string, q: Sql = this.db) {
+    const row = await q.row<{ on: boolean; username: string }>(
+      sql`SELECT (p.track_all OR m.track) AS on, u.username
+          FROM projects p JOIN members m ON m.project=p.id JOIN users u ON u.id=m.user_id
+          WHERE p.id=${project} AND m.user_id=${user}`,
+    );
+    if (!row?.on) return undefined;
+    return { author: user, name: agent ? `${agent} · ${row.username}` : row.username };
+  }
   /** A deleted file keeps its row for history, but must not reserve its path forever. */
   async releasePath(project: string, path: string, q: Sql = this.db) {
     await q.run(

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { AGENT_PERMISSIONS, CHANGES_EVENT, THREADS_EVENT } from "../shared/agents";
+import { resolveChanges } from "../shared/tracked";
 import { AgentHost } from "./agent-host";
 import { fixture } from "./test-fixture";
 
@@ -83,28 +84,34 @@ async function setup(capabilities = ["codex"]) {
   return { ...f, origin, browser, file, text };
 }
 
+/** The shared runner with the fake Codex, working in a temporary folder. */
+async function codexRunner(server: string) {
+  const dir = await mkdtemp(join(tmpdir(), "writer-agents-"));
+  const codex = join(dir, "codex.sh");
+  await writeFile(
+    codex,
+    `#!/bin/sh\nexec "${process.execPath}" "${join(import.meta.dirname, "fake-codex.mjs")}" "$@"\n`,
+  );
+  await chmod(codex, 0o755);
+  const host = new AgentHost({
+    server,
+    token: TOKEN,
+    root: join(dir, "work"),
+    codex,
+    permissions: [...AGENT_PERMISSIONS],
+    log: () => {},
+  }).start();
+  cleanups.push(async () => {
+    host.stop();
+    await rm(dir, { recursive: true, force: true });
+  });
+  return { dir, host };
+}
+
 describe("live AI conversations on the shared runner", () => {
   it("runs a Codex turn whose edits land in the shared text, with a version before it", async () => {
     const f = await setup();
-    const dir = await mkdtemp(join(tmpdir(), "writer-agents-"));
-    const codex = join(dir, "codex.sh");
-    await writeFile(
-      codex,
-      `#!/bin/sh\nexec "${process.execPath}" "${join(import.meta.dirname, "fake-codex.mjs")}" "$@"\n`,
-    );
-    await chmod(codex, 0o755);
-    const host = new AgentHost({
-      server: f.origin,
-      token: TOKEN,
-      root: join(dir, "work"),
-      codex,
-      permissions: [...AGENT_PERMISSIONS],
-      log: () => {},
-    }).start();
-    cleanups.push(async () => {
-      host.stop();
-      await rm(dir, { recursive: true, force: true });
-    });
+    const { dir, host } = await codexRunner(f.origin);
     const chapter = await f.file("chapter.tex", "Hello world\n");
     const owner = await f.browser(f.owner);
     await owner.until((m) => m.status?.online && m.status.harnesses.includes("codex"));
@@ -192,6 +199,32 @@ describe("live AI conversations on the shared runner", () => {
     const files = (await f.call(`/projects/${f.project}/files`, undefined, f.owner)).data;
     expect(files.map((x: { path: string }) => x.path)).toContain("figures/notes.md");
     expect(await readFile(join(dir, "work", f.project, "chapter.tex"), "utf8")).toBe("Hello lab\n");
+  });
+
+  it("records a turn's edits as tracked changes while track changes is on", async () => {
+    const f = await setup();
+    await codexRunner(f.origin);
+    const chapter = await f.file("chapter.tex", "Hello world\n");
+    await f.call(`/projects/${f.project}/tracking`, { everyone: true }, f.owner);
+    const owner = await f.browser(f.owner);
+    await owner.until((m) => m.status?.online && m.status.harnesses.includes("codex"));
+    await owner.request("codex.initialize");
+    const { thread } = await owner.request("codex.startThread", { permissionMode: "fullAccess" });
+    await owner.request("codex.startTurn", {
+      threadId: thread.id,
+      text: "replace chapter.tex world=>team",
+      permissionMode: "fullAccess",
+    });
+    await owner.until((m) => m.event?.method === CHANGES_EVENT);
+    expect(await f.text(chapter)).toBe("Hello team\n");
+    const { doc } = await f.peer(f.owner, chapter);
+    const text = doc.getText("content").toString();
+    expect(
+      resolveChanges(doc).changes.map((c) => [c.kind, c.name, c.text ?? text.slice(c.from, c.to)]),
+    ).toEqual([
+      ["delete", "Codex · owner", "world"],
+      ["insert", "Codex · owner", "team"],
+    ]);
   });
 
   it("shares conversations with the project unless hidden, and admits only owners and editors", async () => {

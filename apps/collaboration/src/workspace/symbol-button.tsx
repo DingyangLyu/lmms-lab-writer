@@ -21,7 +21,7 @@ export function SymbolButton({ ws }: { ws: WorkspaceContext }) {
         className="inline-flex items-center gap-1 hover:text-foreground disabled:opacity-40"
       >
         <span className="font-serif text-sm leading-none">Ω</span>
-        <span className="hidden sm:inline">{t("workspace.symbols")}</span>
+        <span className="hidden @2xl:inline">{t("workspace.symbols")}</span>
       </button>
       <Popover
         open={open}

@@ -322,6 +322,9 @@ export const migrations: string[] = [
      updated BIGINT NOT NULL
    );
    CREATE INDEX agent_tasks_project ON agent_tasks(project, status);`,
+  // 12: track changes, for everyone in a project or for single members.
+  `ALTER TABLE projects ADD COLUMN track_all BOOLEAN NOT NULL DEFAULT false;
+   ALTER TABLE members ADD COLUMN track BOOLEAN NOT NULL DEFAULT false;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

@@ -45,6 +45,7 @@ import { useI18n } from "../i18n";
 import { roleKey, statusKey } from "../labels";
 import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
+import type { ShownChange } from "../tracked-changes";
 import { useAction } from "../use-action";
 import type { AiTask } from "./agents-panel";
 import {
@@ -72,6 +73,7 @@ import { ReviewDialog } from "./review-dialog";
 import { type MarginLayout, ReviewMargin } from "./review-margin";
 import { ShareDialog } from "./share-dialog";
 import { SymbolButton } from "./symbol-button";
+import { TrackedButton } from "./tracked-button";
 import { Btn, ResizeHandle, ToggleButton, useStoredSize } from "./ui";
 import { useProject } from "./use-project";
 import { WordCountDialog } from "./word-count-dialog";
@@ -256,6 +258,9 @@ export function Workspace({
     logSize = useStoredSize("writer-web-log", 220, 120, 640);
   const { busy, error, setError, run } = useAction();
   const data = useProject(prefix, { onRole: setRole, onError: setError });
+  // Track changes: on for everyone, or per member; the open file's changes for the toolbar.
+  const trackAll = data.summary?.trackAll === true;
+  const [trackedChanges, setTrackedChanges] = useState<ShownChange[]>([]);
   const editor = useRef<EditorHandle | null>(null);
   const [draft, setDraft] = useDraft(
     `writer-note-draft:${user.id}:${project.id}`,
@@ -536,6 +541,7 @@ export function Workspace({
   const editorActions = file && !file.binary && (
     <>
       <SymbolButton ws={ws} />
+      <TrackedButton ws={ws} changes={trackedChanges} trackAll={trackAll} members={data.members} />
       <button
         type="button"
         disabled={!ws.canComment}
@@ -544,7 +550,7 @@ export function Workspace({
         onClick={commentOnSelection}
       >
         <ChatCircleTextIcon className="size-3.5" />
-        <span className="hidden sm:inline">{t("workspace.commentSelection")}</span>
+        <span className="hidden @2xl:inline">{t("workspace.commentSelection")}</span>
       </button>
       {b.build?.pdf && (
         <button
@@ -554,7 +560,7 @@ export function Workspace({
           onClick={b.showCursorInPdf}
         >
           <CrosshairIcon className="size-3.5" />
-          <span className="hidden sm:inline">{t("build.forward")}</span>
+          <span className="hidden @2xl:inline">{t("build.forward")}</span>
         </button>
       )}
       <button
@@ -656,6 +662,8 @@ export function Workspace({
         file={file.id}
         settings={editorSettings}
         spellcheck={editorSettings.spellcheck && /\.(tex|ltx)$/i.test(file.path)}
+        tracking={trackAll || data.members.some((m) => m.id === user.id && m.tracking)}
+        onChanges={setTrackedChanges}
         user={user}
         role={role}
         comments={data.comments}

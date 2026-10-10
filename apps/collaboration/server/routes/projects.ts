@@ -23,7 +23,7 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
 /** The dashboard's view of every project a user belongs to, or of one. */
 const summaries = (q: Sql, user: string, project?: string) =>
   q.rows<ProjectSummary>(
-    sql`SELECT p.id, p.name, p.created, p.updated, m.role, m.archived,
+    sql`SELECT p.id, p.name, p.created, p.updated, m.role, m.archived, p.track_all AS "trackAll",
                m.trashed IS NOT NULL AS trashed,
                (SELECT u.username FROM members o JOIN users u ON u.id=o.user_id
                 WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS owner,
@@ -245,6 +245,25 @@ export const projectRoutes = [
     ctx.collab.changed(ctx.project);
     return { ok: true };
   }),
+  // Track changes: anyone who edits turns it on or off for everyone, or for their own edits.
+  route<InProject>("POST", /^tracking$/, async (ctx) => {
+    await ctx.need("edit");
+    const body = await ctx.body();
+    const everyone = typeof body.everyone === "boolean" ? body.everyone : null,
+      mine = typeof body.mine === "boolean" ? body.mine : null;
+    if (everyone === null && mine === null) fail(400, "无效字段 {key}", { key: "everyone" });
+    await ctx.store.db.transaction(async (tx) => {
+      if (everyone !== null)
+        await tx.run(sql`UPDATE projects SET track_all=${everyone} WHERE id=${ctx.project}`);
+      if (mine !== null)
+        await tx.run(
+          sql`UPDATE members SET track=${mine} WHERE project=${ctx.project} AND user_id=${ctx.user.id}`,
+        );
+      await ctx.store.audit(ctx.project, ctx.user.id, "project.tracking", { everyone, mine }, tx);
+    });
+    ctx.collab.changed(ctx.project);
+    return { ok: true };
+  }),
   route<InProject>("PATCH", /^$/, async (ctx) => {
     await ctx.need("owner");
     const name = str(await ctx.body(), "name", 120).trim();
@@ -273,7 +292,7 @@ export const projectRoutes = [
   }),
   route<InProject>("GET", /^members$/, (ctx) =>
     ctx.store.db.rows<Member>(
-      sql`SELECT u.id, u.username, m.role, u.avatar_updated AS avatar
+      sql`SELECT u.id, u.username, m.role, u.avatar_updated AS avatar, m.track AS tracking
           FROM members m JOIN users u ON u.id=m.user_id
           WHERE m.project=${ctx.project} ORDER BY u.username`,
     ),

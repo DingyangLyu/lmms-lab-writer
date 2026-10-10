@@ -143,12 +143,19 @@ export const fileRoutes = [
     const file = await ctx.store.fileMeta(ctx.project, id);
     const body = await ctx.body(file.binary ? BINARY_JSON_BYTES : undefined);
     if (file.binary) return replaceBinary(ctx, file, body);
-    await ctx.collab.replace(
+    // Search and replace across files, for one: tracked like typing when tracking is on.
+    await ctx.collab.replaceMany(
       ctx.project,
-      file.id,
-      str(body, "expected", 2_000_000),
-      str(body, "content", 2_000_000),
+      [
+        {
+          file: file.id,
+          expected: str(body, "expected", 2_000_000),
+          content: str(body, "content", 2_000_000),
+        },
+      ],
       ctx.user.id,
+      undefined,
+      await ctx.store.tracking(ctx.project, ctx.user.id),
     );
     return { ok: true };
   }),

@@ -37,12 +37,22 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
 import type { Comment, Role } from "../shared/api";
+import { changesOf, decideChanges } from "../shared/tracked";
 import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type FilePosition, readPosition, writePosition } from "./positions";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
 import { latexSpellcheck } from "./spellcheck";
+import {
+  changeTracker,
+  followChanges,
+  type ShownChange,
+  TRACK_ORIGIN,
+  trackedChanges,
+  trackedTheme,
+  trackedTooltip,
+} from "./tracked-changes";
 export type Selection = { quote: string; start: string; end: string; from: number; to: number };
 /** A collaborator in the same file, as their cursor shows them. */
 export type Peer = { name: string; color: string };
@@ -190,6 +200,10 @@ export type EditorHandle = {
   focusComment: (comment: Comment) => void;
   /** 1-based line of the cursor, for jumping to the PDF. */
   line: () => number;
+  /** Accept or reject tracked changes; null means every change in the file. */
+  decide: (ids: string[] | null, accept: boolean) => void;
+  /** Select a tracked change's text (or put the cursor where deleted text was). */
+  revealChange: (id: string) => void;
   /** Move the cursor to the start of a 1-based line and scroll it into view. */
   reveal: (line: number) => void;
 };
@@ -215,6 +229,8 @@ export function Editor({
   onNoteIcon,
   settings = DEFAULT_EDITOR_SETTINGS,
   spellcheck = false,
+  tracking = false,
+  onChanges,
 }: {
   project: string;
   file: string;
@@ -249,6 +265,10 @@ export function Editor({
   settings?: Partial<EditorSettings>;
   /** The browser's spell checker on the prose; see spellcheck.ts. */
   spellcheck?: boolean;
+  /** Record this member's edits as tracked changes (shared/tracked.ts). */
+  tracking?: boolean;
+  /** The file's tracked changes, whenever they change. */
+  onChanges?: (changes: ShownChange[]) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
@@ -267,6 +287,7 @@ export function Editor({
     onSelect,
     onLayout,
     onNoteIcon,
+    onChanges,
   });
   callbacks.current = {
     onRole,
@@ -280,6 +301,7 @@ export function Editor({
     onSelect,
     onLayout,
     onNoteIcon,
+    onChanges,
   };
   const draftRef = useRef(draftStart);
   draftRef.current = draftStart;
@@ -289,6 +311,8 @@ export function Editor({
   chosen.current = settings;
   const checked = useRef(spellcheck);
   checked.current = spellcheck;
+  const tracks = useRef(tracking);
+  tracks.current = tracking;
   useEffect(() => {
     if (!host.current) return;
     // The member's place in this file comes back once its text has arrived from the server,
@@ -311,7 +335,16 @@ export function Editor({
     );
     provider.current = p;
     const text = p.doc.getText("content"),
-      undo = new Y.UndoManager(text);
+      // Tracked changes are undone with the edits that made them.
+      undo = new Y.UndoManager([text, changesOf(p.doc)]);
+    undo.addTrackedOrigin(TRACK_ORIGIN);
+    const decide = (ids: string[] | null, accept: boolean) => {
+      if (!p.editable) return;
+      p.doc.transact(
+        () => decideChanges(p.doc, ids ?? [...changesOf(p.doc).keys()], accept),
+        TRACK_ORIGIN,
+      );
+    };
     let textTimer: ReturnType<typeof setTimeout> | null = null;
     const reportPeers = () =>
       callbacks.current.onPeers?.(
@@ -365,6 +398,12 @@ export function Editor({
           yCollab(text, p.awareness, { undoManager: undo }),
           // The desktop editor's theme, gutters, wrapping and brackets, read-only by role.
           editability.current.of(configuration(chosen.current, readOnly.current)),
+          trackedChanges,
+          trackedTheme,
+          trackedTooltip(() => (p.editable ? decide : null)),
+          changeTracker(p.doc, () =>
+            tracks.current && p.editable ? { author: user.id, name: user.name } : null,
+          ),
           commentMarks,
           draftAt,
           noteGutter((ids, draft) => callbacks.current.onNoteIcon?.(ids, draft)),
@@ -460,6 +499,9 @@ export function Editor({
     callbacks.current.onLayout?.(v);
     callbacks.current.onText?.(v.state.doc.toString());
     reportPeers();
+    const stopChanges = followChanges(v, p.doc, (changes) =>
+      callbacks.current.onChanges?.(changes),
+    );
     callbacks.current.onReady({
       text: () => v.state.doc.toString(),
       selection: () => {
@@ -499,6 +541,16 @@ export function Editor({
         v.focus();
       },
       line: () => v.state.doc.lineAt(v.state.selection.main.head).number,
+      decide,
+      revealChange: (id) => {
+        const change = v.state.field(trackedChanges).find((c) => c.id === id);
+        if (!change) return;
+        v.dispatch({
+          selection: { anchor: change.from, head: change.to },
+          effects: EditorView.scrollIntoView(change.from, { y: "center" }),
+        });
+        v.focus();
+      },
       reveal: (line) => {
         const target = v.state.doc.line(Math.min(Math.max(line, 1), v.state.doc.lines));
         v.dispatch({ selection: { anchor: target.from }, scrollIntoView: true });
@@ -527,6 +579,8 @@ export function Editor({
       if (saveTimer) clearTimeout(saveTimer);
       if (latest) writePosition(project, file, latest);
       p.awareness.off("change", reportPeers);
+      stopChanges();
+      callbacks.current.onChanges?.([]);
       callbacks.current.onPeers?.([]);
       callbacks.current.onLayout?.(null);
       callbacks.current.onReady(null);

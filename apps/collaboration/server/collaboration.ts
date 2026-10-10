@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { Locale } from "@lmms-lab/i18n";
-import { diffChars } from "diff";
+import { diffChars, diffWordsWithSpace } from "diff";
 import * as decoding from "lib0/decoding";
 import { WebSocket, WebSocketServer } from "ws";
 import {
@@ -12,6 +12,16 @@ import {
   removeAwarenessStates,
 } from "y-protocols/awareness";
 import * as Y from "yjs";
+import {
+  CHANGES,
+  CHANGES_BYTES,
+  type ChangeAuthor,
+  changesOf,
+  editsFromOperations,
+  resolveChanges,
+  trackEdits,
+  userHue,
+} from "../shared/tracked";
 import { allowedOrigin, bearer, userFor } from "./auth";
 import { type Sql, sql } from "./db";
 import { requestLocale, say } from "./messages";
@@ -56,7 +66,7 @@ const COMPACT_UPDATES = 200,
   COMPACT_BYTES = 512_000;
 /** Stable per-account cursor colour; clients cannot choose another person's identity. */
 export function cursorColors(user: string) {
-  const hue = [...user].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 360, 7);
+  const hue = userHue(user);
   return { color: `hsl(${hue},65%,42%)`, colorLight: `hsl(${hue},65%,85%)` };
 }
 function awarenessClients(bytes: Uint8Array) {
@@ -92,6 +102,15 @@ const logFailure = (what: string) => (error: unknown) =>
  * it is applied, acknowledged or broadcast, so the database is always the complete record.
  * All changes to one document run under its lock; database transactions never wait for a lock.
  */
+/** The tracked changes' size as JSON; a root of another kind counts as too large. */
+function trackedBytes(doc: Y.Doc) {
+  try {
+    return Buffer.byteLength(JSON.stringify(changesOf(doc).toJSON()));
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
 export class Collaboration {
   wss = new WebSocketServer({ noServer: true, maxPayload: 3_000_000 });
   rooms = new Map<string, Room>();
@@ -506,9 +525,11 @@ export class Collaboration {
       try {
         Y.applyUpdate(candidate, Y.encodeStateAsUpdate(room.doc));
         Y.applyUpdate(candidate, update);
+        // The text, and the tracked changes beside it (shared/tracked.ts).
         if (
           Buffer.byteLength(candidate.getText("content").toString()) > 2_000_000 ||
-          [...candidate.share.keys()].some((k) => k !== "content")
+          [...candidate.share.keys()].some((k) => k !== "content" && k !== CHANGES) ||
+          (candidate.share.has(CHANGES) && trackedBytes(candidate) > CHANGES_BYTES)
         )
           fail(413, "文档超过限制");
         if (Y.encodeStateAsUpdate(candidate).length > 8_000_000)
@@ -583,11 +604,16 @@ export class Collaboration {
    * Replace whole documents as one collaborative edit. Every plan is checked against the
    * live text; the updates and `effects` commit in one transaction, then rooms apply them.
    */
+  /**
+   * Replaces whole texts by their smallest character edits, so collaborators' cursors and
+   * comments stay put. With `track`, the edits are recorded as tracked changes by that author.
+   */
   async replaceMany(
     project: string,
     plans: { file: string; expected: string; content: string }[],
     actor: string,
     effects?: (tx: Sql) => Promise<void>,
+    track?: ChangeAuthor,
   ) {
     const opened = new Set<string>();
     try {
@@ -602,7 +628,11 @@ export class Collaboration {
               fail(409, "文档已有新的修改，请刷新审阅");
             const content = normalizeEol(plan.content);
             if (Buffer.byteLength(content) > 2_000_000) fail(413, "文档超过 2 MB");
-            const diff = diffChars(plan.expected, content, { timeout: 500 });
+            // Tracked edits read as whole words ("gamma" became "delta", not g, delt and mma);
+            // the others stay as small as possible, so cursors and comments move least.
+            const diff = track
+              ? diffWordsWithSpace(plan.expected, content, { timeout: 500 })
+              : diffChars(plan.expected, content, { timeout: 500 });
             if (!diff) fail(413, "修改过大，请拆分后审阅");
             const edits: { at: number; remove: number; insert: string }[] = [];
             let offset = 0;
@@ -624,11 +654,14 @@ export class Collaboration {
             try {
               Y.applyUpdate(clone, Y.encodeStateAsUpdate(room.doc));
               const value = clone.getText("content");
+              const before = track ? resolveChanges(clone).changes : [];
               clone.transact(() => {
-                for (const edit of edits.reverse()) {
+                for (const edit of [...edits].reverse()) {
                   value.delete(edit.at, edit.remove);
                   value.insert(edit.at, edit.insert);
                 }
+                if (track)
+                  trackEdits(clone, before, editsFromOperations(plan.expected, edits), track);
               });
               if (Y.encodeStateAsUpdate(clone).length > 8_000_000) fail(413, "文档历史过大");
               prepared.push({

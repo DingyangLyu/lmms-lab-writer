@@ -16,6 +16,7 @@ import { peopleEn, peopleZh } from "./people";
 import { compareEn, compareZh, reviewEn, reviewZh } from "./review";
 import { shellEn, shellZh } from "./shell";
 import { templatesEn, templatesZh } from "./templates";
+import { trackedEn, trackedZh } from "./tracked";
 import { workspaceEn, workspaceZh } from "./workspace";
 
 const zh = {
@@ -36,6 +37,7 @@ const zh = {
   ...reviewZh,
   ...shellZh,
   ...templatesZh,
+  ...trackedZh,
   ...agentsZh,
   ...workspaceZh,
 };
@@ -57,6 +59,7 @@ const en: Record<keyof typeof zh, string> = {
   ...reviewEn,
   ...shellEn,
   ...templatesEn,
+  ...trackedEn,
   ...agentsEn,
   ...workspaceEn,
 };

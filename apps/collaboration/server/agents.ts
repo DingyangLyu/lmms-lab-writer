@@ -27,6 +27,7 @@ import {
   OPENCODE_EVENT,
   THREADS_EVENT,
 } from "../shared/agents";
+import type { ChangeAuthor } from "../shared/tracked";
 import { answerTo, delegatedPrompt, resultPrompt, transcript } from "./agent-bridge";
 import { allowedOrigin, bearer, userFor } from "./auth";
 import type { Collaboration } from "./collaboration";
@@ -81,6 +82,11 @@ type TaskRow = {
 const TASK_PERMISSIONS: Record<string, readonly string[]> = {
   codex: ["fullAccess", "autoReview", "askForApproval", "readOnly"],
   claude: ["bypassPermissions", "acceptEdits", "default", "plan"],
+};
+const HARNESS_NAMES: Record<string, string> = {
+  codex: "Codex",
+  claude: "Claude Code",
+  opencode: "OpenCode",
 };
 type ThreadRow = {
   id: string;
@@ -472,7 +478,13 @@ export class Agents {
       // Normally the member whose turn it is; after a server restart, whoever started it.
       const actor = turn?.thread === thread.id ? turn.user : thread.owner;
       if (!(await this.store.can(project, actor, "edit"))) fail(403, "当前角色不允许此操作");
-      const results = await this.applyChanges(project, actor, params.files);
+      const results = await this.applyChanges(
+        project,
+        actor,
+        params.files,
+        // With track changes on for the member whose turn it is, the edits wait for review.
+        await this.store.tracking(project, actor, HARNESS_NAMES[thread.harness] ?? thread.harness),
+      );
       this.collab.changed(project);
       for (const b of this.browsers)
         if (b.project === project && visible(thread, b.user.id))
@@ -1336,14 +1348,14 @@ ${message}`,
   }
 
   /** Each change on its own: one that cannot be applied does not hold back the others. */
-  private async applyChanges(project: string, actor: string, raw: unknown) {
+  private async applyChanges(project: string, actor: string, raw: unknown, track?: ChangeAuthor) {
     if (!Array.isArray(raw) || raw.length > 200) fail(400, "AI 改动无效");
     const results: AgentChangeResult[] = [];
     for (const value of raw) {
       if (!isObject(value)) fail(400, "AI 改动无效");
       const path = safePath(text(value, "path", 240));
       try {
-        results.push(await this.applyChange(project, actor, path, value));
+        results.push(await this.applyChange(project, actor, path, value, track));
       } catch (error) {
         if (!(error instanceof HttpError) || error.status >= 500) throw error;
         results.push({ path, status: "skipped", reason: error.template });
@@ -1356,6 +1368,7 @@ ${message}`,
     actor: string,
     path: string,
     change: Params,
+    track?: ChangeAuthor,
   ): Promise<AgentChangeResult> {
     const file = await this.store.db.row<{ id: string; binary: boolean; revision: number }>(
       sql`SELECT id, is_binary AS "binary", revision FROM files
@@ -1407,6 +1420,8 @@ ${message}`,
             project,
             [{ file: file.id, expected: current, content: merged.content }],
             actor,
+            undefined,
+            track,
           );
           return { path, status: "applied" };
         } catch (error) {

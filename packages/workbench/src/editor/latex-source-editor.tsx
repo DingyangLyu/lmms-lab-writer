@@ -275,7 +275,8 @@ export function FoldToolbar({
   };
   return (
     // One line that scrolls sideways when the editor is narrow, instead of wrapping each label.
-    <div className="flex shrink-0 items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-border bg-background px-3 py-1 text-[11px] text-muted [scrollbar-width:none] [&>*]:shrink-0">
+    // A container, so `actions` can drop their labels by the editor's width, not the window's.
+    <div className="@container flex shrink-0 items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-border bg-background px-3 py-1 text-[11px] text-muted [scrollbar-width:none] [&>*]:shrink-0">
       <span>{t("editor.fold")}</span>
       <button
         type="button"
