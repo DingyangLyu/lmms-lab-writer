@@ -29,6 +29,7 @@ import {
   editorConfiguration,
   FoldToolbar,
   latexFoldExtensions,
+  symbolInsertion,
   writerSearch,
 } from "@lmms-lab/workbench";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
@@ -183,6 +184,8 @@ export type EditorHandle = {
   /** Where each highlighted comment is now, following edits since the comments loaded. */
   commentRanges: () => Map<string, { from: number; to: number }>;
   insert: (text: string) => void;
+  /** A command from the symbol palette, spaced from a letter that follows. */
+  insertSymbol: (command: string) => void;
   focusComment: (comment: Comment) => void;
   /** 1-based line of the cursor, for jumping to the PDF. */
   line: () => number;
@@ -478,6 +481,14 @@ export function Editor({
       insert: (insert) => {
         if (!p.editable) return;
         v.dispatch(v.state.replaceSelection(insert));
+        v.focus();
+      },
+      insertSymbol: (command) => {
+        if (!p.editable) return;
+        const { to } = v.state.selection.main;
+        v.dispatch(
+          v.state.replaceSelection(symbolInsertion(command, v.state.doc.sliceString(to, to + 1))),
+        );
         v.focus();
       },
       line: () => v.state.doc.lineAt(v.state.selection.main.head).number,

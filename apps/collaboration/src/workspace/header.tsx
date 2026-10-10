@@ -13,6 +13,7 @@ import {
   ListIcon,
   PlayCircleIcon,
   SquaresFourIcon,
+  TextAaIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -163,6 +164,7 @@ export function WorkspaceMenu({
   onProjects,
   onReferences,
   onReview,
+  onWordCount,
   onShare,
 }: {
   user: PublicUser;
@@ -173,6 +175,7 @@ export function WorkspaceMenu({
   onProjects: () => void;
   onReferences: () => void;
   onReview: () => void;
+  onWordCount: () => void;
   /** Phones have no room for the Share button beside the menu. */
   onShare: () => void;
 }) {
@@ -230,6 +233,7 @@ export function WorkspaceMenu({
           </button>
           {entry(<SquaresFourIcon className={icon} />, t("shell.allProjects"), onProjects)}
           {entry(<BooksIcon className={icon} />, t("tab.bibliography"), onReferences)}
+          {entry(<TextAaIcon className={icon} />, t("count.title"), onWordCount)}
           {entry(
             <GitDiffIcon className={icon} />,
             <>

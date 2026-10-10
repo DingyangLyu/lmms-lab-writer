@@ -10,6 +10,8 @@ export * from "./editor/drag-selection";
 export * from "./editor/font-stacks";
 export * from "./editor/latex-source-editor";
 export * from "./editor/search-panel";
+export * from "./editor/symbol-palette";
+export * from "./editor/symbols";
 export * from "./editor/types";
 export * from "./editor-error-boundary";
 export * from "./file-tree";

@@ -70,8 +70,10 @@ import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
 import { type MarginLayout, ReviewMargin } from "./review-margin";
 import { ShareDialog } from "./share-dialog";
+import { SymbolButton } from "./symbol-button";
 import { Btn, ResizeHandle, ToggleButton, useStoredSize } from "./ui";
 import { useProject } from "./use-project";
+import { WordCountDialog } from "./word-count-dialog";
 
 /** The chat panel (with its Markdown renderer) loads when the right column first opens. */
 const AgentsPanel = lazy(() => import("./agents-panel").then((m) => ({ default: m.AgentsPanel })));
@@ -239,7 +241,7 @@ export function Workspace({
     [rightOpen, setRightOpen] = useState(aiBeside),
     [logOpen, setLogOpen] = useState(false),
     [commentsOpen, setCommentsOpen] = useState(false),
-    [dialog, setDialog] = useState<"share" | "references" | "review" | null>(null);
+    [dialog, setDialog] = useState<"share" | "references" | "review" | "count" | null>(null);
   // Smaller windows narrow the side panels first, leaving the editor and the PDF their room.
   const sidebarSize = useStoredSize(
       "writer-web-sidebar",
@@ -526,6 +528,7 @@ export function Workspace({
   const marginShown = reviewOpen && marginFits && !!file && !file.binary;
   const editorActions = file && !file.binary && (
     <>
+      <SymbolButton ws={ws} />
       <button
         type="button"
         disabled={!ws.canComment}
@@ -827,6 +830,7 @@ export function Workspace({
               onProjects={onBack}
               onReferences={() => setDialog("references")}
               onReview={() => setDialog("review")}
+              onWordCount={() => setDialog("count")}
               onShare={() => setDialog("share")}
             />
             <button
@@ -1006,6 +1010,15 @@ export function Workspace({
             ws={ws}
             sources={data.sources}
             refreshSources={data.refreshSources}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog === "count" && (
+          <WordCountDialog
+            ws={ws}
+            main={b.chosenMain}
+            sources={data.sources}
+            refresh={data.refreshSources}
             onClose={() => setDialog(null)}
           />
         )}
