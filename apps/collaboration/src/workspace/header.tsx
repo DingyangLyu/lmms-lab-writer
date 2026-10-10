@@ -289,7 +289,7 @@ export function WorkspaceMenu({
   );
 }
 
-/** Text size, wrapping, line numbers and full-width punctuation marks, for this browser. */
+/** Text size, wrapping, line numbers, full-width punctuation marks and spelling, for this browser. */
 function EditorSettingsSection() {
   const { t } = useI18n();
   const [settings, change] = useEditorSettings();
@@ -339,6 +339,7 @@ function EditorSettingsSection() {
       {toggle(t("shell.markFullWidth"), settings.highlightAmbiguousUnicode, (on) =>
         change({ highlightAmbiguousUnicode: on }),
       )}
+      {toggle(t("shell.spellcheck"), settings.spellcheck, (on) => change({ spellcheck: on }))}
     </div>
   );
 }

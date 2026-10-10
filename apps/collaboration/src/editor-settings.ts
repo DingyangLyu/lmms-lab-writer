@@ -1,6 +1,6 @@
 /**
  * The few editor settings the web offers (the desktop has a full dialog): text size, wrapping,
- * line numbers and boxes around full-width punctuation. Kept per browser.
+ * line numbers, boxes around full-width punctuation and spell checking. Kept per browser.
  */
 import { DEFAULT_EDITOR_SETTINGS, type EditorSettings } from "@lmms-lab/workbench";
 import { useCallback, useEffect, useState } from "react";
@@ -8,7 +8,10 @@ import { useCallback, useEffect, useState } from "react";
 export type WebEditorSettings = Pick<
   EditorSettings,
   "fontSize" | "wordWrap" | "lineNumbers" | "highlightAmbiguousUnicode"
->;
+> & {
+  /** The browser's English checker on the prose of .tex files; see spellcheck.ts. */
+  spellcheck: boolean;
+};
 const KEY = "writer-editor-settings";
 const CHANGED = "writer-editor-settings";
 export const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 22];
@@ -19,6 +22,7 @@ export function readEditorSettings(): WebEditorSettings {
     wordWrap: DEFAULT_EDITOR_SETTINGS.wordWrap,
     lineNumbers: DEFAULT_EDITOR_SETTINGS.lineNumbers,
     highlightAmbiguousUnicode: DEFAULT_EDITOR_SETTINGS.highlightAmbiguousUnicode,
+    spellcheck: true,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -28,6 +32,7 @@ export function readEditorSettings(): WebEditorSettings {
       wordWrap: saved.wordWrap === "off" ? "off" : "on",
       lineNumbers: saved.lineNumbers === "off" ? "off" : "on",
       highlightAmbiguousUnicode: saved.highlightAmbiguousUnicode === true,
+      spellcheck: saved.spellcheck !== false,
     };
   } catch {
     return fallback;

@@ -655,6 +655,7 @@ export function Workspace({
         project={project.id}
         file={file.id}
         settings={editorSettings}
+        spellcheck={editorSettings.spellcheck && /\.(tex|ltx)$/i.test(file.path)}
         user={user}
         role={role}
         comments={data.comments}

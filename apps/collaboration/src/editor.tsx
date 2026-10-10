@@ -42,6 +42,7 @@ import { i18n } from "./i18n";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type FilePosition, readPosition, writePosition } from "./positions";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
+import { latexSpellcheck } from "./spellcheck";
 export type Selection = { quote: string; start: string; end: string; from: number; to: number };
 /** A collaborator in the same file, as their cursor shows them. */
 export type Peer = { name: string; color: string };
@@ -213,6 +214,7 @@ export function Editor({
   draftAt: draftStart = null,
   onNoteIcon,
   settings = DEFAULT_EDITOR_SETTINGS,
+  spellcheck = false,
 }: {
   project: string;
   file: string;
@@ -245,11 +247,14 @@ export function Editor({
   onNoteIcon?: (ids: string[], draft: boolean) => void;
   /** Text size, wrapping and the like, as the member chose them. */
   settings?: Partial<EditorSettings>;
+  /** The browser's spell checker on the prose; see spellcheck.ts. */
+  spellcheck?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
-  const editability = useRef(new Compartment());
+  const editability = useRef(new Compartment()),
+    spelling = useRef(new Compartment());
   const callbacks = useRef({
     onRole,
     onStatus,
@@ -282,6 +287,8 @@ export function Editor({
   readOnly.current = role;
   const chosen = useRef(settings);
   chosen.current = settings;
+  const checked = useRef(spellcheck);
+  checked.current = spellcheck;
   useEffect(() => {
     if (!host.current) return;
     // The member's place in this file comes back once its text has arrived from the server,
@@ -361,9 +368,9 @@ export function Editor({
           commentMarks,
           draftAt,
           noteGutter((ids, draft) => callbacks.current.onNoteIcon?.(ids, draft)),
+          spelling.current.of(latexSpellcheck(checked.current)),
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.label"),
-            spellcheck: "false",
             autocapitalize: "off",
             autocorrect: "off",
           }),
@@ -535,6 +542,9 @@ export function Editor({
       effects: editability.current.reconfigure(configuration(settings, role)),
     });
   }, [role, settings]);
+  useEffect(() => {
+    view.current?.dispatch({ effects: spelling.current.reconfigure(latexSpellcheck(spellcheck)) });
+  }, [spellcheck]);
   useEffect(() => {
     const v = view.current,
       p = provider.current;
