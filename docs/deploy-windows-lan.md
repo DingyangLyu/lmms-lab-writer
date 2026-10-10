@@ -105,8 +105,17 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Server"; Start-Schedul
 Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"
 ```
 
+## 公网访问
+
+服务器经两条 SSH 反向隧道对外：北京阿里云 `http://101.200.37.236:18089` 和洛杉矶 `https://writer.desire-drive.com`，这两个地址都写在 `WRITER_ORIGIN` 里（另设了 `WRITER_TRUST_PROXY=1`）。实测（2026-10-10）一次请求：校园网内直连约 10 毫秒，经北京约 60 毫秒，经洛杉矶 1–2 秒（这台电脑到洛杉矶往返约 220 毫秒，经洛杉矶访问要跨太平洋来回两次；从校园网直连该域名还会失败）。所以：
+
+- 校园网内用 `http://<这台电脑的 IP>`；国内校外用北京地址；洛杉矶域名只留给国外的合作者；
+- 浏览器开着全局代理时，国内地址也会绕到国外，访问 Writer 前请把这些地址设为直连；
+- 网页的脚本和样式已压缩（Brotli/gzip）并长期缓存，第一次打开之后再进只需下载很少的数据。
+
 ## 常见问题
 
 - **IP 变了**：地址由 DHCP 分配。用新 IP 打开网页可以直接登录；邀请链接用的是 `WRITER_ORIGIN` 的第一个地址，改成新地址并重启 Writer Server 即可。能管理路由器时为这台电脑做 DHCP 地址保留。用域名访问（经反向代理）时必须把域名写进 `WRITER_ORIGIN`。
+- **页面偶尔提示“项目权限已变更”或突然变成只读**：以前服务器在数据库短暂不可用（例如 PostgreSQL 重启）时会把在线页面当作失去权限。现在只有确实未登录、不再是成员或项目不存在时才会这样，临时故障时页面自动重连；页面收到这类断开时也会先向服务器确认一次权限。
 - **AI 任务一直排队**：看 `runner.log` 和任务计划程序里 Writer Runner 是否在运行。
 - **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。

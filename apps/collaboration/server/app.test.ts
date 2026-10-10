@@ -593,6 +593,9 @@ describe("real collaboration service", () => {
     await mkdir(join(base, "dist"));
     await mkdir(join(base, "dist-other"));
     await writeFile(join(base, "dist/index.html"), '<div id="root"></div>');
+    await mkdir(join(base, "dist/assets"));
+    const script = `console.log(${JSON.stringify("Y-Writer ".repeat(400))});`;
+    await writeFile(join(base, "dist/assets/app-3f9a1c.js"), script);
     await writeFile(join(base, "dist-other/secret.json"), "{}");
     await writeFile(join(base, "package.json"), "{}");
     try {
@@ -601,6 +604,17 @@ describe("real collaboration service", () => {
       expect(homepage.status).toBe(200);
       expect(homepage.headers.get("content-type")).toContain("text/html");
       expect(await homepage.text()).toContain('<div id="root">');
+      // The entry point is checked every time; hashed assets are kept and sent compressed.
+      expect(homepage.headers.get("cache-control")).toBe("no-cache");
+      for (const encoding of ["br", "gzip"]) {
+        const asset = await fetch(`${f.app.origin}/assets/app-3f9a1c.js`, {
+          headers: { "Accept-Encoding": encoding },
+        });
+        expect(asset.headers.get("content-encoding")).toBe(encoding);
+        expect(asset.headers.get("cache-control")).toContain("immutable");
+        expect(Number(asset.headers.get("content-length"))).toBeLessThan(script.length / 4);
+        expect(await asset.text()).toBe(script);
+      }
       expect((await fetch(`${f.app.origin}/..%2fpackage.json`)).status).toBe(403);
       // A sibling whose name starts with the static directory's is still outside it.
       expect((await fetch(`${f.app.origin}/..%2fdist-other%2fsecret.json`)).status).toBe(403);

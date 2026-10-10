@@ -1,6 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
+import { promisify } from "node:util";
+import { brotliCompress, gzip, constants as zlibConstants } from "node:zlib";
 import type { Locale } from "@lmms-lab/i18n";
 import { Agents } from "./agents";
 import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
@@ -70,6 +72,18 @@ const STATIC_TYPES: Record<string, string> = {
   ".wasm": "application/wasm",
   ".woff2": "font/woff2",
 };
+/** Text worth compressing; images, fonts and PDFs are compressed already. */
+const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".svg", ".json", ".map", ".txt"]);
+/** Compressed copies of the built files, made once per file version. */
+const compressedCache = new Map<string, Buffer>();
+const brotli = promisify(brotliCompress),
+  gzipAsync = promisify(gzip);
+/**
+ * The web app's files. Built assets carry a hash of their content in the name, so browsers keep
+ * them for good; index.html is checked every time, so a new build is picked up at once. Text is
+ * sent compressed (Brotli or gzip): the editor's script is 1.4 MB, a few hundred kB compressed,
+ * which matters through a tunnel to another city.
+ */
 async function serveStatic(ctx: Context, root: string) {
   const path = ctx.url.pathname;
   let requested = "index.html";
@@ -81,11 +95,39 @@ async function serveStatic(ctx: Context, root: string) {
     }
   const file = resolve(root, requested);
   if (!file.startsWith(`${root}${sep}`)) fail(403, "无效路径");
-  const content = await readFile(file).catch(() => fail(404, "资源不存在，请先运行 pnpm build"));
-  ctx.res.writeHead(200, {
-    "Content-Type": STATIC_TYPES[extname(file)] ?? "application/octet-stream",
-  });
-  ctx.res.end(ctx.method === "HEAD" ? undefined : content);
+  const info = await stat(file).catch(() => fail(404, "资源不存在，请先运行 pnpm build"));
+  if (!info.isFile()) fail(404, "资源不存在，请先运行 pnpm build");
+  const type = extname(file);
+  const headers: Record<string, string | number> = {
+    "Content-Type": STATIC_TYPES[type] ?? "application/octet-stream",
+    "Cache-Control": requested.startsWith("assets/")
+      ? "public, max-age=31536000, immutable"
+      : "no-cache",
+  };
+  let body: Buffer = await readFile(file);
+  if (COMPRESSIBLE.has(type) && body.length > 1024) {
+    headers.Vary = "Accept-Encoding";
+    const accepted = String(ctx.req.headers["accept-encoding"] ?? "");
+    const encoding = /\bbr\b/.test(accepted) ? "br" : /\bgzip\b/.test(accepted) ? "gzip" : null;
+    if (encoding) {
+      const key = `${file}:${info.mtimeMs}:${encoding}`;
+      let packed = compressedCache.get(key);
+      if (!packed) {
+        packed =
+          encoding === "br"
+            ? await brotli(body, {
+                params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 },
+              })
+            : await gzipAsync(body, { level: 9 });
+        compressedCache.set(key, packed);
+      }
+      headers["Content-Encoding"] = encoding;
+      body = packed;
+    }
+  }
+  headers["Content-Length"] = body.length;
+  ctx.res.writeHead(200, headers);
+  ctx.res.end(ctx.method === "HEAD" ? undefined : body);
 }
 function sendError(res: ServerResponse, error: unknown, locale: Locale) {
   const status = error instanceof HttpError ? error.status : 500;
