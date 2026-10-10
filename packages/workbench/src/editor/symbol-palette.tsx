@@ -27,6 +27,7 @@ export function SymbolPalette({ onInsert }: { onInsert: (command: string) => voi
         <input
           type="search"
           value={query}
+          // biome-ignore lint/a11y/noAutofocus: the palette opens to search it.
           autoFocus
           placeholder={t("symbols.search")}
           aria-label={t("symbols.search")}

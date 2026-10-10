@@ -20,14 +20,14 @@ export type SearchMatch = {
   length: number;
 };
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Letters, digits and underscore count as a word, in any script. */
 const WORD = "[\\p{L}\\p{N}_]";
 
 /** The pattern to search with; null for an empty query; an Error for a broken expression. */
 export function searchPattern(options: SearchOptions): RegExp | Error | null {
   if (!options.query) return null;
-  const body = options.regexp ? options.query : escape(options.query);
+  const body = options.regexp ? options.query : escapeRegExp(options.query);
   const source = options.wholeWord ? `(?<!${WORD})(?:${body})(?!${WORD})` : body;
   try {
     return new RegExp(source, `gmu${options.caseSensitive ? "" : "i"}`);

@@ -53,6 +53,7 @@ export function ProjectSearchPanel({
   const pattern = useMemo(() => searchPattern(options), [options]);
   // The open file as it is in the editor; the rest as the server has them.
   const openPath = ws.file && !ws.file.binary ? ws.file.path : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the editor's text is read when the search or the files change.
   const results = useMemo(() => {
     if (!(pattern instanceof RegExp)) return [];
     let left = LIMIT;
@@ -66,7 +67,6 @@ export function ProjectSearchPanel({
       list.push({ file: f, matches });
     }
     return list;
-    // biome-ignore lint/correctness/useExhaustiveDependencies: the editor's text is read when the search or the files change.
   }, [pattern, sources, openPath]);
   const total = results.reduce((n, r) => n + r.matches.length, 0);
   const toggle = (key: "caseSensitive" | "regexp" | "wholeWord", label: string, title: string) => (
