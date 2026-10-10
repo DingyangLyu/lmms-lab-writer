@@ -10,7 +10,7 @@ import { Avatar } from "./avatar";
 import { useI18n } from "./i18n";
 import { LanguageSwitch } from "./language-switch";
 
-export type Page = "projects" | "templates" | "admin" | "profile";
+export type Page = "projects" | "templates" | "friends" | "admin" | "profile";
 
 export function TopNav({
   user,
@@ -73,6 +73,7 @@ export function TopNav({
       <nav aria-label={t("nav.label")}>
         {link("projects", t("nav.projects"))}
         {link("templates", t("nav.templates"))}
+        {link("friends", t("nav.friends"), requests)}
         {user.admin && link("admin", t("nav.admin"), pending)}
       </nav>
       <div className="nav-end">
@@ -113,7 +114,6 @@ export function TopNav({
               >
                 <UserCircleIcon aria-hidden="true" />
                 {t("nav.profile")}
-                {requests > 0 && <span className="nav-count">{requests}</span>}
               </button>
               {user.admin && (
                 <button

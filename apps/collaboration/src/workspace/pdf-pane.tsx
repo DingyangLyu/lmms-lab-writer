@@ -21,6 +21,28 @@ export function BuildSummary({ b }: { b: BuildState }) {
   );
 }
 
+/** pdfLaTeX stopped at Chinese text: what to do, and the fix in one click. */
+export function ChineseHint({ b }: { b: BuildState }) {
+  const { t } = useI18n();
+  if (!b.chineseInPdflatex) return null;
+  return (
+    <div
+      role="status"
+      className="shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+    >
+      <p>{t("build.chinese")}</p>
+      <button
+        type="button"
+        className="mt-1.5 border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-100 disabled:opacity-50"
+        disabled={b.compiling}
+        onClick={b.fixChinese}
+      >
+        {t("build.chineseFix")}
+      </button>
+    </div>
+  );
+}
+
 /** The name comments use for the compiled PDF (there is one per project). */
 export const OUTPUT_PDF = "output.pdf";
 
@@ -78,6 +100,7 @@ export function PdfPane({
           <XIcon className="size-4" />
         </button>
       </div>
+      <ChineseHint b={b} />
       <div className="min-h-0 flex-1">
         {build?.pdf ? (
           <PdfAnnotationContext.Provider value={ws.canComment ? (notes ?? null) : null}>

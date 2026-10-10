@@ -62,6 +62,12 @@ describe("people", () => {
         (u) => [u.username, u.relation],
       ),
     ).toEqual([["bob", "none"]]);
+    // An empty search lists everyone else who can sign in.
+    expect(
+      ((await f.call("/users/search?q=", undefined, alice.cookie)).data as FoundUser[]).map(
+        (u) => u.username,
+      ),
+    ).toEqual(["bob", "owner"]);
     expect((await f.call("/friends", { username: "waiting" }, alice.cookie)).status).toBe(404);
     expect((await f.call("/friends", { username: "alice" }, alice.cookie)).status).toBe(400);
 

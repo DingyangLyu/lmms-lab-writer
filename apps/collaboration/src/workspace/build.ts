@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { Build, Engine, PdfRegion, SourceFile, SourceLocation } from "../../shared/api";
+import type {
+  Build,
+  Engine,
+  FileContent,
+  PdfRegion,
+  SourceFile,
+  SourceLocation,
+} from "../../shared/api";
 import { api } from "../api";
 import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 
+/** pdfLaTeX's error for a Chinese, Japanese or Korean character it cannot typeset. */
+const CJK_ERROR = /Unicode character \S+ \(U\+(?:2E[89A-F]|[3-9][0-9A-F]|F[9A]|FF)[0-9A-F]{2}\)/;
 const needsXeLaTeX = (sources: SourceFile[]) =>
   sources.some((f) =>
     /\\usepackage(\[[^\]]*\])?\{(ctex|xeCJK|fontspec)\}|\\documentclass(\[[^\]]*\])?\{ctex/.test(
@@ -58,6 +67,39 @@ export function useBuild(
       setReveal(null);
     }
   }, [reveal, file, status, editor]);
+  const build_ = async (engineNow: Engine) => {
+    if (!chosenMain) throw new Error(t("build.noTex"));
+    setCompiling(true);
+    try {
+      setBuild(await api<Build>(`${ws.prefix}/builds`, { main: chosenMain, engine: engineNow }));
+      setHighlight(null);
+      setOpen(true);
+    } finally {
+      setCompiling(false);
+    }
+  };
+  /** pdfLaTeX stopped at Chinese text: the main file gets ctex, and XeLaTeX builds it. */
+  const chineseInPdflatex =
+    build?.status === "failed" &&
+    build.engine === "pdflatex" &&
+    build.issues.some((i) => CJK_ERROR.test(i.message));
+  const fixChinese = () =>
+    ws.run(async () => {
+      const target = files.find((f) => f.path === chosenMain && !f.binary);
+      if (!target) throw new Error(t("build.noTex"));
+      const current = await api<FileContent>(`${ws.prefix}/files/${target.id}`);
+      const text = "content" in current ? current.content : "";
+      if (!/\\usepackage(\[[^\]]*\])?\{ctex\}/.test(text)) {
+        const next = text.replace(
+          /(\\documentclass(\[[^\]]*\])?\{[^}]*\}[^\n]*\n)/,
+          "$1\\usepackage[UTF8]{ctex}\n",
+        );
+        if (next === text) throw new Error(t("build.chineseManual"));
+        await api(`${ws.prefix}/files/${target.id}`, { expected: text, content: next }, "PUT");
+      }
+      setEngine("xelatex");
+      await build_("xelatex");
+    });
   const compile = () =>
     ws.run(async () => {
       if (!chosenMain) throw new Error(t("build.noTex"));
@@ -113,6 +155,8 @@ export function useBuild(
     setEngine,
     highlight,
     compile,
+    chineseInPdflatex,
+    fixChinese,
     showCursorInPdf,
     showPdfInSource,
     openLocation,

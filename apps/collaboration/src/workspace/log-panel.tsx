@@ -2,7 +2,7 @@
 import { XIcon } from "@phosphor-icons/react";
 import { useI18n } from "../i18n";
 import type { BuildState } from "./build";
-import { BuildSummary } from "./pdf-pane";
+import { BuildSummary, ChineseHint } from "./pdf-pane";
 
 export function LogPanel({ b, onClose }: { b: BuildState; onClose: () => void }) {
   const { t } = useI18n();
@@ -28,6 +28,7 @@ export function LogPanel({ b, onClose }: { b: BuildState; onClose: () => void })
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
+        <ChineseHint b={b} />
         {[...errors, ...warnings].map((issue, i) => (
           <button
             type="button"

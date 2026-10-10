@@ -206,6 +206,8 @@ describe("client panels render", () => {
       setEngine: () => {},
       highlight: null,
       compile: () => {},
+      chineseInPdflatex: false,
+      fixChinese: () => {},
       showCursorInPdf: () => {},
       showPdfInSource: () => {},
       openLocation: () => {},

@@ -152,7 +152,8 @@ export function parseLog(log: string, buildDir: string): Issue[] {
       continue;
     }
     const warning = /^(?:LaTeX|Package \S+) Warning: (.+)$/.exec(line);
-    if (warning?.[1]) {
+    // Builds run without shell escape on purpose; saying so on every build is only noise.
+    if (warning?.[1] && !/^Shell escape feature is not enabled/.test(warning[1])) {
       let message = warning[1];
       for (let j = i + 1; j < lines.length && /^\(\S+\)\s/.test(lines[j] ?? ""); j++)
         message += ` ${(lines[j] ?? "").replace(/^\(\S+\)\s+/, "")}`;

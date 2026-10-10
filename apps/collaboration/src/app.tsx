@@ -6,7 +6,7 @@ import { api } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { useI18n } from "./i18n";
-import { ProfilePage } from "./profile";
+import { FriendsPage, ProfilePage } from "./profile";
 import { TemplateGallery } from "./templates";
 import { type Page, TopNav } from "./top-nav";
 
@@ -23,6 +23,7 @@ export function App() {
     [view, setView] = useState<Page>(() => {
       const params = new URL(location.href).searchParams;
       if (params.has("templates") || params.has("template")) return "templates";
+      if (params.has("friends")) return "friends";
       return params.has("profile") ? "profile" : "projects";
     }),
     // `/?template=<id>` shows one template in the gallery.
@@ -58,11 +59,7 @@ export function App() {
   const navigate = useCallback((next: Page) => {
     setView(next);
     if (next === "templates") setTemplate(null);
-    history.replaceState(
-      null,
-      "",
-      next === "templates" ? "/?templates" : next === "profile" ? "/?profile" : "/",
-    );
+    history.replaceState(null, "", next === "projects" ? "/" : `/?${next}`);
   }, []);
   if (!ready)
     return (
@@ -118,6 +115,8 @@ export function App() {
             openProject(next);
           }}
         />
+      ) : page === "friends" ? (
+        <FriendsPage />
       ) : page === "profile" ? (
         <ProfilePage user={user} onUser={setUser} />
       ) : (

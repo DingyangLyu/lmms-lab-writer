@@ -42,13 +42,15 @@ const isFriend = async (ctx: Authed, other: string) =>
 
 export const peopleRoutes = [
   route<Authed>("GET", /^\/api\/users\/search$/, async (ctx): Promise<FoundUser[]> => {
+    // Without a query: everyone, so a member can see who is on the server.
     const q = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase();
-    if (!q || q.length > 64) return [];
+    if (q.length > 64) return [];
     const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     const found = await ctx.store.db.rows<Person>(
       sql`SELECT u.id, u.username, u.avatar_updated AS avatar FROM users u
           WHERE lower(u.username) LIKE ${like} AND u.id<>${ctx.user.id} AND NOT u.pending AND NOT u.disabled AND NOT u.deleted
-          ORDER BY (lower(u.username)=${q}) DESC, length(u.username), u.username LIMIT 10`,
+          ORDER BY (lower(u.username)=${q}) DESC, ${q ? 1 : 0} * length(u.username), u.username
+          LIMIT ${q ? 10 : 200}`,
     );
     const { friends, incoming, outgoing } = await friendsOf(ctx);
     const among = (list: Person[], id: string) => list.some((p) => p.id === id);

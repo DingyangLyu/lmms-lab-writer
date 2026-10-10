@@ -116,7 +116,6 @@ export function ProfilePage({
           </div>
         </div>
       </section>
-      <FriendsPanel />
       <section className="panel">
         <ChangePassword onDone={() => setPasswordSaved(true)} />
         {passwordSaved && <p className="notice-inline">{t("profile.passwordSaved")}</p>}
@@ -125,11 +124,12 @@ export function ProfilePage({
   );
 }
 
-function FriendsPanel() {
+/** Friends: requests to answer, friends, everyone on the server to find, requests sent. */
+export function FriendsPage() {
   const { t } = useI18n();
   const [friends, setFriends] = useState<Friends | null>(null),
     [query, setQuery] = useState(""),
-    [found, setFound] = useState<FoundUser[]>([]);
+    [found, setFound] = useState<FoundUser[] | null>(null);
   const { busy, error, setError, run } = useAction();
   useEffect(() => {
     void api<Friends>("/friends")
@@ -143,20 +143,17 @@ function FriendsPanel() {
         .catch((e) => setError(errorText(e))),
     [setError],
   );
+  // An empty search lists everyone; typing narrows it.
   useEffect(() => {
     const q = query.trim();
-    if (!q) {
-      setFound([]);
-      return;
-    }
-    const timer = setTimeout(() => void search(q), 250);
+    const timer = setTimeout(() => void search(q), q ? 250 : 0);
     return () => clearTimeout(timer);
   }, [query, search]);
-  /** Every change returns the new lists; the search results follow. */
+  /** Every change returns the new lists; the people below follow. */
   const change = (request: () => Promise<Friends>) =>
     run(async () => {
       setFriends(await request());
-      if (query.trim()) await search(query.trim());
+      await search(query.trim());
     });
   const add = (username: string) => change(() => api<Friends>("/friends", { username }));
   const accept = (p: Person) => change(() => api<Friends>(`/friends/${p.id}/accept`, {}));
@@ -168,57 +165,35 @@ function FriendsPanel() {
       <span className="row">{actions}</span>
     </li>
   );
+  const relationActions = (p: FoundUser) =>
+    p.relation === "friend" ? (
+      <span className="muted">{t("friends.already")}</span>
+    ) : p.relation === "outgoing" ? (
+      <span className="muted">{t("friends.sent")}</span>
+    ) : p.relation === "incoming" ? (
+      <button type="button" className="primary" disabled={busy} onClick={() => accept(p)}>
+        {t("friends.accept")}
+      </button>
+    ) : (
+      <button type="button" className="primary" disabled={busy} onClick={() => add(p.username)}>
+        <UserPlusIcon aria-hidden="true" />
+        {t("friends.add")}
+      </button>
+    );
   return (
-    <section className="panel">
-      <h2>{t("friends.title")}</h2>
-      <p className="muted">{t("friends.lead")}</p>
-      <label className="search-field">
-        <MagnifyingGlassIcon aria-hidden="true" />
-        <input
-          type="search"
-          value={query}
-          placeholder={t("friends.search")}
-          aria-label={t("friends.search")}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
-      {query.trim() && (
-        <ul className="people">
-          {!found.length && <li className="muted">{t("friends.noMatch")}</li>}
-          {found.map((p) =>
-            row(
-              p,
-              p.relation === "friend" ? (
-                <span className="muted">{t("friends.already")}</span>
-              ) : p.relation === "outgoing" ? (
-                <span className="muted">{t("friends.sent")}</span>
-              ) : p.relation === "incoming" ? (
-                <button type="button" className="primary" disabled={busy} onClick={() => accept(p)}>
-                  {t("friends.accept")}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={busy}
-                  onClick={() => add(p.username)}
-                >
-                  <UserPlusIcon aria-hidden="true" />
-                  {t("friends.add")}
-                </button>
-              ),
-            ),
-          )}
-        </ul>
-      )}
+    <main className="page">
+      <div className="page-head">
+        <h1>{t("friends.title")}</h1>
+        <p className="muted">{t("friends.lead")}</p>
+      </div>
       {error && (
         <p role="alert" className="error">
           {error}
         </p>
       )}
       {!!friends?.incoming.length && (
-        <>
-          <h3>{t("friends.incoming", { count: friends.incoming.length })}</h3>
+        <section className="panel">
+          <h2>{t("friends.incoming", { count: friends.incoming.length })}</h2>
           <ul className="people">
             {friends.incoming.map((p) =>
               row(
@@ -239,29 +214,51 @@ function FriendsPanel() {
               ),
             )}
           </ul>
-        </>
+        </section>
       )}
-      <h3>{t("friends.mine", { count: friends?.friends.length ?? 0 })}</h3>
-      <ul className="people">
-        {friends && !friends.friends.length && <li className="muted">{t("friends.none")}</li>}
-        {friends?.friends.map((p) =>
-          row(
-            p,
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                if (confirm(t("friends.removeConfirm", { name: p.username }))) drop(p);
-              }}
-            >
-              {t("friends.remove")}
-            </button>,
-          ),
-        )}
-      </ul>
+      <section className="panel">
+        <h2>{t("friends.mine", { count: friends?.friends.length ?? 0 })}</h2>
+        <ul className="people">
+          {friends && !friends.friends.length && <li className="muted">{t("friends.none")}</li>}
+          {friends?.friends.map((p) =>
+            row(
+              p,
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (confirm(t("friends.removeConfirm", { name: p.username }))) drop(p);
+                }}
+              >
+                {t("friends.remove")}
+              </button>,
+            ),
+          )}
+        </ul>
+      </section>
+      <section className="panel">
+        <h2>{t("friends.find")}</h2>
+        <p className="muted">{t("friends.findLead")}</p>
+        <label className="search-field">
+          <MagnifyingGlassIcon aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            placeholder={t("friends.search")}
+            aria-label={t("friends.search")}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <ul className="people">
+          {found && !found.length && (
+            <li className="muted">{query.trim() ? t("friends.noMatch") : t("friends.nobody")}</li>
+          )}
+          {found?.map((p) => row(p, relationActions(p)))}
+        </ul>
+      </section>
       {!!friends?.outgoing.length && (
-        <>
-          <h3>{t("friends.outgoing", { count: friends.outgoing.length })}</h3>
+        <section className="panel">
+          <h2>{t("friends.outgoing", { count: friends.outgoing.length })}</h2>
           <ul className="people">
             {friends.outgoing.map((p) =>
               row(
@@ -272,8 +269,8 @@ function FriendsPanel() {
               ),
             )}
           </ul>
-        </>
+        </section>
       )}
-    </section>
+    </main>
   );
 }
