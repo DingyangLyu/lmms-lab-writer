@@ -47,6 +47,10 @@ type Room = {
 };
 /** Keystroke updates are durable individually; the audit trail records activity, not keystrokes. */
 const EDIT_AUDIT_INTERVAL = 60_000;
+/** Automatic versions while people write: checked every 5 minutes, at most one per half hour. */
+const AUTOSAVE_CHECK = 5 * 60_000,
+  AUTOSAVE_EVERY = 30 * 60_000,
+  AUTOSAVE_BYTES = 20_000_000;
 /** Fold appended updates into the stored state once a document has this much history. */
 const COMPACT_UPDATES = 200,
   COMPACT_BYTES = 512_000;
@@ -95,6 +99,9 @@ export class Collaboration {
   private locks = new Map<string, Promise<void>>();
   private edits = new Map<string, { at: number; updates: number; bytes: number }>();
   private sweep: ReturnType<typeof setInterval>;
+  private versions: ReturnType<typeof setInterval>;
+  /** Projects edited since their last version, with who edited last; see autosave(). */
+  private unsaved = new Map<string, string>();
   constructor(
     public store: Store,
     private origin: () => string,
@@ -103,6 +110,8 @@ export class Collaboration {
   ) {
     this.sweep = setInterval(() => void this.recheck(), 30000);
     this.sweep.unref();
+    this.versions = setInterval(() => void this.autosave(), AUTOSAVE_CHECK);
+    this.versions.unref();
   }
   /**
    * Every open page's sign-in and membership, checked again. Only a real loss of access closes
@@ -240,7 +249,31 @@ export class Collaboration {
     if (!room.peers.size)
       void this.release(room.project, room.file).catch(logFailure("room release"));
   }
+  /**
+   * A version of each project edited since its last one, at most every half hour, as the
+   * desktop commits to Git as one writes. Projects too large to copy that often keep their
+   * manual versions and the automatic ones taken before risky steps.
+   */
+  async autosave(now = Date.now()) {
+    for (const [project, user] of [...this.unsaved])
+      try {
+        const last = await this.store.db.row<{ created: number | null }>(
+          sql`SELECT max(created) AS created FROM snapshots WHERE project=${project}`,
+        );
+        if (last?.created && now - last.created < AUTOSAVE_EVERY) continue;
+        this.unsaved.delete(project);
+        const size = await this.store.db.row<{ bytes: number }>(
+          sql`SELECT coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project} AND NOT deleted`,
+        );
+        if ((size?.bytes ?? 0) > AUTOSAVE_BYTES) continue;
+        await this.store.snapshot(project, user, "自动保存版本");
+        this.changed(project);
+      } catch (error) {
+        logFailure("automatic version")(error);
+      }
+  }
   private async auditEdit(project: string, file: string, user: string, bytes: number) {
+    this.unsaved.set(project, user);
     const key = `${project}:${file}:${user}`,
       now = Date.now(),
       entry = this.edits.get(key) ?? { at: 0, updates: 0, bytes: 0 };
@@ -633,6 +666,7 @@ export class Collaboration {
   }
   close() {
     clearInterval(this.sweep);
+    clearInterval(this.versions);
     for (const p of this.peers) p.socket.terminate();
     for (const r of this.rooms.values()) {
       r.awareness.destroy();

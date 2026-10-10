@@ -31,6 +31,7 @@ export const reviewZh = {
   "snapshot.共享任务输入版本": "共享任务输入版本",
   "snapshot.审阅决定前": "审阅决定前",
   "snapshot.AI 对话修改前": "AI 对话修改前",
+  "snapshot.自动保存版本": "自动保存版本",
   "snapshot.手动版本": "手动版本",
 };
 export const reviewEn: Record<keyof typeof reviewZh, string> = {
@@ -69,6 +70,7 @@ export const reviewEn: Record<keyof typeof reviewZh, string> = {
   "snapshot.共享任务输入版本": "Shared task input",
   "snapshot.审阅决定前": "Before a review decision",
   "snapshot.AI 对话修改前": "Before an AI conversation turn",
+  "snapshot.自动保存版本": "Automatic version",
   "snapshot.手动版本": "Manual version",
 };
 export const compareZh = {
