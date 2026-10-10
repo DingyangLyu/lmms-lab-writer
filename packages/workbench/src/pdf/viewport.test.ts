@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitPageWidth, pageScale, viewportAnchor } from "./viewport";
+import { destinationFraction, fitPageWidth, pageScale, viewportAnchor } from "./viewport";
 
 describe("responsive PDF viewport", () => {
   it("follows both growing and shrinking panels rather than keeping the opening width", () => {
@@ -14,5 +14,20 @@ describe("responsive PDF viewport", () => {
   it("preserves the visible position as a fraction of the same page", () => {
     expect(viewportAnchor(600, 100, 1000)).toBe(0.5);
     expect(viewportAnchor(30, 100, 1000)).toBe(0);
+  });
+});
+
+describe("PDF link destinations", () => {
+  const page = { num: 4, gen: 0 };
+  it("places contents, citation and cross-reference targets on their page", () => {
+    expect(destinationFraction([page, { name: "XYZ" }, 72, 692, null], 792)).toBeCloseTo(0.126, 3);
+    expect(destinationFraction([page, { name: "FitH" }, 396], 792)).toBe(0.5);
+    expect(destinationFraction([page, { name: "FitR" }, 0, 0, 100, 792], 792)).toBe(0);
+  });
+  it("goes to the top of the page when the destination has no position", () => {
+    expect(destinationFraction([page, { name: "Fit" }], 792)).toBe(0);
+    expect(destinationFraction([page, { name: "XYZ" }, null, null, null], 792)).toBe(0);
+    expect(destinationFraction("chapter.1", 792)).toBe(0);
+    expect(destinationFraction([page, { name: "XYZ" }, 0, 900, 0], 792)).toBe(0);
   });
 });

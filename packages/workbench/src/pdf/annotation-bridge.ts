@@ -20,6 +20,8 @@ export type PdfAnnotationHost = {
   /** Bumped to scroll to `selectedId` again. */
   navigation: number;
   setOpen: (open: boolean) => void;
+  /** A click on the note beside comments on the page (several on one line open together). */
+  openNotes?: (ids: string[]) => void;
 };
 export const PdfAnnotationContext = createContext<PdfAnnotationHost | null>(null);
 /** The app's PDF comments, or null where the preview is read-only. */

@@ -63,6 +63,7 @@ import { memo, type ReactNode, useEffect, useLayoutEffect, useRef } from "react"
 import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../i18n";
 import { trackEditorDrag } from "./drag-selection";
 import { resolveMonoFontFamily } from "./font-stacks";
+import { writerSearch } from "./search-panel";
 import type { EditorSettings, EditorTextRange, EditorTheme, SourceMark } from "./types";
 
 export type LatexSourceEditorProps = {
@@ -405,6 +406,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
               },
             ],
           }),
+          writerSearch(),
           keymap.of([
             { key: "Mod-/", run: toggleLineComment },
             { key: "Ctrl-g", run: gotoLine },

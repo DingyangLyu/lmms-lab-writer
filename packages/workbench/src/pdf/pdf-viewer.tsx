@@ -1,10 +1,11 @@
 "use client";
+import { NoteIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import { useAnnotations } from "./annotation-bridge";
 import { collectSelection, MAX_MARKS, type PdfAnnotation, visibleTextMarks } from "./annotations";
 import { attachPdfSelection } from "./text-selection";
-import { fitPageWidth, pageScale, viewportAnchor } from "./viewport";
+import { destinationFraction, fitPageWidth, pageScale, viewportAnchor } from "./viewport";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { useWorkbenchI18n as useI18n } from "../i18n";
@@ -473,6 +474,23 @@ function PdfPreview({
           <Document
             key={retry}
             file={previewSource}
+            // Contents, citations and cross references move within the preview (pages are
+            // drawn only near the screen, so PDF.js cannot find most of them itself); web
+            // links open beside the editor.
+            onItemClick={({ dest, pageNumber }) => {
+              const container = containerRef.current;
+              const element = container?.querySelector(`[data-pdf-page="${pageNumber}"]`);
+              if (!container || !element) return;
+              const fraction = destinationFraction(
+                dest,
+                pagesRef.current.get(pageNumber)?.height ?? 0,
+              );
+              const rect = element.getBoundingClientRect();
+              container.scrollTop +=
+                rect.top - container.getBoundingClientRect().top + rect.height * fraction - 16;
+            }}
+            externalLinkTarget="_blank"
+            externalLinkRel="noopener noreferrer"
             onLoadSuccess={async (pdf) => {
               setNumPages(pdf.numPages);
               setFingerprint(pdf.fingerprints[0] || "");
@@ -530,6 +548,7 @@ function PdfPreview({
                 pagesRef={pagesRef}
                 sizes={pageSizes}
                 onSynctexClick={onSynctexClick}
+                onNoteIcon={notes?.openNotes}
               />
             )}
           </Document>
@@ -554,6 +573,7 @@ function VirtualPdfPages({
   pagesRef,
   sizes,
   onSynctexClick,
+  onNoteIcon,
 }: {
   numPages: number;
   availableWidth: number;
@@ -569,6 +589,7 @@ function VirtualPdfPages({
   pagesRef: React.MutableRefObject<Map<number, { width: number; height: number }>>;
   sizes: Map<number, { width: number; height: number }> | null;
   onSynctexClick?: (page: number, x: number, y: number) => void;
+  onNoteIcon?: (ids: string[]) => void;
 }) {
   return (
     <>
@@ -589,6 +610,7 @@ function VirtualPdfPages({
           pagesRef={pagesRef}
           size={sizes?.get(page)}
           onSynctexClick={onSynctexClick}
+          onNoteIcon={onNoteIcon}
         />
       ))}
     </>
@@ -610,6 +632,7 @@ function VirtualPdfPage({
   pagesRef,
   size,
   onSynctexClick,
+  onNoteIcon,
 }: {
   page: number;
   availableWidth: number;
@@ -626,6 +649,8 @@ function VirtualPdfPage({
   /** The page's size from the document, before the page itself has rendered. */
   size?: { width: number; height: number };
   onSynctexClick?: (page: number, x: number, y: number) => void;
+  /** Notes beside the comments on this page open the comments (see `notes`). */
+  onNoteIcon?: (ids: string[]) => void;
 }) {
   const { t } = useI18n();
   const pageRef = useRef<HTMLElement>(null);
@@ -736,6 +761,70 @@ function VirtualPdfPage({
               )),
           )}
       </div>
+      {onNoteIcon && (
+        <PageNotes
+          page={page}
+          annotations={annotations}
+          fingerprint={fingerprint}
+          selectedId={selectedId}
+          onOpen={onNoteIcon}
+        />
+      )}
     </section>
+  );
+}
+
+/** A sticky note at the page's right edge beside each line with comments made on the PDF. */
+function PageNotes({
+  page,
+  annotations,
+  fingerprint,
+  selectedId,
+  onOpen,
+}: {
+  page: number;
+  annotations: PdfAnnotation[];
+  fingerprint: string;
+  selectedId?: string | null;
+  onOpen: (ids: string[]) => void;
+}) {
+  const { t } = useI18n();
+  // Comments on the same line share one note.
+  const rows = new Map<number, { top: number; ids: string[] }>();
+  for (const note of annotations)
+    if (!note.resolved && note.fingerprint === fingerprint) {
+      const mark = visibleTextMarks(note.marks).find((m) => m.page === page);
+      if (!mark) continue;
+      const key = Math.round(mark.y * 100);
+      const row = rows.get(key) ?? { top: mark.y, ids: [] };
+      row.ids.push(note.id);
+      rows.set(key, row);
+    }
+  return (
+    <>
+      {[...rows.values()].map((row) => (
+        <button
+          key={row.ids.join()}
+          type="button"
+          data-pdf-note-ids={row.ids.join(" ")}
+          title={t("pdf.openNote", { count: row.ids.length })}
+          aria-label={t("pdf.openNote", { count: row.ids.length })}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(row.ids);
+          }}
+          className={`absolute right-[1.5%] z-[6] flex size-5 items-center justify-center rounded-sm shadow-sm ${row.ids.includes(selectedId ?? "") ? "bg-amber-300 text-amber-900" : "bg-amber-100 text-amber-600 hover:bg-amber-200"}`}
+          style={{ top: `calc(${row.top * 100}% - 3px)` }}
+        >
+          <NoteIcon className="size-3.5" weight="fill" aria-hidden="true" />
+          {row.ids.length > 1 && (
+            <span className="absolute -top-1.5 -right-1.5 text-[9px] font-bold">
+              {row.ids.length}
+            </span>
+          )}
+        </button>
+      ))}
+    </>
   );
 }
