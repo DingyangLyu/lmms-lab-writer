@@ -122,6 +122,17 @@ export type TemplateList = {
   /** The template library's folder (it may be on a removable disk), and whether it can be written. */
   library: { available: boolean; writable: boolean };
 };
+/** A desktop installer the server offers (WRITER_DOWNLOADS_DIR). */
+export type DesktopInstaller = {
+  name: string;
+  platform: "macos" | "windows" | "linux";
+  /** Apple silicon / ARM, or Intel and AMD; null when the name does not say. */
+  arch: "arm64" | "x64" | null;
+  kind: "pkg" | "dmg" | "exe" | "msi" | "appimage" | "deb" | "rpm";
+  bytes: number;
+  updated: number;
+};
+export type DesktopDownloads = { version: string | null; installers: DesktopInstaller[] };
 export type TemplateDetail = TemplateInfo & {
   files: Array<{ path: string; bytes: number }>;
   /** The end of the TeX log when the preview failed. */

@@ -26,6 +26,9 @@ const app = await createWriterServer({
     process.env.WRITER_TEMPLATE_LIBRARY ||
     resolve(process.env.WRITER_DATA_DIR || ".data", "templates"),
   ghostscript: process.env.WRITER_GHOSTSCRIPT || undefined,
+  downloadsDirectory:
+    process.env.WRITER_DOWNLOADS_DIR ||
+    resolve(process.env.WRITER_DATA_DIR || ".data", "downloads"),
   adminUser: process.env.WRITER_ADMIN_USER,
   adminPassword: process.env.WRITER_ADMIN_PASSWORD,
   sharedRunner: process.env.WRITER_SHARED_RUNNER_TOKEN

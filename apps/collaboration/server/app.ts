@@ -16,6 +16,7 @@ import { adminRoutes, passwordRoute } from "./routes/accounts";
 import { bibliographyRoutes } from "./routes/bibliography";
 import { buildRoutes } from "./routes/builds";
 import { commentRoutes } from "./routes/comments";
+import { downloadRoutes } from "./routes/downloads";
 import { fileRoutes } from "./routes/files";
 import { historyRoutes } from "./routes/history";
 import { jobRoutes, runnerRoute } from "./routes/jobs";
@@ -51,6 +52,8 @@ export type Options = {
   templateLibrary?: string;
   /** Ghostscript for template previews; default `rungs` beside latexmk. */
   ghostscript?: string;
+  /** Desktop installers offered to members (see routes/downloads.ts). */
+  downloadsDirectory?: string;
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -176,13 +179,20 @@ export async function createWriterServer(options: Options) {
       library: options.templateLibrary,
       render: { compile: options.compile, ghostscript: options.ghostscript },
     }),
+    downloads: options.downloadsDirectory ?? null,
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
   const publicRoutes = [...session.public, runnerRoute];
   /** Still reachable while an account must replace a temporary password. */
   const accountRoutes = [...session.authed, passwordRoute];
-  const signedInRoutes = [...adminRoutes, ...projectListRoutes, ...templateRoutes, ...peopleRoutes];
+  const signedInRoutes = [
+    ...adminRoutes,
+    ...projectListRoutes,
+    ...templateRoutes,
+    ...peopleRoutes,
+    ...downloadRoutes,
+  ];
   const projectScoped = [
     ...projectRoutes,
     publishTemplateRoute,

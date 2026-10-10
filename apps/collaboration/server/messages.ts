@@ -147,6 +147,7 @@ export const englishMessages: Record<string, string> = {
   "AI 对话操作失败": "The AI conversation request failed",
   无效对话: "Invalid conversation",
   对话不存在或未共享: "This conversation does not exist or is not shared with you",
+  没有这个安装包: "There is no such installer",
   "这是从其他项目关联来的对话，只能查看；请回到原项目继续":
     "This conversation is shown here from another project and is read-only; continue it in its own project",
   请先把对话共享给项目成员: "Share the conversation with the project's members first",

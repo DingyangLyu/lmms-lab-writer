@@ -7,6 +7,7 @@ import {
   CaretDownIcon,
   ClockCounterClockwiseIcon,
   DesktopIcon,
+  DownloadIcon,
   DownloadSimpleIcon,
   GitDiffIcon,
   ListIcon,
@@ -151,7 +152,7 @@ export function CompileButton({ b, disabled }: { b: BuildState; disabled: boolea
   );
 }
 
-/** What the header used to show in a second row: references, review, export, language. */
+/** What the header used to show in a second row (references, review, export, language), and the desktop app. */
 export function WorkspaceMenu({
   user,
   role,
@@ -250,6 +251,17 @@ export function WorkspaceMenu({
           >
             <DesktopIcon className={icon} />
             {t("workspace.openDesktop")}
+          </a>
+          {/* A new tab, so the project stays open here. */}
+          <a
+            href="/?desktop"
+            target="_blank"
+            rel="noopener"
+            className={item}
+            onClick={() => setOpen(false)}
+          >
+            <DownloadIcon className={icon} />
+            {t("desktop.title")}
           </a>
         </nav>
         <div className="flex items-center gap-2 border-t border-border px-3 py-2">

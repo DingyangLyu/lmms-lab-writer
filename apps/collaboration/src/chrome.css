@@ -583,3 +583,51 @@ button.link:hover:not(:disabled) {
     grid-template-rows: auto 1fr;
   }
 }
+
+/* Desktop downloads */
+.installer-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.installer-picks .button-like {
+  padding: 10px 16px;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.installer-picks .installer-size {
+  font-weight: 400;
+  opacity: 0.8;
+}
+.installers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.installers li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--yw-line);
+}
+.installers li:first-child {
+  border-top: 0;
+}
+.installer-kind {
+  flex: 1;
+  min-width: 0;
+}
+.installers a {
+  color: var(--yw-accent);
+  font-weight: 600;
+}
+.installer-command {
+  overflow-x: auto;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--yw-canvas);
+  font-size: 12px;
+}

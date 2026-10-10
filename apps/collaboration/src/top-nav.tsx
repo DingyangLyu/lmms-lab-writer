@@ -10,7 +10,7 @@ import { Avatar } from "./avatar";
 import { useI18n } from "./i18n";
 import { LanguageSwitch } from "./language-switch";
 
-export type Page = "projects" | "templates" | "friends" | "admin" | "profile";
+export type Page = "projects" | "templates" | "friends" | "desktop" | "admin" | "profile";
 
 export function TopNav({
   user,
@@ -74,6 +74,7 @@ export function TopNav({
         {link("projects", t("nav.projects"))}
         {link("templates", t("nav.templates"))}
         {link("friends", t("nav.friends"), requests)}
+        {link("desktop", t("nav.desktop"))}
         {user.admin && link("admin", t("nav.admin"), pending)}
       </nav>
       <div className="nav-end">

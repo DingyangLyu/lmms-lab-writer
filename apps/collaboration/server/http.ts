@@ -85,6 +85,8 @@ export type Services = {
   sharedRunner?: SharedRunner;
   /** The template gallery. */
   templates: TemplateLibrary;
+  /** Where the desktop installers members may download are kept, if anywhere. */
+  downloads: string | null;
 };
 export type Context = Services & {
   req: IncomingMessage;

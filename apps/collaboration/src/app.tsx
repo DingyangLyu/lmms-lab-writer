@@ -5,6 +5,7 @@ import { AdminConsole } from "./admin";
 import { api } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
+import { DesktopPage } from "./desktop";
 import { useI18n } from "./i18n";
 import { FriendsPage, ProfilePage } from "./profile";
 import { TemplateGallery } from "./templates";
@@ -24,6 +25,7 @@ export function App() {
       const params = new URL(location.href).searchParams;
       if (params.has("templates") || params.has("template")) return "templates";
       if (params.has("friends")) return "friends";
+      if (params.has("desktop")) return "desktop";
       return params.has("profile") ? "profile" : "projects";
     }),
     // `/?template=<id>` shows one template in the gallery.
@@ -117,6 +119,8 @@ export function App() {
         />
       ) : page === "friends" ? (
         <FriendsPage />
+      ) : page === "desktop" ? (
+        <DesktopPage />
       ) : page === "profile" ? (
         <ProfilePage user={user} onUser={setUser} />
       ) : (
