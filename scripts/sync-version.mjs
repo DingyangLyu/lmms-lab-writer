@@ -9,8 +9,11 @@ const TARGET_JSON_FILES = [
   "package.json",
   "apps/desktop/package.json",
   "apps/collaboration/package.json",
+  "packages/i18n/package.json",
   "packages/latex-editor/package.json",
   "packages/shared/package.json",
+  "packages/sync/package.json",
+  "packages/workbench/package.json",
   "packages/writing/package.json",
   "apps/desktop/src-tauri/tauri.conf.json",
 ];

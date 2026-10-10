@@ -93,7 +93,9 @@ jobs:
 
   build-aur-package:
     name: Prepare AUR Package Files
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # The AUR and Arch packages are published from the upstream repository only; forks still
+    # get their GitHub release.
+    if: github.repository == 'EvolvingLMMs-Lab/lmms-lab-writer' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: build-tauri-release
     runs-on: ubuntu-latest
     steps:
@@ -177,7 +179,12 @@ jobs:
 
   release-github:
     name: Publish GitHub Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # Also when the AUR files were skipped (a fork), but not when anything failed.
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') &&
+      needs.build-tauri-release.result == 'success' &&
+      needs.build-tauri-arch-release.result == 'success' &&
+      needs.build-aur-package.result != 'failure' }}
     needs:
       - build-tauri-release
       - build-tauri-arch-release
@@ -216,7 +223,7 @@ jobs:
 
   release-arch-package:
     name: Build and Release Arch Package
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    if: github.repository == 'EvolvingLMMs-Lab/lmms-lab-writer' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     needs:
       - build-aur-package
       - release-github
@@ -313,7 +320,7 @@ jobs:
 
   publish-aur:
     name: Publish AUR Package
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    if: github.repository == 'EvolvingLMMs-Lab/lmms-lab-writer' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     needs:
       - build-aur-package
       - release-arch-package
