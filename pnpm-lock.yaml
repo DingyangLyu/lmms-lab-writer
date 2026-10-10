@@ -368,6 +368,8 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@25.9.1)(vite@8.3.2(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.23.15))
 
+  packages/agent-hub: {}
+
   packages/i18n:
     devDependencies:
       '@types/react':

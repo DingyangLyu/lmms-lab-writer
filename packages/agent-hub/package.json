@@ -1,0 +1,13 @@
+{
+  "name": "@lmms-lab/agent-hub",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Lets the Claude Code sessions on one computer read each other and hand each other tasks (MCP server).",
+  "type": "module",
+  "bin": {
+    "agent-hub": "./agent-hub.mjs"
+  },
+  "scripts": {
+    "test": "node --test agent-hub.test.mjs"
+  }
+}
