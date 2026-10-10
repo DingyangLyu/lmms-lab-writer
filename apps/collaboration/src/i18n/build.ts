@@ -20,6 +20,8 @@ export const buildZh = {
     "文档里有中文，但 pdfLaTeX 不能排版中文。需要在导言区加入 \\usepackage{ctex} 并用 XeLaTeX 编译。",
   "build.chineseFix": "一键修复：加入 ctex 并用 XeLaTeX 编译",
   "build.chineseManual": "没找到 \\documentclass，请手动在导言区加入 \\usepackage{ctex}。",
+  "build.askAi": "让 AI 修复",
+  "build.askAiTitle": "把错误和日志发给右侧当前的 AI 对话，请它修改源文件",
 };
 export const buildEn: Record<keyof typeof buildZh, string> = {
   "build.missingFile": "{path} is not in the project",
@@ -44,4 +46,7 @@ export const buildEn: Record<keyof typeof buildZh, string> = {
   "build.chineseFix": "Fix it: add ctex and build with XeLaTeX",
   "build.chineseManual":
     "No \\documentclass found; add \\usepackage{ctex} to the preamble yourself.",
+  "build.askAi": "Ask AI to fix",
+  "build.askAiTitle":
+    "Send the errors and the log to the AI conversation on the right to fix the sources",
 };

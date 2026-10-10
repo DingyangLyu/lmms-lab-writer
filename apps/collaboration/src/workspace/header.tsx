@@ -19,6 +19,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { Engine, Member, PublicUser, Role, Snapshot } from "../../shared/api";
 import { Avatar } from "../avatar";
 import { ago } from "../dashboard";
+import { FONT_SIZES, useEditorSettings } from "../editor-settings";
 import { useSnapshotLabel } from "../history";
 import { useI18n } from "../i18n";
 import { roleKey } from "../labels";
@@ -264,6 +265,7 @@ export function WorkspaceMenu({
             {t("desktop.title")}
           </a>
         </nav>
+        <EditorSettingsSection />
         <div className="flex items-center gap-2 border-t border-border px-3 py-2">
           <span className="flex-1 text-muted">{t("language.label")}</span>
           {(["zh", "en"] as const).map((lang) => (
@@ -280,5 +282,59 @@ export function WorkspaceMenu({
         </div>
       </Popover>
     </>
+  );
+}
+
+/** Text size, wrapping, line numbers and full-width punctuation marks, for this browser. */
+function EditorSettingsSection() {
+  const { t } = useI18n();
+  const [settings, change] = useEditorSettings();
+  const at = FONT_SIZES.indexOf(settings.fontSize);
+  const step = (by: number) => {
+    const next = FONT_SIZES[at + by];
+    if (next) change({ fontSize: next });
+  };
+  const box = "border border-border px-1.5 leading-5 hover:bg-accent-hover disabled:opacity-40";
+  const toggle = (label: string, checked: boolean, set: (on: boolean) => void) => (
+    <label className="flex cursor-pointer items-center gap-2 py-0.5">
+      <input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} />
+      {label}
+    </label>
+  );
+  return (
+    <div className="flex flex-col gap-1 border-t border-border px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className="flex-1 text-muted">{t("shell.editorSettings")}</span>
+        <span className="text-muted">{t("shell.fontSize")}</span>
+        <button
+          type="button"
+          className={box}
+          aria-label={t("shell.smaller")}
+          disabled={at <= 0}
+          onClick={() => step(-1)}
+        >
+          −
+        </button>
+        <span className="w-6 text-center tabular-nums">{settings.fontSize}</span>
+        <button
+          type="button"
+          className={box}
+          aria-label={t("shell.larger")}
+          disabled={at >= FONT_SIZES.length - 1}
+          onClick={() => step(1)}
+        >
+          +
+        </button>
+      </div>
+      {toggle(t("shell.wordWrap"), settings.wordWrap !== "off", (on) =>
+        change({ wordWrap: on ? "on" : "off" }),
+      )}
+      {toggle(t("shell.lineNumbers"), settings.lineNumbers !== "off", (on) =>
+        change({ lineNumbers: on ? "on" : "off" }),
+      )}
+      {toggle(t("shell.markFullWidth"), settings.highlightAmbiguousUnicode, (on) =>
+        change({ highlightAmbiguousUnicode: on }),
+      )}
+    </div>
   );
 }

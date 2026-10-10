@@ -7,7 +7,7 @@ import { isTextPath } from "@lmms-lab/sync";
 import { type FileOperations, FileSidebarPanel } from "@lmms-lab/workbench";
 import type { FileNode } from "@lmms-lab/writer-shared";
 import { FolderOpenIcon, UploadSimpleIcon } from "@phosphor-icons/react";
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { FileContent } from "../../shared/api";
 import { api, base64 } from "../api";
 import { useI18n } from "../i18n";
@@ -109,7 +109,7 @@ export function FilePanel({
       await reload();
     },
   };
-  const upload = (selected: FileList | null) =>
+  const upload = (selected: FileList | File[] | null) =>
     run(async () => {
       if (!selected) return;
       let count = 0;
@@ -135,9 +135,38 @@ export function FilePanel({
     upload(event.target.files);
     event.target.value = "";
   };
+  // Files dragged in from the computer are uploaded to the project's top folder.
+  const [dropping, setDropping] = useState(false);
+  const dropped = (event: DragEvent<HTMLDivElement>) => {
+    if (!canEdit || !event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    setDropping(false);
+    const picked = Array.from(event.dataTransfer.items)
+      .filter((item) => item.kind === "file" && !item.webkitGetAsEntry?.()?.isDirectory)
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => !!f);
+    if (picked.length) upload(picked);
+  };
   const action = "p-1 text-muted hover:text-foreground hover:bg-foreground/5 transition-colors";
   return (
-    <>
+    // biome-ignore lint/a11y/noStaticElementInteractions: a drop target for the mouse; the upload buttons do the same from the keyboard.
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragOver={(event) => {
+        if (!canEdit || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDropping(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={dropped}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center border-2 border-dashed border-foreground/40 bg-background/85 text-xs">
+          {t("files.dropToUpload")}
+        </div>
+      )}
       <FileSidebarPanel
         projectPath={ws.project.name}
         files={tree}
@@ -193,6 +222,6 @@ export function FilePanel({
       />
       <input ref={uploads} type="file" multiple hidden onChange={picked} />
       <input ref={folderInput} type="file" multiple hidden onChange={picked} />
-    </>
+    </div>
   );
 }

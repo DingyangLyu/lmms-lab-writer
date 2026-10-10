@@ -22,4 +22,6 @@ export type WorkspaceContext = {
   files: FileInfo[];
   openFile: (file: FileInfo) => void;
   status: SyncStatus;
+  /** Hands work (comments to address, a build to fix) to the AI conversation; editors only. */
+  askAi: ((text: string) => void) | null;
 };

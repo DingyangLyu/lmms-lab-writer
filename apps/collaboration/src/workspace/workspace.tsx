@@ -12,6 +12,7 @@ import {
   type TabItem,
   WorkbenchLocale,
 } from "@lmms-lab/workbench";
+import type { EditorSelectionContext } from "@lmms-lab/workbench/agents";
 import { parseBib } from "@lmms-lab/writing";
 import {
   ChatCircleTextIcon,
@@ -39,11 +40,13 @@ import {
 import type { FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { api, download } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
+import { useEditorSettings } from "../editor-settings";
 import { useI18n } from "../i18n";
 import { roleKey, statusKey } from "../labels";
 import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
 import { useAction } from "../use-action";
+import type { AiTask } from "./agents-panel";
 import { BinaryPreview } from "./binary-preview";
 import { useBuild } from "./build";
 import { CommentsPanel } from "./comments-panel";
@@ -63,6 +66,14 @@ import { useProject } from "./use-project";
 
 /** The chat panel (with its Markdown renderer) loads when the right column first opens. */
 const AgentsPanel = lazy(() => import("./agents-panel").then((m) => ({ default: m.AgentsPanel })));
+/** Whether two quoted selections are the same (the panel's own test, without loading it). */
+const sameEditorSelection = (a: EditorSelectionContext | null, b: EditorSelectionContext) =>
+  !!a &&
+  a.path === b.path &&
+  a.ranges.length === b.ranges.length &&
+  a.ranges.every(
+    (r, i) => r.startOffset === b.ranges[i]?.startOffset && r.endOffset === b.ranges[i]?.endOffset,
+  );
 
 /** The width of an element, kept current as panels open, close and resize. */
 function useWidth() {
@@ -194,6 +205,7 @@ export function Workspace({
     [peers, setPeers] = useState<Peer[]>([]),
     [text, setText] = useState<{ file: string; value: string } | null>(null);
   const narrow = useNarrow();
+  const [editorSettings] = useEditorSettings();
   const [sidebar, setSidebar] = useState(!narrow),
     [sidebarTab, setSidebarTab] = useState<"files" | "history">("files"),
     // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
@@ -227,6 +239,9 @@ export function Workspace({
   const [activeComment, setActiveComment] = useState<string | null>(null),
     [selected, setSelected] = useState<{ from: number; to: number } | null>(null),
     [pdfNavigation, setPdfNavigation] = useState(0);
+  // The selection the next AI message quotes, and work handed to the AI from elsewhere.
+  const [aiSelection, setAiSelection] = useState<EditorSelectionContext | null>(null),
+    [aiTask, setAiTask] = useState<AiTask | null>(null);
   const layout = useMemo<MarginLayout>(() => ({ view: null, events: new EventTarget() }), []);
   useEffect(() => {
     try {
@@ -319,12 +334,27 @@ export function Workspace({
       if (narrow) setSidebar(false);
     },
     status,
+    askAi:
+      role === "owner" || role === "editor"
+        ? (text) => {
+            setAiTask({ id: Date.now(), text });
+            setRightOpen(true);
+          }
+        : null,
   };
   const b = useBuild(ws, data.latestBuild, data.sources, data.loaded);
   const [centerWidth, centerRef] = useWidth();
   const activate = (id: string | null) => {
     setActiveComment(id);
     if (id && data.comments.find((c) => c.id === id)?.pdf) setPdfNavigation((n) => n + 1);
+  };
+  /**
+   * Where the comment being written shows: the margin beside the text when there is room for
+   * it, otherwise the comments panel, so starting one from the PDF always shows its box.
+   */
+  const showDraftPlace = () => {
+    if (marginFits) showReview();
+    else setCommentsOpen(true);
   };
   const commentOnSelection = () => {
     const s = editor.current?.selection();
@@ -333,8 +363,7 @@ export function Workspace({
       return;
     }
     setDraft({ file: file.id, body: draft?.body ?? "", ...s });
-    if (narrow) setCommentsOpen(true);
-    else showReview();
+    showDraftPlace();
   };
   const submitDraft = () =>
     draft &&
@@ -385,8 +414,7 @@ export function Workspace({
         setDraft(next);
         const target = data.files.find((f) => f.id === next.file);
         if (target && target.id !== file?.id) ws.openFile(target);
-        if (narrow) setCommentsOpen(true);
-        else showReview();
+        showDraftPlace();
       });
     },
   };
@@ -432,12 +460,8 @@ export function Workspace({
     ? Math.min(pdfSize.size, Math.max(260, centerWidth - EDITOR_MIN))
     : pdfSize.size;
   const editorWidth = centerWidth - (pdfShown ? pdfWidth : 0);
-  const marginShown =
-    reviewOpen &&
-    !narrow &&
-    !!file &&
-    !file.binary &&
-    (!centerWidth || editorWidth >= EDITOR_MIN + MARGIN_WIDTH);
+  const marginFits = !narrow && (!centerWidth || editorWidth >= EDITOR_MIN + MARGIN_WIDTH);
+  const marginShown = reviewOpen && marginFits && !!file && !file.binary;
   const editorActions = file && !file.binary && (
     <>
       <button
@@ -529,6 +553,14 @@ export function Workspace({
         user={user}
         memberRole={role}
         visible={rightOpen}
+        selection={aiSelection}
+        onSelectionDone={(sent) =>
+          setAiSelection((current) =>
+            !sent || sameEditorSelection(current, sent) ? null : current,
+          )
+        }
+        task={aiTask}
+        onTaskTaken={(id) => setAiTask((current) => (current?.id === id ? null : current))}
         onOpenFile={(path, line) => b.openLocation(path, line)}
         onError={setError}
       />
@@ -542,6 +574,7 @@ export function Workspace({
         key={file.id}
         project={project.id}
         file={file.id}
+        settings={editorSettings}
         user={user}
         role={role}
         comments={data.comments}
@@ -561,7 +594,12 @@ export function Workspace({
           if (narrow) setCommentsOpen(true);
           else showReview();
         }}
-        onSelect={setSelected}
+        onSelect={(next) => {
+          setSelected(next);
+          // A selection stays quoted for the AI until another replaces it or it is sent.
+          if (next) setAiSelection({ project: project.id, path: file.path, ranges: [next.range] });
+          else setAiSelection((old) => (old?.path === file.path ? null : old));
+        }}
         onLayout={(view) => {
           layout.view = view;
           layout.events.dispatchEvent(new Event("layout"));
@@ -841,7 +879,7 @@ export function Workspace({
                   onDone={logSize.save}
                 />
                 <div style={{ height: logSize.size }} className="shrink-0 border-t border-border">
-                  <LogPanel b={b} onClose={() => setLogOpen(false)} />
+                  <LogPanel ws={ws} b={b} onClose={() => setLogOpen(false)} />
                 </div>
               </>
             )}

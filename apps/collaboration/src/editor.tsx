@@ -17,10 +17,12 @@ import {
 import { latexLanguage } from "@lmms-lab/latex-editor";
 import {
   DEFAULT_EDITOR_SETTINGS,
+  type EditorSettings,
   editorConfiguration,
   FoldToolbar,
   latexFoldExtensions,
 } from "@lmms-lab/workbench";
+import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import { type ReactNode, useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
@@ -44,6 +46,13 @@ const commentMarks = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+/** The desktop editor's theme, gutters, wrapping and brackets with the member's settings, read-only by role. */
+const configuration = (settings: Partial<EditorSettings>, role: Role) =>
+  editorConfiguration(
+    { ...DEFAULT_EDITOR_SETTINGS, ...settings },
+    false,
+    !["owner", "editor"].includes(role),
+  );
 export type EditorHandle = {
   text: () => string;
   selection: () => Selection | null;
@@ -74,6 +83,7 @@ export function Editor({
   onCommentClick,
   onSelect,
   onLayout,
+  settings = DEFAULT_EDITOR_SETTINGS,
 }: {
   project: string;
   file: string;
@@ -96,10 +106,12 @@ export function Editor({
   activeComment?: string | null;
   /** A click on commented text. */
   onCommentClick?: (id: string) => void;
-  /** The selection's offsets as it changes, or null when nothing is selected. */
-  onSelect?: (range: { from: number; to: number } | null) => void;
+  /** The selection as it changes (offsets, and lines and columns for the AI), or null. */
+  onSelect?: (range: { from: number; to: number; range: EditorTextRange } | null) => void;
   /** The CodeMirror view and every scroll, resize or edit, for the review margin. */
   onLayout?: (view: EditorView | null) => void;
+  /** Text size, wrapping and the like, as the member chose them. */
+  settings?: Partial<EditorSettings>;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
@@ -131,6 +143,8 @@ export function Editor({
   };
   const readOnly = useRef(role);
   readOnly.current = role;
+  const chosen = useRef(settings);
+  chosen.current = settings;
   useEffect(() => {
     if (!host.current) return;
     // The member's place in this file comes back once its text has arrived from the server,
@@ -154,7 +168,6 @@ export function Editor({
     provider.current = p;
     const text = p.doc.getText("content"),
       undo = new Y.UndoManager(text);
-    const canEdit = () => ["owner", "editor"].includes(readOnly.current);
     let textTimer: ReturnType<typeof setTimeout> | null = null;
     const reportPeers = () =>
       callbacks.current.onPeers?.(
@@ -207,7 +220,7 @@ export function Editor({
           ]),
           yCollab(text, p.awareness, { undoManager: undo }),
           // The desktop editor's theme, gutters, wrapping and brackets, read-only by role.
-          editability.current.of(editorConfiguration(DEFAULT_EDITOR_SETTINGS, false, !canEdit())),
+          editability.current.of(configuration(chosen.current, readOnly.current)),
           commentMarks,
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.label"),
@@ -217,8 +230,27 @@ export function Editor({
           }),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet || update.docChanged) {
-              const main = update.state.selection.main;
-              callbacks.current.onSelect?.(main.empty ? null : { from: main.from, to: main.to });
+              const main = update.state.selection.main,
+                doc = update.state.doc;
+              const start = doc.lineAt(main.from),
+                end = doc.lineAt(main.to);
+              callbacks.current.onSelect?.(
+                main.empty
+                  ? null
+                  : {
+                      from: main.from,
+                      to: main.to,
+                      range: {
+                        startLineNumber: start.number,
+                        startColumn: main.from - start.from + 1,
+                        endLineNumber: end.number,
+                        endColumn: main.to - end.from + 1,
+                        startOffset: main.from,
+                        endOffset: main.to,
+                        text: doc.sliceString(main.from, main.to),
+                      },
+                    },
+              );
             }
             if (update.selectionSet) remember();
             if (update.docChanged || update.geometryChanged || update.viewportChanged)
@@ -348,11 +380,9 @@ export function Editor({
   }, [project, file, user]);
   useEffect(() => {
     view.current?.dispatch({
-      effects: editability.current.reconfigure(
-        editorConfiguration(DEFAULT_EDITOR_SETTINGS, false, !["owner", "editor"].includes(role)),
-      ),
+      effects: editability.current.reconfigure(configuration(settings, role)),
     });
-  }, [role]);
+  }, [role, settings]);
   useEffect(() => {
     const v = view.current,
       p = provider.current;

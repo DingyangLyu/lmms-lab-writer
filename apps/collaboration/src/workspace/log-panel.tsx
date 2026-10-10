@@ -2,9 +2,18 @@
 import { XIcon } from "@phosphor-icons/react";
 import { useI18n } from "../i18n";
 import type { BuildState } from "./build";
-import { BuildSummary, ChineseHint } from "./pdf-pane";
+import type { WorkspaceContext } from "./context";
+import { AskAiToFix, BuildSummary, ChineseHint } from "./pdf-pane";
 
-export function LogPanel({ b, onClose }: { b: BuildState; onClose: () => void }) {
+export function LogPanel({
+  ws,
+  b,
+  onClose,
+}: {
+  ws: WorkspaceContext;
+  b: BuildState;
+  onClose: () => void;
+}) {
   const { t } = useI18n();
   const { build } = b;
   const errors = build?.issues.filter((i) => i.level === "error") ?? [],
@@ -18,6 +27,7 @@ export function LogPanel({ b, onClose }: { b: BuildState; onClose: () => void })
           {!!build?.issues.length &&
             ` · ${t("build.issues", { errors: errors.length, warnings: warnings.length })}`}
         </span>
+        <AskAiToFix ws={ws} b={b} />
         <button
           type="button"
           aria-label={t("common.close")}

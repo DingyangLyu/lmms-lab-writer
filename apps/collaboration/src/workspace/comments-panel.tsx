@@ -8,11 +8,13 @@ import {
   ChatCircleTextIcon,
   CheckCircleIcon,
   CrosshairIcon,
+  RobotIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import type { Comment } from "../../shared/api";
 import { useI18n } from "../i18n";
+import { commentsTask } from "./ai-tasks";
 import type { WorkspaceContext } from "./context";
 import type { CommentDraft } from "./notes";
 import { DraftCard } from "./review-margin";
@@ -41,7 +43,7 @@ export function CommentsPanel({
   showDraft: boolean;
   onLocate: (comment: Comment) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const button = useRef<HTMLButtonElement>(null);
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all"),
     [query, setQuery] = useState("");
@@ -93,6 +95,20 @@ export function CommentsPanel({
           <span className="mr-auto text-muted">
             {t("shell.commentCounts", { open: pending.length, resolved: resolved.length })}
           </span>
+          {ws.askAi && pending.length > 0 && (
+            <button
+              type="button"
+              title={t("comments.askAiTitle")}
+              onClick={() => {
+                ws.askAi?.(commentsTask(pending, ws.files, locale));
+                setOpen(false);
+              }}
+              className="inline-flex items-center gap-1 border border-border px-2 py-1 hover:border-foreground hover:bg-accent-hover"
+            >
+              <RobotIcon className="size-3.5" aria-hidden="true" />
+              {t("comments.askAiAll", { count: pending.length })}
+            </button>
+          )}
           <button
             type="button"
             aria-label={t("common.close")}

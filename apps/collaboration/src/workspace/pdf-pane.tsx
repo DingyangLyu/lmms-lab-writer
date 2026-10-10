@@ -1,9 +1,10 @@
 /** The compiled PDF beside the editor, as the desktop's split preview, with the build status. */
 import { PdfAnnotationContext, type PdfAnnotationHost } from "@lmms-lab/workbench";
 import { PdfViewer } from "@lmms-lab/workbench/pdf-viewer";
-import { CrosshairIcon, DownloadSimpleIcon, XIcon } from "@phosphor-icons/react";
+import { CrosshairIcon, DownloadSimpleIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
 import "../pdf-setup";
 import { useI18n } from "../i18n";
+import { buildTask } from "./ai-tasks";
 import type { BuildState } from "./build";
 import type { WorkspaceContext } from "./context";
 
@@ -18,6 +19,24 @@ export function BuildSummary({ b }: { b: BuildState }) {
       {t("build.seconds", { seconds: (build.duration / 1000).toFixed(1) })} ·{" "}
       {new Date(build.created).toLocaleTimeString(locale === "zh" ? "zh-CN" : "en")}
     </span>
+  );
+}
+
+/** A failed build handed to the AI conversation, with its errors and log (editors only). */
+export function AskAiToFix({ ws, b }: { ws: WorkspaceContext; b: BuildState }) {
+  const { t, locale } = useI18n();
+  const { build } = b;
+  if (!ws.askAi || !build || build.status !== "failed" || b.compiling) return null;
+  return (
+    <button
+      type="button"
+      title={t("build.askAiTitle")}
+      onClick={() => ws.askAi?.(buildTask(build, locale))}
+      className="inline-flex shrink-0 items-center gap-1 border border-border px-1.5 py-0.5 text-foreground hover:border-foreground hover:bg-accent-hover"
+    >
+      <RobotIcon className="size-3.5" aria-hidden="true" />
+      {t("build.askAi")}
+    </button>
   );
 }
 
@@ -68,6 +87,7 @@ export function PdfPane({
         <span className="min-w-0 flex-1 truncate">
           <BuildSummary b={b} />
         </span>
+        <AskAiToFix ws={ws} b={b} />
         {build?.pdf && ws.file && !ws.file.binary && (
           <button
             type="button"

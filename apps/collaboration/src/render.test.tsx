@@ -49,6 +49,7 @@ const ws: WorkspaceContext = {
   files: [file],
   openFile: () => {},
   status: "saved",
+  askAi: () => {},
 };
 const comment: Comment = {
   id: "c1",
@@ -146,6 +147,10 @@ describe("client panels render", () => {
           user={ws.user}
           memberRole="commenter"
           visible
+          selection={null}
+          onSelectionDone={() => {}}
+          task={null}
+          onTaskTaken={() => {}}
           onOpenFile={() => {}}
           onError={() => {}}
         />,
@@ -212,9 +217,14 @@ describe("client panels render", () => {
       showPdfInSource: () => {},
       openLocation: () => {},
     };
-    const log = html(<LogPanel b={b} onClose={() => {}} />);
+    const log = html(<LogPanel ws={ws} b={b} onClose={() => {}} />);
     expect(log).toContain("编译有错误");
     expect(log).toContain("main.tex:4");
+    // Editors may hand the failed build to the AI; others see no such button.
+    expect(log).toContain("让 AI 修复");
+    expect(html(<LogPanel ws={{ ...ws, askAi: null }} b={b} onClose={() => {}} />)).not.toContain(
+      "让 AI 修复",
+    );
     expect(html(<PdfPane ws={ws} b={b} onClose={() => {}} />)).toContain("没有生成 PDF");
   });
 });

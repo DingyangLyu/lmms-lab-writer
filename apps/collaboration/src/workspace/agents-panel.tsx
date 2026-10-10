@@ -8,6 +8,7 @@ import { workbenchI18n } from "@lmms-lab/workbench";
 import {
   ClaudePanel,
   CodexPanel,
+  type EditorSelectionContext,
   HARNESSES,
   HarnessButtons,
   type HarnessId,
@@ -32,6 +33,8 @@ import {
 
 const PANELS = { codex: CodexPanel, claude: ClaudePanel, opencode: OpenCodePanel };
 const WEB_ORDER: HarnessId[] = ["codex", "claude", "opencode"];
+/** Text for the conversation in front, from a button elsewhere on the page. */
+export type AiTask = { id: number; text: string };
 /** What the server adds to OpenCode's session list: whose conversation it is. */
 type Linked = { id: string; name: string } | null;
 type Shared = {
@@ -74,6 +77,10 @@ export function AgentsPanel({
   user,
   memberRole,
   visible,
+  selection,
+  onSelectionDone,
+  task,
+  onTaskTaken,
   onOpenFile,
   onError,
 }: {
@@ -81,6 +88,13 @@ export function AgentsPanel({
   user: PublicUser;
   memberRole: Role;
   visible: boolean;
+  /** The editor's selection, offered to the next message as context (as on the desktop). */
+  selection: EditorSelectionContext | null;
+  /** The selection was sent, or its chip removed. */
+  onSelectionDone: (sent: EditorSelectionContext | null) => void;
+  /** Work from the page (comments to address, a build to fix) for the current conversation. */
+  task: AiTask | null;
+  onTaskTaken: (id: number) => void;
   onOpenFile: (path: string, line: number) => void;
   onError: (message: string) => void;
 }) {
@@ -117,6 +131,18 @@ export function AgentsPanel({
   useEffect(() => {
     if (allowed && first && workspace.ready && !workspace.tabs.length) workspace.open(first);
   }, [allowed, first, workspace]);
+  // A task goes to the conversation in front (queued while it works), else a new one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per task, when the conversations are known.
+  useEffect(() => {
+    if (!task || !first || !workspace.ready) return;
+    const active = workspace.tabs.find((tab) => tab.id === workspace.activeId);
+    try {
+      workspace.dispatch({ backend: active?.backend ?? first, tabId: active?.id }, task.text);
+    } catch (cause) {
+      onError(String(cause));
+    }
+    onTaskTaken(task.id);
+  }, [task, first, workspace.ready]);
   if (!allowed || !backends)
     return <p className="p-4 text-sm text-muted">{t("agents.ownersAndEditorsOnly")}</p>;
   const opencodeHistory = (): HistoryAdapter => {
@@ -210,9 +236,10 @@ export function AgentsPanel({
             if (target) onOpenFile(target.path, target.line ?? 1);
             else onError(t("agents.notInProject", { path: reference }));
           },
-          editorSelection: null,
-          onClearSelection: () => {},
-          onSelectionSent: () => {},
+          editorSelection: selection?.project === project ? selection : null,
+          onClearSelection: () => onSelectionDone(null),
+          onSelectionSent: (sent) => onSelectionDone(sent),
+          // The shared text is saved as it is typed; the runner copies it before each turn.
           onBeforeSend: async () => {},
         }}
       />
