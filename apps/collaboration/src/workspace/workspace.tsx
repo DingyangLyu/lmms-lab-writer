@@ -91,6 +91,21 @@ function useWidth() {
 const EDITOR_MIN = 380,
   MARGIN_WIDTH = 288;
 
+/** The window's width, kept current. */
+function useWindowWidth() {
+  const [width, setWidth] = useState(() =>
+    typeof window === "undefined" ? 1440 : window.innerWidth,
+  );
+  useEffect(() => {
+    const changed = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", changed);
+    return () => window.removeEventListener("resize", changed);
+  }, []);
+  return width;
+}
+/** Below this width the AI panel opens over the editor rather than squeezing it. */
+const AI_BESIDE = 1200;
+
 /** Narrow windows show the side panels over the editor instead of beside it. */
 function useNarrow() {
   const query = "(max-width: 900px)";
@@ -205,17 +220,26 @@ export function Workspace({
     [peers, setPeers] = useState<Peer[]>([]),
     [text, setText] = useState<{ file: string; value: string } | null>(null);
   const narrow = useNarrow();
+  const windowWidth = useWindowWidth();
+  const aiBeside = !narrow && windowWidth >= AI_BESIDE;
   const [editorSettings] = useEditorSettings();
   const [sidebar, setSidebar] = useState(!narrow),
     [sidebarTab, setSidebarTab] = useState<"files" | "history">("files"),
     // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
-    // where to write, what it gives, and whom to ask.
-    [rightOpen, setRightOpen] = useState(!narrow),
+    // where to write, what it gives, and whom to ask; a laptop opens the AI when asked.
+    [rightOpen, setRightOpen] = useState(aiBeside),
     [logOpen, setLogOpen] = useState(false),
     [commentsOpen, setCommentsOpen] = useState(false),
     [dialog, setDialog] = useState<"share" | "references" | "review" | null>(null);
-  const sidebarSize = useStoredSize("writer-web-sidebar", 260, 180, 520),
-    rightSize = useStoredSize("writer-web-right", 380, 280, 720),
+  // Smaller windows narrow the side panels first, leaving the editor and the PDF their room.
+  const sidebarSize = useStoredSize(
+      "writer-web-sidebar",
+      260,
+      180,
+      520,
+      Math.round(windowWidth * 0.17),
+    ),
+    rightSize = useStoredSize("writer-web-right", 380, 280, 720, Math.round(windowWidth * 0.27)),
     pdfSize = useStoredSize("writer-web-pdf", 560, 260, 1600),
     logSize = useStoredSize("writer-web-log", 220, 120, 640);
   const { busy, error, setError, run } = useAction();
@@ -263,6 +287,10 @@ export function Workspace({
       setRightOpen(false);
     }
   }, [narrow]);
+  // A window made too small for the AI beside the editor closes it rather than covering it.
+  useEffect(() => {
+    if (!aiBeside) setRightOpen(false);
+  }, [aiBeside]);
   // Tabs follow the file list (renames, deletions); the first visit opens the main file.
   useEffect(() => {
     // Until the list has loaded, the tabs remembered from the last visit stay as they are.
@@ -806,7 +834,9 @@ export function Workspace({
           <div ref={centerRef} className="flex w-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex min-h-0 flex-1">
               {narrow && b.open ? (
-                <PdfPane ws={ws} b={b} notes={pdfNotes} onClose={() => b.setOpen(false)} />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <PdfPane ws={ws} b={b} notes={pdfNotes} onClose={() => b.setOpen(false)} />
+                </div>
               ) : (
                 <div className="flex min-w-0 flex-1 flex-col">
                   {tabs.length > 0 && (
@@ -885,7 +915,7 @@ export function Workspace({
             )}
           </div>
           {rightOpen &&
-            (narrow ? (
+            (!aiBeside ? (
               overlay("right", assistant, () => setRightOpen(false))
             ) : (
               <>

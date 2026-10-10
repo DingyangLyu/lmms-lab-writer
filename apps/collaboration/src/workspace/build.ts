@@ -21,6 +21,9 @@ const needsXeLaTeX = (sources: SourceFile[]) =>
   );
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
+const phone = () =>
+  typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
+
 export function useBuild(
   ws: WorkspaceContext,
   latest: Build | null,
@@ -31,7 +34,8 @@ export function useBuild(
   const { t } = useI18n();
   const [build, setBuild] = useState<Build | null>(null),
     [compiling, setCompiling] = useState(false),
-    [open, setOpen] = useState(true),
+    // Phones show the editor first; the PDF takes the whole screen when opened.
+    [open, setOpen] = useState(() => !phone()),
     [main, setMain] = useState(""),
     [engine, setEngine] = useState<Engine | "">(""),
     [highlight, setHighlight] = useState<PdfRegion | null>(null),
@@ -100,7 +104,8 @@ export function useBuild(
       setEngine("xelatex");
       await build_("xelatex");
     });
-  const compile = () =>
+  /** `show: false` builds without switching a phone to the PDF. */
+  const compile = (show?: unknown) =>
     ws.run(async () => {
       if (!chosenMain) throw new Error(t("build.noTex"));
       setCompiling(true);
@@ -109,7 +114,7 @@ export function useBuild(
           await api<Build>(`${ws.prefix}/builds`, { main: chosenMain, engine: chosenEngine }),
         );
         setHighlight(null);
-        setOpen(true);
+        if (show !== false) setOpen(true);
       } finally {
         setCompiling(false);
       }
@@ -121,7 +126,7 @@ export function useBuild(
     if (autoCompiled.current || !loaded || latest || build || compiling) return;
     if (!chosenMain || !ws.canComment) return;
     autoCompiled.current = true;
-    compile();
+    compile(!phone());
   }, [loaded, latest, build, chosenMain, ws.canComment]);
   const showCursorInPdf = () =>
     build &&

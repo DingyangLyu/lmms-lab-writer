@@ -106,9 +106,11 @@ export function DocumentOutline({
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-medium"
         >
-          <CaretRightIcon className={`size-3 transition-transform ${open ? "rotate-90" : ""}`} />
-          <ListIcon className="size-3.5" />
-          {t("outline.outline")}{" "}
+          <CaretRightIcon
+            className={`size-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+          />
+          <ListIcon className="size-3.5 shrink-0" />
+          <span className="shrink-0 whitespace-nowrap">{t("outline.outline")}</span>
           <span className="truncate font-normal text-muted">{path?.split("/").pop()}</span>
         </button>
         {open && (

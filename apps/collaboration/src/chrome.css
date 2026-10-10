@@ -92,6 +92,7 @@ button.link:hover:not(:disabled) {
 }
 .nav-brand img {
   height: 28px;
+  max-width: none;
 }
 .top-nav nav {
   display: flex;
@@ -569,8 +570,25 @@ button.link:hover:not(:disabled) {
   .top-nav .language-switch {
     display: none;
   }
+  /* The logo's icon alone, and the pages scroll sideways rather than wrap letter by letter. */
+  .nav-brand {
+    flex: none;
+    width: 28px;
+    overflow: hidden;
+  }
+  .top-nav nav {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
   .nav-link {
+    flex: none;
     padding: 0 8px;
+    white-space: nowrap;
+  }
+  .dash-actions button.dash-wide-only {
+    display: none;
   }
   .signin-main {
     padding-top: 40px;

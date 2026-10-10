@@ -362,10 +362,12 @@ export function Dashboard({
     Icon: typeof FolderIcon,
     onClick: () => void,
     danger = false,
+    /** Left out on phones, where the row has room for few buttons. */
+    wideOnly = false,
   ) => (
     <button
       type="button"
-      className={`icon ${danger ? "danger-text" : ""}`}
+      className={`icon ${danger ? "danger-text" : ""} ${wideOnly ? "dash-wide-only" : ""}`}
       title={t(label)}
       aria-label={t(label)}
       disabled={busy}
@@ -400,12 +402,22 @@ export function Dashboard({
           iconButton("dash.rename", PencilSimpleIcon, () =>
             setDialog({ kind: "rename", project: p }),
           )}
-        {iconButton("dash.copy", CopyIcon, () => setDialog({ kind: "copy", project: p }))}
+        {iconButton(
+          "dash.copy",
+          CopyIcon,
+          () => setDialog({ kind: "copy", project: p }),
+          false,
+          true,
+        )}
         {(p.role === "owner" || p.role === "editor") &&
-          iconButton("tpl.publish", BookBookmarkIcon, () =>
-            setDialog({ kind: "publish", project: p }),
+          iconButton(
+            "tpl.publish",
+            BookBookmarkIcon,
+            () => setDialog({ kind: "publish", project: p }),
+            false,
+            true,
           )}
-        {iconButton("dash.download", DownloadSimpleIcon, () => download([p]))}
+        {iconButton("dash.download", DownloadSimpleIcon, () => download([p]), false, true)}
         {p.archived
           ? iconButton("dash.unarchive", ArchiveIcon, () =>
               each([p], "archive", { archived: false }),

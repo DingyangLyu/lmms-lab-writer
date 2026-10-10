@@ -271,8 +271,17 @@ export function ResizeHandle({
   );
 }
 
-/** A size remembered per browser, clamped to a range. */
-export function useStoredSize(key: string, fallback: number, min: number, max: number) {
+/**
+ * A size remembered per browser, clamped to a range. `limit` caps it for now (a smaller
+ * window) without forgetting the size the member chose.
+ */
+export function useStoredSize(
+  key: string,
+  fallback: number,
+  min: number,
+  max: number,
+  limit = max,
+) {
   const clamp = (value: number) => Math.min(max, Math.max(min, value));
   const [size, setSize] = useState(() => {
     try {
@@ -285,8 +294,8 @@ export function useStoredSize(key: string, fallback: number, min: number, max: n
   const latest = useRef(size);
   latest.current = size;
   return {
-    size,
-    resize: (delta: number) => setSize((value) => clamp(value + delta)),
+    size: Math.max(min, Math.min(size, limit)),
+    resize: (delta: number) => setSize((value) => clamp(Math.min(value, limit) + delta)),
     save: () => {
       try {
         localStorage.setItem(key, String(latest.current));
