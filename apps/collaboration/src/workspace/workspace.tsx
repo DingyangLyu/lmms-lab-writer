@@ -66,6 +66,7 @@ import { LogPanel } from "./log-panel";
 import { type BubbleState, NoteBubble, toggleBubble } from "./note-bubble";
 import { draftFromPdf, postDraft, useDraft, useSentNotes } from "./notes";
 import { OUTPUT_PDF, PdfPane } from "./pdf-pane";
+import { ProjectSearchPanel } from "./project-search-panel";
 import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
 import { type MarginLayout, ReviewMargin } from "./review-margin";
@@ -235,7 +236,7 @@ export function Workspace({
   const aiBeside = !narrow && windowWidth >= AI_BESIDE;
   const [editorSettings] = useEditorSettings();
   const [sidebar, setSidebar] = useState(!narrow),
-    [sidebarTab, setSidebarTab] = useState<"files" | "history">("files"),
+    [sidebarTab, setSidebarTab] = useState<"files" | "search" | "history">("files"),
     // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
     // where to write, what it gives, and whom to ask; a laptop opens the AI when asked.
     [rightOpen, setRightOpen] = useState(aiBeside),
@@ -493,6 +494,12 @@ export function Workspace({
         event.preventDefault();
         compileRef.current();
       }
+      // Search the whole project, as on Overleaf.
+      if (mod && event.shiftKey && key === "f") {
+        event.preventDefault();
+        setSidebar(true);
+        setSidebarTab("search");
+      }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
@@ -593,10 +600,11 @@ export function Workspace({
       <TabBar
         tabs={[
           { id: "files", label: t("shell.files") },
+          { id: "search", label: t("psearch.tab") },
           { id: "history", label: t("shell.history"), badge: data.snapshots.length || undefined },
         ]}
         activeTab={sidebarTab}
-        onTabSelect={(id) => setSidebarTab(id as "files" | "history")}
+        onTabSelect={(id) => setSidebarTab(id as "files" | "search" | "history")}
         variant="sidebar"
       />
       {sidebarTab === "files" ? (
@@ -605,6 +613,12 @@ export function Workspace({
           outlinePath={outlinePath}
           outlineSource={text && text.file === outlinePath ? text.value : undefined}
           onOutline={(path, line) => b.openLocation(path, line)}
+        />
+      ) : sidebarTab === "search" ? (
+        <ProjectSearchPanel
+          ws={ws}
+          refresh={data.refreshSources}
+          onOpen={(path, line) => b.openLocation(path, line)}
         />
       ) : (
         <HistoryPanel ws={ws} snapshots={data.snapshots} />
