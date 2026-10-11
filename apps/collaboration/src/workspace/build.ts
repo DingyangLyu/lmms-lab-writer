@@ -1,3 +1,4 @@
+import { magicEngine, neededEngine } from "@lmms-lab/writing";
 import { useEffect, useRef, useState } from "react";
 import type {
   Build,
@@ -13,12 +14,20 @@ import type { WorkspaceContext } from "./context";
 
 /** pdfLaTeX's error for a Chinese, Japanese or Korean character it cannot typeset. */
 const CJK_ERROR = /Unicode character \S+ \(U\+(?:2E[89A-F]|[3-9][0-9A-F]|F[9A]|FF)[0-9A-F]{2}\)/;
-const needsXeLaTeX = (sources: SourceFile[]) =>
-  sources.some((f) =>
-    /\\usepackage(\[[^\]]*\])?\{(ctex|xeCJK|fontspec)\}|\\documentclass(\[[^\]]*\])?\{ctex/.test(
-      f.content,
-    ),
-  );
+/** XeTeX's or LuaTeX's warning for such a character missing from the font. */
+const CJK_MISSING = /^Missing character: There is no [\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+/**
+ * The engine nobody chose, by the rules the desktop uses too (@lmms-lab/writing engine.ts):
+ * the main file's `% !TEX program` line, else what its sources need. The server builds from
+ * the project folder, so inputs are relative to it.
+ */
+function autoEngine(sources: SourceFile[], main: string): Engine {
+  const read = (path: string) => sources.find((f) => f.path === path)?.content;
+  const magic = magicEngine(read(main) ?? "");
+  if (magic === "pdflatex" || magic === "xelatex" || magic === "lualatex") return magic;
+  // Tectonic is XeTeX underneath; `latexmk` leaves the choice to the sources.
+  return magic === "tectonic" ? "xelatex" : neededEngine(read, main);
+}
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
 const phone = () =>
@@ -49,8 +58,7 @@ export function useBuild(
     main ||
     build?.main ||
     (texFiles.some((f) => f.path === "main.tex") ? "main.tex" : (texFiles[0]?.path ?? ""));
-  const chosenEngine: Engine =
-    engine || build?.engine || (needsXeLaTeX(sources) ? "xelatex" : "pdflatex");
+  const chosenEngine: Engine = engine || build?.engine || autoEngine(sources, chosenMain);
   const { file, files, editor, status, openFile } = ws;
   /** Open a source location: switch files if needed, then move the cursor once it loaded. */
   const openLocation = (path: string, line: number) => {
@@ -82,11 +90,19 @@ export function useBuild(
       setCompiling(false);
     }
   };
-  /** pdfLaTeX stopped at Chinese text: the main file gets ctex, and XeLaTeX builds it. */
-  const chineseInPdflatex =
-    build?.status === "failed" &&
-    build.engine === "pdflatex" &&
-    build.issues.some((i) => CJK_ERROR.test(i.message));
+  /**
+   * Chinese text the build could not show: pdfLaTeX stopped at it, or the font had no glyphs
+   * for it. Either way the main file gets ctex, and XeLaTeX builds it.
+   */
+  const chinese: "pdflatex" | "font" | null = !build
+    ? null
+    : build.status === "failed" &&
+        build.engine === "pdflatex" &&
+        build.issues.some((i) => CJK_ERROR.test(i.message))
+      ? "pdflatex"
+      : build.engine !== "pdflatex" && build.issues.some((i) => CJK_MISSING.test(i.message))
+        ? "font"
+        : null;
   const fixChinese = () =>
     ws.run(async () => {
       const target = files.find((f) => f.path === chosenMain && !f.binary);
@@ -160,7 +176,7 @@ export function useBuild(
     setEngine,
     highlight,
     compile,
-    chineseInPdflatex,
+    chinese,
     fixChinese,
     showCursorInPdf,
     showPdfInSource,

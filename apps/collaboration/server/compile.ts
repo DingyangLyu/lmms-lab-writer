@@ -139,6 +139,16 @@ export function parseLog(log: string, buildDir: string): Issue[] {
     return file.replace(/^(\.\/)+/, "");
   };
   const lines = log.split("\n");
+  // XeTeX and LuaTeX note each character the font lacks; one warning says so for them all.
+  const missing = lines.filter((line) => line.startsWith("Missing character: There is no "));
+  if (missing[0])
+    issues.push({
+      level: "warning",
+      file: null,
+      line: null,
+      message:
+        missing.length > 1 ? `${missing[0].trim()} (+${missing.length - 1})` : missing[0].trim(),
+    });
   for (let i = 0; i < lines.length && issues.length < 100; i++) {
     const line = lines[i] ?? "";
     const error = /^((?:[A-Za-z]:)?\.?\.?\/?[^:\n]*\.(?:tex|sty|cls|bib|bbl)):(\d+): (.+)$/.exec(

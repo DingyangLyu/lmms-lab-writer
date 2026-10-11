@@ -18,6 +18,8 @@ export const buildZh = {
   "build.noPdf": "这次编译没有生成 PDF，请根据错误或日志修改。",
   "build.chinese":
     "文档里有中文，但 pdfLaTeX 不能排版中文。需要在导言区加入 \\usepackage{ctex} 并用 XeLaTeX 编译。",
+  "build.chineseFont":
+    "文档里有中文，但没有加载中文字体，PDF 里的中文是空白的。需要在导言区加入 \\usepackage{ctex}。",
   "build.chineseFix": "一键修复：加入 ctex 并用 XeLaTeX 编译",
   "build.chineseManual": "没找到 \\documentclass，请手动在导言区加入 \\usepackage{ctex}。",
   "build.askAi": "让 AI 修复",
@@ -43,6 +45,8 @@ export const buildEn: Record<keyof typeof buildZh, string> = {
   "build.noPdf": "This build produced no PDF; fix the errors or check the log.",
   "build.chinese":
     "The document has Chinese text, which pdfLaTeX cannot typeset. Add \\usepackage{ctex} to the preamble and build with XeLaTeX.",
+  "build.chineseFont":
+    "The document has Chinese text but loads no Chinese font, so it is blank in the PDF. Add \\usepackage{ctex} to the preamble.",
   "build.chineseFix": "Fix it: add ctex and build with XeLaTeX",
   "build.chineseManual":
     "No \\documentclass found; add \\usepackage{ctex} to the preamble yourself.",

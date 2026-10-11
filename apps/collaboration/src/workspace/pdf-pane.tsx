@@ -40,16 +40,16 @@ export function AskAiToFix({ ws, b }: { ws: WorkspaceContext; b: BuildState }) {
   );
 }
 
-/** pdfLaTeX stopped at Chinese text: what to do, and the fix in one click. */
+/** Chinese text the build could not show: what to do, and the fix in one click. */
 export function ChineseHint({ b }: { b: BuildState }) {
   const { t } = useI18n();
-  if (!b.chineseInPdflatex) return null;
+  if (!b.chinese) return null;
   return (
     <div
       role="status"
       className="shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
     >
-      <p>{t("build.chinese")}</p>
+      <p>{t(b.chinese === "font" ? "build.chineseFont" : "build.chinese")}</p>
       <button
         type="button"
         className="mt-1.5 border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-100 disabled:opacity-50"

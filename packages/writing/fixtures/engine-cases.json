@@ -1,0 +1,214 @@
+[
+  {
+    "name": "plain English",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\nHello.\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "magic comment",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "% !TEX program = XeLaTeX\n\\documentclass{article}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "TS-program magic comment wins over packages",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "%!TEX TS-program=lualatex\n\\documentclass{article}\n\\usepackage{ctex}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "lualatex"
+  },
+  {
+    "name": "magic comment past line 30 is ignored",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n% !TEX program = xelatex\n\\documentclass{article}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "unknown magic engine is ignored",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "% !TEX program = context\n\\documentclass{article}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "ctex class",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass[fontset=fandol]{ctexart}\n\\begin{document}\n中文\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "ctex in a package list",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\usepackage{amsmath, ctex}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "fontspec with options",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\usepackage [no-math] {fontspec}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "unicode-math",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\usepackage{unicode-math}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "commented-out package",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n% \\usepackage{ctex}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "escaped percent keeps the rest of the line",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n50\\% \\usepackage{xeCJK}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "Chinese text",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\n电解质界面\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "Japanese kana",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\nひらがな\\end{document}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "Chinese only in a comment",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "% 中文注释\n\\documentclass{article}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "Chinese in an input file",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{body}\n\\end{document}\n",
+      "body.tex": "中文正文"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "package in an included chapter",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\n\\include{chapters/one}\n\\end{document}\n",
+      "chapters/one.tex": "\\RequirePackage{polyglossia}"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "luatexja",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\usepackage{luatexja-preset}\n\\begin{document}\n日本語\\end{document}\n"
+    },
+    "engine": "lualatex"
+  },
+  {
+    "name": "luatexja class over Chinese text",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{ltjsarticle}\n\\begin{document}\n日本語\\end{document}\n"
+    },
+    "engine": "lualatex"
+  },
+  {
+    "name": "includegraphics is not an include",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\n\\includegraphics{body}\n\\end{document}\n",
+      "body.tex": "中文"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "input outside the project is skipped",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{../secret}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "input cycle",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\input{a}\n",
+      "a.tex": "\\input{main}\n\\usepackage{fontspec}"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "package name prefix is not the package",
+    "main": "main.tex",
+    "base": "",
+    "files": {
+      "main.tex": "\\documentclass{article}\n\\usepackage{fontspecx}\n\\usepackagex{ctex}\n\\begin{document}\n\\end{document}\n"
+    },
+    "engine": "pdflatex"
+  },
+  {
+    "name": "nested main, inputs relative to its folder",
+    "main": "paper/main.tex",
+    "base": "paper",
+    "files": {
+      "paper/main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{sec/intro}\n\\end{document}\n",
+      "paper/sec/intro.tex": "中文"
+    },
+    "engine": "xelatex"
+  }
+]

@@ -34,6 +34,22 @@ describe("TeX log", () => {
       { level: "warning", file: null, line: null, message: "There were undefined references." },
     ]);
   });
+  it("sums up the characters XeTeX's font lacks in one warning", () => {
+    const log = [
+      "Missing character: There is no 电 (U+7535) in font [lmroman10-regular]:mapping=tex-text;!",
+      "Missing character: There is no 解 (U+89E3) in font [lmroman10-regular]:mapping=tex-text;!",
+      "Missing character: There is no 质 (U+8D28) in font [lmroman10-regular]:mapping=tex-text;!",
+    ].join("\n");
+    expect(parseLog(log, "/tmp/build")).toEqual([
+      {
+        level: "warning",
+        file: null,
+        line: null,
+        message:
+          "Missing character: There is no 电 (U+7535) in font [lmroman10-regular]:mapping=tex-text;! (+2)",
+      },
+    ]);
+  });
   it("maps Windows build paths, whichever slashes TeX writes", () => {
     const log = [
       "D:/writer/build/sections/intro.tex:7: Undefined control sequence.",

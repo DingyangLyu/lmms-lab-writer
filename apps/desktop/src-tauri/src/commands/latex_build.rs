@@ -71,14 +71,23 @@ pub async fn resolve(
         ))
     }
 }
-fn unicode_source(text: &str) -> bool {
-    let source = super::latex_project::without_comments(text);
-    source.chars().any(
-        |c| matches!(c,'\u{3040}'..='\u{30ff}'|'\u{3400}'..='\u{9fff}'|'\u{f900}'..='\u{faff}'),
-    ) || ["{ctex", "fontspec", "xeCJK"]
-        .iter()
-        .any(|s| source.contains(s))
-}
+// Which engine a project needs when its target says "auto": the same rules, step for step,
+// as packages/writing/src/engine.ts on the web; packages/writing/fixtures/engine-cases.json is
+// checked on both sides, so change them together.
+const MAGIC: [&str; 5] = ["pdflatex", "xelatex", "lualatex", "tectonic", "latexmk"];
+const XE_PACKAGES: [&str; 7] = [
+    "ctex",
+    "xeCJK",
+    "fontspec",
+    "polyglossia",
+    "unicode-math",
+    "xltxtra",
+    "xunicode",
+];
+const XE_CLASSES: [&str; 4] = ["ctexart", "ctexbook", "ctexrep", "ctexbeamer"];
+/// Files followed through \input and \include, at most.
+const MAX_FILES: usize = 100;
+/// `% !TEX program = xelatex` (or TS-program) in the first 30 lines.
 fn magic_engine(text: &str) -> Option<String> {
     text.lines().take(30).find_map(|line| {
         let lower = line.to_lowercase();
@@ -89,50 +98,107 @@ fn magic_engine(text: &str) -> Option<String> {
             return None;
         }
         let engine = lower.split('=').nth(1)?.trim();
-        ["pdflatex", "xelatex", "lualatex", "tectonic", "latexmk"]
-            .contains(&engine)
-            .then(|| engine.into())
+        MAGIC.contains(&engine).then(|| engine.into())
     })
 }
-async fn needs_unicode(root: &Path, work: &Path, entry: &Path) -> bool {
-    let root = tokio::fs::canonicalize(root)
-        .await
-        .unwrap_or_else(|_| root.to_path_buf());
-    let mut pending = vec![entry.to_path_buf()];
-    let mut visited = std::collections::HashSet::new();
-    while let Some(path) = pending.pop() {
-        if visited.len() > 100 {
-            break;
-        }
-        let Ok(path) = tokio::fs::canonicalize(path).await else {
-            continue;
+/// The braced arguments of `\command[options]{…}` (not of longer command names).
+fn arguments(source: &str, command: &str) -> Vec<String> {
+    let mut found = vec![];
+    let mut from = 0;
+    while let Some(offset) = source[from..].find(command) {
+        let at = from + offset;
+        let mut i = at + command.len();
+        let skip = |i: &mut usize| {
+            while let Some(c) = source[*i..].chars().next().filter(|c| c.is_whitespace()) {
+                *i += c.len_utf8();
+            }
         };
-        if !path.starts_with(&root) || !visited.insert(path.clone()) {
-            continue;
-        }
-        let Ok(text) = tokio::fs::read_to_string(path).await else {
-            continue;
-        };
-        if unicode_source(&text) {
-            return true;
-        }
-        let source = super::latex_project::without_comments(&text);
-        for command in ["\\input", "\\include"] {
-            for rest in source.split(command).skip(1) {
-                let Some(rest) = rest.trim_start().strip_prefix('{') else {
-                    continue;
-                };
-                if let Some(end) = rest.find('}') {
-                    let mut name = rest[..end].to_string();
-                    if !name.ends_with(".tex") {
-                        name.push_str(".tex");
-                    }
-                    pending.push(work.join(name));
+        if !source[i..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '@')
+        {
+            skip(&mut i);
+            if source[i..].starts_with('[') {
+                i = source[i..]
+                    .find(']')
+                    .map_or(source.len(), |close| i + close + 1);
+                skip(&mut i);
+            }
+            if source[i..].starts_with('{') {
+                if let Some(close) = source[i..].find('}') {
+                    found.push(source[i + 1..i + close].to_string());
                 }
             }
         }
+        from = at + command.len();
     }
-    false
+    found
+}
+fn names(source: &str, command: &str) -> Vec<String> {
+    arguments(source, command)
+        .iter()
+        .flat_map(|list| list.split(',').map(|name| name.trim().to_string()))
+        .collect()
+}
+/// 3 LuaLaTeX, 2 XeLaTeX for its packages, 1 XeLaTeX for CJK text, 0 anything.
+fn engine_need(text: &str) -> u8 {
+    let source = super::latex_project::without_comments(text);
+    let mut packages = names(&source, "\\usepackage");
+    packages.extend(names(&source, "\\RequirePackage"));
+    let classes = names(&source, "\\documentclass");
+    if packages.iter().any(|p| p.starts_with("luatexja"))
+        || classes.iter().any(|c| c.starts_with("ltj"))
+    {
+        return 3;
+    }
+    if packages.iter().any(|p| XE_PACKAGES.contains(&p.as_str()))
+        || classes.iter().any(|c| XE_CLASSES.contains(&c.as_str()))
+    {
+        return 2;
+    }
+    let cjk = source.chars().any(
+        |c| matches!(c,'\u{3040}'..='\u{30ff}'|'\u{3400}'..='\u{9fff}'|'\u{f900}'..='\u{faff}'),
+    );
+    u8::from(cjk)
+}
+/// The most any of `entry` and the files it inputs (inside `root`, relative to `work`) needs.
+async fn needed_engine(root: &Path, work: &Path, entry: &Path) -> u8 {
+    let root = tokio::fs::canonicalize(root)
+        .await
+        .unwrap_or_else(|_| root.to_path_buf());
+    let mut need = 0;
+    let mut pending = vec![entry.to_path_buf()];
+    let mut visited = std::collections::HashSet::new();
+    while visited.len() < MAX_FILES {
+        let Some(path) = pending.pop() else {
+            break;
+        };
+        let Ok(path) = tokio::fs::canonicalize(path).await else {
+            continue;
+        };
+        if !path.starts_with(&root) || visited.contains(&path) {
+            continue;
+        }
+        let Ok(text) = tokio::fs::read_to_string(&path).await else {
+            continue;
+        };
+        visited.insert(path);
+        need = need.max(engine_need(&text));
+        let source = super::latex_project::without_comments(&text);
+        let mut inputs = arguments(&source, "\\input");
+        inputs.extend(arguments(&source, "\\include"));
+        for name in inputs {
+            let name = name.trim();
+            if name.ends_with(".tex") {
+                pending.push(work.join(name));
+            } else {
+                pending.push(work.join(format!("{name}.tex")));
+                pending.push(work.join(name));
+            }
+        }
+    }
+    need
 }
 #[derive(Debug)]
 struct Plan {
@@ -152,17 +218,17 @@ async fn plan(
     let text = tokio::fs::read_to_string(entry)
         .await
         .map_err(|e| e.to_string())?;
-    let unicode = needs_unicode(root, work, entry).await;
+    let need = needed_engine(root, work, entry).await;
     let requested = if target.engine == "auto" {
         magic_engine(&text).unwrap_or("auto".into())
     } else {
         target.engine.clone()
     };
     let candidates: Vec<&str> = if requested == "auto" || requested == "latexmk" {
-        if unicode {
-            vec!["xelatex", "lualatex", "tectonic"]
-        } else {
-            vec!["pdflatex", "xelatex", "lualatex", "tectonic"]
+        match need {
+            3 => vec!["lualatex"],
+            1 | 2 => vec!["xelatex", "lualatex", "tectonic"],
+            _ => vec!["pdflatex", "xelatex", "lualatex", "tectonic"],
         }
     } else {
         vec![&requested]
@@ -175,7 +241,13 @@ async fn plan(
         }
     }
     let (engine, path) = selected.ok_or_else(|| {
-        if unicode {
+        if need == 3 {
+            tr!(
+                "这份文稿使用 luatexja，需要 LuaLaTeX，当前未检测到。",
+                "This document uses luatexja and needs LuaLaTeX, which was not found."
+            )
+            .to_string()
+        } else if need > 0 {
             tr!(
                 "中文／Unicode 文稿需要 XeLaTeX、LuaLaTeX 或 Tectonic，当前未检测到。",
                 "Chinese/Unicode documents need XeLaTeX, LuaLaTeX or Tectonic, and none was found."
@@ -575,15 +647,48 @@ async fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn unicode_and_magic_do_not_treat_comments_as_document_content() {
-        assert!(!unicode_source("% 中文注释\n\\documentclass{article}"));
-        assert!(unicode_source("\\documentclass{ctexart}"));
-        assert!(unicode_source("\\input{a}\n正文"));
-        assert_eq!(
-            magic_engine("% !TEX program = LuaLaTeX\nhello"),
-            Some("lualatex".into())
-        );
+    /// The web chooses engines with packages/writing; its cases must come out the same here.
+    #[tokio::test]
+    async fn chooses_engines_as_the_web_does() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            name: String,
+            main: String,
+            base: String,
+            files: HashMap<String, String>,
+            engine: String,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!(
+            "../../../../../packages/writing/fixtures/engine-cases.json"
+        ))
+        .unwrap();
+        for c in cases {
+            let d = tempfile::tempdir().unwrap();
+            // Inputs that leave the project must not be read even when the file exists.
+            let root = d.path().join("project");
+            tokio::fs::write(d.path().join("secret.tex"), "\\usepackage{fontspec}")
+                .await
+                .unwrap();
+            for (path, text) in &c.files {
+                let file = root.join(path);
+                tokio::fs::create_dir_all(file.parent().unwrap())
+                    .await
+                    .unwrap();
+                tokio::fs::write(file, text).await.unwrap();
+            }
+            let entry = root.join(&c.main);
+            let text = tokio::fs::read_to_string(&entry).await.unwrap();
+            let engine = match magic_engine(&text) {
+                Some(engine) => engine,
+                None => match needed_engine(&root, &root.join(&c.base), &entry).await {
+                    3 => "lualatex",
+                    1 | 2 => "xelatex",
+                    _ => "pdflatex",
+                }
+                .into(),
+            };
+            assert_eq!(engine, c.engine, "{}", c.name);
+        }
     }
     #[test]
     fn failed_log_keeps_the_end_on_a_char_boundary() {
@@ -593,17 +698,6 @@ mod tests {
         assert!(tail.len() <= FAILED_LOG_LIMIT);
         assert!(tail.ends_with("! Undefined control sequence."));
         assert_eq!(log_tail(b"short"), "short");
-    }
-    #[tokio::test]
-    async fn follows_included_chinese_sources() {
-        let d = tempfile::tempdir().unwrap();
-        tokio::fs::write(d.path().join("main.tex"), "\\input{body}")
-            .await
-            .unwrap();
-        tokio::fs::write(d.path().join("body.tex"), "中文正文")
-            .await
-            .unwrap();
-        assert!(needs_unicode(d.path(), d.path(), &d.path().join("main.tex")).await);
     }
 }
 
