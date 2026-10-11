@@ -3,7 +3,7 @@
 //! The bridge speaks newline-delimited JSON-RPC over stdio. Codex owns its
 //! authentication and conversation history; Writer never reads auth.json.
 
-use super::util::command;
+use super::util::{command, AGENT_CLI};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -19,8 +19,9 @@ use tokio::time::{timeout, Duration};
 
 const EVENT_NAME: &str = "codex://event";
 
-/// The permission choices shown in Writer's Codex composer. Keep the wire
-/// values here so the frontend never has to construct app-server policies.
+/// The permission choices shown in Writer's Codex composer. Their app-server
+/// policies live in packages/shared/agent-cli.json, which the runner reads too,
+/// so the frontend never has to construct them.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum CodexPermissionMode {
@@ -32,46 +33,32 @@ pub enum CodexPermissionMode {
 }
 
 impl CodexPermissionMode {
-    fn approval_policy(self) -> &'static str {
-        match self {
-            Self::FullAccess => "never",
-            Self::ReadOnly | Self::AskForApproval | Self::AutoReview => "on-request",
-        }
+    fn policy(self) -> &'static Value {
+        let key = match self {
+            Self::ReadOnly => "readOnly",
+            Self::AskForApproval => "askForApproval",
+            Self::AutoReview => "autoReview",
+            Self::FullAccess => "fullAccess",
+        };
+        &AGENT_CLI["codex"]["permissions"][key]
     }
 
-    fn approvals_reviewer(self) -> &'static str {
-        match self {
-            Self::AutoReview => "auto_review",
-            Self::ReadOnly | Self::AskForApproval | Self::FullAccess => "user",
-        }
-    }
-
-    fn thread_sandbox(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "read-only",
-            Self::AskForApproval | Self::AutoReview => "workspace-write",
-            Self::FullAccess => "danger-full-access",
-        }
-    }
-
-    fn turn_sandbox_policy(self) -> Value {
-        match self {
-            Self::ReadOnly => json!({"type": "readOnly"}),
-            Self::AskForApproval | Self::AutoReview => json!({"type": "workspaceWrite"}),
-            Self::FullAccess => json!({"type": "dangerFullAccess"}),
+    fn apply(self, params: &mut Value, fields: [&str; 3]) {
+        let policy = self.policy();
+        for field in fields {
+            params[field] = policy[field].clone();
         }
     }
 
     fn apply_to_thread(self, params: &mut Value) {
-        params["approvalPolicy"] = json!(self.approval_policy());
-        params["approvalsReviewer"] = json!(self.approvals_reviewer());
-        params["sandbox"] = json!(self.thread_sandbox());
+        self.apply(params, ["approvalPolicy", "approvalsReviewer", "sandbox"]);
     }
 
     fn apply_to_turn(self, params: &mut Value) {
-        params["approvalPolicy"] = json!(self.approval_policy());
-        params["approvalsReviewer"] = json!(self.approvals_reviewer());
-        params["sandboxPolicy"] = self.turn_sandbox_policy();
+        self.apply(
+            params,
+            ["approvalPolicy", "approvalsReviewer", "sandboxPolicy"],
+        );
     }
 }
 

@@ -2,10 +2,11 @@
   "name": "@lmms-lab/writer-shared",
   "version": "0.2.0",
   "private": true,
-  "description": "Types shared by the desktop app",
+  "description": "Types and settings shared by the desktop app and the collaboration server",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./agent-cli.json": "./agent-cli.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

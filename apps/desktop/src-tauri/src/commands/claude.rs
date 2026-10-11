@@ -1,5 +1,5 @@
 //! Native Claude Code stream-json bridge. Claude owns login and resumable context.
-use super::util::command;
+use super::util::{command, AGENT_CLI};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -306,20 +306,26 @@ async fn send(input: &Mutex<ChildStdin>, message: Value) -> Result<(), String> {
     input.write_all(&bytes).await.map_err(|e| e.to_string())?;
     input.flush().await.map_err(|e| e.to_string())
 }
+/// The CLI's arguments, permission flags and efforts, shared with the runner.
+fn cli_strings(path: &[&str]) -> Vec<String> {
+    let mut value = &*AGENT_CLI;
+    for key in path {
+        value = &value[*key];
+    }
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
 fn protocol_command(bin: &Path, dir: &Path) -> tokio::process::Command {
     let mut cmd = command(&bin.to_string_lossy());
     cmd.current_dir(dir)
-        .args([
-            "-p",
-            "--input-format",
-            "stream-json",
-            "--output-format",
-            "stream-json",
-            "--verbose",
-            "--include-partial-messages",
-            "--permission-prompt-tool",
-            "stdio",
-        ])
+        .args(cli_strings(&["claude", "protocolArgs"]))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -534,20 +540,16 @@ pub struct TurnOptions {
     effort: Option<String>,
     permission_mode: String,
 }
-fn permission_args(mode: &str) -> Result<Vec<&str>, String> {
-    match mode {
-        "default" | "acceptEdits" | "plan" => Ok(vec!["--permission-mode", mode]),
-        "bypassPermissions" => Ok(vec![
-            "--permission-mode",
-            mode,
-            "--dangerously-skip-permissions",
-        ]),
-        _ => Err(tr!(
+fn permission_args(mode: &str) -> Result<Vec<String>, String> {
+    let args = cli_strings(&["claude", "permissions", mode]);
+    if args.is_empty() {
+        return Err(tr!(
             "不支持的 Claude 权限模式",
             "Unsupported Claude permission mode"
         )
-        .into()),
+        .into());
     }
+    Ok(args)
 }
 #[tauri::command]
 pub async fn claude_start_turn(
@@ -563,7 +565,7 @@ pub async fn claude_start_turn(
     if options
         .effort
         .as_ref()
-        .is_some_and(|e| !["low", "medium", "high", "xhigh", "max"].contains(&e.as_str()))
+        .is_some_and(|e| !cli_strings(&["claude", "efforts"]).contains(e))
     {
         return Err(tr!("无效推理强度", "Invalid reasoning effort").into());
     }

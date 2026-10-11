@@ -14,6 +14,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { validPath } from "@lmms-lab/sync";
+// The CLI settings the desktop uses too (its Rust reads the same file).
+import agentCli from "@lmms-lab/writer-shared/agent-cli.json" with { type: "json" };
 import { WebSocket } from "ws";
 import {
   AGENT_PERMISSIONS,
@@ -63,17 +65,7 @@ type ClaudeRun = {
   send: (message: Json) => void;
   kill: () => void;
 };
-const CLAUDE_ARGS = [
-  "-p",
-  "--input-format",
-  "stream-json",
-  "--output-format",
-  "stream-json",
-  "--verbose",
-  "--include-partial-messages",
-  "--permission-prompt-tool",
-  "stdio",
-];
+const CLAUDE_ARGS = agentCli.claude.protocolArgs;
 const CLAUDE_PROMPT =
   "You are working in Y-Writer on a copy of a shared LaTeX project kept by the lab's runner. After each tool step, the files you change here are merged into your collaborators' live text, and the project was saved as a version before this turn. Follow the user's requested scope and preserve unrelated changes. Verify citations against primary sources and never invent bibliographic details. Do not commit, push or publish anything, and do not read credentials or files outside this folder. Link project files with relative Markdown links and line numbers when useful.";
 const CLAUDE_INIT = {
@@ -102,10 +94,7 @@ export function claudeInput(text: string, images: string[]): Json {
   };
 }
 /** The CLI's permission flags; skipping approvals must be asked for explicitly. */
-const claudePermissionArgs = (mode: ClaudePermission) =>
-  mode === "bypassPermissions"
-    ? ["--permission-mode", mode, "--dangerously-skip-permissions"]
-    : ["--permission-mode", mode];
+const claudePermissionArgs = (mode: ClaudePermission) => agentCli.claude.permissions[mode];
 /** The agents run collaborators' prompts: they get none of Writer's tokens or passwords. */
 function agentEnv() {
   const env = { ...process.env };
@@ -235,36 +224,11 @@ function spawnAgent(binary: string, args: string[], cwd: string) {
   return { child, kill };
 }
 
-/** Codex's composer choices as app-server policies, exactly as the desktop sends them. */
+/** Codex's composer choices as app-server policies, the same table the desktop sends from. */
 const POLICIES: Record<
   AgentPermission,
   { approvalPolicy: string; approvalsReviewer: string; sandbox: string; sandboxPolicy: Json }
-> = {
-  readOnly: {
-    approvalPolicy: "on-request",
-    approvalsReviewer: "user",
-    sandbox: "read-only",
-    sandboxPolicy: { type: "readOnly" },
-  },
-  askForApproval: {
-    approvalPolicy: "on-request",
-    approvalsReviewer: "user",
-    sandbox: "workspace-write",
-    sandboxPolicy: { type: "workspaceWrite" },
-  },
-  autoReview: {
-    approvalPolicy: "on-request",
-    approvalsReviewer: "auto_review",
-    sandbox: "workspace-write",
-    sandboxPolicy: { type: "workspaceWrite" },
-  },
-  fullAccess: {
-    approvalPolicy: "never",
-    approvalsReviewer: "user",
-    sandbox: "danger-full-access",
-    sandboxPolicy: { type: "dangerFullAccess" },
-  },
-};
+> = agentCli.codex.permissions;
 const threadPolicy = (mode: AgentPermission) => {
   const { approvalPolicy, approvalsReviewer, sandbox } = POLICIES[mode];
   return { approvalPolicy, approvalsReviewer, sandbox };
@@ -1288,7 +1252,7 @@ export class AgentHost {
     if (!this.claudePermissions.includes(mode))
       throw new Error("This runner does not support that permission mode");
     const effort = typeof params.effort === "string" && params.effort ? params.effort : null;
-    if (effort && !["low", "medium", "high", "xhigh", "max"].includes(effort))
+    if (effort && !agentCli.claude.efforts.includes(effort))
       throw new Error("Invalid reasoning effort");
     const model =
       typeof params.model === "string" && params.model && params.model !== "default"

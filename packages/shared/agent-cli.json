@@ -1,0 +1,55 @@
+{
+  "$comment": "How Writer starts the agent CLIs, in one place for both of its hosts: the desktop (Rust, apps/desktop/src-tauri/src/commands/codex.rs and claude.rs, through include_str!) and the shared runner (Node, apps/collaboration/server/agent-host.ts). A protocol change made here reaches both.",
+  "codex": {
+    "permissions": {
+      "readOnly": {
+        "approvalPolicy": "on-request",
+        "approvalsReviewer": "user",
+        "sandbox": "read-only",
+        "sandboxPolicy": { "type": "readOnly" }
+      },
+      "askForApproval": {
+        "approvalPolicy": "on-request",
+        "approvalsReviewer": "user",
+        "sandbox": "workspace-write",
+        "sandboxPolicy": { "type": "workspaceWrite" }
+      },
+      "autoReview": {
+        "approvalPolicy": "on-request",
+        "approvalsReviewer": "auto_review",
+        "sandbox": "workspace-write",
+        "sandboxPolicy": { "type": "workspaceWrite" }
+      },
+      "fullAccess": {
+        "approvalPolicy": "never",
+        "approvalsReviewer": "user",
+        "sandbox": "danger-full-access",
+        "sandboxPolicy": { "type": "dangerFullAccess" }
+      }
+    }
+  },
+  "claude": {
+    "protocolArgs": [
+      "-p",
+      "--input-format",
+      "stream-json",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--include-partial-messages",
+      "--permission-prompt-tool",
+      "stdio"
+    ],
+    "permissions": {
+      "default": ["--permission-mode", "default"],
+      "acceptEdits": ["--permission-mode", "acceptEdits"],
+      "plan": ["--permission-mode", "plan"],
+      "bypassPermissions": [
+        "--permission-mode",
+        "bypassPermissions",
+        "--dangerously-skip-permissions"
+      ]
+    },
+    "efforts": ["low", "medium", "high", "xhigh", "max"]
+  }
+}

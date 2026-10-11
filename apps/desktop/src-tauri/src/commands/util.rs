@@ -1,4 +1,15 @@
+use serde_json::Value;
+use std::sync::LazyLock;
 use tokio::process::Command as TokioCommand;
+
+/// How Writer starts the agent CLIs (Codex policies, Claude Code arguments), shared with the
+/// collaboration server's runner so that a protocol change reaches both hosts.
+pub static AGENT_CLI: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::from_str(include_str!(
+        "../../../../../packages/shared/agent-cli.json"
+    ))
+    .expect("packages/shared/agent-cli.json is valid JSON")
+});
 
 /// Windows CREATE_NO_WINDOW flag to hide console windows
 #[cfg(target_os = "windows")]
