@@ -1,0 +1,2630 @@
+[
+  {
+    "name": "independent Chinese edits in one line",
+    "base": "这里讨论材料与方法。",
+    "ours": "这里讨论新材料与方法。",
+    "theirs": "这里讨论材料与实验方法。",
+    "content": "这里讨论新材料与实验方法。",
+    "parts": [
+      {
+        "text": "这里讨论",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "新",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "材料与",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "实验",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "方法。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "two edits to one identifier conflict",
+    "base": "cat",
+    "ours": "bat",
+    "theirs": "car",
+    "content": null,
+    "parts": [
+      {
+        "text": null,
+        "base": "cat",
+        "ours": "bat",
+        "theirs": "car"
+      }
+    ]
+  },
+  {
+    "name": "the same edit on both sides",
+    "base": "abc",
+    "ours": "new abc",
+    "theirs": "new abc",
+    "content": "new abc",
+    "parts": [
+      {
+        "text": "new abc",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "adjacent insertion and replacement",
+    "base": "甲乙",
+    "ours": "前甲乙",
+    "theirs": "甲丙",
+    "content": "前甲丙",
+    "parts": [
+      {
+        "text": "前",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "甲",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "丙",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "deletion beside an emoji",
+    "base": "甲😀乙丙",
+    "ours": "甲😀乙",
+    "theirs": "新甲😀乙丙",
+    "content": "新甲😀乙",
+    "parts": [
+      {
+        "text": "新",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "甲😀乙",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "overlapping rewrites keep all three versions",
+    "base": "原稿",
+    "ours": "我的版本",
+    "theirs": "其他版本",
+    "content": null,
+    "parts": [
+      {
+        "text": null,
+        "base": "原稿",
+        "ours": "我的版本",
+        "theirs": "其他版本"
+      }
+    ]
+  },
+  {
+    "name": "TeX commands stay whole",
+    "base": "\\section{Intro}\nText.",
+    "ours": "\\subsection{Intro}\nText.",
+    "theirs": "\\section{Intro}\nMore text.",
+    "content": "\\subsection{Intro}\nMore text.",
+    "parts": [
+      {
+        "text": "\\subsection",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{Intro}\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "More text",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": ".",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "edits in different paragraphs",
+    "base": "First para.\n\nSecond para.\n\nThird.",
+    "ours": "First paragraph.\n\nSecond para.\n\nThird.",
+    "theirs": "First para.\n\nSecond para.\n\nThird, edited.",
+    "content": "First paragraph.\n\nSecond para.\n\nThird, edited.",
+    "parts": [
+      {
+        "text": "First ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "paragraph",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": ".\n\nSecond para.\n\nThird",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": ", edited",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": ".",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "insertions at the same point conflict",
+    "base": "a b",
+    "ours": "a x b",
+    "theirs": "a y b",
+    "content": null,
+    "parts": [
+      {
+        "text": "a ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "",
+        "ours": "x ",
+        "theirs": "y "
+      },
+      {
+        "text": "b",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "repeated tokens around a moved deletion",
+    "base": " barrier\\cite\n\n电x%{%解，。 ",
+    "ours": " barrier\\cite\n\n电the\n\nx%{%解，。 ",
+    "theirs": " barrier\\cite\n\n电x%{%解 thea ",
+    "content": " barrier\\cite\n\n电the\n\nx%{%解 thea ",
+    "parts": [
+      {
+        "text": " barrier\\cite\n\n电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x%{%解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " thea",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "CRLF line endings",
+    "base": "one\r\ntwo\r\n",
+    "ours": "one\r\nTWO\r\n",
+    "theirs": "zero\r\none\r\ntwo\r\n",
+    "content": "zero\r\none\r\nTWO\r\n",
+    "parts": [
+      {
+        "text": "zero\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "one\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "TWO",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "one side empties the document",
+    "base": "text",
+    "ours": "",
+    "theirs": "text",
+    "content": "",
+    "parts": [
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 1",
+    "base": "\\sectionbarrier。😀Results😀ab_c\\cite，\né $of",
+    "ours": "\\sectionbarrier。😀Results😀电\\cite，\né $of",
+    "theirs": "\\sectionbarrier😀ab_c\\cite，\né%of",
+    "content": "\\sectionbarrier😀电\\cite，\né%of",
+    "parts": [
+      {
+        "text": "\\sectionbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，\né",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "of",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 2",
+    "base": "\\citeE_a 质ab_c\r\nathe\\cite\\label\\label，the，barrierawe😀\r\nthe。\nof $ab_cthe}\r\n\n\na\\label",
+    "ours": "\\citeE_a 质ab_c\r\nathe\\cite\\labelab_cthe，barrierawe😀é\r\nthe。\nof $}\r\n\n\na\\label",
+    "theirs": "\\citeE_a 质ab_c\r\n电电é\\cite\\label\\label，the，barrierawe😀\r\nthe。\n{ 。of $ab_cthe}\r\n\n\na",
+    "content": null,
+    "parts": [
+      {
+        "text": "\\citeE_a 质ab_c\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "athe\\cite\\label\\label",
+        "ours": "athe\\cite\\labelab_cthe",
+        "theirs": "电电é\\cite\\label\\label"
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrierawe😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\r\nthe。\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{ 。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "of $",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}\r\n\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 3",
+    "base": "%a$解%theE_a%\r\nthe\\section。%Results \r\n😀\n\n$barrier质 of\\label质$。%Results\r\n\\cite%{质\\labelx\\labela",
+    "ours": "%a$解%theE_a%\r\nthe\\section。%Results \r\n😀\n\n$barrier质 of。%Results\r\n\\cite%{质\\label{\nE_aa",
+    "theirs": "%a$解%theE_a%\r\nthe\\section。%Results \r\n$theé😀\n\n$barrier质 of\\label质$。%Results\r\n\\cite%{质\\labelx\\labela",
+    "content": "%a$解%theE_a%\r\nthe\\section。%Results \r\n$theé😀\n\n$barrier质 of。%Results\r\n\\cite%{质\\label{\nE_aa",
+    "parts": [
+      {
+        "text": "%a$解%theE_a%\r\nthe\\section。%Results \r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$theé",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀\n\n$barrier质 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "of",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。%Results\r\n\\cite%{质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\label{\nE_aa",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 4",
+    "base": " }the\r\n电质}，",
+    "ours": " \r\n\n\n\n质}，",
+    "theirs": " }the} the质\n\n，",
+    "content": null,
+    "parts": [
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "\r\n电质",
+        "ours": "\r\n\n\n\n质",
+        "theirs": ""
+      },
+      {
+        "text": "}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " the质\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 5",
+    "base": "😀 ， ab_c，质$电\\cite{%we\\citeweé we\\sectionof",
+    "ours": "😀 ， ab_c，质$电\\cite{%we\\citeweé we\\section",
+    "theirs": "😀 解$， ab_c，质$电\\cite{%we\\citeweé we\\sectionof😀",
+    "content": "😀 解$， ab_c，质$电\\cite{%we\\citeweé we\\section😀",
+    "parts": [
+      {
+        "text": "😀 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "解$",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "， ab_c，质$电\\cite{%we\\citeweé ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "we\\section",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 6",
+    "base": "。😀%%thex电\n\nwethe",
+    "ours": "。😀\\section%%thex电\n\nthe。",
+    "theirs": "。\\label ofthex电aé\n\nwethe",
+    "content": null,
+    "parts": [
+      {
+        "text": "。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "😀%%thex",
+        "ours": "😀\\section%%thex",
+        "theirs": "\\label ofthex"
+      },
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "aé",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 7",
+    "base": "the电\n\\section %，。{质xtheE_axa%xxweab_cthe\n\n\\cite",
+    "ours": "the电\n\\section %a {质xtheE_axbarrier%xxweab_cthe\n\n\\cite",
+    "theirs": "the电\n\\section %，xtheE_axa%xx\n\n\\cite",
+    "content": null,
+    "parts": [
+      {
+        "text": "the电\n\\section %",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "，。{质",
+        "ours": "a {质",
+        "theirs": "，"
+      },
+      {
+        "text": "xtheE_axbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "xx",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 8",
+    "base": "barrier\\cite%解\\cite}\n\n\\label \\cite 😀{{ }",
+    "ours": "barrier😀  解\\cite}\n\n\\label 电😀{{we of",
+    "theirs": "barrier解\\cite}\n\n\\label \\cite 😀{{。$of}",
+    "content": null,
+    "parts": [
+      {
+        "text": null,
+        "base": "barrier\\cite%",
+        "ours": "barrier😀  ",
+        "theirs": "barrier"
+      },
+      {
+        "text": "解\\cite}\n\n\\label ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀{{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "we",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。$of",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "of",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 9",
+    "base": "\r\n。ab_cE_a\\cite%}the",
+    "ours": "\r\n。ab_cthe，éE_a\\cite",
+    "theirs": "\r\n。ab_cthe，éE_a\\cite",
+    "content": "\r\n。ab_cthe，éE_a\\cite",
+    "parts": [
+      {
+        "text": "\r\n。ab_cthe，éE_a\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 10",
+    "base": "ab_c\n\n\n电\\label%the😀}the\\section E_a{}%\r\n\n\n\\section\\cite质abarrier\\labelResults电ofaE_aResultsbarrierthe%",
+    "ours": "ab_c\n\n\n电\\label%the😀xthe}the\\section E_a{}%\r\n\n\n{\\section\\cite质abarrier\\labelResults电电ofaE_aResultsbarrierthe%",
+    "theirs": "ab_c\n\n\n电\\label%the😀}the\\section E_a{\n\nResults}%\r\n\n\n\\section。Results\nabarrier\\labelResults电theofaE_aResultsbarrierthe%",
+    "content": "ab_c\n\n\n电\\label%the😀xthe}the\\section E_a{\n\nResults}%\r\n\n\n{\\section。Results\nabarrier\\labelResults电电theofaE_aResultsbarrierthe%",
+    "parts": [
+      {
+        "text": "ab_c\n\n\n电\\label%the😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "xthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}the\\section E_a{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\nResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}%\r\n\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\section。Results\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "abarrier\\labelResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "theofaE_aResultsbarrierthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 11",
+    "base": " 😀the{\n\nthe\\citexwebarrier\\citewethe，barrierthethe解解\n质x{the\n ",
+    "ours": " the{\n\nthe\\citexwebarrier\\citewethe，barrierthethe解解\n质x{the\n ",
+    "theirs": " 😀the{\n\nthe\n\n\\citexwebarrier\\citewethe，barrierthethe解解\n质x{the\n ",
+    "content": " the{\n\nthe\n\n\\citexwebarrier\\citewethe，barrierthethe解解\n质x{the\n ",
+    "parts": [
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the{\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the\n\n\\citexwebarrier\\citewethe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，barrierthethe解解\n质x{the\n ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 12",
+    "base": "{$of😀\\label\n%。weof。\r\n",
+    "ours": "{$of😀\\label\n%。weResults。\r\n",
+    "theirs": "{$of%质\\label\n%。weof。\r\n",
+    "content": "{$of%质\\label\n%。weResults。\r\n",
+    "parts": [
+      {
+        "text": "{$of",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\label\n%。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "weResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 13",
+    "base": "weResultsthe😀。 \\label\\label。 \n\n thex解\n质{xthe，",
+    "ours": "weResultsthe😀。 \\label\\label。 \n\n the解E_athe质{xthe，",
+    "theirs": "weResultsthe😀。 \\label\\label。 \n\n theaResultsx解\n质{x\ntheab_cthe，x ",
+    "content": null,
+    "parts": [
+      {
+        "text": "weResultsthe😀。 \\label\\label。 \n\n ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "thex",
+        "ours": "the",
+        "theirs": "theaResultsx"
+      },
+      {
+        "text": "解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "E_athe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "质{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x\ntheab_cthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 14",
+    "base": "x电\n\n}😀the\nwe$解 Results",
+    "ours": "x电\n\n}😀the\n\n$解 thexResults",
+    "theirs": "x电\n\n，\\cite}😀the\nwe$解E_aab_cthe Results",
+    "content": "x电\n\n，\\cite}😀the\n\n$解E_aab_cthe thexResults",
+    "parts": [
+      {
+        "text": "x电\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}😀the\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "E_aab_cthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "thexResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 15",
+    "base": "电%theab_c😀barrier电ab_cResults $\n\n \\label，\n\n质\\label\n\n质aa$ab_cthe%Resultsthe atheE_a，质the\n\nab_c}。é",
+    "ours": "电x%。%theab_c😀barrier电ab_cResults $\n\n \\label，\n\n质\\label\n\n质aa$ab_cthe%Resultsthe atheE_aé，质the\n\nab_c}。é",
+    "theirs": "电%theab_c😀barrier电ab_c $\n\n \\label，\n\n质\\label\n\n质aa$ab_cthe%Resultsthe atheE_a，质the\n\nab_c}。é",
+    "content": "电x%。%theab_c😀barrier电ab_c $\n\n \\label，\n\n质\\label\n\n质aa$ab_cthe%Resultsthe atheE_aé，质the\n\nab_c}。é",
+    "parts": [
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "theab_c😀barrier电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_c",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " $\n\n \\label，\n\n质\\label\n\n质aa$ab_cthe%Resultsthe atheE_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，质the\n\nab_c}。é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 16",
+    "base": "x😀x\\sectionthe\\sectionwethe\n\nbarrier\n xa质barrierthe，%ofthe ，a\n\n电a{ab_c😀of\n\nE_a质解\nab_c$😀",
+    "ours": "x😀x\\sectionthe\\sectionwethe\n\nbarrier\n xa质barrierthe， %ofofthe ，a\n\n电a{ab_c😀of\n\nE_a质解\nab_c$😀",
+    "theirs": "x😀xwethe\n\nbarriera质barrierthe，%ofthe ，a\n\n电a{ab_c😀of\n\nE_a质解ab_c$😀",
+    "content": "x😀xwethe\n\nbarriera质barrierthe， %ofofthe ，a\n\n电a{ab_c😀of\n\nE_a质解ab_c$😀",
+    "parts": [
+      {
+        "text": "x😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "xwethe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barriera",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "质barrierthe，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ofofthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ，a\n\n电a{ab_c😀of\n\nE_a质解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_c$😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 17",
+    "base": "barrierResultsthe\\label ，the\\citeé解",
+    "ours": " ，the\\citeé",
+    "theirs": "barrierResultsthe\\label ，the\r\nxbarrier{we解\\citeé解",
+    "content": " ，the\r\nxbarrier{we解\\citeé",
+    "parts": [
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the\r\nxbarrier{we解\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 18",
+    "base": " a质\\section$\r\n\n$😀， $😀电\r\nof",
+    "ours": " a质\\section$\r\n\n$😀， $😀电thex}，of解the",
+    "theirs": " a质\\section$\r\n\n$😀， $😀电thex}，of解the",
+    "content": " a质\\section$\r\n\n$😀， $😀电thex}，of解the",
+    "parts": [
+      {
+        "text": " a质\\section$\r\n\n$😀， $😀电thex}，of解the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 19",
+    "base": "the\n\n\nwe\n {\\labelthethe\r\n{ab_cxofbarrier",
+    "ours": "the\n\n\nwe$解 E_a{\\labelthethe\r\n{ab_cxofbarrier",
+    "theirs": "the\n\n\\citethe解we\n {\\labelthethe\r\n{ab_cxofbarrier",
+    "content": "the\n\n\\citethe解we$解 E_a{\\labelthethe\r\n{ab_cxofbarrier",
+    "parts": [
+      {
+        "text": "the\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\citethe解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "we",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "E_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{\\labelthethe\r\n{ab_cxofbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 20",
+    "base": "质{\\sectionweof\\sectionbarrierthe%the\n😀{}the}{ barrier{E_a\\label\\section\r\n\r\nwe",
+    "ours": "质{\\sectionweof\\sectionbarrierthe%the{}the barrier{\r\n\r\nwe",
+    "theirs": "质{\\sectionweof\\sectionbarrierthe%the{}the barrier{\r\n\r\nwe",
+    "content": "质{\\sectionweof\\sectionbarrierthe%the{}the barrier{\r\n\r\nwe",
+    "parts": [
+      {
+        "text": "质{\\sectionweof\\sectionbarrierthe%the{}the barrier{\r\n\r\nwe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 21",
+    "base": " E_a}😀Results 😀é。\r\n\\label%\n\n  😀",
+    "ours": " E_a}😀Results 😀é。。\r\n%\n\n }ab_c",
+    "theirs": " E_a}😀Results 😀é。。\r\n%\n\n }ab_c",
+    "content": " E_a}😀Results 😀é。。\r\n%\n\n }ab_c",
+    "parts": [
+      {
+        "text": " E_a}😀Results 😀é。。\r\n%\n\n }ab_c",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 22",
+    "base": " 质 $\\sectiontheofResultsResultsx\n\nbarrier$\n质 。}",
+    "ours": " 质 $\\sectiontheofResultsResultsx\n\nbarrier\\section质质the解\n质 。}",
+    "theirs": " 质xxthe $ResultsResultsbarrier\n\nbarrier$\n质 。}",
+    "content": " 质xxthe $ResultsResultsbarrier\n\nbarrier\\section质质the解\n质 。}",
+    "parts": [
+      {
+        "text": " 质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "xxthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " $",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ResultsResultsbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrier\\section质质the解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n质 。}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 23",
+    "base": "\n\n，\\section$\n\nthexE_aof。thea a  { x$ of}}the解",
+    "ours": "\n\n，$\n\nthexE_aof。thea a  { x$ of}\\label\\section}",
+    "theirs": "\n\n，\\sectionxE_aof。thea a \n$质 { x$ of}}",
+    "content": null,
+    "parts": [
+      {
+        "text": "\n\n，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "\\section$\n\nthexE_aof",
+        "ours": "$\n\nthexE_aof",
+        "theirs": "\\sectionxE_aof"
+      },
+      {
+        "text": "。thea a ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n$质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " { x$ of}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\label\\section",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 24",
+    "base": "😀。\\section{。thethe wex\n\n",
+    "ours": "😀。\\section{。thethe we😀E_ax\n\n",
+    "theirs": "😀 \\cite{。thethe we\\cite%\n\n",
+    "content": null,
+    "parts": [
+      {
+        "text": "😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " \\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{。thethe ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "wex",
+        "ours": "we😀E_ax",
+        "theirs": "we\\cite%"
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 25",
+    "base": "the éResultsab_c\\label\\citeE_a{aab_c{the。质a😀，athe}😀E_a the}ab_cbarrier",
+    "ours": "the éResultsab_c\\label\\citeE_a{barrier\r\naab_c{。质，athe}😀E_a the}ab_cbarrier",
+    "theirs": "the éResultsab_c%E_a{aab_cof质质。质a😀，athe}😀E_a \n质the}ab_cbarrier",
+    "content": null,
+    "parts": [
+      {
+        "text": "the é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "Resultsab_c%E_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrier\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "aab_c{the",
+        "ours": "aab_c{",
+        "theirs": "aab_cof质质"
+      },
+      {
+        "text": "。质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，athe}😀E_a ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the}ab_cbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 26",
+    "base": "\\citethea{质😀of}E_ax\n\\sectionResults%电é",
+    "ours": "\\citethe$电é{质😀of}E_ax\n\\sectionResults%电é",
+    "theirs": "\\cite {\\sectiona{质😀of}E_ax\n\\sectionResults%电é",
+    "content": null,
+    "parts": [
+      {
+        "text": null,
+        "base": "\\citethea",
+        "ours": "\\citethe$电é",
+        "theirs": "\\cite {\\sectiona"
+      },
+      {
+        "text": "{质😀of}E_ax\n\\sectionResults%电é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 27",
+    "base": "\r\n\nbarrierthe\n\n\\cite\\section\\citeab_c\n。\\sectionab_c电barrierthe。\n\n😀ab_c😀Resultsthe $  { barrier\n} 解we of\n\nab_cbarrier",
+    "ours": "\r\n\nbarrierthe\n\n\\cite\\section\\citeab_c\n。\\sectionab_c电barrierthe。\n\n😀ab_c😀 $  { barrier\n} 解we of\n\nab_cbarrier",
+    "theirs": "\r\n\nbarrierthe\n\n\n\\cite\\section\\citeab_c\n。\\sectionab_c电barrierthe。\n\n😀ab_c\\labelé 😀Resultsthe $  { barrier\n} 解we of\n\nab_cbarrier",
+    "content": "\r\n\nbarrierthe\n\n\n\\cite\\section\\citeab_c\n。\\sectionab_c电barrierthe。\n\n😀ab_c\\labelé 😀 $  { barrier\n} 解we of\n\nab_cbarrier",
+    "parts": [
+      {
+        "text": "\r\n\nbarrierthe\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\cite\\section\\citeab_c\n。\\sectionab_c电barrierthe。\n\n😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_c\\labelé ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " $  { barrier\n} 解we of\n\nab_cbarrier",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 28",
+    "base": "we E_a\nab_cthe a",
+    "ours": "we E_a\nab_cthe",
+    "theirs": "we E_a\nab_c{a。\\cite😀",
+    "content": null,
+    "parts": [
+      {
+        "text": "we E_a\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "ab_cthe a",
+        "ours": "ab_cthe",
+        "theirs": "ab_c{a"
+      },
+      {
+        "text": "。\\cite😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 29",
+    "base": "ResultsxéResults{E_a\\label😀x 电解，thethe\n\n\nab_c，xResultsthethe。theE_a ",
+    "ours": "Resultsxéa。{E_a\\label😀电解，thethe\n\n\nab_c，xResultsthethethe。theE_a ",
+    "theirs": "Resultsxéa。{E_a\\label😀电解，thethe\n\n\nab_c，xResultsthethethe。theE_a ",
+    "content": "Resultsxéa。{E_a\\label😀电解，thethe\n\n\nab_c，xResultsthethethe。theE_a ",
+    "parts": [
+      {
+        "text": "Resultsxéa。{E_a\\label😀电解，thethe\n\n\nab_c，xResultsthethethe。theE_a ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 30",
+    "base": "%电 thetheab_c电\r\n解a，E_a\n\n$，x",
+    "ours": "%电 thetheab_c电\r\n解a，E_a\n\n\\labelResults{é$，x",
+    "theirs": "%电 thetheab_c电\r\n解a，E_a\n\n\\labelResults{é$，x",
+    "content": "%电 thetheab_c电\r\n解a，E_a\n\n\\labelResults{é$，x",
+    "parts": [
+      {
+        "text": "%电 thetheab_c电\r\n解a，E_a\n\n\\labelResults{é$，x",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 31",
+    "base": "ab_c \n{a\n\n%{atheResultsE_a😀$质}",
+    "ours": "ab_c \n{the电a\n\ntheResultsE_a😀$质}",
+    "theirs": "ab_c \n{a\n\n%{atheResultsE_a}the $质}",
+    "content": "ab_c \n{the电a\n\ntheResultsE_a}the $质}",
+    "parts": [
+      {
+        "text": "ab_c \n{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "a\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "theResultsE_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}the ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$质}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 32",
+    "base": "电thexx \n\ntheof",
+    "ours": "电the质x。\n\nthe",
+    "theirs": "电the\r\nxx \n\ntheof",
+    "content": null,
+    "parts": [
+      {
+        "text": "电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "thexx ",
+        "ours": "the质x。",
+        "theirs": "the\r\nxx "
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 33",
+    "base": "éé%\\cite}ab_cE_athe\n\n 😀\\cite barrierbarrierthe\\labeltheof$ theE_aaResults}a\\citex 😀\\labelE_athe",
+    "ours": "é}ab_cE_a\n\n 😀\\cite % the\\labeltheof$ theE_aaResults}a\\citex 😀\\labelE_athe",
+    "theirs": "éé%\\cite}ab_cE_a 😀\\cite barrierbarrierthe\\label😀é of$ theE_aaResults}a\\citex 😀\\labelE_a{质。the",
+    "content": null,
+    "parts": [
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "ab_cE_athe\n\n",
+        "ours": "ab_cE_a\n\n",
+        "theirs": "ab_cE_a"
+      },
+      {
+        "text": " 😀\\cite ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "barrierbarrierthe\\labeltheof",
+        "ours": "% the\\labeltheof",
+        "theirs": "barrierbarrierthe\\label😀é of"
+      },
+      {
+        "text": "$ theE_aaResults}a\\citex 😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\labelE_a{质。the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 34",
+    "base": "of% {barrierthe，%é😀we😀\n\r\n😀\\cite电Resultsawe \\section解E_a$ 。",
+    "ours": "of% {barrierthe，%é😀we😀\n\r\n😀\\cite电Resultswe\nawe \\section解E_a$",
+    "theirs": "of% {barrier质😀，，%é😀we😀\n\r\n😀\\cite电the{Resultsawe \\section解E_a",
+    "content": null,
+    "parts": [
+      {
+        "text": "of% {",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrier质😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%é😀we😀\n\r\n😀\\cite电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "the{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "Resultswe\nawe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " \\section解E_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "$ 。",
+        "ours": "$",
+        "theirs": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 35",
+    "base": "x。 \\cite}é } \nof\n%E_awe$解Results %a\\label{ a\\citethe质  解Resultsab_cweé\\citeab_c \\label",
+    "ours": "x。 \\cite}é } \nof\n%E_awe$解Results %a\\labelof\nResults{ a\\citethe质  解Resultsab_cé\\citeab_c \\label",
+    "theirs": "\n\nx。 \\cite}é } \nof\n%E_awe$解Results %aoféab_c{ a\\citethe质  解Resultsab_cweé\\citeab_c \\label",
+    "content": null,
+    "parts": [
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x。 \\cite}é } \nof\n%E_awe$解Results %",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "a\\label",
+        "ours": "a\\labelof\nResults",
+        "theirs": "aoféab_c"
+      },
+      {
+        "text": "{ a\\citethe质  解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "Resultsab_c",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é\\citeab_c \\label",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 36",
+    "base": "the\\citeé\\label$😀thethe$。质解$",
+    "ours": "the\\citeé\\label$😀 \\citeofthethethe$。质解$Results\\label",
+    "theirs": "Resultsthea\\cite$é解解$😀thethe$。质解$",
+    "content": "Resultsthea\\cite$é解解$😀 \\citeofthethethe$。质解$Results\\label",
+    "parts": [
+      {
+        "text": "Resultsthea\\cite$",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "解解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " \\citeofthethethe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$。质解$",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "Results\\label",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 37",
+    "base": "thetheéwe质 \n。。 awe%{ \\citexof。étheathethe é，，",
+    "ours": "thetheéwe质 \n。。we。\n\n awe%{ \\citexof。étheResultsa{a\r\n质解 é，，",
+    "theirs": "thetheéwe质。 awe%{ \\citeétheathethe é，，",
+    "content": "thetheéwe质。we。\n\n awe%{ \\citeétheResultsa{a\r\n质解 é，，",
+    "parts": [
+      {
+        "text": "thetheéwe质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "we。\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " awe%{ ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\cite",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "theResultsa{a\r\n质解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " é，，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 38",
+    "base": "thetheof\n\nwe\\label",
+    "ours": "解the电 thetheoféof}\n\nwe\\label",
+    "theirs": "thethe电。we\\labela\\section。\\cite ",
+    "content": null,
+    "parts": [
+      {
+        "text": "解the电 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "thetheof\n\nwe\\label",
+        "ours": "thetheoféof}\n\nwe\\label",
+        "theirs": "thethe电。we\\labela\\section。\\cite "
+      }
+    ]
+  },
+  {
+    "name": "generated 39",
+    "base": "\r\nwe。barriera$解质$the$\r\n{，\\sectionthe电。 of}😀，。\r\n$éthe电theab_cE_aé%\n",
+    "ours": "\r\nwe thea。barriera$解质$the$\r\n{，\\sectionthe电。 of}barrier\n，。\r\n$éthe电theab_cE_aé电the %\n",
+    "theirs": "\r\nwe。barriera$解质$the$\r\n{，\\sectionthe电。 ofof}😀，。\r\n$éthe电ab_cE_aé%\n",
+    "content": "\r\nwe thea。barriera$解质$the$\r\n{，\\sectionthe电。 ofof}barrier\n，。\r\n$éthe电ab_cE_aé电the %\n",
+    "parts": [
+      {
+        "text": "\r\nwe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " thea",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。barriera$解质$the$\r\n{，\\sectionthe电。 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ofof",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrier\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，。\r\n$éthe电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_cE_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电the ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 40",
+    "base": "\\cite{质barriertheé \r\n é the %\ntheoféofthethe质。E_a{the",
+    "ours": "\\cite{\n\\cite{theé \r\n é the %\ntheoféofthethe质。E_a{the",
+    "theirs": "\\cite{质barriertheé\n\n  \r\n é the %\ntheoféofthetheE_a{the",
+    "content": "\\cite{\n\\cite{theé\n\n  \r\n é the %\ntheoféofthetheE_a{the",
+    "parts": [
+      {
+        "text": "\\cite{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\\cite{the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "é",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\r\n é the %\ntheofé",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ofthetheE_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 41",
+    "base": "\n\nxbarrierbarrier😀$，。\r\nwe $athe \\label$\n",
+    "ours": "\n\nxbarrierbarrier😀$，。\r\n\n\n  the \\label$\n",
+    "theirs": "😀xbarrier。$，barrier😀$，。\r\nwe $athe \\label$\n\\labelx",
+    "content": "😀xbarrier。$，barrier😀$，。\r\n\n\n  the \\label$\n\\labelx",
+    "parts": [
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "xbarrier。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "barrier😀$，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。\r\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " \\label$\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\labelx",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 42",
+    "base": "é\r\n\n\\section the。Resultsa",
+    "ours": "é\r\n\n\\section the{质Resultsa",
+    "theirs": "xthe\r\n\n。ResultsE_a\\cite a",
+    "content": "xthe\r\n\n{质ResultsE_a\\cite a",
+    "parts": [
+      {
+        "text": "xthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\r\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "{质",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ResultsE_a\\cite a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 43",
+    "base": "éthetheResults解\\labelResultsthe\n{E_athe",
+    "ours": "éthetheResults解\n{E_athe",
+    "theirs": "éthetheResults解\n{E_athe",
+    "content": "éthetheResults解\n{E_athe",
+    "parts": [
+      {
+        "text": "éthetheResults解\n{E_athe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 44",
+    "base": "。}质the，%\n\nthe{\n\n%解xwe E_a aa$E_awe😀we",
+    "ours": "。}质the，解of\n%\n\nthe{\\sectionx}\n\n%解xwe E_a aa$E_awe😀we",
+    "theirs": "athe质the，%\n\nthe{\n\n%解xwe E_a aa$E_awe😀we",
+    "content": "athe质the，解of\n%\n\nthe{\\sectionx}\n\n%解xwe E_a aa$E_awe😀we",
+    "parts": [
+      {
+        "text": "athe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "质the，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "解of\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%\n\nthe{",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\sectionx}",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\n\n%解xwe E_a aa$E_awe😀we",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 45",
+    "base": "。of电解theawe the\\label}\n\n\n\n\\cite%",
+    "ours": "。of电解thetheResultsawe the\\label\\section \n\n\n\n\\cite%\r\na",
+    "theirs": "。ab_ca电解😀 theawe éwethe\\label}\n\n\n\n\\cite%",
+    "content": null,
+    "parts": [
+      {
+        "text": "。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_ca",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "电解",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "😀 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "thetheResultsawe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "the\\label}",
+        "ours": "the\\label\\section ",
+        "theirs": "éwethe\\label}"
+      },
+      {
+        "text": "\n\n\n\n\\cite%",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\r\na",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 46",
+    "base": "of\\label  %E_aResults \\citeE_a。解解质😀 ",
+    "ours": "of\\label  %E_a \\citeE_a。质😀 ",
+    "theirs": "of\\label  %E_aResults \\citeE_aE_abarrierResults。解解质😀 ",
+    "content": "of\\label  %E_a \\citeE_aE_abarrierResults。质😀 ",
+    "parts": [
+      {
+        "text": "of\\label  %",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "E_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\citeE_aE_abarrierResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "质😀 ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 47",
+    "base": "电E_aof\\label of $ \\labelxab_cof。 barrier$解}x\\label质$x}%。\r\n{ athe\\sectionResultsthe",
+    "ours": "电E_aof\\label of $ \\labelxab_cof。 barrier$解}x\\label质$x }%。\r\n{ athe\\sectionResultsthe",
+    "theirs": "电E_aof\\label of $ \\labelx barrier$解}x\\label质$x}%。\r\n{ athe\\sectionResultsthe",
+    "content": "电E_aof\\label of $ \\labelx barrier$解}x\\label质$x }%。\r\n{ athe\\sectionResultsthe",
+    "parts": [
+      {
+        "text": "电E_aof\\label of $ ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\labelx",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " barrier$解}x\\label质$x",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "}%。\r\n{ athe\\sectionResultsthe",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 48",
+    "base": "。ab_cof， \\cite$aab_cE_a。\\citethe\\label",
+    "ours": "。ab_cof， \\cite$aab_cE_a。\\citethe\\labelbarrier。the",
+    "theirs": "。ab_cof，%E_a。\\citethe\\label",
+    "content": "。ab_cof，%E_a。\\citethe\\labelbarrier。the",
+    "parts": [
+      {
+        "text": "。ab_cof，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "%E_a",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "。",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "\\citethe\\labelbarrier。the",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 49",
+    "base": "the，the😀  xResults电\nof解wethe éx\n\\citea 解\nab_cweE_athe\\label\\citeResults é\n\nwe$ thebarrier}of质\\cite\\section",
+    "ours": "，the😀  xResults电\nof解wethe éx\n 解\nab_cweE_athe\\label\\citeResults é\n\n$ thebarrier}of质\\cite\\section",
+    "theirs": "the，the😀  xResults电x$of解wethe éx%a 解\nab_cthe\\label\\citeResults é\n\nwe$ thebarrier}of质\\cite\\section",
+    "content": null,
+    "parts": [
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，the😀  xResults电",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "x$",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "of解wethe éx",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "\n\\citea",
+        "ours": "\n",
+        "theirs": "%a"
+      },
+      {
+        "text": " 解\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "ab_cthe\\label\\citeResults",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " é\n\n",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$ thebarrier}of质\\cite\\section",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      }
+    ]
+  },
+  {
+    "name": "generated 50",
+    "base": "the{\\section😀 %\n\nthe",
+    "ours": "the{\\section， $%E_aéResults",
+    "theirs": "the{\\section😀 barrierthe",
+    "content": null,
+    "parts": [
+      {
+        "text": "the{\\section",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "，",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": " ",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": "$",
+        "base": null,
+        "ours": null,
+        "theirs": null
+      },
+      {
+        "text": null,
+        "base": "%\n\nthe",
+        "ours": "%E_aéResults",
+        "theirs": "barrierthe"
+      }
+    ]
+  }
+]

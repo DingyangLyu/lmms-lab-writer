@@ -1,8 +1,6 @@
 //! Optimistic, revision-based document edits shared by the editor and Writer MCP.
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use similar::{Algorithm, DiffTag};
-use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::fs;
 const LIMIT: usize = 2_000_000;
@@ -46,30 +44,111 @@ fn tokens(text: &str) -> (Vec<&str>, Vec<usize>) {
     let values = offsets.windows(2).map(|r| &text[r[0]..r[1]]).collect();
     (values, offsets)
 }
+/// A changed span: tokens `a[.0, .1)` became `b[.2, .3)`.
+type Hunk = (usize, usize, usize, usize);
+/// Steps the diff may take before it settles for one change covering everything between the
+/// common prefix and suffix: a step count rather than a clock, so every machine agrees.
+const BUDGET: usize = 4_000_000;
+/// The changes from `a` to `b`: Myers' greedy shortest edit script after trimming the common
+/// prefix and suffix. The same algorithm, step for step, as `hunks` in
+/// packages/writing/src/merge.ts, so the editor's merges and the backend's agree (the
+/// `agrees_with_typescript` test checks); change both together.
+fn hunks(a: &[&str], b: &[&str]) -> Vec<Hunk> {
+    let mut p = 0;
+    while p < a.len() && p < b.len() && a[p] == b[p] {
+        p += 1;
+    }
+    let mut s = 0;
+    while s < a.len() - p && s < b.len() - p && a[a.len() - 1 - s] == b[b.len() - 1 - s] {
+        s += 1;
+    }
+    let (n, m) = (a.len() - p - s, b.len() - p - s);
+    if n == 0 && m == 0 {
+        return vec![];
+    }
+    let whole = vec![(p, p + n, p, p + m)];
+    if n == 0 || m == 0 {
+        return whole;
+    }
+    // v[k + o]: furthest x reached on diagonal k; trace[d]: v over -d..=d after step d.
+    let max = (n + m) as i64;
+    let o = max + 1;
+    let mut v = vec![0i64; (2 * max + 3) as usize];
+    let mut trace: Vec<Vec<i64>> = vec![];
+    let mut work = 0usize;
+    for d in 0..=max {
+        let mut k = -d;
+        while k <= d {
+            let down = k == -d || (k != d && v[(o + k - 1) as usize] < v[(o + k + 1) as usize]);
+            let mut x = if down {
+                v[(o + k + 1) as usize]
+            } else {
+                v[(o + k - 1) as usize] + 1
+            };
+            let mut y = x - k;
+            while x < n as i64 && y < m as i64 && a[p + x as usize] == b[p + y as usize] {
+                x += 1;
+                y += 1;
+                work += 1;
+            }
+            v[(o + k) as usize] = x;
+            work += 1;
+            if work > BUDGET {
+                return whole;
+            }
+            if x >= n as i64 && y >= m as i64 {
+                return backtrack(&trace, d, n as i64, m as i64, p);
+            }
+            k += 2;
+        }
+        trace.push(v[(o - d) as usize..=(o + d) as usize].to_vec());
+    }
+    whole
+}
+/// Walks the script back from the end, one insertion or deletion per step, into hunks.
+fn backtrack(trace: &[Vec<i64>], last: i64, n: i64, m: i64, p: usize) -> Vec<Hunk> {
+    let mut steps = vec![];
+    let (mut x, mut y) = (n, m);
+    for d in (1..=last).rev() {
+        let before = &trace[(d - 1) as usize];
+        let at = |k: i64| before[(k + d - 1) as usize];
+        let k = x - y;
+        let down = k == -d || (k != d && at(k - 1) < at(k + 1));
+        let pk = if down { k + 1 } else { k - 1 };
+        let (px, py) = (at(pk), at(pk) - pk);
+        let (px, py) = (px as usize, py as usize);
+        steps.push(if down {
+            (px, px, py, py + 1)
+        } else {
+            (px, px + 1, py, py)
+        });
+        x = px as i64;
+        y = py as i64;
+    }
+    let mut out: Vec<Hunk> = vec![];
+    for (a_start, a_end, b_start, b_end) in steps.into_iter().rev() {
+        match out.last_mut() {
+            Some(previous) if previous.1 == p + a_start && previous.3 == p + b_start => {
+                previous.1 = p + a_end;
+                previous.3 = p + b_end;
+            }
+            _ => out.push((p + a_start, p + a_end, p + b_start, p + b_end)),
+        }
+    }
+    out
+}
 fn edits(base: &str, new: &str, side: u8) -> Vec<Edit> {
     let (a, ap) = tokens(base);
     let (b, _) = tokens(new);
-    similar::capture_diff_slices_deadline(
-        Algorithm::Myers,
-        &a,
-        &b,
-        Some(Instant::now() + Duration::from_millis(600)),
-    )
-    .into_iter()
-    .filter_map(|op| {
-        if op.tag() == DiffTag::Equal {
-            return None;
-        }
-        let old = op.old_range();
-        let new = op.new_range();
-        Some(Edit {
-            start: ap[old.start],
-            end: ap[old.end],
-            text: new.clone().map(|i| b[i]).collect(),
+    hunks(&a, &b)
+        .into_iter()
+        .map(|(a_start, a_end, b_start, b_end)| Edit {
+            start: ap[a_start],
+            end: ap[a_end],
+            text: b[b_start..b_end].concat(),
             side,
         })
-    })
-    .collect()
+        .collect()
 }
 fn apply(base: &str, start: usize, end: usize, changes: &[Edit], side: u8) -> String {
     let mut result = String::new();
@@ -661,6 +740,61 @@ pub fn patch(base: &str, edits: &[TextEdit]) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[derive(Deserialize)]
+    struct Case {
+        #[serde(default)]
+        name: String,
+        base: String,
+        ours: String,
+        theirs: String,
+        content: Option<String>,
+        parts: Vec<MergePart>,
+    }
+    /// The editor merges with packages/writing; its cases (written by that merge) must come
+    /// out the same here.
+    #[test]
+    fn agrees_with_typescript_on_shared_cases() {
+        let cases: Vec<Case> = serde_json::from_str(include_str!(
+            "../../../../../packages/writing/fixtures/merge-cases.json"
+        ))
+        .unwrap();
+        assert!(cases.len() > 50);
+        for c in cases {
+            let r = merge(&c.base, &c.ours, &c.theirs);
+            assert_eq!((r.content, r.parts), (c.content, c.parts), "{}", c.name);
+        }
+    }
+    /// The same on many cases generated by the TypeScript merge, when changing the algorithm:
+    /// WRITER_MERGE_CASES=<file.json> cargo test --lib agrees_with -- --ignored
+    #[test]
+    #[ignore]
+    fn agrees_with_typescript_on_generated_cases() {
+        let file = std::env::var("WRITER_MERGE_CASES").expect("WRITER_MERGE_CASES");
+        let cases: Vec<Case> =
+            serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        let mut differ = 0;
+        for (i, c) in cases.iter().enumerate() {
+            let Ok(r) = std::panic::catch_unwind(|| merge(&c.base, &c.ours, &c.theirs)) else {
+                differ += 1;
+                eprintln!(
+                    "case {i} panics: base={:?} ours={:?} theirs={:?}",
+                    c.base, c.ours, c.theirs
+                );
+                continue;
+            };
+            if r.content != c.content || r.parts != c.parts {
+                differ += 1;
+                if differ <= 5 {
+                    eprintln!(
+                        "case {i}: base={:?} ours={:?} theirs={:?}\n  ts={:?}\n  rs={:?}",
+                        c.base, c.ours, c.theirs, c.content, r.content
+                    );
+                }
+            }
+        }
+        eprintln!("{differ} of {} cases differ", cases.len());
+        assert_eq!(differ, 0);
+    }
     #[test]
     fn merges_independent_chinese_changes_in_one_line() {
         let r = merge(

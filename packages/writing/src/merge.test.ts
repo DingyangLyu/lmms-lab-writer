@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { documentEdits, mergeText } from "./merge";
+// Also run by the desktop's Rust merge (document_merge.rs), which must give the same results.
+import CASES from "../fixtures/merge-cases.json" with { type: "json" };
+import { documentEdits, hunks, mergeText } from "./merge";
 
 describe("incremental merges", () => {
   it("keeps identifier changes atomic but merges separate Chinese edits in one line", () => {
@@ -19,5 +21,25 @@ describe("incremental merges", () => {
     const result = mergeText("甲乙", "甲新乙", "甲旧乙");
     expect(result.content).toBeNull();
     expect(result.parts.find((p) => p.text === null)).toMatchObject({ ours: "新", theirs: "旧" });
+  });
+});
+
+describe("merges shared with the desktop", () => {
+  it.each(CASES.map((c) => [c.name, c] as const))("%s", (_, c) => {
+    const { content, parts } = mergeText(c.base, c.ours, c.theirs);
+    expect({ content, parts }).toEqual({ content: c.content, parts: c.parts });
+  });
+
+  it("finds a shortest edit script, and settles for one change when that is too costly", () => {
+    expect(hunks([..."abcabba"], [..."cbabac"])).toEqual([
+      [0, 2, 0, 0],
+      [3, 3, 1, 2],
+      [5, 6, 4, 4],
+      [7, 7, 5, 6],
+    ]);
+    expect(hunks([..."same"], [..."same"])).toEqual([]);
+    const a = Array.from({ length: 6000 }, (_, i) => `a${i}`),
+      b = Array.from({ length: 6000 }, (_, i) => `b${i}`);
+    expect(hunks(["x", ...a, "y"], ["x", ...b, "y"])).toEqual([[1, 6001, 1, 6001]]);
   });
 });
