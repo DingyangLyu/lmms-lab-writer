@@ -53,7 +53,7 @@ const BUDGET: usize = 4_000_000;
 /// prefix and suffix. The same algorithm, step for step, as `hunks` in
 /// packages/writing/src/merge.ts, so the editor's merges and the backend's agree (the
 /// `agrees_with_typescript` test checks); change both together.
-fn hunks(a: &[&str], b: &[&str]) -> Vec<Hunk> {
+pub(crate) fn hunks(a: &[&str], b: &[&str]) -> Vec<Hunk> {
     let mut p = 0;
     while p < a.len() && p < b.len() && a[p] == b[p] {
         p += 1;

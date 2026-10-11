@@ -1,4 +1,4 @@
-import { diffLines } from "diff";
+import { hunks } from "./merge";
 export type ReviewHunk = {
   id: string;
   from: number;
@@ -7,38 +7,26 @@ export type ReviewHunk = {
   after: string;
   status: "pending" | "accepted" | "rejected";
 };
+/** A text's lines, each with its newline (the last may have none). */
+export const lines = (text: string) => text.match(/[^\n]*\n|[^\n]+/g) ?? [];
+/**
+ * The changes from `before` to `after` as hunks to accept or reject one by one: the shared
+ * diff (merge.ts `hunks`) over lines, as the desktop's reviews (reviews.rs `parts`) split
+ * them, so one AI edit is reviewed in the same pieces on either side.
+ */
 export function reviewHunks(before: string, after: string): ReviewHunk[] {
-  const parts = diffLines(before, after, { timeout: 600 });
-  if (!parts) throw new Error("文件差异计算超时，请拆分修改。");
-  const hunks: ReviewHunk[] = [];
-  let offset = 0,
-    pending: ReviewHunk | null = null;
-  for (const part of parts) {
-    if (!part.added && !part.removed) {
-      if (pending) {
-        hunks.push(pending);
-        pending = null;
-      }
-      offset += part.value.length;
-    } else {
-      pending ??= {
-        id: String(hunks.length),
-        from: offset,
-        to: offset,
-        before: "",
-        after: "",
-        status: "pending",
-      };
-      if (part.removed) pending.before += part.value;
-      else {
-        pending.after += part.value;
-        offset += part.value.length;
-        pending.to = offset;
-      }
-    }
-  }
-  if (pending) hunks.push(pending);
-  return hunks;
+  const a = lines(before),
+    b = lines(after);
+  const at = [0];
+  for (const line of b) at.push((at.at(-1) ?? 0) + line.length);
+  return hunks(a, b).map(([aStart, aEnd, bStart, bEnd], i) => ({
+    id: String(i),
+    from: at[bStart] ?? 0,
+    to: at[bEnd] ?? 0,
+    before: a.slice(aStart, aEnd).join(""),
+    after: b.slice(bStart, bEnd).join(""),
+    status: "pending",
+  }));
 }
 /** Original after-version is immutable; decisions create a new desired version. */
 export function reviewedText(after: string, hunks: ReviewHunk[]) {

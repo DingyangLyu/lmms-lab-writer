@@ -62,28 +62,31 @@ pub struct Review {
     pub version: String,
     pub annotations: Vec<String>,
 }
+/// The changes as parts to accept or reject, between unchanged ones: the shared diff over
+/// lines, split as the web splits its reviews (packages/writing review.ts `reviewHunks`).
 fn parts(before: &str, after: &str) -> Vec<Part> {
-    let diff = similar::TextDiff::from_lines(before, after);
+    let a: Vec<&str> = before.split_inclusive('\n').collect();
+    let b: Vec<&str> = after.split_inclusive('\n').collect();
     let mut out: Vec<Part> = vec![];
-    for change in diff.iter_all_changes() {
-        let tag = change.tag();
-        let changed = tag != similar::ChangeTag::Equal;
-        if out.last().is_none_or(|p| p.changed != changed) {
-            out.push(Part {
-                id: out.len(),
-                before: String::new(),
-                after: String::new(),
-                changed,
-                status: if changed { "pending" } else { "unchanged" }.into(),
-            });
+    let mut push = |changed: bool, before: String, after: String| {
+        out.push(Part {
+            id: out.len(),
+            before,
+            after,
+            changed,
+            status: if changed { "pending" } else { "unchanged" }.into(),
+        })
+    };
+    let (mut at_a, mut at_b) = (0, 0);
+    for (a_start, a_end, b_start, b_end) in super::document_merge::hunks(&a, &b) {
+        if a_start > at_a {
+            push(false, a[at_a..a_start].concat(), b[at_b..b_start].concat());
         }
-        let p = out.last_mut().unwrap();
-        if tag != similar::ChangeTag::Insert {
-            p.before.push_str(change.value());
-        }
-        if tag != similar::ChangeTag::Delete {
-            p.after.push_str(change.value());
-        }
+        push(true, a[a_start..a_end].concat(), b[b_start..b_end].concat());
+        (at_a, at_b) = (a_end, b_end);
+    }
+    if at_a < a.len() {
+        push(false, a[at_a..].concat(), b[at_b..].concat());
     }
     out
 }
@@ -562,6 +565,43 @@ async fn decide_record(
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// The web splits AI changes with packages/writing; its cases must split the same here.
+    #[test]
+    fn splits_changes_as_the_web_does() {
+        #[derive(serde::Deserialize)]
+        struct Change {
+            before: String,
+            after: String,
+        }
+        #[derive(serde::Deserialize)]
+        struct Case {
+            name: String,
+            before: String,
+            after: String,
+            changes: Vec<Change>,
+        }
+        let cases: Vec<Case> = serde_json::from_str(include_str!(
+            "../../../../../packages/writing/fixtures/review-cases.json"
+        ))
+        .unwrap();
+        for c in cases {
+            let parts = parts(&c.before, &c.after);
+            let changed: Vec<(&str, &str)> = parts
+                .iter()
+                .filter(|p| p.changed)
+                .map(|p| (p.before.as_str(), p.after.as_str()))
+                .collect();
+            let expected: Vec<(&str, &str)> = c
+                .changes
+                .iter()
+                .map(|p| (p.before.as_str(), p.after.as_str()))
+                .collect();
+            assert_eq!(changed, expected, "{}", c.name);
+            let before: String = parts.iter().map(|p| p.before.as_str()).collect();
+            let after: String = parts.iter().map(|p| p.after.as_str()).collect();
+            assert_eq!((before, after), (c.before, c.after), "{}", c.name);
+        }
+    }
     #[tokio::test]
     async fn queued_turn_closes_previous_record_before_capturing_the_next() {
         let dir = tempfile::tempdir().unwrap();

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+// Also split by the desktop's reviews (reviews.rs), which must give the same hunks.
+import REVIEWS from "../fixtures/review-cases.json" with { type: "json" };
 import {
   citations,
   importBibliography,
@@ -79,5 +81,19 @@ describe("hunk decisions", () => {
       for (const h of hunks) h.status = "rejected";
       expect(reviewedText(after ?? "", hunks)).toBe(before);
     }
+  });
+});
+
+describe("review hunks shared with the desktop", () => {
+  it.each(REVIEWS.map((c) => [c.name, c] as const))("%s", (_, c) => {
+    const hunks = reviewHunks(c.before, c.after);
+    expect(hunks.map(({ before, after }) => ({ before, after }))).toEqual(c.changes);
+    for (const h of hunks) expect(c.after.slice(h.from, h.to)).toBe(h.after);
+    expect(
+      reviewedText(
+        c.after,
+        hunks.map((h) => ({ ...h, status: "rejected" })),
+      ),
+    ).toBe(c.before);
   });
 });

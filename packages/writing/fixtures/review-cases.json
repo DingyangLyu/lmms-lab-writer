@@ -1,0 +1,603 @@
+[
+  {
+    "name": "one changed line",
+    "before": "a\nb\nc\n",
+    "after": "a\nB\nc\n",
+    "changes": [
+      {
+        "before": "b\n",
+        "after": "B\n"
+      }
+    ]
+  },
+  {
+    "name": "two separate changes",
+    "before": "a\nb\nc\nd\ne\n",
+    "after": "A\nb\nc\nd\nE\n",
+    "changes": [
+      {
+        "before": "a\n",
+        "after": "A\n"
+      },
+      {
+        "before": "e\n",
+        "after": "E\n"
+      }
+    ]
+  },
+  {
+    "name": "added file",
+    "before": "",
+    "after": "new\nfile\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "new\nfile\n"
+      }
+    ]
+  },
+  {
+    "name": "deleted file",
+    "before": "old\n",
+    "after": "",
+    "changes": [
+      {
+        "before": "old\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "last line without newline",
+    "before": "a\nb",
+    "after": "a\nc",
+    "changes": [
+      {
+        "before": "b",
+        "after": "c"
+      }
+    ]
+  },
+  {
+    "name": "Unicode",
+    "before": "你好\n世界\n",
+    "after": "你好\n新世界\n",
+    "changes": [
+      {
+        "before": "世界\n",
+        "after": "新世界\n"
+      }
+    ]
+  },
+  {
+    "name": "repeated lines",
+    "before": "x\nx\nx\n",
+    "after": "x\ny\nx\nx\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "y\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 1",
+    "before": "\\section{Intro}\n\\begin{equation}\n\\section{Intro}\n\\end{equation}\n\\begin{equation}\n\\begin{equation}\nText.\n\n\\begin{equation}\nText.\n\\section{Intro}\n",
+    "after": "\\section{Intro}\n\\begin{equation}\n\\section{Intro}\n\\end{equation}\n\\begin{equation}\nText.\r\nText.\n\n\\begin{equation}\nText.\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "\\begin{equation}\n",
+        "after": "Text.\r\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 2",
+    "before": "\n\\end{equation}\n\\begin{equation}\nText.\r\n\\begin{equation}\n\\section{Intro}\nText.\r\n\n%\n\\end{equation}\n电解质界面。\n",
+    "after": "\n\\end{equation}\n\\end{equation}\n\\begin{equation}\nText.\r\n\\begin{equation}\n\\section{Intro}\nText.\r\n\n%\n\\end{equation}\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\\end{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 3",
+    "before": "\\begin{equation}\nText.\r\nx = 1\n",
+    "after": "\\begin{equation}\n\\begin{equation}\nx = 1\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": "\\begin{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 4",
+    "before": "\\end{equation}\nText.\r\nx = 1\n电解质界面。\n\\end{equation}\n\\end{equation}\n\\begin{equation}\n%\nText.\r\n",
+    "after": "\\end{equation}\nText.\r\nx = 1\n电解质界面。\n\\end{equation}\n\\end{equation}\n\\end{equation}\n%\nText.\r\n",
+    "changes": [
+      {
+        "before": "\\begin{equation}\n",
+        "after": "\\end{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 5",
+    "before": "\\begin{equation}\nText.\r\n电解质界面。\n",
+    "after": "\\begin{equation}\n\\end{equation}\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": "\\end{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 6",
+    "before": "x = 1\n\\end{equation}\n\\end{equation}\n\\section{Intro}\n电解质界面。\nText.\n\\end{equation}\n\\end{equation}\nx = 1\n%\n%\n%\nx = 1\nText.\r\n",
+    "after": "x = 1\n\\end{equation}\n\\end{equation}\n\\section{Intro}\n电解质界面。\nText.\n\\end{equation}\nx = 1\n%\n%\n%\nx = 1\nx = 1\nText.\r\n",
+    "changes": [
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "x = 1\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 7",
+    "before": "\\begin{equation}\n\nText.\r\n\\section{Intro}\nText.\r\n\\section{Intro}\n电解质界面。\n%\n\\section{Intro}\n\\end{equation}\n",
+    "after": "\\begin{equation}\n\nText.\r\n\\begin{equation}\nText.\r\n\\section{Intro}\n电解质界面。\n%\n\\section{Intro}\n\\end{equation}\n",
+    "changes": [
+      {
+        "before": "\\section{Intro}\n",
+        "after": "\\begin{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 8",
+    "before": "Text.\nx = 1\nx = 1\n",
+    "after": "Text.\nx = 1\nText.\n",
+    "changes": [
+      {
+        "before": "x = 1\n",
+        "after": "Text.\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 9",
+    "before": "x = 1\n\\end{equation}\nx = 1\n\\end{equation}\n",
+    "after": "x = 1\n\\end{equation}\nx = 1\n\\end{equation}\n%\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "%\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 10",
+    "before": "\\begin{equation}\n电解质界面。\n\\begin{equation}\n\n\\end{equation}\n\\section{Intro}\n\\begin{equation}\n",
+    "after": "\\begin{equation}\n电解质界面。\n\n\\end{equation}\n\\section{Intro}\n\\begin{equation}\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "\\begin{equation}\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "\\section{Intro}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 11",
+    "before": "Text.\r\n\\end{equation}\nText.\r\n电解质界面。\n",
+    "after": "Text.\r\nText.\n\\end{equation}\nText.\r\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "Text.\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 12",
+    "before": "\n\\section{Intro}\n\\begin{equation}\n\\begin{equation}\n电解质界面。\n%\n%\n",
+    "after": "\n\\section{Intro}\n\n\\begin{equation}\n\\begin{equation}\n电解质界面。\n%\n%\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 13",
+    "before": "\\section{Intro}\nText.\n电解质界面。\n%\n\nx = 1\nText.\nx = 1\nText.\r\n\\section{Intro}\n%\n\n",
+    "after": "Text.\n电解质界面。\n%\n\nx = 1\nText.\nx = 1\nText.\r\n\\section{Intro}\n%\n",
+    "changes": [
+      {
+        "before": "\\section{Intro}\n",
+        "after": ""
+      },
+      {
+        "before": "\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 14",
+    "before": "x = 1\nText.\r\nText.\r\nx = 1\n\nx = 1\n%\n\\begin{equation}\nText.\nText.\n\\begin{equation}\nText.\nx = 1\n",
+    "after": "x = 1\nText.\r\nx = 1\nx = 1\n\nx = 1\n%\n\\begin{equation}\nText.\nText.\n\\begin{equation}\nText.\nx = 1\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": "x = 1\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 15",
+    "before": "%\n\\end{equation}\n\\begin{equation}\nText.\r\n电解质界面。\n",
+    "after": "%\n\\end{equation}\n\\end{equation}\n\\begin{equation}\n\\end{equation}\nText.\r\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\\end{equation}\n"
+      },
+      {
+        "before": "",
+        "after": "\\end{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 16",
+    "before": "%\nText.\r\nText.\r\n电解质界面。\nText.\n\\section{Intro}\nText.\n\\end{equation}\nx = 1\n%\n\n",
+    "after": "%\nText.\r\nText.\r\n\nText.\n\\section{Intro}\nText.\nText.\r\nx = 1\n%\n\n",
+    "changes": [
+      {
+        "before": "电解质界面。\n",
+        "after": "\n"
+      },
+      {
+        "before": "\\end{equation}\n",
+        "after": "Text.\r\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 17",
+    "before": "\n%\nText.\r\n\\end{equation}\n\\end{equation}\n电解质界面。\n\\section{Intro}\n\nx = 1\n\\begin{equation}\n\\begin{equation}\nx = 1\n\\section{Intro}\n",
+    "after": "%\nText.\r\n\\end{equation}\n\\end{equation}\n电解质界面。\n\\section{Intro}\n\nx = 1\n\\begin{equation}\nx = 1\n\\section{Intro}\n%\n",
+    "changes": [
+      {
+        "before": "\n",
+        "after": ""
+      },
+      {
+        "before": "\\begin{equation}\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "%\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 18",
+    "before": "x = 1\nx = 1\nText.\r\n\\end{equation}\n",
+    "after": "x = 1\nx = 1\n\\end{equation}\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 19",
+    "before": "电解质界面。\n\\end{equation}\n\n电解质界面。\n",
+    "after": "Text.\n电解质界面。\n\\end{equation}\n\\section{Intro}\n\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "Text.\n"
+      },
+      {
+        "before": "",
+        "after": "\\section{Intro}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 20",
+    "before": "\\end{equation}\n电解质界面。\n\\end{equation}\n\\begin{equation}\n%\n%\nx = 1\n",
+    "after": "\\end{equation}\n电解质界面。\n\\end{equation}\n\\begin{equation}\n%\n%\n\\end{equation}\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "x = 1\n",
+        "after": "\\end{equation}\n电解质界面。\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 21",
+    "before": "\\end{equation}\nText.\r\n电解质界面。\n\\begin{equation}\n电解质界面。\n电解质界面。\n",
+    "after": "\\end{equation}\n电解质界面。\n\\begin{equation}\n电解质界面。\n\\begin{equation}\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": ""
+      },
+      {
+        "before": "电解质界面。\n",
+        "after": "\\begin{equation}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 22",
+    "before": "Text.\n\\begin{equation}\n\\begin{equation}\nx = 1\n\\begin{equation}\nx = 1\nText.\nText.\r\n\n电解质界面。\n\\end{equation}\n\\section{Intro}\n",
+    "after": "Text.\n\\begin{equation}\n\\begin{equation}\nx = 1\n\\begin{equation}\nx = 1\nText.\nText.\nText.\r\n\n电解质界面。\n\\end{equation}\nText.\r\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "Text.\n"
+      },
+      {
+        "before": "",
+        "after": "Text.\r\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 23",
+    "before": "\\end{equation}\n\\section{Intro}\n\nx = 1\n\\end{equation}\n电解质界面。\n\n\n",
+    "after": "%\n\\end{equation}\n\\section{Intro}\n\nx = 1\n\\end{equation}\n电解质界面。\n\n\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "%\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 24",
+    "before": "Text.\nText.\nx = 1\n",
+    "after": "Text.\nx = 1\n",
+    "changes": [
+      {
+        "before": "Text.\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 25",
+    "before": "\\section{Intro}\n\\section{Intro}\n电解质界面。\n",
+    "after": "\\section{Intro}\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "\\section{Intro}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 26",
+    "before": "Text.\n\\section{Intro}\nText.\r\n电解质界面。\n\nText.\r\nText.\r\nText.\r\n\n\\end{equation}\n\\end{equation}\nText.\n",
+    "after": "Text.\n\\section{Intro}\nText.\r\n电解质界面。\n\n\nText.\r\nText.\r\nText.\r\n\n\\end{equation}\nText.\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\n"
+      },
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 27",
+    "before": "\\section{Intro}\nText.\n\\begin{equation}\n\\end{equation}\n\\end{equation}\n电解质界面。\n\\end{equation}\nText.\n\\end{equation}\n",
+    "after": "Text.\nText.\n\\begin{equation}\n\\end{equation}\n\\end{equation}\n电解质界面。\n\\end{equation}\nText.\n",
+    "changes": [
+      {
+        "before": "\\section{Intro}\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "Text.\n"
+      },
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 28",
+    "before": "%\n电解质界面。\nText.\n电解质界面。\nText.\n\\section{Intro}\nx = 1\n\\section{Intro}\n",
+    "after": "电解质界面。\nText.\n电解质界面。\nText.\n\\section{Intro}\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "%\n",
+        "after": ""
+      },
+      {
+        "before": "x = 1\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 29",
+    "before": "\\end{equation}\n%\n\\section{Intro}\nText.\n\\end{equation}\n电解质界面。\n电解质界面。\n\\begin{equation}\n\\begin{equation}\n",
+    "after": "\\end{equation}\n%\n\\section{Intro}\nText.\n\\end{equation}\n电解质界面。\n\\begin{equation}\nText.\r\n\\begin{equation}\n",
+    "changes": [
+      {
+        "before": "电解质界面。\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "Text.\r\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 30",
+    "before": "Text.\nText.\nx = 1\nx = 1\nText.\r\nText.\r\n\\section{Intro}\n",
+    "after": "Text.\nText.\nx = 1\n\\section{Intro}\nx = 1\nText.\r\nText.\r\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\\section{Intro}\n"
+      },
+      {
+        "before": "\\section{Intro}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 31",
+    "before": "%\n\\end{equation}\nText.\r\n",
+    "after": "Text.\r\n",
+    "changes": [
+      {
+        "before": "%\n\\end{equation}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 32",
+    "before": "\nText.\r\n\\begin{equation}\n\n%\n",
+    "after": "\nText.\r\n\\begin{equation}\n\n%\nText.\r\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "Text.\r\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 33",
+    "before": "Text.\n\\section{Intro}\nText.\n\nText.\n\n\\end{equation}\n\n电解质界面。\n",
+    "after": "Text.\n\\section{Intro}\nText.\n\nText.\n\n\\end{equation}\n\n%\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "%\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 34",
+    "before": "\\begin{equation}\n\\end{equation}\n%\n\\end{equation}\nText.\r\n\n%\n\\end{equation}\nx = 1\nx = 1\nText.\r\n\\section{Intro}\n",
+    "after": "\\begin{equation}\n\\end{equation}\n%\n\\end{equation}\n\n%\n\\end{equation}\n\\section{Intro}\nx = 1\nText.\r\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "Text.\r\n",
+        "after": ""
+      },
+      {
+        "before": "x = 1\n",
+        "after": "\\section{Intro}\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 35",
+    "before": "\\end{equation}\n\\begin{equation}\n电解质界面。\n电解质界面。\n",
+    "after": "\\end{equation}\n电解质界面。\n电解质界面。\n电解质界面。\n",
+    "changes": [
+      {
+        "before": "\\begin{equation}\n",
+        "after": "电解质界面。\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 36",
+    "before": "\n\\begin{equation}\n\\end{equation}\nText.\n\\end{equation}\n%\n\nText.\r\n%\n",
+    "after": "\n\\begin{equation}\n\\end{equation}\n\\end{equation}\n\n%\n\nText.\r\n%\n",
+    "changes": [
+      {
+        "before": "Text.\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "\n"
+      }
+    ]
+  },
+  {
+    "name": "generated 37",
+    "before": "%\n\\end{equation}\nx = 1\n\\end{equation}\n电解质界面。\n\\begin{equation}\n\\end{equation}\n\\end{equation}\n\\section{Intro}\n",
+    "after": "%\n\\end{equation}\nx = 1\n\\end{equation}\n电解质界面。\n\\begin{equation}\n\\end{equation}\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 38",
+    "before": "电解质界面。\n\nText.\r\n\\section{Intro}\n\\section{Intro}\n",
+    "after": "电解质界面。\nText.\r\n\\section{Intro}\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 39",
+    "before": "x = 1\nText.\r\nText.\r\n\\begin{equation}\nText.\n\\end{equation}\nText.\r\n\\end{equation}\n\\section{Intro}\n",
+    "after": "x = 1\n\\section{Intro}\nText.\r\nText.\r\n\\begin{equation}\nText.\n\\end{equation}\nText.\r\n\\section{Intro}\n",
+    "changes": [
+      {
+        "before": "",
+        "after": "\\section{Intro}\n"
+      },
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "name": "generated 40",
+    "before": "\\end{equation}\n电解质界面。\n\\end{equation}\n\nx = 1\n\\begin{equation}\n\\begin{equation}\nText.\r\nText.\n\\end{equation}\n\\begin{equation}\n\n",
+    "after": "\\end{equation}\n电解质界面。\n\nx = 1\n\\begin{equation}\n\\begin{equation}\nText.\r\nText.\nText.\r\n\\end{equation}\n\\begin{equation}\n\n",
+    "changes": [
+      {
+        "before": "\\end{equation}\n",
+        "after": ""
+      },
+      {
+        "before": "",
+        "after": "Text.\r\n"
+      }
+    ]
+  }
+]
