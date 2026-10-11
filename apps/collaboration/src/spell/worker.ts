@@ -3,6 +3,7 @@
  * neither loading it nor checking a page of words holds up typing.
  */
 import NSpell from "nspell";
+import { type Dictionary, derived } from "./derived";
 
 type Request =
   | { id: number; init: { aff: string; dic: string } }
@@ -10,6 +11,15 @@ type Request =
   | { id: number; suggest: string };
 
 let checker: Promise<ReturnType<typeof NSpell>> | null = null;
+
+/** The dictionary's word, or one built from its words ("composable", "subgraphs"). */
+function correct(spell: ReturnType<typeof NSpell>, word: string) {
+  if (spell.correct(word)) return true;
+  // nspell keeps each root's affix flags here; the rules ask whether a root has a plural.
+  const roots = (spell as unknown as { data?: Record<string, string[] | undefined> }).data ?? {};
+  const dict: Dictionary = { correct: (w) => spell.correct(w), flags: (w) => roots[w] };
+  return derived(word, dict);
+}
 /**
  * A dictionary file: fetched, or decoded when the build inlined it as a data URL (the page's
  * policy allows fetching only from the server itself).
@@ -40,7 +50,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     if (!checker) throw new Error("not loaded");
     const spell = await checker;
     if ("check" in message)
-      postMessage({ id: message.id, misspelled: message.check.filter((w) => !spell.correct(w)) });
+      postMessage({ id: message.id, misspelled: message.check.filter((w) => !correct(spell, w)) });
     else postMessage({ id: message.id, suggestions: spell.suggest(message.suggest).slice(0, 6) });
   } catch (error) {
     postMessage({ id: message.id, error: String(error) });
