@@ -31,6 +31,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AddressSwitch } from "./address-switch";
 import { useI18n } from "./i18n";
 import "./landing.css";
+import { typedBy, walk } from "./scene";
 
 /** The official kits of the template library. */
 const VENUES = [
@@ -142,6 +143,33 @@ const SOURCE = [
   "\\end{equation}",
 ];
 const TYPED = SOURCE.join("\n").length;
+/**
+ * Colleagues' cursors: each comes to a line once it is written, then stops at a column, waits
+ * and steps on (column, steps waited).
+ */
+const PEERS = [
+  {
+    name: "Wang",
+    line: 2,
+    className: "ld-peer",
+    stops: [
+      [21, 20],
+      [32, 30],
+      [8, 30],
+      [13, 0],
+    ],
+  },
+  {
+    name: "Chen",
+    line: 5,
+    className: "ld-peer ld-peer-c",
+    stops: [
+      [6, 25],
+      [20, 30],
+      [10, 0],
+    ],
+  },
+] as const;
 
 function Code({ text }: { text: string }) {
   const parts: Array<{ at: number; text: string; kind: string }> = [];
@@ -261,15 +289,20 @@ function HeroDemo() {
                     <Code text={lines[i] ?? ""} />
                   )}
                   {i === typing && <span className="ld-caret" />}
-                  {i === 2 && at > 30 && (
-                    <span className="ld-peer">
-                      <span>Wang</span>
-                    </span>
-                  )}
-                  {i === 5 && at > 60 && (
-                    <span className="ld-peer ld-peer-c">
-                      <span>Chen</span>
-                    </span>
+                  {PEERS.map(
+                    (peer) =>
+                      peer.line === i &&
+                      done(i) && (
+                        <span
+                          key={peer.name}
+                          className={peer.className}
+                          style={{
+                            left: `${walk(peer.stops, at - typedBy(SOURCE, i))}ch`,
+                          }}
+                        >
+                          <span>{peer.name}</span>
+                        </span>
+                      ),
                   )}
                 </span>
               </div>

@@ -581,14 +581,14 @@ button.link:hover:not(:disabled) {
   background: #5eead4;
   animation: yw-blink 1s steps(1) infinite;
 }
+/* A colleague's cursor, placed on a character boundary (`left` in ch) by auth-showcase.tsx. */
 .hero-peer {
   position: absolute;
-  top: 0;
-  left: 9.5ch;
+  top: 0.3em;
   width: 2px;
-  height: 1.3em;
+  height: 1.15em;
+  margin-left: -1px;
   background: #38bdf8;
-  animation: yw-peer 5s ease-in-out infinite;
 }
 .hero-peer-flag {
   position: absolute;
@@ -741,15 +741,6 @@ button.link:hover:not(:disabled) {
 @keyframes yw-blink {
   50% {
     opacity: 0;
-  }
-}
-@keyframes yw-peer {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(7ch);
   }
 }
 @keyframes yw-ink {

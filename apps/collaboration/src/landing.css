@@ -546,14 +546,14 @@
   background: #111;
   animation: ld-blink 1s steps(1) infinite;
 }
+/* A colleague's cursor, placed on a character boundary (`left` in ch) by landing.tsx. */
 .ld-peer {
   position: absolute;
-  top: 2px;
-  left: 11ch;
+  top: 0.35em;
   width: 2px;
-  height: 1.4em;
+  height: 1.2em;
+  margin-left: -1px;
   background: #0ea5e9;
-  animation: ld-peer 6s ease-in-out infinite;
 }
 .ld-peer span {
   position: absolute;
@@ -569,10 +569,7 @@
   line-height: 15px;
 }
 .ld-peer-c {
-  left: 4ch;
   background: #f97316;
-  animation-duration: 7.5s;
-  animation-delay: -2s;
 }
 .ld-note-card {
   position: absolute;
@@ -1005,7 +1002,7 @@
   display: inline-block;
   width: 2px;
   height: 1.15em;
-  margin: 0 1px;
+  margin: 0 -1px;
   vertical-align: -0.18em;
   animation: ld-blink 1.1s steps(1) infinite;
 }
@@ -1591,15 +1588,6 @@
 @keyframes ld-blink {
   50% {
     opacity: 0;
-  }
-}
-@keyframes ld-peer {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(10ch);
   }
 }
 @keyframes ld-ink {

@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
+import { typedBy, walk } from "./scene";
 
 const SOURCE = [
   "\\section{Results}",
@@ -22,6 +23,13 @@ const STEP = 42,
   NOTE = TOTAL + 18,
   AI = TOTAL + 50,
   END = TOTAL + 120;
+/** Wang comes to line 3 once it is written: columns to stop at, and steps waited there. */
+const PEER_LINE = 2,
+  PEER_STOPS = [
+    [8, 20],
+    [20, 30],
+    [14, 0],
+  ] as const;
 
 /** Characters typed so far: the scene's clock. */
 function useClock() {
@@ -110,8 +118,11 @@ export function AuthShowcase() {
                 <span className="hero-code">
                   <Highlighted text={lines[i] ?? ""} />
                   {i === typing && <span className="hero-caret" />}
-                  {i === 2 && at > 40 && (
-                    <span className="hero-peer">
+                  {i === PEER_LINE && done(i) && (
+                    <span
+                      className="hero-peer"
+                      style={{ left: `${walk(PEER_STOPS, at - typedBy(SOURCE, i))}ch` }}
+                    >
                       <span className="hero-peer-flag">Wang</span>
                     </span>
                   )}
