@@ -15,12 +15,22 @@ const clearLink = () => history.replaceState(null, "", "/");
  * Sign-in, registration and invitation links. `?invite=` is a project invitation (join with an
  * existing or new account); `?signup=` is an administrator's site invitation.
  */
-export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => void }) {
+export function AuthPage({
+  onSignedIn,
+  initial = "login",
+  onHome,
+}: {
+  onSignedIn: (user: PublicUser) => void;
+  /** Which form shows first (the homepage's "Start writing" opens registration). */
+  initial?: "login" | "register";
+  /** Back to the homepage. */
+  onHome?: () => void;
+}) {
   const { t } = useI18n();
   const [projectInvite] = useState(() => params().get("invite"));
   const [signup] = useState(() => params().get("signup"));
   const [info, setInfo] = useState<RegistrationInfo | null>(null);
-  const [tab, setTab] = useState<"login" | "register">(signup ? "register" : "login");
+  const [tab, setTab] = useState<"login" | "register">(signup ? "register" : initial);
   const [waiting, setWaiting] = useState<"register" | "join" | null>(null);
   useEffect(() => {
     void api<RegistrationInfo>(
@@ -149,7 +159,9 @@ export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => voi
           <span />
           <span />
         </div>
-        <img className="hero-logo" src="/logo-dark.svg" alt="Y-Writer" />
+        <button type="button" className="hero-home" onClick={onHome} disabled={!onHome}>
+          <img className="hero-logo" src="/logo-dark.svg" alt="Y-Writer" />
+        </button>
         <h2 className="hero-title">{t("hero.title")}</h2>
         <p className="hero-lead">{t("hero.lead")}</p>
         <AuthShowcase />
@@ -164,7 +176,9 @@ export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => voi
       </aside>
       <section className="signin-side">
         <header className="signin-top">
-          <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
+          <button type="button" className="signin-home" onClick={onHome} disabled={!onHome}>
+            <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
+          </button>
           <LanguageSwitch />
         </header>
         <main className="signin-main">

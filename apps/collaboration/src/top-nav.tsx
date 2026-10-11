@@ -78,7 +78,7 @@ function Messages({ onOpen }: { onOpen: (notice: Notice) => void }) {
   );
 }
 
-export type Page = "projects" | "templates" | "friends" | "desktop" | "admin" | "profile";
+export type Page = "projects" | "templates" | "friends" | "desktop" | "admin" | "profile" | "about";
 
 export function TopNav({
   user,
@@ -145,6 +145,7 @@ export function TopNav({
         {link("templates", t("nav.templates"))}
         {link("friends", t("nav.friends"), requests)}
         {link("desktop", t("nav.desktop"))}
+        {link("about", t("nav.about"))}
         {user.admin && link("admin", t("nav.admin"), pending)}
       </nav>
       <div className="nav-end">

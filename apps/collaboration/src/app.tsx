@@ -7,6 +7,16 @@ import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { DesktopPage } from "./desktop";
 import { useI18n } from "./i18n";
+
+// The homepage (and its stylesheet) loads only for those who see it.
+const Landing = lazy(() => import("./landing").then((m) => ({ default: m.Landing })));
+/** Where a visitor who is not signed in is: the homepage, or a form. */
+type Entry = "landing" | "login" | "register";
+const entryOf = (): Entry => {
+  const params = new URL(location.href).searchParams;
+  return params.has("login") ? "login" : params.has("register") ? "register" : "landing";
+};
+
 import { FriendsPage, ProfilePage } from "./profile";
 import { TemplateGallery } from "./templates";
 import { type Page, TopNav } from "./top-nav";
@@ -33,12 +43,27 @@ export function App() {
       if (params.has("templates") || params.has("template")) return "templates";
       if (params.has("friends")) return "friends";
       if (params.has("desktop")) return "desktop";
+      if (params.has("about")) return "about";
       return params.has("profile") ? "profile" : "projects";
     }),
     // `/?template=<id>` shows one template in the gallery.
     [template, setTemplate] = useState<string | null>(() =>
       new URL(location.href).searchParams.get("template"),
     );
+  const [entry, setEntry] = useState<Entry>(() =>
+    typeof location === "undefined" ? "landing" : entryOf(),
+  );
+  /** Moves between the homepage and the forms, with the browser's Back going back. */
+  const enter = useCallback((next: Entry) => {
+    setEntry(next);
+    history.pushState(null, "", next === "landing" ? "/" : `/?${next}`);
+    window.scrollTo(0, 0);
+  }, []);
+  useEffect(() => {
+    const back = () => setEntry(entryOf());
+    window.addEventListener("popstate", back);
+    return () => window.removeEventListener("popstate", back);
+  }, []);
   // Invitation links show the sign-in page even when signed in, to join with any account.
   const [link, setLink] = useState(() => {
     const params = new URL(location.href).searchParams;
@@ -97,12 +122,27 @@ export function App() {
         <p>{t("common.loading")}</p>
       </div>
     );
+  // An address naming a project goes straight to signing in.
+  if (!user && !link && !wanted && entry === "landing")
+    return (
+      <Suspense fallback={<div className="landing-wait" />}>
+        <Landing
+          signedIn={false}
+          onLogin={() => enter("login")}
+          onStart={() => enter("register")}
+        />
+      </Suspense>
+    );
   if (!user || link)
     return (
       <AuthPage
+        key={entry}
+        initial={entry === "register" ? "register" : "login"}
+        onHome={link ? undefined : () => enter("landing")}
         onSignedIn={(next) => {
           setUser(next);
           setLink(false);
+          history.replaceState(null, "", "/");
         }}
       />
     );
@@ -135,6 +175,16 @@ export function App() {
       </Suspense>
     );
   const page = view === "admin" && !user.admin ? "projects" : view;
+  if (page === "about")
+    return (
+      <Suspense fallback={<div className="landing-wait" />}>
+        <Landing
+          signedIn
+          onLogin={() => navigate("projects")}
+          onStart={() => navigate("projects")}
+        />
+      </Suspense>
+    );
   return (
     <div className="app-shell">
       <TopNav
@@ -142,7 +192,12 @@ export function App() {
         page={page}
         onNavigate={navigate}
         onOpenNotice={openNotice}
-        onSignOut={() => void api("/logout", {}).finally(() => setUser(null))}
+        onSignOut={() =>
+          void api("/logout", {}).finally(() => {
+            setUser(null);
+            enter("login");
+          })
+        }
       />
       {page === "admin" ? (
         <AdminConsole me={user.id} />

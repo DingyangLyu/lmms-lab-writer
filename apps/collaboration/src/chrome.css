@@ -1238,3 +1238,23 @@ button.link:hover:not(:disabled) {
     animation: none;
   }
 }
+
+/* Before the homepage's code arrives, its background. */
+.landing-wait {
+  min-height: 100vh;
+  background: #05090d;
+}
+.hero-home,
+.signin-home {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.hero-home {
+  align-self: flex-start;
+}
+.hero-home:disabled,
+.signin-home:disabled {
+  cursor: default;
+}
