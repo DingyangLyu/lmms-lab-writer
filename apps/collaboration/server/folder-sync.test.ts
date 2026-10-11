@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FolderSync, type SyncNotice } from "@lmms-lab/sync";
+import { FolderSync, RequestError, SyncIncomplete, type SyncNotice } from "@lmms-lab/sync";
 import { jsonFileStore, nodeFolder, nodeTransport } from "@lmms-lab/sync/node";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveChanges } from "../shared/tracked";
@@ -76,6 +76,56 @@ async function setup(user = "owner") {
 }
 
 describe("desktop folder sync against the real server", () => {
+  it("does not report a folder as up to date while the server refuses its files", async () => {
+    const s = await setup();
+    await s.api("/files", { path: "main.tex", content: "one\n" });
+    let refuse = true;
+    const real = nodeTransport(s.f.app.origin, await s.token("owner"));
+    const sync = new FolderSync({
+      project: s.f.project,
+      transport: {
+        ...real,
+        request: (method, path, body) =>
+          refuse && method === "POST" && path.endsWith("/files")
+            ? Promise.reject(new RequestError(503, "Service unavailable"))
+            : real.request(method, path, body),
+      },
+      folder: nodeFolder(s.dir),
+      store: jsonFileStore(join(s.dir, ".writer", "sync.json")),
+      onNotice: (n) => s.notices.push(n),
+      textDelay: 20,
+      deleteDelay: 200,
+      rescanInterval: 0,
+    });
+    stops.push(() => sync.stop());
+    await sync.start();
+    await until(async () => (await s.local("main.tex")) === "one\n", "clone");
+    await s.put("figure.tex", "new\n");
+    const failed = await sync.flush(5000).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failed).toBeInstanceOf(SyncIncomplete);
+    expect((failed as SyncIncomplete).paths).toEqual(["figure.tex"]);
+    expect(sync.status().unsynced).toEqual(["figure.tex"]);
+    // Once the server takes it, the next flush retries, uploads and passes.
+    refuse = false;
+    await sync.flush(5000);
+    expect((await s.remote("figure.tex"))?.content).toBe("new\n");
+    expect(sync.status().unsynced).toEqual([]);
+  });
+
+  it("does not report a read-only member's edits as uploaded", async () => {
+    const s = await setup();
+    await s.api("/files", { path: "main.tex", content: "one\n" });
+    await s.f.invite("viewer", "reader");
+    const sync = await s.engine("reader");
+    await until(async () => (await s.local("main.tex")) === "one\n", "clone");
+    await s.put("main.tex", "mine\n");
+    await expect(sync.flush(5000)).rejects.toBeInstanceOf(SyncIncomplete);
+    expect((await s.remote("main.tex"))?.content).toBe("one\n");
+  });
+
   it("flushes only once the server has the folder's edits", async () => {
     const s = await setup();
     await s.api("/files", { path: "main.tex", content: "one\n" });

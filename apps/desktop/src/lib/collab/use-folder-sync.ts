@@ -1,5 +1,5 @@
 "use client";
-import { FolderSync, type SyncNotice, type SyncStatus } from "@lmms-lab/sync";
+import { FolderSync, SyncIncomplete, type SyncNotice, type SyncStatus } from "@lmms-lab/sync";
 import type { ChangeAuthor } from "@lmms-lab/sync/tracked";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
@@ -203,8 +203,13 @@ export function useFolderSync(projectPath: string | null) {
     if (!sync) throw new Error(say.current.t("agentLocation.notSynced"));
     try {
       await sync.flush();
-    } catch {
-      throw new Error(say.current.t("agentLocation.notSynced"));
+    } catch (error) {
+      // Files the server would not take are named; the sync's notices say why.
+      throw new Error(
+        error instanceof SyncIncomplete
+          ? say.current.t("agentLocation.notUploaded", { paths: error.paths.join(", ") })
+          : say.current.t("agentLocation.notSynced"),
+      );
     }
   }, []);
   const resolveMissing = useCallback((choice: "restore" | "delete") => {

@@ -4,6 +4,7 @@ export {
   type FolderSyncOptions,
   fromBase64,
   type ShownChange,
+  SyncIncomplete,
   type TextOperation,
   toBase64,
 } from "./engine";

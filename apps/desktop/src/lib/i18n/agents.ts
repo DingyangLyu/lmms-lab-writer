@@ -54,6 +54,8 @@ export const agentsZh = {
   "agentLocation.notSynced": "这个文件夹还没和服务器同步完，稍后再发送。",
   "agentLocation.buildFailureSent": "编译失败，日志已交给服务器上的 AI。",
   "agentLocation.commentsRunHere": "本机批注要用本机 AI 处理，已切换到“本机”。",
+  "agentLocation.notUploaded":
+    "这些文件没能上传到服务器，服务器上还是旧内容：{paths}。原因见同步提示。",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.retry": "Retry",
@@ -119,4 +121,6 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "agentLocation.buildFailureSent": "The build failed; its log went to the AI on the server.",
   "agentLocation.commentsRunHere":
     "This folder's comments are handled by this computer's AI; switched to This computer.",
+  "agentLocation.notUploaded":
+    "These files could not be uploaded, so the server still has their old version: {paths}. The sync notices say why.",
 };

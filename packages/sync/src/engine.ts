@@ -59,6 +59,14 @@ function decode(bytes: Uint8Array) {
 /** An empty Yjs update is two zero bytes (no structs, no deletions). */
 const hasChanges = (update: Uint8Array) => update.length > 2;
 
+/** flush() found files whose local version the server does not have (see the notices). */
+export class SyncIncomplete extends Error {
+  constructor(readonly paths: string[]) {
+    super(`sync incomplete: ${paths.join(", ")}`);
+    this.name = "SyncIncomplete";
+  }
+}
+
 /** One edit of `before`, at its offset there: `remove` characters became `insert`. */
 export type TextOperation = { at: number; remove: number; insert: string };
 /**
@@ -202,6 +210,11 @@ export class FolderSync {
   private rescan: ReturnType<typeof setInterval> | null = null;
   private missingSince = new Map<string, number>();
   private unacked = new Map<string, string>();
+  /**
+   * Paths whose local state the server does not have, and why: an upload that failed, an edit
+   * it refused, a limit, no permission to write. Cleared once the path really syncs.
+   */
+  private unsynced = new Map<string, string>();
   private told = new Set<string>();
   private sequence = 0;
   private attempts = 0;
@@ -287,7 +300,8 @@ export class FolderSync {
   /**
    * Uploads what changed in the folder now and resolves once the server has it: connected,
    * every text file joined, nothing queued, scheduled or unacknowledged. Throws when that
-   * cannot happen in time (offline, paused, signed out, still connecting), so work that needs
+   * cannot happen in time (offline, paused, signed out, still connecting) or a file could not
+   * be uploaded (SyncIncomplete names them: refused, too large, read-only), so work that needs
    * the server's copy to match the folder (an AI turn or a build there) does not start on an
    * old one. `idle()` alone would also return while the connection is still being made.
    */
@@ -306,8 +320,11 @@ export class FolderSync {
         !this.timers.has("text") &&
         !this.dirty.size &&
         !this.unacked.size
-      )
+      ) {
+        // Settled, but settled is not the same as uploaded.
+        if (this.unsynced.size) throw new SyncIncomplete([...this.unsynced.keys()]);
         return;
+      }
       if (["paused", "signed-out", "stopped"].includes(this.state))
         throw new Error(`sync ${this.state}`);
       if (Date.now() > until) throw new Error(`sync not settled (${this.state})`);
@@ -355,6 +372,7 @@ export class FolderSync {
       state: this.state,
       role: this.role,
       pending: this.unacked.size + this.dirty.size,
+      unsynced: [...this.unsynced.keys()],
       lastSynced: this.lastSynced,
       error: this.error,
     };
@@ -463,7 +481,10 @@ export class FolderSync {
         this.options.onDocument?.(t.path);
       }
     } else if (msg.type === "ack" && msg.id) {
+      const file = this.unacked.get(msg.id);
       this.unacked.delete(msg.id);
+      const acked = file ? this.tracked.get(file) : undefined;
+      if (acked) this.cleared(acked.path);
       this.publish();
     } else if (msg.type === "rejected") {
       if (msg.id) this.unacked.delete(msg.id);
@@ -471,9 +492,14 @@ export class FolderSync {
       if (msg.status === 404) this.later("refresh", 0);
       else if (msg.status === 403) {
         this.role = "viewer";
-        if (t) this.tell({ kind: "read-only", path: t.path });
+        if (t) this.blocked(t.path, { kind: "read-only", path: t.path });
       } else if (t)
-        this.tell({ kind: "not-synced", path: t.path, reason: "server", detail: msg.message });
+        this.blocked(t.path, {
+          kind: "not-synced",
+          path: t.path,
+          reason: "server",
+          detail: msg.message,
+        });
     } else if (msg.type === "closed" || msg.type === "project-changed") this.later("refresh", 100);
   }
 
@@ -535,13 +561,16 @@ export class FolderSync {
     t.present = true;
     const diskText = decode(disk);
     if (diskText === null)
-      return this.tell({ kind: "not-synced", path: t.path, reason: "encoding" });
+      return this.blocked(t.path, { kind: "not-synced", path: t.path, reason: "encoding" });
     const shadowText = t.shadow.getText("content").toString();
+    // Nothing of the folder's waits to go up. Not after a refusal: the refused edit is in the
+    // shadow already, and only the server acknowledging an edit to this file clears that.
+    if (diskText === shadowText && this.unsynced.get(t.path) !== "server") this.cleared(t.path);
     if (diskText !== shadowText) {
       // Local edits are never overwritten, even when they cannot be uploaded.
-      if (this.readOnly) return this.tell({ kind: "read-only", path: t.path });
+      if (this.readOnly) return this.blocked(t.path, { kind: "read-only", path: t.path });
       if (disk.length > TEXT_LIMIT)
-        return this.tell({ kind: "not-synced", path: t.path, reason: "size" });
+        return this.blocked(t.path, { kind: "not-synced", path: t.path, reason: "size" });
       const before = Y.encodeStateVector(t.shadow);
       const shadow = t.shadow;
       // Tracking: the edit is recorded in the same update, as the web's editor records typing.
@@ -693,9 +722,11 @@ export class FolderSync {
   }
 
   private async renameRemote(t: Tracked, path: string) {
-    if (this.readOnly) return this.tell({ kind: "read-only", path });
+    if (this.readOnly) return this.blocked(path, { kind: "read-only", path });
     try {
       await this.options.transport.request("PATCH", this.api(`/files/${t.id}`), { path });
+      this.cleared(t.path);
+      this.cleared(path);
       t.path = path;
       this.missingSince.delete(t.id);
     } catch (error) {
@@ -705,7 +736,7 @@ export class FolderSync {
 
   private async deleteRemote(t: Tracked) {
     this.missingSince.delete(t.id);
-    if (this.readOnly) return this.tell({ kind: "read-only", path: t.path });
+    if (this.readOnly) return this.blocked(t.path, { kind: "read-only", path: t.path });
     try {
       await this.options.transport.request("DELETE", this.api(`/files/${t.id}`));
     } catch (error) {
@@ -717,14 +748,14 @@ export class FolderSync {
 
   private async uploadNew(path: string) {
     const bytes = await this.options.folder.read(path);
-    if (!bytes) return;
-    if (this.readOnly) return this.tell({ kind: "read-only", path });
+    if (!bytes) return this.cleared(path);
+    if (this.readOnly) return this.blocked(path, { kind: "read-only", path });
     const binary = !isTextPath(path);
     if (bytes.length > (binary ? BINARY_LIMIT : TEXT_LIMIT))
-      return this.tell({ kind: "not-synced", path, reason: "size" });
+      return this.blocked(path, { kind: "not-synced", path, reason: "size" });
     const text = binary ? null : decode(bytes);
     if (!binary && text === null)
-      return this.tell({ kind: "not-synced", path, reason: "encoding" });
+      return this.blocked(path, { kind: "not-synced", path, reason: "encoding" });
     try {
       const info = await this.options.transport.request<RemoteFile>(
         "POST",
@@ -743,6 +774,7 @@ export class FolderSync {
         present: true,
       };
       this.tracked.set(t.id, t);
+      this.cleared(path);
       this.join(t);
     } catch (error) {
       // Someone created the same path meanwhile: the next refresh keeps both versions.
@@ -786,14 +818,14 @@ export class FolderSync {
     const disk = await this.options.folder.read(t.path);
     if (!disk) return;
     const hash = await sha256(disk);
-    if (hash === t.hash) return;
+    if (hash === t.hash) return this.cleared(t.path);
     if (t.hash === null) {
       t.hash = hash; // Adopted at an identical path before any change.
       return;
     }
-    if (this.readOnly) return this.tell({ kind: "read-only", path: t.path });
+    if (this.readOnly) return this.blocked(t.path, { kind: "read-only", path: t.path });
     if (disk.length > BINARY_LIMIT)
-      return this.tell({ kind: "not-synced", path: t.path, reason: "size" });
+      return this.blocked(t.path, { kind: "not-synced", path: t.path, reason: "size" });
     try {
       const saved = await this.options.transport.request<{ revision: number }>(
         "PUT",
@@ -802,6 +834,7 @@ export class FolderSync {
       );
       t.revision = saved.revision;
       t.hash = hash;
+      this.cleared(t.path);
       this.synced();
     } catch (error) {
       // Replaced remotely first: pulling it keeps this version as a conflict copy.
@@ -818,6 +851,7 @@ export class FolderSync {
   }
 
   private untrack(t: Tracked) {
+    this.cleared(t.path);
     this.tracked.delete(t.id);
     this.dirty.delete(t.id);
     this.missingSince.delete(t.id);
@@ -838,12 +872,23 @@ export class FolderSync {
     if (error instanceof RequestError && error.status === 401)
       this.setState("signed-out", error.message);
     else
-      this.tell({
+      this.blocked(path, {
         kind: "not-synced",
         path,
         reason: "server",
         detail: error instanceof Error ? error.message : String(error),
       });
+  }
+
+  /** The folder's version of `path` did not reach the server; flush() fails until it does. */
+  private blocked(path: string, notice: SyncNotice) {
+    this.unsynced.set(path, notice.kind === "not-synced" ? notice.reason : notice.kind);
+    this.tell(notice);
+    this.publish();
+  }
+
+  private cleared(path: string) {
+    if (this.unsynced.delete(path)) this.publish();
   }
 
   private tell(notice: SyncNotice, always = false) {

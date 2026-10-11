@@ -64,6 +64,8 @@ export type SyncStatus = {
   role: Role | null;
   /** Local changes not yet confirmed by the server. */
   pending: number;
+  /** Files whose local version could not be uploaded (refused, too large, read-only). */
+  unsynced: string[];
   lastSynced: number | null;
   error: string | null;
 };

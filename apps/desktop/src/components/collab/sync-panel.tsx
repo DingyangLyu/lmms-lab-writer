@@ -74,6 +74,11 @@ export function SyncPanel({
             · {t("collab.pending", { count: status.pending })}
           </span>
         )}
+        {!!status?.unsynced?.length && (
+          <span className="text-red-600" title={status.unsynced.join("\n")}>
+            · {t("collab.unsynced", { count: status.unsynced.length })}
+          </span>
+        )}
       </button>
       {open && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/30 p-5">

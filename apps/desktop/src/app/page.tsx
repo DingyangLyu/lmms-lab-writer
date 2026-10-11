@@ -2684,8 +2684,10 @@ export default function EditorPage() {
                               );
                               try {
                                 await folderSync.flush();
-                              } catch {
-                                throw new Error(t("agentLocation.notSynced"));
+                              } catch (error) {
+                                throw error instanceof Error
+                                  ? error
+                                  : new Error(t("agentLocation.notSynced"));
                               }
                             },
                           }}
