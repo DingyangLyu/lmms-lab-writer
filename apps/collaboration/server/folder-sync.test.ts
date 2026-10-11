@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { FolderSync, type SyncNotice } from "@lmms-lab/sync";
 import { jsonFileStore, nodeFolder, nodeTransport } from "@lmms-lab/sync/node";
 import { afterEach, describe, expect, it } from "vitest";
+import { resolveChanges } from "../shared/tracked";
 import { fixture } from "./test-fixture";
 
 const stops: Array<() => Promise<void>> = [];
@@ -36,7 +37,10 @@ async function setup(user = "owner") {
       ).json()) as { token: string }
     ).token;
   const notices: SyncNotice[] = [];
-  const engine = async (as = user) => {
+  const engine = async (
+    as = user,
+    extra: Partial<ConstructorParameters<typeof FolderSync>[0]> = {},
+  ) => {
     const sync = new FolderSync({
       project: f.project,
       transport: nodeTransport(f.app.origin, await token(as)),
@@ -46,6 +50,7 @@ async function setup(user = "owner") {
       textDelay: 20,
       deleteDelay: 200,
       rescanInterval: 0,
+      ...extra,
     });
     stops.push(() => sync.stop());
     await sync.start();
@@ -71,6 +76,48 @@ async function setup(user = "owner") {
 }
 
 describe("desktop folder sync against the real server", () => {
+  it("records a folder's edits as tracked changes while tracking, and decides them", async () => {
+    const s = await setup();
+    const id = (await s.api("/files", { path: "main.tex", content: "The cat sat on the mat.\n" }))
+      .data.id as string;
+    const sync = await s.engine("owner", {
+      tracking: () => ({ author: "desk", name: "Desk" }),
+    });
+    await until(async () => (await s.local("main.tex")) === "The cat sat on the mat.\n", "clone");
+    await sync.idle();
+    await s.put("main.tex", "The black cat sat on mat.\n");
+    sync.notifyLocal(["main.tex"]);
+    await until(
+      async () => (await s.remote("main.tex"))?.content === "The black cat sat on mat.\n",
+      "server text",
+    );
+    await sync.idle();
+    // The server's document holds the changes as whole words, as a browser would see them.
+    const { doc } = await s.f.peer(s.f.owner, id);
+    const text = doc.getText("content").toString();
+    const shown = resolveChanges(doc).changes.map((c) => [
+      c.kind,
+      c.author,
+      (c.kind === "insert" ? text.slice(c.from, c.to) : (c.text ?? "")).trim(),
+    ]);
+    expect(shown).toEqual([
+      ["insert", "desk", "black"],
+      ["delete", "desk", "the"],
+    ]);
+    expect(sync.trackedChanges("main.tex")?.changes.map((c) => c.quote.trim())).toEqual([
+      "black",
+      "the",
+    ]);
+    // Rejecting them all puts the old text back, on the server and in the folder.
+    expect(sync.decide("main.tex", null, false)).toBe(true);
+    await until(async () => (await s.local("main.tex")) === "The cat sat on the mat.\n", "local");
+    await until(
+      async () => (await s.remote("main.tex"))?.content === "The cat sat on the mat.\n",
+      "server",
+    );
+    expect(sync.trackedChanges("main.tex")?.changes).toEqual([]);
+  });
+
   it("keeps Windows line endings out of the shared text", async () => {
     const s = await setup();
     await s.api("/files", { path: "w.tex", content: "one\ntwo\n" });

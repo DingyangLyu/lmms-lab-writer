@@ -101,6 +101,22 @@ export const collabZh = {
   "collab.versions.restore": "把当前文件恢复到这个版本",
   "collab.versions.restoreConfirm":
     "把 {path} 恢复到 {time} 的版本？这是一次普通的修改，可以撤销，也会同步给项目成员。",
+  "collab.tracked.button": "修订",
+  "collab.tracked.on": "修订中",
+  "collab.tracked.title": "修订模式（和网页的“修订”是同一个设置）",
+  "collab.tracked.lead":
+    "开启后，在这里保存的修改会作为插入和删除记录到服务器项目里，等有人接受或拒绝；网页上也看得到。悬停在编辑器里的修订上可以逐条接受或拒绝。",
+  "collab.tracked.everyone": "为所有人开启",
+  "collab.tracked.everyoneHint": "项目里每位编辑者和 AI 的修改都记录",
+  "collab.tracked.mine": "为我开启",
+  "collab.tracked.mineHint": "只记录我（和我发起的 AI 对话）的修改",
+  "collab.tracked.inFile": "本文件 {count} 处修订",
+  "collab.tracked.none": "本文件没有待处理的修订。",
+  "collab.tracked.acceptAll": "全部接受",
+  "collab.tracked.rejectAll": "全部拒绝",
+  "collab.tracked.confirmRejectAll":
+    "拒绝本文件全部 {count} 处修订？插入的文字会删除，删除的文字会恢复。",
+  "collab.tracked.readOnly": "只有编辑者可以开启修订或接受、拒绝修改。",
 };
 export const collabEn: Record<keyof typeof collabZh, string> = {
   "collab.status.unlinked": "Collaborate",
@@ -215,4 +231,20 @@ export const collabEn: Record<keyof typeof collabZh, string> = {
   "collab.versions.restore": "Restore the open file to this version",
   "collab.versions.restoreConfirm":
     "Restore {path} to the version of {time}? It is an ordinary edit: it can be undone, and it syncs to the project's members.",
+  "collab.tracked.button": "Track changes",
+  "collab.tracked.on": "Tracking",
+  "collab.tracked.title": "Track changes (the same setting as Track changes on the web)",
+  "collab.tracked.lead":
+    "While on, what you save here reaches the server project as insertions and deletions waiting to be accepted or rejected, also shown on the web. Hover over one in the editor to accept or reject it.",
+  "collab.tracked.everyone": "On for everyone",
+  "collab.tracked.everyoneHint": "Every editor's and AI's edits in this project are tracked",
+  "collab.tracked.mine": "On for me",
+  "collab.tracked.mineHint": "Only my edits (and the AI conversations I start) are tracked",
+  "collab.tracked.inFile": "{count} changes in this file",
+  "collab.tracked.none": "No changes waiting in this file.",
+  "collab.tracked.acceptAll": "Accept all",
+  "collab.tracked.rejectAll": "Reject all",
+  "collab.tracked.confirmRejectAll":
+    "Reject all {count} changes in this file? Inserted text is removed and deleted text comes back.",
+  "collab.tracked.readOnly": "Only editors can turn tracking on or accept and reject changes.",
 };

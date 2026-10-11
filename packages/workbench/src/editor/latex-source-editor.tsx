@@ -58,6 +58,7 @@ import {
   latexHighlighting,
   latexLanguage,
 } from "@lmms-lab/latex-editor";
+import type { ResolvedChange } from "@lmms-lab/sync/tracked";
 import { documentEdits } from "@lmms-lab/writing";
 import { memo, type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../i18n";
@@ -66,6 +67,13 @@ import { resolveMonoFontFamily } from "./font-stacks";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { writerSearch } from "./search-panel";
 import { latexSpellcheck } from "./spellcheck";
+import {
+  type DecideChanges,
+  setTrackedChanges,
+  trackedChanges,
+  trackedTheme,
+  trackedTooltip,
+} from "./tracked-changes";
 import type { EditorSettings, EditorTextRange, EditorTheme, SourceMark } from "./types";
 
 export type LatexSourceEditorProps = {
@@ -85,6 +93,14 @@ export type LatexSourceEditorProps = {
   hints?: () => ProjectHints;
   /** Spell check the prose (needs a SpellService registered; .tex files only). */
   spellcheck?: boolean;
+  /**
+   * Tracked changes to show, at their places in `trackedText`; shown only while the editor
+   * holds exactly that text (unsaved edits hide them until they are synced).
+   */
+  trackedChanges?: ResolvedChange[] | null;
+  trackedText?: string;
+  /** Accept or reject from a change's hover card; absent: shown without the buttons. */
+  onDecideChanges?: DecideChanges;
 };
 const NO_HINTS: ProjectHints = { citations: [], labels: [] };
 
@@ -410,6 +426,9 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           }),
           // The browser's own checker stays off: it would underline every command.
           spelling.current.of(latexSpellcheck(!!initial.spellcheck && !initial.readOnly)),
+          trackedChanges,
+          trackedTheme,
+          trackedTooltip(() => currentProps.current.onDecideChanges ?? null),
           EditorView.domEventHandlers({
             click: (event) => {
               if (!(event.metaKey || event.ctrlKey)) return false;
@@ -472,6 +491,18 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
       effects: spelling.current.reconfigure(latexSpellcheck(!!props.spellcheck && !props.readOnly)),
     });
   }, [props.spellcheck, props.readOnly]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `content` changes mean the text may match again (or no longer).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    const shown =
+      props.trackedChanges?.length && props.trackedText?.replace(/\r\n/g, "\n") === current
+        ? props.trackedChanges
+        : [];
+    if (!shown.length && !view.state.field(trackedChanges).length) return;
+    view.dispatch({ effects: setTrackedChanges.of(shown) });
+  }, [props.trackedChanges, props.trackedText, props.content]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -16,6 +16,7 @@ export * from "./editor/spell/words";
 export * from "./editor/spellcheck";
 export * from "./editor/symbol-palette";
 export * from "./editor/symbols";
+export * from "./editor/tracked-changes";
 export * from "./editor/types";
 export * from "./editor-error-boundary";
 export * from "./file-tree";

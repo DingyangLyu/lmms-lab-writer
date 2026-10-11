@@ -1,6 +1,14 @@
-import { diffChars } from "diff";
+import { diffChars, diffWordsWithSpace } from "diff";
 import * as Y from "yjs";
 import { conflictCopyPath, isConflictCopy, isTextPath, validPath } from "./paths";
+import {
+  type ChangeAuthor,
+  decideChanges,
+  editsFromOperations,
+  type ResolvedChange,
+  resolveChanges,
+  trackEdits,
+} from "./tracked";
 import {
   type LocalFolder,
   type RemoteFile,
@@ -51,12 +59,23 @@ function decode(bytes: Uint8Array) {
 /** An empty Yjs update is two zero bytes (no structs, no deletions). */
 const hasChanges = (update: Uint8Array) => update.length > 2;
 
+/** One edit of `before`, at its offset there: `remove` characters became `insert`. */
+export type TextOperation = { at: number; remove: number; insert: string };
 /**
  * Turns `before` into `after` with character-level edits, so concurrent edits elsewhere in the
- * text merge instead of being overwritten by one large replacement.
+ * text merge instead of being overwritten by one large replacement. Returns the edits, for
+ * recording them as tracked changes (editsFromOperations).
  */
-export function applyTextChange(text: Y.Text, before: string, after: string) {
-  const parts = diffChars(before, after, { timeout: 2000 });
+export function applyTextChange(
+  text: Y.Text,
+  before: string,
+  after: string,
+  /** Whole words, for tracked changes, as the server records an AI's ("delta", not "delt"). */
+  words = false,
+): TextOperation[] {
+  const parts = words
+    ? diffWordsWithSpace(before, after, { timeout: 2000 })
+    : diffChars(before, after, { timeout: 2000 });
   if (!parts) {
     // Diff timed out: replace only the region between the common prefix and suffix.
     let start = 0;
@@ -70,16 +89,40 @@ export function applyTextChange(text: Y.Text, before: string, after: string) {
       end++;
     text.delete(start, before.length - start - end);
     text.insert(start, after.slice(start, after.length - end));
-    return;
+    return [
+      {
+        at: start,
+        remove: before.length - start - end,
+        insert: after.slice(start, after.length - end),
+      },
+    ];
   }
-  let index = 0;
+  const operations: TextOperation[] = [];
+  let index = 0,
+    original = 0;
   for (const part of parts) {
+    const last = operations.at(-1);
+    // A removal and an insertion at one place are one replacement.
+    const current =
+      last && last.at + last.remove === original && (part.added || part.removed)
+        ? last
+        : part.added || part.removed
+          ? operations[operations.push({ at: original, remove: 0, insert: "" }) - 1]
+          : null;
     if (part.added) {
       text.insert(index, part.value);
       index += part.value.length;
-    } else if (part.removed) text.delete(index, part.value.length);
-    else index += part.value.length;
+      if (current) current.insert += part.value;
+    } else if (part.removed) {
+      text.delete(index, part.value.length);
+      original += part.value.length;
+      if (current) current.remove += part.value.length;
+    } else {
+      index += part.value.length;
+      original += part.value.length;
+    }
   }
+  return operations;
 }
 
 type Tracked = {
@@ -124,7 +167,16 @@ export type FolderSyncOptions = {
   /** Full rescan for changes a file watcher missed (ms); 0 disables it. */
   rescanInterval?: number;
   now?: () => Date;
+  /**
+   * Who to record this folder's edits as, as tracked changes (the project tracks everyone's
+   * edits, or this member turned it on), or null when they go in untracked.
+   */
+  tracking?: () => ChangeAuthor | null;
+  /** A text file's shared document changed (its text or its tracked changes). */
+  onDocument?: (path: string) => void;
 };
+/** A tracked change as lists show it, with its text: what was inserted, or what was deleted. */
+export type ShownChange = ResolvedChange & { quote: string };
 
 /**
  * Keeps a local folder and a collaboration project in step.
@@ -230,6 +282,41 @@ export class FolderSync {
       await new Promise((r) => setTimeout(r, 20));
     }
     throw new Error("sync did not settle");
+  }
+
+  /** A text file's tracked changes, at their places in its shared text (and that text). */
+  trackedChanges(path: string): { text: string; changes: ShownChange[] } | null {
+    const t = this.byPath(path);
+    if (!t?.doc || t.binary) return null;
+    const text = t.doc.getText("content").toString();
+    return {
+      text,
+      changes: resolveChanges(t.doc).changes.map((c) => ({
+        ...c,
+        quote: c.kind === "insert" ? text.slice(c.from, c.to) : (c.text ?? ""),
+      })),
+    };
+  }
+
+  /**
+   * Accepts or rejects tracked changes of a text file (all of them when `ids` is null): the
+   * decision goes to the server, and the file is rewritten with the result.
+   */
+  decide(path: string, ids: string[] | null, accept: boolean) {
+    const t = this.byPath(path);
+    if (!t?.doc || t.binary || this.readOnly) return false;
+    const doc = t.doc;
+    const vector = Y.encodeStateVector(doc);
+    doc.transact(
+      () => decideChanges(doc, ids ?? resolveChanges(doc).changes.map((c) => c.id), accept),
+      "local",
+    );
+    const update = Y.encodeStateAsUpdate(doc, vector);
+    if (!hasChanges(update)) return false;
+    this.sendUpdate(t, update);
+    this.markText(t.id, 0);
+    this.options.onDocument?.(t.path);
+    return true;
   }
 
   status(): SyncStatus {
@@ -342,6 +429,7 @@ export class FolderSync {
       if (t?.doc) {
         Y.applyUpdate(t.doc, fromBase64(msg.update), "remote");
         this.markText(t.id, 50);
+        this.options.onDocument?.(t.path);
       }
     } else if (msg.type === "ack" && msg.id) {
       this.unacked.delete(msg.id);
@@ -380,6 +468,7 @@ export class FolderSync {
       Y.applyUpdate(t.shadow, Y.encodeStateAsUpdate(t.doc));
     }
     t.joined = true;
+    this.options.onDocument?.(t.path);
     // Edits the server never acknowledged (the app quit or the connection dropped).
     if (vector) {
       const missing = Y.encodeStateAsUpdate(t.doc, fromBase64(vector));
@@ -424,10 +513,17 @@ export class FolderSync {
         return this.tell({ kind: "not-synced", path: t.path, reason: "size" });
       const before = Y.encodeStateVector(t.shadow);
       const shadow = t.shadow;
-      shadow.transact(() => applyTextChange(shadow.getText("content"), shadowText, diskText));
+      // Tracking: the edit is recorded in the same update, as the web's editor records typing.
+      const who = this.options.tracking?.() ?? null;
+      shadow.transact(() => {
+        const changes = who ? resolveChanges(shadow).changes : [];
+        const operations = applyTextChange(shadow.getText("content"), shadowText, diskText, !!who);
+        if (who) trackEdits(shadow, changes, editsFromOperations(shadowText, operations), who);
+      });
       const local = Y.encodeStateAsUpdate(shadow, before);
       Y.applyUpdate(t.doc, local, "local");
       this.sendUpdate(t, local);
+      this.options.onDocument?.(t.path);
     }
     const text = t.doc.getText("content").toString();
     const advance = Y.encodeStateAsUpdate(t.doc, Y.encodeStateVector(t.shadow));

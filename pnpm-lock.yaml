@@ -454,6 +454,9 @@ importers:
       '@lmms-lab/latex-editor':
         specifier: workspace:*
         version: link:../latex-editor
+      '@lmms-lab/sync':
+        specifier: workspace:*
+        version: link:../sync
       '@lmms-lab/writing':
         specifier: workspace:*
         version: link:../writing

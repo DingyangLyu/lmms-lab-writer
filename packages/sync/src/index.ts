@@ -3,6 +3,8 @@ export {
   FolderSync,
   type FolderSyncOptions,
   fromBase64,
+  type ShownChange,
+  type TextOperation,
   toBase64,
 } from "./engine";
 export { conflictCopyPath, isConflictCopy, isTextPath, textExtensions, validPath } from "./paths";

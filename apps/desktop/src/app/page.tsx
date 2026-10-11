@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OpenFromServer } from "@/components/collab/open-from-server";
 import { ServerVersions } from "@/components/collab/server-versions";
 import { SyncPanel } from "@/components/collab/sync-panel";
+import { TrackedCenter } from "@/components/collab/tracked-center";
 import {
   type DockviewPanelItem,
   DockviewPanelLayout,
@@ -345,6 +346,9 @@ export default function EditorPage() {
     },
     [agentBackend, daemon.projectPath, opencode.ensure, toast, t],
   );
+  // A linked folder's tracked changes in the open file (from its sync's copy of the document).
+  const openTracked =
+    folderSync.link && selectedFile ? folderSync.trackedChanges(selectedFile) : null;
   // A linked folder may build on the server; its PDFs answer SyncTeX lookups from there.
   const [buildOnServer, setBuildOnServer] = useState(false);
   useEffect(() => {
@@ -2024,6 +2028,13 @@ export default function EditorPage() {
                 editorSettings={editorSettings.settings}
                 editorTheme={editorSettings.editorTheme}
                 goToLine={pendingGoToLine}
+                trackedChanges={openTracked?.changes}
+                trackedText={openTracked?.text}
+                onDecideChanges={
+                  folderSync.tracking?.canEdit && selectedFile
+                    ? (ids, accept) => void folderSync.decide(selectedFile, ids, accept)
+                    : undefined
+                }
                 className="h-full"
               />
             </EditorErrorBoundary>
@@ -2282,26 +2293,33 @@ export default function EditorPage() {
               <SaveStatus
                 serverVersions={
                   folderSync.link && daemon.projectPath ? (
-                    <ServerVersions
-                      key={`${folderSync.link.server}#${folderSync.link.project}`}
-                      link={folderSync.link}
-                      project={daemon.projectPath}
-                      path={selectedFile ?? undefined}
-                      manager={saveManager}
-                      paused={conversations.tabs.some(
-                        (tab) => tab.status === "running" || tab.status === "waiting",
-                      )}
-                      flush={folderSync.flush}
-                      onReload={(path, content) => {
-                        if (path === selectedFile) {
-                          setFileContent(content);
-                          setFileLoadError(null);
-                        }
-                        setSplitPane((prev) =>
-                          prev?.selectedFile === path ? { ...prev, content, error: null } : prev,
-                        );
-                      }}
-                    />
+                    <>
+                      <TrackedCenter
+                        sync={folderSync}
+                        path={selectedFile ?? undefined}
+                        changes={openTracked?.changes ?? []}
+                      />
+                      <ServerVersions
+                        key={`${folderSync.link.server}#${folderSync.link.project}`}
+                        link={folderSync.link}
+                        project={daemon.projectPath}
+                        path={selectedFile ?? undefined}
+                        manager={saveManager}
+                        paused={conversations.tabs.some(
+                          (tab) => tab.status === "running" || tab.status === "waiting",
+                        )}
+                        flush={folderSync.flush}
+                        onReload={(path, content) => {
+                          if (path === selectedFile) {
+                            setFileContent(content);
+                            setFileLoadError(null);
+                          }
+                          setSplitPane((prev) =>
+                            prev?.selectedFile === path ? { ...prev, content, error: null } : prev,
+                          );
+                        }}
+                      />
+                    </>
                   ) : null
                 }
                 collaboration={

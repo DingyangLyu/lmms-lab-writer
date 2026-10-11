@@ -2,6 +2,7 @@
 
 import "@/lib/monaco/config";
 
+import type { ResolvedChange } from "@lmms-lab/sync/tracked";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import Editor, { type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
@@ -34,6 +35,10 @@ type Props = {
   onContentChange?: (content: string, previous?: string) => void;
   goToLine?: number;
   onSelectionChange?: (ranges: EditorTextRange[] | null) => void;
+  /** A linked folder's tracked changes in this file, placed in the shared text. */
+  trackedChanges?: ResolvedChange[] | null;
+  trackedText?: string;
+  onDecideChanges?: (ids: string[], accept: boolean) => void;
 };
 
 type VimModeController = {

@@ -4,6 +4,20 @@ import { applyTextChange, fromBase64, toBase64 } from "./engine";
 import { conflictCopyPath, isConflictCopy, isTextPath, validPath } from "./paths";
 
 describe("applyTextChange", () => {
+  it("returns its edits at their places in the old text", () => {
+    const doc = new Y.Doc();
+    const text = doc.getText("content");
+    const before = "The cat sat on the mat.";
+    text.insert(0, before);
+    const after = "The black cat sat on a mat!";
+    const operations = applyTextChange(text, before, after);
+    expect(text.toString()).toBe(after);
+    let rebuilt = before;
+    for (const op of [...operations].reverse())
+      rebuilt = rebuilt.slice(0, op.at) + op.insert + rebuilt.slice(op.at + op.remove);
+    expect(rebuilt).toBe(after);
+    expect(operations.every((op) => op.remove > 0 || op.insert)).toBe(true);
+  });
   it("keeps a concurrent edit that a whole-text replacement would have overwritten", () => {
     const base = new Y.Doc();
     base.getText("content").insert(0, "intro\nmethods\nresults\n");
