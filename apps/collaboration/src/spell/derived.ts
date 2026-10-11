@@ -28,6 +28,20 @@ export const EXTRA_WORDS = new Set(
   pretrain finetune finetunes finetuned finetuning embedder embedders optimizers embeddings
   covariances schemas benchmarked reproducibility replicable replicability tokenizer tokenizers
   workflow workflows multimodal stateful stateless composable
+  enthalpy enthalpies exergy entropic isochoric isentropic stoichiometric stoichiometry
+  voltammetry chronoamperometry crystallinity diffractogram diffractometer mesoscale
+  viscoelastic viscoplastic rheology rheological tribology oligomer ligand chelate isotropy
+  ferroelectric pyroelectric quadrupole plasmonic excitonic polariton fermionic bosonic
+  perturbative discretization discretize barostat equilibration equilibrate sigmoid allosteric
+  transcriptome metabolome genotype mutagenesis cytotoxicity cytotoxic angiogenesis
+  immunohistochemistry graphene fullerene chemisorption physisorption desorb inviscid
+  incompressible advection radiative emissivity absorptance reflectance birefringence
+  orthotropic elastoplastic mesoporous tortuosity wettability amphiphilic surfactant micelle
+  solvation solvate protonation deprotonation tautomer enantiomer chiral chirality racemic
+  regioselective anharmonic anharmonicity phononic photonic photonics austenite ferrite bainite
+  passivation redox potentiostatic galvanostatic coulombic faradaic capacitive pseudocapacitive
+  electrolyzer catalytically operando spectrometry chromatographic calorimetry calorimetric
+  thermogravimetric interferometry ellipsometry profilometry moduli
   `
     .split(/\s+/)
     .filter(Boolean),
