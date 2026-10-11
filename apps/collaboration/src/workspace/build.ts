@@ -1,4 +1,4 @@
-import { magicEngine, neededEngine } from "@lmms-lab/writing";
+import { buildEngine } from "@lmms-lab/writing";
 import { useEffect, useRef, useState } from "react";
 import type {
   Build,
@@ -16,19 +16,9 @@ import type { WorkspaceContext } from "./context";
 const CJK_ERROR = /Unicode character \S+ \(U\+(?:2E[89A-F]|[3-9][0-9A-F]|F[9A]|FF)[0-9A-F]{2}\)/;
 /** XeTeX's or LuaTeX's warning for such a character missing from the font. */
 const CJK_MISSING = /^Missing character: There is no [\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
-/**
- * The engine nobody chose, by the rules the desktop uses too (@lmms-lab/writing engine.ts):
- * the main file's `% !TEX program` line, else what its sources need. The server builds in the
- * main file's folder, so inputs are relative to it.
- */
-function autoEngine(sources: SourceFile[], main: string): Engine {
-  const read = (path: string) => sources.find((f) => f.path === path)?.content;
-  const magic = magicEngine(read(main) ?? "");
-  if (magic === "pdflatex" || magic === "xelatex" || magic === "lualatex") return magic;
-  const folder = main.includes("/") ? main.slice(0, main.lastIndexOf("/")) : "";
-  // Tectonic is XeTeX underneath; `latexmk` leaves the choice to the sources.
-  return magic === "tectonic" ? "xelatex" : neededEngine(read, main, folder);
-}
+/** The engine nobody chose, by the rules the desktop and the server use too. */
+const autoEngine = (sources: SourceFile[], main: string): Engine =>
+  buildEngine((path) => sources.find((f) => f.path === path)?.content, main);
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
 const phone = () =>

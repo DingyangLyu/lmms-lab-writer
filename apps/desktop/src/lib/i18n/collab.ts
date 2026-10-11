@@ -81,6 +81,26 @@ export const collabZh = {
   "team.sharing": "正在发给团队…",
   "team.shareComment": "发表团队批注",
   "team.shareFailed": "未能发到团队：{error}。如果本机修改还没同步到服务器，请先等同步完成。",
+  "collab.build.location": "在哪里编译",
+  "collab.build.local": "本机编译",
+  "collab.build.server": "服务器编译",
+  "collab.build.serverTitle":
+    "用服务器的 TeX 编译这个文件夹对应的服务器项目（先上传本机修改），PDF 下载到这里；本机不用装 TeX",
+  "collab.versions.save": "保存服务器版本",
+  "collab.versions.saveTitle":
+    "先上传本机修改，再在服务器项目里保存一个版本（网页“版本”里也能看到）",
+  "collab.versions.history": "服务器版本",
+  "collab.versions.title": "服务器版本",
+  "collab.versions.hint":
+    "服务器项目「{project}」的版本：手动保存的、AI 对话修改前的、编辑时每半小时自动保存的，和网页“版本”里的是同一批。",
+  "collab.versions.none": "还没有服务器版本。",
+  "collab.versions.choose": "选一个版本，看当前文件从那时到现在改了什么。",
+  "collab.versions.notInVersion": "这个版本里没有 {path}。",
+  "collab.versions.same": "{path} 和这个版本一样。",
+  "collab.versions.legend": "{path}：红色是这个版本里的，绿色是现在的",
+  "collab.versions.restore": "把当前文件恢复到这个版本",
+  "collab.versions.restoreConfirm":
+    "把 {path} 恢复到 {time} 的版本？这是一次普通的修改，可以撤销，也会同步给项目成员。",
 };
 export const collabEn: Record<keyof typeof collabZh, string> = {
   "collab.status.unlinked": "Collaborate",
@@ -175,4 +195,24 @@ export const collabEn: Record<keyof typeof collabZh, string> = {
   "team.shareComment": "Post team comment",
   "team.shareFailed":
     "Could not share with the team: {error}. If local edits have not synced to the server yet, wait for the sync first.",
+  "collab.build.location": "Where to build",
+  "collab.build.local": "Build here",
+  "collab.build.server": "Build on server",
+  "collab.build.serverTitle":
+    "Build the linked server project with the server's TeX (local changes are uploaded first) and download the PDF here; no TeX needed on this computer",
+  "collab.versions.save": "Save server version",
+  "collab.versions.saveTitle":
+    "Upload local changes, then save a version in the server project (also listed under History on the web)",
+  "collab.versions.history": "Server versions",
+  "collab.versions.title": "Server versions",
+  "collab.versions.hint":
+    "Versions of the server project “{project}”: saved by hand, before AI turns, and every half hour while edited — the same list as History on the web.",
+  "collab.versions.none": "No server versions yet.",
+  "collab.versions.choose": "Choose a version to see what changed in the open file since then.",
+  "collab.versions.notInVersion": "{path} is not in this version.",
+  "collab.versions.same": "{path} is the same as in this version.",
+  "collab.versions.legend": "{path}: red is the version, green is now",
+  "collab.versions.restore": "Restore the open file to this version",
+  "collab.versions.restoreConfirm":
+    "Restore {path} to the version of {time}? It is an ordinary edit: it can be undone, and it syncs to the project's members.",
 };

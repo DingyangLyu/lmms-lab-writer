@@ -73,7 +73,7 @@ fn relative(path: &str) -> Result<PathBuf, String> {
 }
 
 /// The file inside `root`; refuses links that lead outside the project.
-async fn inside(root: &Path, path: &str) -> Result<PathBuf, String> {
+pub(crate) async fn inside(root: &Path, path: &str) -> Result<PathBuf, String> {
     let target = root.join(relative(path)?);
     if let Ok(meta) = tokio::fs::symlink_metadata(&target).await {
         if meta.file_type().is_symlink() {

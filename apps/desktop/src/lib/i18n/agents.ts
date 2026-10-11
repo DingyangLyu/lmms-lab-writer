@@ -41,6 +41,17 @@ export const agentsZh = {
   "bridge.idle": "空闲",
   "bridge.statusReplyCallback": "{status} · 回信：{callback}",
   "bridge.delegationsCount": "协作 {count}",
+  "agentLocation.label": "AI 运行在",
+  "agentLocation.local": "本机",
+  "agentLocation.server": "服务器",
+  "agentLocation.localTitle":
+    "用这台电脑上登录的 Codex、Claude Code、OpenCode，改动直接写进这个文件夹",
+  "agentLocation.serverTitle":
+    "用服务器执行器上的 AI（{runner}），对话与项目成员共享，改动进入服务器上的项目后同步回这个文件夹",
+  "agentLocation.runner": "服务器执行器",
+  "agentLocation.offline": "执行器未连接",
+  "agentLocation.signIn": "请先在协作设置里登录 {server}，才能使用服务器上的 AI。",
+  "agentLocation.notSynced": "这个文件夹还没和服务器同步完，稍后再发送。",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.retry": "Retry",
@@ -90,4 +101,17 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "bridge.idle": "Idle",
   "bridge.statusReplyCallback": "{status} · reply: {callback}",
   "bridge.delegationsCount": "Delegations {count}",
+  "agentLocation.label": "AI runs on",
+  "agentLocation.local": "This computer",
+  "agentLocation.server": "Server",
+  "agentLocation.localTitle":
+    "Codex, Claude Code and OpenCode signed in on this computer; changes go straight into this folder",
+  "agentLocation.serverTitle":
+    "The AI on the server's runner ({runner}); conversations are shared with the project's members, and changes reach this folder through the server project",
+  "agentLocation.runner": "the server's runner",
+  "agentLocation.offline": "Runner not connected",
+  "agentLocation.signIn":
+    "Sign in to {server} under Collaboration settings to use the server's AI.",
+  "agentLocation.notSynced":
+    "This folder has not finished syncing with the server; send again shortly.",
 };

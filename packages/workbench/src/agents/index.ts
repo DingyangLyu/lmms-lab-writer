@@ -48,4 +48,7 @@ export type { OpenCodeDaemonStatus, Props as OpenCodePanelProps } from "./openco
 export { runOpenCodePrompt } from "./opencode/run-prompt";
 export { formatRelativeTime } from "./opencode/utils";
 export * from "./platform";
+export * from "./relay/link";
+export * from "./relay/panel";
+export * from "./relay/protocol";
 export * from "./selection-context";

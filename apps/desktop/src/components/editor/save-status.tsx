@@ -18,6 +18,7 @@ export function SaveStatus({
   agentBusy = false,
   rightActions,
   collaboration,
+  serverVersions,
   onConflictResolved,
   manager,
   project,
@@ -34,6 +35,8 @@ export function SaveStatus({
   rightActions?: ReactNode;
   /** The collaboration sync button for the open project. */
   collaboration?: ReactNode;
+  /** The linked server project's versions, beside the local Git ones. */
+  serverVersions?: ReactNode;
   onConflictResolved?: (conflict: DocumentConflict) => void;
   manager: SaveManager;
   project?: string | null;
@@ -164,6 +167,7 @@ export function SaveStatus({
             onReload={onReload}
           />
         )}
+        {serverVersions}
         <div className="ml-auto">{rightActions}</div>
       </div>
       {(message || closeError) && (

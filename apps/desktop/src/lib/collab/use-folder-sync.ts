@@ -120,10 +120,17 @@ export function useFolderSync(projectPath: string | null) {
     },
     [linkTo],
   );
+  /** Uploads local changes now and waits until the server has them (before a server AI turn). */
+  const flush = useCallback(async () => {
+    const sync = engine.current;
+    if (!sync) return;
+    sync.notifyLocal();
+    await sync.idle();
+  }, []);
   const resolveMissing = useCallback((choice: "restore" | "delete") => {
     engine.current?.resolveMissing(choice);
     setMissing(0);
   }, []);
-  return { link, status, missing, linkTo, unlink, upload, resolveMissing };
+  return { link, status, missing, linkTo, unlink, upload, flush, resolveMissing };
 }
 export type FolderSyncControls = ReturnType<typeof useFolderSync>;

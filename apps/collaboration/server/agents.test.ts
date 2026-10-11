@@ -109,6 +109,31 @@ async function codexRunner(server: string) {
 }
 
 describe("live AI conversations on the shared runner", () => {
+  it("lets the desktop reach the relay with its device token, as a member", async () => {
+    const f = await setup();
+    await codexRunner(f.origin);
+    const issued = await f.call("/tokens", {
+      username: "owner",
+      password: "test-password-1234",
+      name: "Writer Desktop",
+    });
+    // The desktop's Rust side sends the token and no browser Origin.
+    const desktop = client(`${f.origin.replace("http:", "ws:")}/api/projects/${f.project}/agents`, {
+      Authorization: `Bearer ${issued.data.token}`,
+    });
+    await desktop.opened;
+    const status = await desktop.until((m) => m.status?.online);
+    expect(status.status.harnesses).toContain("codex");
+    expect(await desktop.request("codex.threads")).toEqual({ data: [] });
+    // Without a token, a socket from another site is refused.
+    const stranger = client(
+      `${f.origin.replace("http:", "ws:")}/api/projects/${f.project}/agents`,
+      {
+        Origin: "http://evil.example",
+      },
+    );
+    await expect(stranger.opened).rejects.toThrow();
+  });
   it("runs a Codex turn whose edits land in the shared text, with a version before it", async () => {
     const f = await setup();
     const { dir, host } = await codexRunner(f.origin);

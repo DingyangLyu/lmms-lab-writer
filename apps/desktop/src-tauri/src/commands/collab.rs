@@ -287,6 +287,64 @@ pub async fn collab_request(
     result
 }
 
+/// Saves a server build's PDF into the project folder (`dest`, relative to it) so the PDF
+/// tab shows it as it shows a local build's; returns the absolute path.
+#[tauri::command]
+pub async fn collab_download(
+    app: AppHandle,
+    state: State<'_, CollabState>,
+    server: String,
+    path: String,
+    project: String,
+    dest: String,
+) -> Result<String, String> {
+    let endpoint = path.split('?').next().unwrap_or_default();
+    if !path.starts_with("/api/projects/")
+        || !endpoint.contains("/builds/")
+        || !endpoint.ends_with("/pdf")
+        || path.contains("..")
+        || !dest.to_ascii_lowercase().ends_with(".pdf")
+    {
+        return Err(failure(400, tr!("无效的下载", "Invalid download")));
+    }
+    let root = super::annotations::root(&project).await?;
+    let file = super::folder_sync::inside(&root, &dest).await?;
+    let token = token_for(&app, &state, &server).await?;
+    let response = client()?
+        .get(format!("{server}{path}"))
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|e| {
+            failure(
+                0,
+                trf!(
+                    "无法连接协作服务器：{e}",
+                    "Could not connect to the collaboration server: {e}"
+                ),
+            )
+        })?;
+    let status = response.status();
+    if !status.is_success() {
+        let body: Value = response.json().await.unwrap_or(Value::Null);
+        return Err(failure(
+            status.as_u16(),
+            body["error"].as_str().unwrap_or("download failed"),
+        ));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| failure(0, e.to_string()))?;
+    if let Some(parent) = file.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    super::saving::atomic_write(&file, &bytes).await?;
+    Ok(file.to_string_lossy().into_owned())
+}
+
 /// Runs one WebSocket until either side closes; `report` sees every message and one close.
 pub async fn run_socket(
     id: u64,
@@ -353,7 +411,12 @@ pub async fn collab_connect(
     server: String,
     path: String,
 ) -> Result<u64, String> {
-    if !path.starts_with("/api/projects/") || !path.contains("/socket") || path.contains("..") {
+    // A project's document sockets, or its AI conversations on the server's runner.
+    let endpoint = path.split('?').next().unwrap_or_default();
+    if !path.starts_with("/api/projects/")
+        || !(path.contains("/socket") || endpoint.ends_with("/agents"))
+        || path.contains("..")
+    {
         return Err(failure(
             400,
             tr!("无效的连接路径", "Invalid connection path"),

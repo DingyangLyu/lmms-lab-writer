@@ -221,6 +221,30 @@ describe.skipIf(process.platform === "win32")("server builds", () => {
       await s.app.close();
     }
   });
+  it("chooses the engine from the sources when asked for an automatic build", async () => {
+    const s = await server(await fakeLatexmk());
+    try {
+      const prefix = `/projects/${s.project}`;
+      await s.call(
+        `${prefix}/files`,
+        {
+          path: "zh.tex",
+          content: "\\documentclass{ctexart}\n\\begin{document}中文\\end{document}\n",
+        },
+        s.cookie,
+      );
+      const build = await s.call(`${prefix}/builds`, { main: "zh.tex", engine: "auto" }, s.cookie);
+      expect(build.data).toMatchObject({ main: "zh.tex", engine: "xelatex", auto: true });
+      const plain = await s.call(
+        `${prefix}/builds`,
+        { main: "main.tex", engine: "auto" },
+        s.cookie,
+      );
+      expect(plain.data).toMatchObject({ engine: "pdflatex", auto: true });
+    } finally {
+      await s.app.close();
+    }
+  });
   it("explains a missing TeX installation", async () => {
     const s = await server(join(dir, "no-such-latexmk"));
     try {

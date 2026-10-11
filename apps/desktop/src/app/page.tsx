@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OpenFromServer } from "@/components/collab/open-from-server";
+import { ServerVersions } from "@/components/collab/server-versions";
 import { SyncPanel } from "@/components/collab/sync-panel";
 import {
   type DockviewPanelItem,
@@ -29,6 +30,7 @@ import { SaveStatus } from "@/components/editor/save-status";
 import { FileSidebarPanel } from "@/components/editor/sidebar-file-panel";
 import { GitSidebarPanel } from "@/components/editor/sidebar-git-panel";
 import { TerminalPanel } from "@/components/editor/terminal-panel";
+import { AgentLocation } from "@/components/harness/agent-location";
 import { HarnessButtons, HarnessWorkspace } from "@/components/harness/workspace";
 import { LaTeXInstallPrompt, LaTeXSettingsDialog, SynctexInstallDialog } from "@/components/latex";
 import { BuildTargetsEditor } from "@/components/latex/build-targets-editor";
@@ -43,7 +45,7 @@ import {
   type TabReorderPosition,
 } from "@/components/ui/tab-bar";
 import { useToast } from "@/components/ui/toast";
-import { linkedFolders } from "@/lib/collab/accounts";
+import { linkedFolders, serverRequest } from "@/lib/collab/accounts";
 import { TeamCommentsProvider } from "@/lib/collab/team-comments";
 import { useFolderSync } from "@/lib/collab/use-folder-sync";
 import { useEditorSettings } from "@/lib/editor";
@@ -63,7 +65,7 @@ import { useI18n } from "@/lib/i18n";
 import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
 import { compileFailurePrompt } from "@/lib/latex/compile-failure";
 import type { BuildTarget, SynctexResult, TargetBuildResult } from "@/lib/latex/types";
-import { useTargetBuild } from "@/lib/latex/use-target-build";
+import { type ServerBuild, useTargetBuild } from "@/lib/latex/use-target-build";
 import { useOpenCodeDaemon } from "@/lib/opencode/use-opencode-daemon";
 import { pathSync } from "@/lib/path";
 import { AnnotationProvider } from "@/lib/pdf/annotation-context";
@@ -342,8 +344,61 @@ export default function EditorPage() {
     },
     [agentBackend, daemon.projectPath, opencode.ensure, toast, t],
   );
+  // A linked folder may build on the server; its PDFs answer SyncTeX lookups from there.
+  const [buildOnServer, setBuildOnServer] = useState(false);
+  useEffect(() => {
+    try {
+      setBuildOnServer(
+        !!daemon.projectPath &&
+          localStorage.getItem(`writer-build-location:${daemon.projectPath}`) === "server",
+      );
+    } catch {
+      setBuildOnServer(false);
+    }
+  }, [daemon.projectPath]);
+  const chooseBuildLocation = useCallback(
+    (server: boolean) => {
+      setBuildOnServer(server);
+      try {
+        if (daemon.projectPath)
+          localStorage.setItem(
+            `writer-build-location:${daemon.projectPath}`,
+            server ? "server" : "local",
+          );
+      } catch {}
+    },
+    [daemon.projectPath],
+  );
+  const buildServer = useMemo(
+    () =>
+      buildOnServer && folderSync.link ? { link: folderSync.link, flush: folderSync.flush } : null,
+    [buildOnServer, folderSync.link, folderSync.flush],
+  );
+  const [serverPdf, setServerPdf] = useState<{ relative: string; build: ServerBuild } | null>(null);
+  /** PDF position → source, for a PDF the server built: its SyncTeX stays on the server. */
+  const serverSynctex = useCallback(
+    async (pdf: string, page: number, x: number, y: number) => {
+      const link = folderSync.link;
+      if (!link || serverPdf?.relative !== pdf) return null;
+      return serverRequest<{ file: string; line: number }>(
+        link.server,
+        "GET",
+        `/api/projects/${link.project}/builds/${serverPdf.build.id}/inverse?page=${page}&x=${x}&y=${y}`,
+      );
+    },
+    [folderSync.link, serverPdf],
+  );
   const showBuiltPdf = useCallback(
-    ({ relative, absolute }: { relative: string; absolute: string }) => {
+    ({
+      relative,
+      absolute,
+      build,
+    }: {
+      relative: string;
+      absolute: string;
+      build?: ServerBuild;
+    }) => {
+      setServerPdf(build ? { relative, build } : null);
       setEditorViewMode("file");
       setGitDiffPreview(null);
       setOpenTabs((prev) => (prev.includes(relative) ? prev : [...prev, relative]));
@@ -360,6 +415,7 @@ export default function EditorPage() {
     prepare: flushBeforeLeave,
     onBuilt: showBuiltPdf,
     onFailed: handOffBuildFailure,
+    server: buildServer,
   });
   const handleCompileWithDetection = useCallback(async () => {
     if (!daemon.projectPath || latexSettings.isDetecting || latexSettings.saving) return;
@@ -638,6 +694,12 @@ export default function EditorPage() {
       const pdfPath = pathSync.join(daemon.projectPath, selectedFile);
 
       try {
+        const remote = await serverSynctex(selectedFile, page, x, y);
+        if (remote) {
+          await handleFileSelect(remote.file);
+          setPendingGoToLine(remote.line);
+          return;
+        }
         const result = await invoke<SynctexResult>("latex_synctex_edit", {
           pdfPath,
           page,
@@ -677,7 +739,7 @@ export default function EditorPage() {
         }
       }
     },
-    [daemon.projectPath, selectedFile, handleFileSelect, toast],
+    [daemon.projectPath, selectedFile, handleFileSelect, toast, serverSynctex],
   );
 
   const handleSplitSynctexClick = useCallback(
@@ -687,6 +749,12 @@ export default function EditorPage() {
       const pdfPath = pathSync.join(daemon.projectPath, splitPane.selectedFile);
 
       try {
+        const remote = await serverSynctex(splitPane.selectedFile, page, x, y);
+        if (remote) {
+          await handleFileSelect(remote.file);
+          setPendingGoToLine(remote.line);
+          return;
+        }
         const result = await invoke<SynctexResult>("latex_synctex_edit", {
           pdfPath,
           page,
@@ -723,7 +791,7 @@ export default function EditorPage() {
         }
       }
     },
-    [daemon.projectPath, splitPane, handleFileSelect, toast],
+    [daemon.projectPath, splitPane, handleFileSelect, toast, serverSynctex],
   );
 
   const handleSynctexInstallComplete = useCallback(() => {
@@ -2132,6 +2200,21 @@ export default function EditorPage() {
                             </option>
                           ))}
                         </select>
+                        {folderSync.link && (
+                          <select
+                            aria-label={t("collab.build.location")}
+                            title={t("collab.build.serverTitle")}
+                            value={buildOnServer ? "server" : "local"}
+                            disabled={targetBuild.compiling}
+                            onChange={(event) =>
+                              chooseBuildLocation(event.target.value === "server")
+                            }
+                            className="h-8 border border-border bg-background px-2 text-xs"
+                          >
+                            <option value="local">{t("collab.build.local")}</option>
+                            <option value="server">{t("collab.build.server")}</option>
+                          </select>
+                        )}
                         <button
                           type="button"
                           onClick={() => setShowTemplateImport(true)}
@@ -2195,6 +2278,30 @@ export default function EditorPage() {
 
           {daemon.projectPath && (
             <SaveStatus
+              serverVersions={
+                folderSync.link && daemon.projectPath ? (
+                  <ServerVersions
+                    key={`${folderSync.link.server}#${folderSync.link.project}`}
+                    link={folderSync.link}
+                    project={daemon.projectPath}
+                    path={selectedFile ?? undefined}
+                    manager={saveManager}
+                    paused={conversations.tabs.some(
+                      (tab) => tab.status === "running" || tab.status === "waiting",
+                    )}
+                    flush={folderSync.flush}
+                    onReload={(path, content) => {
+                      if (path === selectedFile) {
+                        setFileContent(content);
+                        setFileLoadError(null);
+                      }
+                      setSplitPane((prev) =>
+                        prev?.selectedFile === path ? { ...prev, content, error: null } : prev,
+                      );
+                    }}
+                  />
+                ) : null
+              }
               collaboration={
                 daemon.projectPath ? (
                   <SyncPanel
@@ -2496,32 +2603,69 @@ export default function EditorPage() {
                     className="border-l border-border flex flex-col flex-shrink-0 overflow-hidden"
                   >
                     <ChatImageDirectory.Provider value={daemon.projectPath ?? undefined}>
-                      <HarnessWorkspace
-                        workspace={conversations}
-                        preferredBackend={agentBackend}
-                        visible={showRightPanel}
-                        onBackendChange={setAgentBackend}
-                        shared={{
-                          directory: daemon.projectPath ?? undefined,
-                          onFileClick: handleChatFileClick,
-                          editorSelection:
-                            editorSelection?.project === daemon.projectPath
-                              ? editorSelection
+                      <AgentLocation
+                        projectPath={daemon.projectPath}
+                        link={folderSync.link}
+                        server={{
+                          visible: showRightPanel,
+                          // The server knows the project by its ID, not this folder's path.
+                          selection:
+                            folderSync.link && editorSelection?.project === daemon.projectPath
+                              ? { ...editorSelection, project: folderSync.link.project }
                               : null,
-                          onClearSelection: () => setEditorSelection(null),
-                          onSelectionSent: (sent) =>
+                          onSelectionDone: (sent) =>
                             setEditorSelection((current) =>
-                              sameEditorSelection(current, sent) ? null : current,
+                              !sent ||
+                              (current &&
+                                sameEditorSelection({ ...current, project: sent.project }, sent))
+                                ? null
+                                : current,
                             ),
-                          onBeforeSend: prepareEditorMessage,
+                          onOpenFile: (path, line) => void handleChatFileClick(`${path}:${line}`),
+                          onError: (message) => toast(message, "error"),
+                          // Saved and uploaded first: the runner copies the server's text.
+                          onBeforeSend: async (selection) => {
+                            await prepareEditorMessage(
+                              selection && daemon.projectPath
+                                ? { ...selection, project: daemon.projectPath }
+                                : null,
+                            );
+                            try {
+                              await folderSync.flush();
+                            } catch {
+                              throw new Error(t("agentLocation.notSynced"));
+                            }
+                          },
                         }}
-                        opencode={{
-                          baseUrl: `http://localhost:${opencode.port}`,
-                          autoConnect: opencode.status === "running" && !!daemon.projectPath,
-                          daemonStatus: opencode.status,
-                          onRestartOpenCode: opencode.restart,
-                          onMaxReconnectFailed: opencode.showDisconnected,
-                        }}
+                        local={
+                          <HarnessWorkspace
+                            workspace={conversations}
+                            preferredBackend={agentBackend}
+                            visible={showRightPanel}
+                            onBackendChange={setAgentBackend}
+                            shared={{
+                              directory: daemon.projectPath ?? undefined,
+                              onFileClick: handleChatFileClick,
+                              editorSelection:
+                                editorSelection?.project === daemon.projectPath
+                                  ? editorSelection
+                                  : null,
+                              onClearSelection: () => setEditorSelection(null),
+                              onSelectionSent: (sent) =>
+                                setEditorSelection((current) =>
+                                  sameEditorSelection(current, sent) ? null : current,
+                                ),
+                              onBeforeSend: prepareEditorMessage,
+                            }}
+                            opencode={{
+                              baseUrl: `http://localhost:${opencode.port}`,
+                              autoConnect: opencode.status === "running" && !!daemon.projectPath,
+                              daemonStatus: opencode.status,
+                              onRestartOpenCode: opencode.restart,
+                              onMaxReconnectFailed: opencode.showDisconnected,
+                            }}
+                          />
+                        }
                       />
                     </ChatImageDirectory.Provider>
                   </aside>

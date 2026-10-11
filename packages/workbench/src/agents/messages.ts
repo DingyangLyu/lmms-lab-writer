@@ -432,6 +432,10 @@ export const agentsZh = {
   "status.ready": "就绪",
   "status.running": "执行中",
   "status.waitingForApprovalOrAReply": "等待批准或回复",
+  "relay.disconnected": "与服务器的 AI 连接已断开",
+  "relay.noAnswer": "服务器没有响应",
+  "relay.notInProject": "这个链接不是本项目的文件：{path}",
+  "relay.linkedFrom": "来自项目「{project}」· {name}",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "activity.analysing": "Analysing…",
@@ -909,4 +913,8 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "status.ready": "Ready",
   "status.running": "Running",
   "status.waitingForApprovalOrAReply": "Waiting for approval or a reply",
+  "relay.disconnected": "The AI connection to the server was lost",
+  "relay.noAnswer": "The server did not answer",
+  "relay.notInProject": "This link is not a file of this project: {path}",
+  "relay.linkedFrom": "From “{project}” · {name}",
 };

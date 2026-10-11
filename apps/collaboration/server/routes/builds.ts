@@ -15,8 +15,8 @@ export const buildRoutes = [
   route<InProject>("POST", /^builds$/, async (ctx): Promise<Build> => {
     await ctx.need("comment");
     const body = await ctx.body(),
-      engine = str(body, "engine", 20) as Engine;
-    if (!engines.includes(engine)) fail(400, "不支持的编译器");
+      engine = str(body, "engine", 20) as Engine | "auto";
+    if (engine !== "auto" && !engines.includes(engine)) fail(400, "不支持的编译器");
     const build = await ctx.compiler.compile(
       ctx.project,
       ctx.user.id,

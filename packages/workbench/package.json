@@ -9,6 +9,7 @@
     "./theme.css": "./src/theme.css",
     "./scoped-preflight.css": "./src/scoped-preflight.css",
     "./agents": "./src/agents/index.ts",
+    "./agents/relay-protocol": "./src/agents/relay/protocol.ts",
     "./agents.css": "./src/agents.css"
   },
   "scripts": {

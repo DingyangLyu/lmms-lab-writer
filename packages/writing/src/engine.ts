@@ -116,6 +116,20 @@ export function texEngine(
 ): TexEngine {
   return magicEngine(read(main) ?? "") ?? neededEngine(read, main, base);
 }
+/**
+ * The engine of a build that offers pdfLaTeX, XeLaTeX and LuaLaTeX (the server's), when none
+ * was chosen: as `texEngine`, with Tectonic (XeTeX underneath) as XeLaTeX and latexmk leaving
+ * the choice to the sources. LaTeX runs in the main file's folder.
+ */
+export function buildEngine(
+  read: (path: string) => string | null | undefined,
+  main: string,
+): "pdflatex" | "xelatex" | "lualatex" {
+  const magic = magicEngine(read(main) ?? "");
+  if (magic === "pdflatex" || magic === "xelatex" || magic === "lualatex") return magic;
+  if (magic === "tectonic") return "xelatex";
+  return neededEngine(read, main, main.includes("/") ? main.slice(0, main.lastIndexOf("/")) : "");
+}
 /** What the sources ask for, without the magic comment (which may name latexmk). */
 export function neededEngine(
   read: (path: string) => string | null | undefined,

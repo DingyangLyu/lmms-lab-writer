@@ -32,6 +32,7 @@ export const msgZh = {
   "msg.openAProjectFirst2": "请先打开项目",
   "msg.compilingNameFile": "正在编译 {name} · {file}",
   "msg.compiledPdfEngine": "编译完成：{pdf}（{engine}）",
+  "msg.compiledPdfOnServer": "服务器已编译：{pdf}（{engine}）",
   "msg.compilationDidNotFinishError": "编译未完成：{error}",
   "msg.opencodeIsStillNotInstalledPleaseInstall":
     "OpenCode 仍未安装，请先安装：\nnpm i -g opencode-ai@latest\n或\nbrew install sst/tap/opencode",
@@ -105,6 +106,7 @@ export const msgEn: Record<keyof typeof msgZh, string> = {
   "msg.openAProjectFirst2": "Open a project first",
   "msg.compilingNameFile": "Compiling {name} · {file}",
   "msg.compiledPdfEngine": "Compiled: {pdf} ({engine})",
+  "msg.compiledPdfOnServer": "Compiled on the server: {pdf} ({engine})",
   "msg.compilationDidNotFinishError": "Compilation did not finish: {error}",
   "msg.opencodeIsStillNotInstalledPleaseInstall":
     "OpenCode is still not installed. Please install it first:\nnpm i -g opencode-ai@latest\nor\nbrew install sst/tap/opencode",

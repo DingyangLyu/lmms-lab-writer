@@ -103,6 +103,7 @@ pub fn run() {
             commands::collab::collab_sign_out,
             commands::collab::collab_accounts,
             commands::collab::collab_request,
+            commands::collab::collab_download,
             commands::collab::collab_connect,
             commands::collab::collab_send,
             commands::collab::collab_close,

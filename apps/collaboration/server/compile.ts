@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, posix } from "node:path";
+import { buildEngine } from "@lmms-lab/writing";
 import { sql } from "./db";
 import type { Store } from "./store";
 import { OUTPUT_DIR, parseSyncTex, type SyncTex } from "./synctex";
@@ -224,16 +225,31 @@ export class Compiler {
     if (next) next();
     else this.active--;
   }
-  async compile(project: string, author: string, main: string, engine: Engine, auto = false) {
+  /** `engine` "auto": chosen from the sources, as the web and desktop choose it. */
+  async compile(
+    project: string,
+    author: string,
+    main: string,
+    requested: Engine | "auto",
+    chosenAutomatically = false,
+  ) {
     safePath(main);
     if (!main.endsWith(".tex")) fail(400, "请选择 .tex 主文件");
-    if (!engines.includes(engine)) fail(400, "不支持的编译器");
+    if (requested !== "auto" && !engines.includes(requested)) fail(400, "不支持的编译器");
     if (this.running.has(project)) fail(409, "这个项目正在编译，请稍候");
     this.running.add(project);
     try {
       const files = await this.store.projectFiles(project);
       if (!files.some((f) => f.path === main && !f.binary))
         fail(404, "项目中没有 {main}", { main });
+      const auto = requested === "auto" || chosenAutomatically;
+      const engine =
+        requested === "auto"
+          ? buildEngine((path) => {
+              const file = files.find((f) => f.path === path && !f.binary);
+              return file ? decodeText(file.state) : undefined;
+            }, main)
+          : requested;
       await this.slot();
       try {
         return await this.build(project, author, main, engine, auto, files);
