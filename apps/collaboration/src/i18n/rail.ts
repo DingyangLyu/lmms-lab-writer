@@ -25,6 +25,12 @@ export const railZh = {
   "settings.language": "界面语言",
   "settings.spellHint":
     "拼写检查只检查英文正文；句中大写的专有名词、复合词和常见科研术语不会标红。右键标红的词可加入个人词典。",
+  "settings.dictionary": "个人词典（{count}）",
+  "settings.addWord": "添加一个词",
+  "settings.add": "添加",
+  "settings.removeWord": "从词典中删除 {word}",
+  "settings.noWords": "还没有词。在编辑器里右键标红的词，选“加入我的词典”。",
+  "settings.dictionaryHint": "个人词典跟随账号保存，换浏览器或电脑登录也有效。",
   "comments.filterMine": "@我 {count}",
   "comments.filterAi": "已交给 AI {count}",
   "comments.mentionHint": "输入 @ 可以提醒项目成员，对方会在“消息”里收到通知",
@@ -61,6 +67,13 @@ export const railEn: Record<keyof typeof railZh, string> = {
   "settings.language": "Language",
   "settings.spellHint":
     "Spell checking looks at English prose only; names inside sentences, compounds and common technical terms are not underlined. Right-click an underlined word to add it to your dictionary.",
+  "settings.dictionary": "Your dictionary ({count})",
+  "settings.addWord": "Add a word",
+  "settings.add": "Add",
+  "settings.removeWord": "Remove {word} from the dictionary",
+  "settings.noWords": "No words yet. Right-click an underlined word in the editor and add it.",
+  "settings.dictionaryHint":
+    "Your dictionary is kept with your account, in every browser you sign in on.",
   "comments.filterMine": "@me {count}",
   "comments.filterAi": "Sent to AI {count}",
   "comments.mentionHint": "Type @ to notify a member; they get it under Messages",

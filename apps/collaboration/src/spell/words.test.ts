@@ -47,13 +47,13 @@ describe("spell checking words", () => {
 
   it("accepts the words technical writing builds from dictionary words", () => {
     const coined =
-      "composable stateful scalable interpretable composability modularity multiscale subgraphs nonconvex interatomic microstructures preprocessing reweighting upsampling tokenizers tokenization embeddings optimizers regressor denoiser benchmarking checkpointing codebase timestamps dataflow hyperparameters eigenstates heterostructure pairwise reimplementation et al";
+      "composable stateful scalable interpretable composability modularity multiscale subgraphs nonconvex interatomic microstructures preprocessing reweighting upsampling tokenizers tokenization embeddings optimizers regressor denoiser benchmarking checkpointing codebase timestamps dataflow hyperparameters eigenstates heterostructure pairwise reimplementation et al summarise summarised organisation colour behaviour centre modelling labelled analyse catalogue";
     expect(coined.split(" ").filter((w) => !accepted(w))).toEqual([]);
   });
 
   it("still catches typos and plurals of uncountable nouns", () => {
     const typos =
-      "untill statefull recieve occured refered prefered transfered trainning acceptible computor writter resluts softwares informations feedbacks datas equipments researchs exasmple metsdhod";
+      "untill statefull recieve occured refered prefered transfered trainning acceptible computor writter resluts softwares informations feedbacks datas equipments researchs exasmple metsdhod summarixe colourr";
     expect(typos.split(" ").filter(accepted)).toEqual([]);
   });
 

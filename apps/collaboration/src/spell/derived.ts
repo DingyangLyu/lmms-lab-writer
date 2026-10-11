@@ -45,6 +45,17 @@ const PREFIXES =
   photo auto cross over under up down semi pseudo quasi mono thermo geo neuro opto anti counter
   mis ultra trans bi tri uni mid eigen hetero homo iso para`.split(/\s+/);
 
+/** British endings and their American spelling, which the dictionary lists. */
+const BRITISH: Array<[RegExp, string]> = [
+  [/is(e|ed|es|ing|er|ers|ation|ations)$/, "iz$1"],
+  [/ys(e|ed|es|ing|er|ers)$/, "yz$1"],
+  [/our(s|ed|ing|ite|ites|able|ful)?$/, "or$1"],
+  [/tre(s|d)?$/, "ter$1"],
+  [/ll(ed|ing|er|ers)$/, "l$1"],
+  [/ogue(s)?$/, "og$1"],
+  [/ence(s)?$/, "ense$1"],
+];
+
 /** What the dictionary knows: its words (with their own endings) and a root's affix flags. */
 export type Dictionary = {
   correct: (word: string) => boolean;
@@ -64,6 +75,12 @@ export function derived(word: string, dict: Dictionary, depth = 0): boolean {
   const ok = (part: string) => known(part) || derived(part, dict, depth + 1);
   const ending = (suffix: string) => (w.endsWith(suffix) ? w.slice(0, -suffix.length) : null);
 
+  // British spellings of words the (American) dictionary has: summarise, colour, centre.
+  for (const [pattern, american] of BRITISH) {
+    if (!pattern.test(w)) continue;
+    const other = w.replace(pattern, american);
+    if (other !== w && dict.correct(other)) return true;
+  }
   // Possessives, and plurals of nouns the dictionary lists without one.
   const own = ending("'s");
   if (own && ok(own)) return true;

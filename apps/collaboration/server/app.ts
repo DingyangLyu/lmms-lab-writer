@@ -35,6 +35,7 @@ import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
 import { publishTemplateRoute, templateRoutes } from "./routes/templates";
+import { wordRoutes } from "./routes/words";
 import { Store } from "./store";
 import { TemplateLibrary } from "./templates";
 import { fail, HttpError } from "./util";
@@ -216,6 +217,7 @@ export async function createWriterServer(options: Options) {
     ...templateRoutes,
     ...peopleRoutes,
     ...notificationRoutes,
+    ...wordRoutes,
     ...downloadRoutes,
   ];
   const projectScoped = [

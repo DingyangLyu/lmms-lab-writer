@@ -1,10 +1,13 @@
 /**
  * The page's side of the spell checker: one worker for every editor, the answers remembered,
- * and the member's own words (kept in this browser) and those ignored for this visit.
+ * the member's own words (kept with their account, and in this browser to start at once) and
+ * those ignored for this visit.
  */
+
 // By path: the package exports only its Node entry, which reads these with fs.
 import affUrl from "../../node_modules/dictionary-en/index.aff?url";
 import dicUrl from "../../node_modules/dictionary-en/index.dic?url";
+import { api } from "../api";
 
 type Reply = { id: number; error?: string; misspelled?: string[]; suggestions?: string[] };
 
@@ -63,24 +66,70 @@ export function onWordsChanged(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
-export function addWord(word: string) {
-  own.add(word);
+const notify = () => {
+  for (const listener of listeners) listener();
+};
+const keep = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify([...own].sort()));
   } catch {
     /* Kept for this visit. */
   }
-  for (const listener of listeners) listener();
+};
+/** Set once this browser's earlier words have gone to an account. */
+const MOVED = "writer-spell-words-moved";
+let synced: Promise<void> | null = null;
+/**
+ * Takes the account's words (once per page). Words this browser kept before dictionaries
+ * lived with accounts go to the account the first time.
+ */
+export function syncWords() {
+  synced ??= (async () => {
+    try {
+      const words = await api<string[]>("/me/words");
+      let moved = true;
+      try {
+        moved = localStorage.getItem(MOVED) === "1";
+      } catch {}
+      const earlier = moved ? [] : [...own].filter((w) => !words.includes(w));
+      if (earlier.length) await api("/me/words", { words: earlier });
+      try {
+        localStorage.setItem(MOVED, "1");
+      } catch {}
+      own.clear();
+      for (const w of [...words, ...earlier]) own.add(w);
+      keep();
+      notify();
+    } catch {
+      synced = null; // Signed out, or offline: the browser's copy serves until next time.
+    }
+  })();
+  return synced;
+}
+/** The member's own words, sorted. */
+export const ownWords = () => [...own].sort((a, b) => a.localeCompare(b));
+export function addWord(word: string) {
+  own.add(word);
+  keep();
+  notify();
+  void api("/me/words", { word }).catch(() => {});
+}
+export function removeWord(word: string) {
+  own.delete(word);
+  keep();
+  notify();
+  void api("/me/words/remove", { word }).catch(() => {});
 }
 export function ignoreWord(word: string) {
   ignored.add(word);
-  for (const listener of listeners) listener();
+  notify();
 }
 
 /** The dictionary's verdict on each word asked so far: true when misspelled. */
 const verdicts = new Map<string, boolean>();
 /** Which of `words` are misspelled, asking the dictionary only about new ones. */
 export async function misspelled(words: string[]) {
+  void syncWords();
   await load();
   const unknown = [...new Set(words)].filter((w) => !verdicts.has(w) && !known(w));
   if (unknown.length) {

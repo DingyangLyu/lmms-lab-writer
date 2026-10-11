@@ -112,6 +112,8 @@ export const englishMessages: Record<string, string> = {
   // comments
   批注不存在: "Comment not found",
   批注已存在: "That comment already exists",
+  无效的单词: "Not a word",
+  个人词典已满: "Your dictionary is full",
   回复已存在: "That reply already exists",
   无效的编号: "Invalid id",
   "请选择 AI 对话": "Choose an AI conversation",

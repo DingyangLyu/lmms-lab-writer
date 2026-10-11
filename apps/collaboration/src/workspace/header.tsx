@@ -21,6 +21,7 @@ import { FONT_SIZES, useEditorSettings } from "../editor-settings";
 import { useSnapshotLabel } from "../history";
 import { useI18n } from "../i18n";
 import { roleKey } from "../labels";
+import { addWord, onWordsChanged, ownWords, removeWord, syncWords } from "../spell/client";
 import type { BuildState } from "./build";
 import { Popover, Select } from "./ui";
 
@@ -267,6 +268,7 @@ export function SettingsPanel() {
           <EditorSettingsSection />
           <p className="mt-2 leading-relaxed text-muted">{t("settings.spellHint")}</p>
         </div>
+        <PersonalDictionary />
         <div>
           <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
             {t("settings.language")}
@@ -287,6 +289,80 @@ export function SettingsPanel() {
         </div>
       </div>
     </section>
+  );
+}
+
+/** The member's spelling dictionary (kept with the account): add and remove words. */
+function PersonalDictionary() {
+  const { t } = useI18n();
+  const [words, setWords] = useState<string[]>(ownWords);
+  const [adding, setAdding] = useState("");
+  useEffect(() => {
+    const stop = onWordsChanged(() => setWords(ownWords()));
+    void syncWords();
+    return () => {
+      stop();
+    };
+  }, []);
+  const add = () => {
+    const word = adding.trim();
+    if (!word || /\s/.test(word)) return;
+    addWord(word);
+    setAdding("");
+  };
+  return (
+    <div>
+      <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+        {t("settings.dictionary", { count: words.length })}
+      </h3>
+      <form
+        className="mb-2 flex gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          add();
+        }}
+      >
+        <input
+          value={adding}
+          onChange={(event) => setAdding(event.target.value)}
+          placeholder={t("settings.addWord")}
+          aria-label={t("settings.addWord")}
+          maxLength={64}
+          className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 focus:border-foreground focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={!adding.trim()}
+          className="rounded-md border border-border px-2 hover:bg-accent-hover disabled:opacity-40"
+        >
+          {t("settings.add")}
+        </button>
+      </form>
+      {words.length ? (
+        <div className="flex flex-wrap gap-1">
+          {words.map((word) => (
+            <span
+              key={word}
+              className="pop-in inline-flex items-center gap-1 rounded-full border border-border bg-background py-0.5 pr-1 pl-2"
+            >
+              {word}
+              <button
+                type="button"
+                aria-label={t("settings.removeWord", { word })}
+                title={t("settings.removeWord", { word })}
+                onClick={() => removeWord(word)}
+                className="rounded-full px-1 text-muted hover:bg-accent-hover hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-muted">{t("settings.noWords")}</p>
+      )}
+      <p className="mt-2 leading-relaxed text-muted">{t("settings.dictionaryHint")}</p>
+    </div>
   );
 }
 

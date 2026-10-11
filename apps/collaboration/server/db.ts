@@ -347,6 +347,13 @@ export const migrations: string[] = [
      read BOOLEAN NOT NULL DEFAULT false
    );
    CREATE INDEX notifications_user ON notifications(user_id, created);`,
+  // 14: each member's spelling dictionary, kept with the account rather than in one browser.
+  `CREATE TABLE user_words(
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     word TEXT NOT NULL,
+     created BIGINT NOT NULL,
+     PRIMARY KEY (user_id, word)
+   );`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */
