@@ -83,9 +83,23 @@ const STATIC_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".wasm": "application/wasm",
   ".woff2": "font/woff2",
+  // The spell checker's Hunspell dictionary.
+  ".aff": "text/plain; charset=utf-8",
+  ".dic": "text/plain; charset=utf-8",
 };
 /** Text worth compressing; images, fonts and PDFs are compressed already. */
-const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".svg", ".json", ".map", ".txt"]);
+const COMPRESSIBLE = new Set([
+  ".html",
+  ".js",
+  ".mjs",
+  ".css",
+  ".svg",
+  ".json",
+  ".map",
+  ".txt",
+  ".aff",
+  ".dic",
+]);
 /** Compressed copies of the built files, made once per file version. */
 const compressedCache = new Map<string, Buffer>();
 const brotli = promisify(brotliCompress),
