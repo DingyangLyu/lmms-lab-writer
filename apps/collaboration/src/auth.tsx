@@ -1,6 +1,8 @@
+import { ArrowsLeftRightIcon, AtIcon, RobotIcon, UsersThreeIcon } from "@phosphor-icons/react";
 import { type FormEvent, useEffect, useState } from "react";
 import type { PublicUser, Registered, RegistrationInfo } from "../shared/api";
 import { api } from "./api";
+import { AuthShowcase } from "./auth-showcase";
 import { useI18n } from "./i18n";
 import { LanguageSwitch } from "./language-switch";
 import { useAction } from "./use-action";
@@ -133,20 +135,47 @@ export function AuthPage({ onSignedIn }: { onSignedIn: (user: PublicUser) => voi
     : tab === "register" && canRegister && !waiting
       ? [t("auth.createAccount"), t("auth.createLead")]
       : [t("auth.welcome"), t("auth.welcomeLead")];
+  const features = [
+    [<UsersThreeIcon key="1" />, t("hero.f1")],
+    [<AtIcon key="2" />, t("hero.f2")],
+    [<RobotIcon key="3" />, t("hero.f3")],
+    [<ArrowsLeftRightIcon key="4" />, t("hero.f4")],
+  ] as const;
   return (
     <div className="signin">
-      <header className="signin-top">
-        <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
-        <LanguageSwitch />
-      </header>
-      <main className="signin-main">
-        <div className="signin-box">
-          <h1>{heading[0]}</h1>
-          <p className="signin-lead">{heading[1]}</p>
-          {body}
+      <aside className="signin-hero">
+        <div className="hero-glow" aria-hidden="true">
+          <span />
+          <span />
+          <span />
         </div>
-      </main>
-      <footer className="signin-foot">{t("signIn.storage")}</footer>
+        <img className="hero-logo" src="/logo-dark.svg" alt="Y-Writer" />
+        <h2 className="hero-title">{t("hero.title")}</h2>
+        <p className="hero-lead">{t("hero.lead")}</p>
+        <AuthShowcase />
+        <ul className="hero-features">
+          {features.map(([icon, text], i) => (
+            <li key={text} style={{ animationDelay: `${300 + i * 90}ms` }}>
+              {icon}
+              {text}
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <section className="signin-side">
+        <header className="signin-top">
+          <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
+          <LanguageSwitch />
+        </header>
+        <main className="signin-main">
+          <div className="signin-box" key={`${tab}:${waiting ?? ""}`}>
+            <h1>{heading[0]}</h1>
+            <p className="signin-lead">{heading[1]}</p>
+            {body}
+          </div>
+        </main>
+        <footer className="signin-foot">{t("signIn.storage")}</footer>
+      </section>
     </div>
   );
 }
