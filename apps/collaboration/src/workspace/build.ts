@@ -18,15 +18,16 @@ const CJK_ERROR = /Unicode character \S+ \(U\+(?:2E[89A-F]|[3-9][0-9A-F]|F[9A]|F
 const CJK_MISSING = /^Missing character: There is no [\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
 /**
  * The engine nobody chose, by the rules the desktop uses too (@lmms-lab/writing engine.ts):
- * the main file's `% !TEX program` line, else what its sources need. The server builds from
- * the project folder, so inputs are relative to it.
+ * the main file's `% !TEX program` line, else what its sources need. The server builds in the
+ * main file's folder, so inputs are relative to it.
  */
 function autoEngine(sources: SourceFile[], main: string): Engine {
   const read = (path: string) => sources.find((f) => f.path === path)?.content;
   const magic = magicEngine(read(main) ?? "");
   if (magic === "pdflatex" || magic === "xelatex" || magic === "lualatex") return magic;
+  const folder = main.includes("/") ? main.slice(0, main.lastIndexOf("/")) : "";
   // Tectonic is XeTeX underneath; `latexmk` leaves the choice to the sources.
-  return magic === "tectonic" ? "xelatex" : neededEngine(read, main);
+  return magic === "tectonic" ? "xelatex" : neededEngine(read, main, folder);
 }
 
 /** Server builds for the open project, PDF highlights and source <-> PDF jumps. */
@@ -46,7 +47,8 @@ export function useBuild(
     // Phones show the editor first; the PDF takes the whole screen when opened.
     [open, setOpen] = useState(() => !phone()),
     [main, setMain] = useState(""),
-    [engine, setEngine] = useState<Engine | "">(""),
+    // "auto": chosen by the sources at every build, as the desktop's targets do by default.
+    [engine, setEngine] = useState<Engine | "auto" | "">(""),
     [highlight, setHighlight] = useState<PdfRegion | null>(null),
     [reveal, setReveal] = useState<{ file: string; line: number } | null>(null);
   // A collaborator's newer build replaces the one shown here.
@@ -58,7 +60,9 @@ export function useBuild(
     main ||
     build?.main ||
     (texFiles.some((f) => f.path === "main.tex") ? "main.tex" : (texFiles[0]?.path ?? ""));
-  const chosenEngine: Engine = engine || build?.engine || autoEngine(sources, chosenMain);
+  const engineSetting: Engine | "auto" = engine || (build && !build.auto ? build.engine : "auto");
+  const chosenEngine: Engine =
+    engineSetting === "auto" ? autoEngine(sources, chosenMain) : engineSetting;
   const { file, files, editor, status, openFile } = ws;
   /** Open a source location: switch files if needed, then move the cursor once it loaded. */
   const openLocation = (path: string, line: number) => {
@@ -127,7 +131,11 @@ export function useBuild(
       setCompiling(true);
       try {
         setBuild(
-          await api<Build>(`${ws.prefix}/builds`, { main: chosenMain, engine: chosenEngine }),
+          await api<Build>(`${ws.prefix}/builds`, {
+            main: chosenMain,
+            engine: chosenEngine,
+            auto: engineSetting === "auto",
+          }),
         );
         setHighlight(null);
         if (show !== false) setOpen(true);
@@ -173,6 +181,7 @@ export function useBuild(
     chosenMain,
     setMain,
     chosenEngine,
+    engineSetting,
     setEngine,
     highlight,
     compile,

@@ -34,6 +34,21 @@ describe("TeX log", () => {
       { level: "warning", file: null, line: null, message: "There were undefined references." },
     ]);
   });
+  it("places errors from a main file in a folder, where TeX ran", () => {
+    const log = [
+      "./sec/intro.tex:3: Undefined control sequence.",
+      "l.3 \\bad",
+      "./main.tex:5: Missing $ inserted.",
+      "l.5 x",
+      "/tmp/build/macros.tex:2: Undefined control sequence.",
+      "l.2 \\worse",
+    ].join("\n");
+    expect(parseLog(log, "/tmp/build", "paper").map((i) => [i.file, i.line])).toEqual([
+      ["paper/sec/intro.tex", 3],
+      ["paper/main.tex", 5],
+      ["macros.tex", 2],
+    ]);
+  });
   it("sums up the characters XeTeX's font lacks in one warning", () => {
     const log = [
       "Missing character: There is no 电 (U+7535) in font [lmroman10-regular]:mapping=tex-text;!",
@@ -80,13 +95,14 @@ async function fakeLatexmk() {
   await writeFile(
     script,
     `#!/bin/sh
-for a; do main="$a"; done
+out=build-output
+for a; do main="$a"; case "$a" in -outdir=*) out="\${a#-outdir=}";; esac; done
 stem=$(basename "$main" .tex)
-mkdir -p build-output
+mkdir -p "$out"
 [ "$stem" = slow ] && sleep 1
-printf '%%PDF-1.4 fake\\n' > "build-output/$stem.pdf"
-gunzip -c "${fixture}" | sed "s#/tmp/writer-build-fixture#$(pwd -P)#g" | gzip > "build-output/$stem.synctex.gz"
-printf './main.tex:4: Undefined control sequence.\\nl.4 \\\\bad\\n' > "build-output/$stem.log"
+printf '%%PDF-1.4 fake\\n' > "$out/$stem.pdf"
+gunzip -c "${fixture}" | sed "s#/tmp/writer-build-fixture#$(pwd -P)#g" | gzip > "$out/$stem.synctex.gz"
+printf './main.tex:4: Undefined control sequence.\\nl.4 \\\\bad\\nran in %s with %s\\n' "$(pwd -P)" "$TEXINPUTS" > "$out/$stem.log"
 exit 12
 `,
   );
@@ -136,7 +152,12 @@ describe.skipIf(process.platform === "win32")("server builds", () => {
         s.cookie,
       );
       expect(build.status).toBe(200);
-      expect(build.data).toMatchObject({ status: "failed", pdf: true, main: "main.tex" });
+      expect(build.data).toMatchObject({
+        status: "failed",
+        pdf: true,
+        main: "main.tex",
+        auto: false,
+      });
       expect(build.data.issues[0]).toMatchObject({ file: "main.tex", line: 4 });
       const latest = await s.call(`${prefix}/builds/latest`, undefined, s.cookie);
       expect(latest.data.id).toBe(build.data.id);
@@ -169,6 +190,33 @@ describe.skipIf(process.platform === "win32")("server builds", () => {
       ]);
       expect(first.status).toBe(200);
       expect(second.status).toBe(409);
+    } finally {
+      await s.app.close();
+    }
+  });
+  it("builds a main file in a folder from that folder, the project's top folder next", async () => {
+    const s = await server(await fakeLatexmk());
+    try {
+      const prefix = `/projects/${s.project}`;
+      await s.call(`${prefix}/files`, { path: "paper/main.tex", content: "x" }, s.cookie);
+      const build = await s.call(
+        `${prefix}/builds`,
+        { main: "paper/main.tex", engine: "pdflatex", auto: true },
+        s.cookie,
+      );
+      expect(build.data).toMatchObject({ pdf: true, main: "paper/main.tex", auto: true });
+      // The next opening decides the engine again from the sources.
+      expect((await s.call(`${prefix}/builds/latest`, undefined, s.cookie)).data.auto).toBe(true);
+      expect(build.data.issues[0]).toMatchObject({ file: "paper/main.tex", line: 4 });
+      const ran = /ran in (\S+) with (\S+)/.exec(build.data.log);
+      expect(ran?.[1]).toMatch(/\/paper$/);
+      expect(ran?.[2]).toBe(`.:${ran?.[1]?.replace(/\/paper$/, "")}:`);
+      const forward = await s.call(
+        `${prefix}/builds/${build.data.id}/forward?file=paper/main.tex&line=5`,
+        undefined,
+        s.cookie,
+      );
+      expect(forward.data.page).toBe(1);
     } finally {
       await s.app.close();
     }

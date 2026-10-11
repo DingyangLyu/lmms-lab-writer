@@ -77,6 +77,7 @@ describe("tasks for the AI conversation", () => {
       id: "b1",
       main: "main.tex",
       engine: "xelatex",
+      auto: true,
       status: "failed",
       issues: [
         { level: "error", file: "main.tex", line: 34, message: "Undefined control sequence" },

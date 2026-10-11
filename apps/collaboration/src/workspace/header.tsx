@@ -73,6 +73,11 @@ export function VersionStatus({
   );
 }
 
+const ENGINE_NAMES: Record<Engine, string> = {
+  pdflatex: "pdfLaTeX",
+  xelatex: "XeLaTeX",
+  lualatex: "LuaLaTeX",
+};
 /** Compile, with the main file and the engine one click away (Overleaf's caret beside it). */
 export function CompileButton({ b, disabled }: { b: BuildState; disabled: boolean }) {
   const { t } = useI18n();
@@ -138,9 +143,12 @@ export function CompileButton({ b, disabled }: { b: BuildState; disabled: boolea
             </label>
             <Select
               id={`${id}-engine`}
-              value={b.chosenEngine}
-              onChange={(e) => b.setEngine(e.target.value as Engine)}
+              value={b.engineSetting}
+              onChange={(e) => b.setEngine(e.target.value as Engine | "auto")}
             >
+              <option value="auto">
+                {t("build.engineAuto", { engine: ENGINE_NAMES[b.chosenEngine] })}
+              </option>
               <option value="pdflatex">pdfLaTeX</option>
               <option value="xelatex">XeLaTeX</option>
               <option value="lualatex">LuaLaTeX</option>

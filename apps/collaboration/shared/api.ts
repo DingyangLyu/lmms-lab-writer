@@ -277,6 +277,8 @@ export type Build = {
   id: string;
   main: string;
   engine: Engine;
+  /** The engine was chosen by the sources (Automatic), so the next build chooses again. */
+  auto: boolean;
   status: "success" | "failed";
   issues: BuildIssue[];
   log: string;

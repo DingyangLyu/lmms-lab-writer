@@ -21,6 +21,7 @@ export const buildZh = {
   "build.chineseFont":
     "文档里有中文，但没有加载中文字体，PDF 里的中文是空白的。需要在导言区加入 \\usepackage{ctex}。",
   "build.chineseFix": "一键修复：加入 ctex 并用 XeLaTeX 编译",
+  "build.engineAuto": "自动（现在是 {engine}）",
   "build.chineseManual": "没找到 \\documentclass，请手动在导言区加入 \\usepackage{ctex}。",
   "build.askAi": "让 AI 修复",
   "build.askAiTitle": "把错误和日志发给右侧当前的 AI 对话，请它修改源文件",
@@ -48,6 +49,7 @@ export const buildEn: Record<keyof typeof buildZh, string> = {
   "build.chineseFont":
     "The document has Chinese text but loads no Chinese font, so it is blank in the PDF. Add \\usepackage{ctex} to the preamble.",
   "build.chineseFix": "Fix it: add ctex and build with XeLaTeX",
+  "build.engineAuto": "Automatic (now {engine})",
   "build.chineseManual":
     "No \\documentclass found; add \\usepackage{ctex} to the preamble yourself.",
   "build.askAi": "Ask AI to fix",

@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join, posix } from "node:path";
 import { sql } from "./db";
 import type { Store } from "./store";
 import { OUTPUT_DIR, parseSyncTex, type SyncTex } from "./synctex";
@@ -23,6 +23,7 @@ export type BuildSummary = {
   id: string;
   main: string;
   engine: Engine;
+  auto: boolean;
   status: "success" | "failed";
   issues: Issue[];
   log: string;
@@ -48,12 +49,30 @@ const flags: Record<Engine, string> = {
   lualatex: "-lualatex",
 };
 
+/** The folder of `main` within the project ("" at the top), where LaTeX runs. */
+export const mainFolder = (main: string) => {
+  const folder = posix.dirname(main);
+  return folder === "." ? "" : folder;
+};
 /**
  * latexmk on `main` in `dir`, outputs in OUTPUT_DIR: shell escape off, TeX file access limited to
  * the directory. Also builds the sample PDFs of templates.
+ *
+ * TeX runs in the main file's folder, as on the desktop and in any LaTeX editor, so its inputs
+ * are relative to it; the project's top folder comes next on the search paths, so projects
+ * written relative to it still build. Paranoid file access forbids `..`, hence the absolute
+ * output folder, allowed through TEXMFOUTPUT.
  */
 export function runLatexmk(dir: string, main: string, engine: Engine, options: CompileOptions) {
   const latexmk = options.latexmk || "latexmk";
+  const folder = mainFolder(main);
+  const nested = folder
+    ? {
+        TEXMFOUTPUT: dir,
+        TEXINPUTS: `.${delimiter}${dir}${delimiter}`,
+        BIBINPUTS: `.${delimiter}${dir}${delimiter}`,
+      }
+    : {};
   return new Promise<{ code: number | null; text: string; timedOut: boolean }>(
     (resolve, reject) => {
       const child = spawn(
@@ -66,11 +85,11 @@ export function runLatexmk(dir: string, main: string, engine: Engine, options: C
           "-synctex=1",
           "-f",
           flags[engine],
-          `-outdir=${OUTPUT_DIR}`,
-          main,
+          `-outdir=${folder ? join(dir, OUTPUT_DIR) : OUTPUT_DIR}`,
+          folder ? basename(main) : main,
         ],
         {
-          cwd: dir,
+          cwd: folder ? join(dir, folder) : dir,
           detached: process.platform !== "win32",
           stdio: ["ignore", "pipe", "pipe"],
           env: {
@@ -85,6 +104,7 @@ export function runLatexmk(dir: string, main: string, engine: Engine, options: C
             // A shared cache keeps LuaLaTeX from rebuilding its font database per build.
             TEXMFVAR: process.env.WRITER_TEXMFVAR || join(dir, "texmf-var"),
             ...(process.env.TEXMFHOME ? { TEXMFHOME: process.env.TEXMFHOME } : {}),
+            ...nested,
           },
         },
       );
@@ -126,8 +146,11 @@ export function runLatexmk(dir: string, main: string, engine: Engine, options: C
   );
 }
 
-/** file-line-error messages and LaTeX warnings from a TeX log. */
-export function parseLog(log: string, buildDir: string): Issue[] {
+/**
+ * file-line-error messages and LaTeX warnings from a TeX log. Relative paths in it are relative
+ * to `folder`, the main file's folder, where TeX ran.
+ */
+export function parseLog(log: string, buildDir: string, folder = ""): Issue[] {
   const issues: Issue[] = [];
   // Files outside the build directory (TeX's own classes and packages) are not editable.
   // Windows: Node gives D:\build, TeX may write D:/build or d:\build.
@@ -136,7 +159,8 @@ export function parseLog(log: string, buildDir: string): Issue[] {
     const file = slashes(raw);
     if (file.startsWith(`${root}/`)) return file.slice(root.length + 1);
     if (file.startsWith("/") || /^[A-Z]:\//.test(file)) return null;
-    return file.replace(/^(\.\/)+/, "");
+    const path = posix.normalize(posix.join(folder, file));
+    return path.startsWith("../") ? null : path;
   };
   const lines = log.split("\n");
   // XeTeX and LuaTeX note each character the font lacks; one warning says so for them all.
@@ -200,7 +224,7 @@ export class Compiler {
     if (next) next();
     else this.active--;
   }
-  async compile(project: string, author: string, main: string, engine: Engine) {
+  async compile(project: string, author: string, main: string, engine: Engine, auto = false) {
     safePath(main);
     if (!main.endsWith(".tex")) fail(400, "请选择 .tex 主文件");
     if (!engines.includes(engine)) fail(400, "不支持的编译器");
@@ -212,7 +236,7 @@ export class Compiler {
         fail(404, "项目中没有 {main}", { main });
       await this.slot();
       try {
-        return await this.build(project, author, main, engine, files);
+        return await this.build(project, author, main, engine, auto, files);
       } finally {
         this.release();
       }
@@ -225,6 +249,7 @@ export class Compiler {
     author: string,
     main: string,
     engine: Engine,
+    auto: boolean,
     files: Awaited<ReturnType<Store["projectFiles"]>>,
   ): Promise<BuildSummary> {
     const started = Date.now();
@@ -245,7 +270,7 @@ export class Compiler {
       const texLog = (await readFile(`${stem}.log`, "utf8").catch(() => "")) || output.text;
       const pdf = await read(`${stem}.pdf`, MAX_PDF);
       const synctex = pdf ? await read(`${stem}.synctex.gz`, MAX_SYNCTEX) : null;
-      const issues = parseLog(texLog, dir);
+      const issues = parseLog(texLog, dir, mainFolder(main));
       if (output.timedOut)
         issues.unshift({ level: "error", file: null, line: null, message: "编译超时，已停止" });
       else if (output.code !== 0 && !issues.some((i) => i.level === "error"))
@@ -259,6 +284,7 @@ export class Compiler {
         id: uid(),
         main,
         engine,
+        auto,
         status: output.code === 0 && !output.timedOut && pdf ? "success" : "failed",
         issues,
         log: `${texLog.slice(-MAX_LOG)}\n\n--- latexmk ---\n${output.text.slice(-20_000)}`,
@@ -269,8 +295,8 @@ export class Compiler {
       };
       await this.store.db.transaction(async (tx) => {
         await tx.run(
-          sql`INSERT INTO builds(id, project, author, main, engine, status, issues, log, pdf, synctex, build_dir, duration, created)
-              VALUES(${summary.id}, ${project}, ${author}, ${main}, ${engine}, ${summary.status},
+          sql`INSERT INTO builds(id, project, author, main, engine, auto, status, issues, log, pdf, synctex, build_dir, duration, created)
+              VALUES(${summary.id}, ${project}, ${author}, ${main}, ${engine}, ${auto}, ${summary.status},
                      ${JSON.stringify(issues)}, ${summary.log}, ${pdf}, ${synctex}, ${dir},
                      ${summary.duration}, ${summary.created})`,
         );
@@ -289,7 +315,7 @@ export class Compiler {
   }
   async latest(project: string) {
     const row = await this.store.db.row<BuildSummary & { issues: string; pdf: boolean }>(
-      sql`SELECT id, main, engine, status, issues, log, pdf IS NOT NULL AS pdf, duration, created, author
+      sql`SELECT id, main, engine, auto, status, issues, log, pdf IS NOT NULL AS pdf, duration, created, author
           FROM builds WHERE project=${project} ORDER BY created DESC, id DESC LIMIT 1`,
     );
     return row ? { ...row, issues: JSON.parse(row.issues) as Issue[] } : null;

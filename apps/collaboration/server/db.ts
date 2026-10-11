@@ -357,6 +357,9 @@ export const migrations: string[] = [
      created BIGINT NOT NULL,
      PRIMARY KEY (user_id, word)
    );`,
+  // 15: whether a build's engine was chosen by the project's sources (the desktop's "auto"),
+  // so the next build decides again rather than keeping it.
+  `ALTER TABLE builds ADD COLUMN auto BOOLEAN NOT NULL DEFAULT false;`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

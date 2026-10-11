@@ -22,6 +22,7 @@ export const buildRoutes = [
       ctx.user.id,
       str(body, "main", 240),
       engine,
+      body.auto === true,
     );
     ctx.collab.changed(ctx.project);
     return build;
