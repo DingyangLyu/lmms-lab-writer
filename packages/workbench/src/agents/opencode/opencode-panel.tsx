@@ -86,6 +86,19 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   }, [opencode.error]);
   const [preparing, setPreparing] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  /**
+   * The message just sent, shown at once: before OpenCode has it, the desktop saves the open
+   * files and records the project as it was before the AI's edits, which can take a moment.
+   */
+  const [pendingSend, setPendingSend] = useState<{
+    id: number;
+    text: string;
+    /** User messages OpenCode already had: the next one beyond these is this message. */
+    known: Set<string>;
+    sent: boolean;
+  } | null>(null);
+  const messagesRef = useRef(opencode.messages);
+  messagesRef.current = opencode.messages;
   const sendingRef = useRef(false);
   const cancelSendRef = useRef(false);
   const [attachedFiles, setAttachedFiles] = useState<ChatImageFile[]>([]);
@@ -390,15 +403,43 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   });
 
   const handleSend = useCallback(async () => {
-    if (sendingRef.current || (!input.trim() && !attachedFiles.length)) return;
+    if (!input.trim() && !attachedFiles.length) return;
+    if (sendingRef.current) {
+      setSendError(t("opencode.thePreviousMessageIsStillSending"));
+      return;
+    }
     const draft: ChatDraft = { raw: input, files: [...attachedFiles], selection: editorSelection };
+    const queue = (isWorking || bridgeWorking) && deliveryMode === "queue";
+    // The composer empties at once and the message shows as sending; it comes back if the
+    // send fails.
+    setInput((current) => (current === draft.raw ? "" : current));
+    setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
+    const pending = {
+      id: Date.now(),
+      text: draft.raw.trim() || draft.files.map((file) => file.filename).join(", "),
+      known: new Set(
+        messagesRef.current.filter((message) => message.role === "user").map(({ id }) => id),
+      ),
+      sent: false,
+    };
+    if (!queue) setPendingSend(pending);
     try {
-      if ((isWorking || bridgeWorking) && deliveryMode === "queue") await outbox.enqueue(draft);
-      else await transmit(draft, isWorking || bridgeWorking);
-      setInput((current) => (current === draft.raw ? "" : current));
-      setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
+      if (queue) await outbox.enqueue(draft);
+      else {
+        await transmit(draft, isWorking || bridgeWorking);
+        setPendingSend((current) =>
+          current?.id === pending.id ? { ...pending, sent: true } : current,
+        );
+      }
       if (draft.selection) onSelectionSent?.(draft.selection);
     } catch (cause) {
+      setPendingSend((current) => (current?.id === pending.id ? null : current));
+      // Anything typed since goes after it, so neither is lost.
+      setInput((current) => (current ? `${draft.raw}\n${current}` : draft.raw));
+      setAttachedFiles((current) => [
+        ...draft.files.filter((file) => !current.includes(file)),
+        ...current,
+      ]);
       setSendError(getOpenCodeErrorMessage(cause, t("opencode.sendingFailedTheMessageIsKept")));
     }
   }, [
@@ -416,6 +457,22 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   useEffect(() => {
     onWorkingChange?.(isWorking || preparing || bridgeWorking);
   }, [isWorking, preparing, bridgeWorking, onWorkingChange]);
+  // The sending message gives way to OpenCode's copy of it (or, failing that, a while later).
+  useEffect(() => {
+    if (!pendingSend?.sent) return;
+    const arrived = opencode.messages.some(
+      (message) => message.role === "user" && !pendingSend.known.has(message.id),
+    );
+    if (arrived) {
+      setPendingSend(null);
+      return;
+    }
+    const timer = setTimeout(
+      () => setPendingSend((current) => (current?.id === pendingSend.id ? null : current)),
+      20_000,
+    );
+    return () => clearTimeout(timer);
+  }, [pendingSend, opencode.messages]);
   useEffect(() => {
     let cancelled = false;
     let stop: (() => void) | undefined;
@@ -639,6 +696,19 @@ export const OpenCodePanel = memo(function OpenCodePanel({
               onFileClick={onFileClick}
               onAnswer={handleAnswer}
             />
+          )}
+          {pendingSend && (
+            <div
+              className="mt-6 border-l-4 border-accent/50 bg-background px-4 py-3"
+              aria-live="polite"
+            >
+              <p className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-words text-foreground/80">
+                {pendingSend.text}
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                {pendingSend.sent ? t("opencode.sentWaiting") : t("opencode.sending")}
+              </p>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>

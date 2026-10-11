@@ -370,13 +370,13 @@ export class OpenCodeClient {
         this.touchSession(msg.sessionID);
         const messages = this.store.messages.get(msg.sessionID) || [];
         const existingIndex = messages.findIndex((m) => m?.id === msg.id);
-        if (existingIndex >= 0) {
-          messages[existingIndex] = msg;
-        } else {
-          messages.push(msg);
-          messages.sort((a, b) => (a?.id || "").localeCompare(b?.id || ""));
-        }
-        this.store.messages.set(msg.sessionID, messages);
+        // A new array, so React state holding the old one sees the change.
+        this.store.messages.set(
+          msg.sessionID,
+          existingIndex >= 0
+            ? messages.map((m, index) => (index === existingIndex ? msg : m))
+            : [...messages, msg].sort((a, b) => (a?.id || "").localeCompare(b?.id || "")),
+        );
         break;
       }
 
