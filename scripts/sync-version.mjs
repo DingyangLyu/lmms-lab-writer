@@ -127,8 +127,14 @@ function updateJsonVersion(relPath, version, dryRun) {
     return { changed: false, previous: prev };
   }
 
-  parsed.version = version;
-  const next = `${JSON.stringify(parsed, null, 2)}${eol}`;
+  // Only the version string changes, so each file keeps its formatting (Biome's, which
+  // JSON.stringify would undo by spreading short arrays over lines).
+  const pattern = new RegExp(
+    `("version"\\s*:\\s*)"${String(prev).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+  );
+  const next = pattern.test(original)
+    ? original.replace(pattern, `$1"${version}"`)
+    : `${JSON.stringify({ ...parsed, version }, null, 2)}${eol}`;
 
   if (!dryRun) {
     writeText(relPath, next);
