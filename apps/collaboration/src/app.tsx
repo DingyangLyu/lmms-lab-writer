@@ -195,7 +195,7 @@ export function App() {
         onSignOut={() =>
           void api("/logout", {}).finally(() => {
             setUser(null);
-            enter("login");
+            enter("landing");
           })
         }
       />

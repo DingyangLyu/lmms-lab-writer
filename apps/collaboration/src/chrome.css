@@ -1258,3 +1258,214 @@ button.link:hover:not(:disabled) {
 .signin-home:disabled {
   cursor: default;
 }
+.signin-top-end {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.signin-back {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--yw-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.signin-back:hover {
+  background: var(--yw-accent-soft);
+}
+.hero-more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(94, 234, 212, 0.5);
+  background: none;
+  color: #5eead4;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: yw-rise 600ms 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-more:hover {
+  border-bottom-color: #5eead4;
+}
+@media (max-width: 960px) {
+  .signin-back {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+/* Which of the server's addresses to use (address-switch.tsx). */
+.addr-switch {
+  position: relative;
+}
+.addr-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--yw-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--yw-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.addr-button:hover,
+.addr-button[aria-expanded="true"] {
+  color: var(--yw-ink);
+}
+.addr-button svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.addr-button .addr-caret {
+  width: 11px;
+  height: 11px;
+}
+.addr-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(300px, calc(100vw - 24px));
+  padding: 6px;
+  border: 1px solid var(--yw-line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.14);
+  text-align: left;
+  animation: yw-rise 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.addr-head {
+  padding: 8px 10px 6px;
+  color: var(--yw-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.addr-menu a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 34px 9px 10px;
+  border-radius: 6px;
+  color: var(--yw-ink);
+  text-decoration: none;
+}
+.addr-menu a:hover,
+.addr-menu a:focus-visible {
+  background: var(--yw-canvas);
+}
+.addr-menu a.is-current {
+  background: var(--yw-accent-soft);
+}
+.addr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.addr-row strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.addr-host {
+  overflow: hidden;
+  color: var(--yw-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.addr-hint {
+  color: var(--yw-muted);
+  font-size: 12px;
+}
+.addr-check {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 15px;
+  height: 15px;
+  color: var(--yw-accent);
+  transform: translateY(-50%);
+}
+.addr-note {
+  margin-top: 4px;
+  padding: 8px 10px 6px;
+  border-top: 1px solid var(--yw-line);
+  color: var(--yw-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+/* On the homepage's dark bar. */
+.addr-switch.is-dark .addr-button {
+  height: auto;
+  padding: 5px 10px;
+  border-color: rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: none;
+  color: #93a4b8;
+  font-size: 12px;
+}
+.addr-switch.is-dark .addr-button:hover,
+.addr-switch.is-dark .addr-button[aria-expanded="true"] {
+  color: #fff;
+}
+.addr-switch.is-dark .addr-menu {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(12, 18, 25, 0.97);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+}
+.addr-switch.is-dark .addr-menu a {
+  color: #e6edf3;
+}
+.addr-switch.is-dark .addr-menu a:hover,
+.addr-switch.is-dark .addr-menu a:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+.addr-switch.is-dark .addr-menu a.is-current {
+  background: rgba(45, 212, 191, 0.12);
+}
+.addr-switch.is-dark .addr-head,
+.addr-switch.is-dark .addr-host,
+.addr-switch.is-dark .addr-hint,
+.addr-switch.is-dark .addr-note {
+  color: #93a4b8;
+}
+.addr-switch.is-dark .addr-note {
+  border-top-color: rgba(255, 255, 255, 0.09);
+}
+.addr-switch.is-dark .addr-check {
+  color: #2dd4bf;
+}
+@media (max-width: 960px) {
+  .signin-top .addr-button {
+    border-color: transparent;
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+@media (max-width: 560px) {
+  .addr-menu {
+    position: fixed;
+    top: 58px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+  .signin-top-end {
+    gap: 8px;
+  }
+  .signin-top-end > * {
+    flex: none;
+  }
+  .signin-back {
+    white-space: nowrap;
+  }
+}

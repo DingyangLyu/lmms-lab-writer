@@ -4,6 +4,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { brotliCompress, gzip, constants as zlibConstants } from "node:zlib";
 import type { Locale } from "@lmms-lab/i18n";
+import { parseAddresses } from "./addresses";
 import { Agents } from "./agents";
 import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
@@ -48,6 +49,8 @@ export type Options = {
   host?: string;
   port?: number;
   origin?: string;
+  /** The addresses offered to visitors, `name=url,…` (see addresses.ts). */
+  addresses?: string;
   /** Set when a reverse proxy (Caddy, nginx) forwards the requests. */
   trustProxy?: boolean;
   staticDirectory?: string;
@@ -189,6 +192,10 @@ export async function createWriterServer(options: Options) {
     .filter(Boolean);
   let origin = configured[0] ?? `http://127.0.0.1:${options.port ?? 8787}`;
   const trusted = () => (configured.length ? configured : [origin]);
+  const addresses = parseAddresses(options.addresses);
+  for (const { url } of addresses)
+    if (!configured.some((c) => c.toLowerCase() === url))
+      console.warn(`WRITER_ADDRESSES 中的 ${url} 不在 WRITER_ORIGIN 里，经这个地址可能无法登录。`);
   const collab = new Collaboration(store, () => origin, trusted);
   const agents = new Agents(store, collab, () => origin, options.sharedRunner, trusted);
   const services = {
@@ -205,6 +212,7 @@ export async function createWriterServer(options: Options) {
       render: { compile: options.compile, ghostscript: options.ghostscript },
     }),
     downloads: options.downloadsDirectory ?? null,
+    addresses,
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();

@@ -23,6 +23,8 @@ export type FoundUser = Person & { relation: "friend" | "incoming" | "outgoing" 
 export type Registered = { pending: true } | { pending: false; user: PublicUser };
 export type RegistrationMode = "approval" | "open" | "closed";
 export type RegistrationInfo = { mode: RegistrationMode; invite: boolean };
+/** One of the addresses the server is reached at (WRITER_ADDRESSES), as `https://host[:port]`. */
+export type ServerAddress = { name: string; url: string };
 export type Account = {
   id: string;
   username: string;

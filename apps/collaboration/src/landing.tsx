@@ -28,6 +28,7 @@ import {
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { AddressSwitch } from "./address-switch";
 import { useI18n } from "./i18n";
 import "./landing.css";
 
@@ -704,6 +705,7 @@ export function Landing({
           </button>
         </nav>
         <div className="ld-nav-end">
+          <AddressSwitch dark />
           <button
             type="button"
             className="ld-lang"

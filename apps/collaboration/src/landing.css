@@ -1783,6 +1783,12 @@
   }
 }
 @media (max-width: 560px) {
+  .ld-nav {
+    gap: 12px;
+  }
+  .ld-nav .ld-cta.small {
+    white-space: nowrap;
+  }
   .ld-nav .ld-ghost,
   .ld-lang {
     display: none;

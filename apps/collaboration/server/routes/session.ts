@@ -1,6 +1,6 @@
 /** Sign-in, invitations and the current session. */
 import { randomBytes } from "node:crypto";
-import type { Device, IssuedToken, PublicUser, Registered } from "../../shared/api";
+import type { Device, IssuedToken, PublicUser, Registered, ServerAddress } from "../../shared/api";
 import { bearer, cookie, deviceToken, passwordHash, session, verifyPassword } from "../auth";
 import { sql, uniqueViolation } from "../db";
 import { type Authed, type Context, route, str } from "../http";
@@ -68,6 +68,10 @@ export async function sessionRoutes() {
           mode: await registrationMode(ctx.store.db),
           invite: invite ? !!(await ctx.store.db.row(usableInvite(digest(invite)))) : false,
         };
+      }),
+      /** The server's addresses, for visitors to pick the one nearest them. */
+      route<Context>("GET", /^\/api\/addresses$/, async (ctx): Promise<ServerAddress[]> => {
+        return ctx.addresses;
       }),
       /** Self-registration: active at once with a site invitation or in open mode, else pending. */
       route<Context>("POST", /^\/api\/register$/, async (ctx): Promise<Registered> => {

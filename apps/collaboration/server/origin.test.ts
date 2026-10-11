@@ -1,5 +1,6 @@
 import { request } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
+import { parseAddresses } from "./addresses";
 import { createWriterServer } from "./app";
 import { allowedOrigin } from "./auth";
 
@@ -103,5 +104,41 @@ describe("request origins", () => {
       { days: 1, uses: 1 },
     );
     expect(invite.data.url).toMatch(new RegExp(`^http://10\\.100\\.147\\.57:${port}/\\?signup=`));
+  });
+
+  it("offers visitors the server's named addresses", async () => {
+    expect(
+      parseAddresses(" campus=http://10.100.147.57, china=http://101.200.37.236:18089/ ,"),
+    ).toEqual([
+      { name: "campus", url: "http://10.100.147.57" },
+      { name: "china", url: "http://101.200.37.236:18089" },
+    ]);
+    expect(parseAddresses(undefined)).toEqual([]);
+    for (const wrong of [
+      "http://10.100.147.57",
+      "=http://10.100.147.57",
+      "lab=ftp://10.100.147.57",
+      "lab=https://writer.example.com/app",
+      "lab=writer.example.com",
+    ])
+      expect(() => parseAddresses(wrong), wrong).toThrow(/WRITER_ADDRESSES/);
+
+    const app = await createWriterServer({
+      databaseUrl: "pglite:memory",
+      port: 0,
+      origin: "https://writer.example.com,http://10.100.147.57",
+      addresses: "global=https://writer.example.com,campus=http://10.100.147.57",
+      adminUser: "owner",
+      adminPassword: "test-password-1234",
+    });
+    servers.push(app);
+    const port = (app.server.address() as { port: number }).port;
+    // Asked before signing in, by the homepage.
+    const response = await fetch(`http://127.0.0.1:${port}/api/addresses`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      { name: "global", url: "https://writer.example.com" },
+      { name: "campus", url: "http://10.100.147.57" },
+    ]);
   });
 });

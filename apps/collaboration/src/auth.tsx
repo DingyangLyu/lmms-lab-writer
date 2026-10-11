@@ -1,6 +1,7 @@
 import { ArrowsLeftRightIcon, AtIcon, RobotIcon, UsersThreeIcon } from "@phosphor-icons/react";
 import { type FormEvent, useEffect, useState } from "react";
 import type { PublicUser, Registered, RegistrationInfo } from "../shared/api";
+import { AddressSwitch } from "./address-switch";
 import { api } from "./api";
 import { AuthShowcase } from "./auth-showcase";
 import { useI18n } from "./i18n";
@@ -164,6 +165,11 @@ export function AuthPage({
         </button>
         <h2 className="hero-title">{t("hero.title")}</h2>
         <p className="hero-lead">{t("hero.lead")}</p>
+        {onHome && (
+          <button type="button" className="hero-more" onClick={onHome}>
+            {t("auth.more")} →
+          </button>
+        )}
         <AuthShowcase />
         <ul className="hero-features">
           {features.map(([icon, text], i) => (
@@ -179,7 +185,15 @@ export function AuthPage({
           <button type="button" className="signin-home" onClick={onHome} disabled={!onHome}>
             <img className="signin-logo" src="/logo-light.svg" alt="Y-Writer" />
           </button>
-          <LanguageSwitch />
+          <span className="signin-top-end">
+            {onHome && (
+              <button type="button" className="signin-back" onClick={onHome}>
+                ← {t("auth.home")}
+              </button>
+            )}
+            <AddressSwitch />
+            <LanguageSwitch />
+          </span>
         </header>
         <main className="signin-main">
           <div className="signin-box" key={`${tab}:${waiting ?? ""}`}>

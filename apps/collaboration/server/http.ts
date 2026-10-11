@@ -1,5 +1,6 @@
 /** Request context, body parsing and a small method + path router for the HTTP API. */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ServerAddress } from "../shared/api";
 import { allowedOrigin } from "./auth";
 import type { Collaboration } from "./collaboration";
 import type { Compiler } from "./compile";
@@ -87,6 +88,8 @@ export type Services = {
   templates: TemplateLibrary;
   /** Where the desktop installers members may download are kept, if anywhere. */
   downloads: string | null;
+  /** The addresses offered to visitors (WRITER_ADDRESSES). */
+  addresses: ServerAddress[];
 };
 export type Context = Services & {
   req: IncomingMessage;

@@ -113,6 +113,8 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 - 浏览器开着全局代理时，国内地址也会绕到国外，访问 Writer 前请把这些地址设为直连；
 - 网页的脚本和样式已压缩（Brotli/gzip）并长期缓存，第一次打开之后再进只需下载很少的数据。
 
+首页和登录页右上角有“线路”切换，列出 `server.env` 里 `WRITER_ADDRESSES=campus=http://10.100.147.57,china=http://101.200.37.236:18089,global=https://writer.desire-drive.com` 的三个地址（内网、国内、海外），访问者按自己所在的位置换到更快的那个。切换时停在同一页（登录、注册表单和邀请链接都保留）；各地址的登录状态互不相通，换过去可能要重新登录。改地址后重启 Writer Server。
+
 ## 常见问题
 
 - **IP 变了**：地址由 DHCP 分配。用新 IP 打开网页可以直接登录；邀请链接用的是 `WRITER_ORIGIN` 的第一个地址，改成新地址并重启 Writer Server 即可。能管理路由器时为这台电脑做 DHCP 地址保留。用域名访问（经反向代理）时必须把域名写进 `WRITER_ORIGIN`。
