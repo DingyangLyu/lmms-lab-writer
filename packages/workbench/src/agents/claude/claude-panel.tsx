@@ -23,7 +23,7 @@ import { shouldSendOnEnter } from "../codex/composer-keys";
 import type { HarnessLifecycle } from "../harness/types";
 import { useAutoReconnect } from "../harness/use-auto-reconnect";
 import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
-import { useBridge } from "../platform";
+import { useAgentPlatform, useBridge } from "../platform";
 import {
   type EditorSelectionContext,
   selectionRangeLabel,
@@ -144,6 +144,7 @@ export function ClaudePanel({
     },
     [directory],
   );
+  const platform = useAgentPlatform();
   const bridge = useBridge(
     "claude",
     sessionId,
@@ -320,7 +321,7 @@ export function ClaudePanel({
       setError("");
       try {
         await onBeforeSend(draft.selection);
-        const payload = await prepareChatFiles(directory, draft.raw, draft.files);
+        const payload = await prepareChatFiles(directory, draft.raw, draft.files, platform);
         if (sessionRef.current !== expectedSession)
           throw new Error(t("claude.theConversationChangedTheMessageWasNotSe"));
         let id = expectedSession;
@@ -374,6 +375,7 @@ export function ClaudePanel({
       refresh,
       t,
       backend,
+      platform,
     ],
   );
   const outbox = useChatOutbox({

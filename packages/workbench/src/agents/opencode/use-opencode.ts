@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { workbenchI18n as i18n } from "../../i18n";
-import { agentPlatform } from "../platform";
+import { useAgentPlatform } from "../platform";
 import {
   createOpenCodeClient,
   getOpenCodeErrorMessage,
@@ -132,6 +132,10 @@ function isUnsupportedModelError(message: string): boolean {
 }
 
 export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn {
+  // Read through a ref: the send callback must not change identity with it.
+  const platform = useAgentPlatform();
+  const platformRef = useRef(platform);
+  platformRef.current = platform;
   const {
     baseUrl = DEFAULT_BASE_URL,
     directory,
@@ -864,7 +868,7 @@ export function useOpenCode(options: UseOpenCodeOptions = {}): UseOpenCodeReturn
           retriedUnsupportedModel: false,
         };
         if (directory && !steer)
-          await agentPlatform().beforeAgentTurn?.(directory, `opencode:${sessionId}`);
+          await platformRef.current.beforeAgentTurn?.(directory, `opencode:${sessionId}`);
         await client.chat(sessionId, content, {
           agent: agentToUse,
           model: selectedModel

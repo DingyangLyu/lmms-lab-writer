@@ -21,6 +21,7 @@ import {
 import { useHarnessWorkspace } from "../harness/use-workspace";
 import { OpenCodeClient } from "../opencode/client";
 import { OpenCodePanel } from "../opencode/opencode-panel";
+import { type AgentPlatform, AgentPlatformScope, agentPlatform } from "../platform";
 import type { EditorSelectionContext } from "../selection-context";
 import {
   type AgentLink,
@@ -77,6 +78,22 @@ export function relayProjectPath(reference: string, project: string) {
   return path.startsWith("/") || /^[A-Za-z]:/.test(path) ? null : { path, line: target.line };
 }
 
+/**
+ * The app's platform without what works only on a local folder: the conversations run in the
+ * server's copy, which the desktop's bridge, attachment copies and review baseline cannot
+ * reach. Images still attach (they travel with the message); other files are refused, as on
+ * the web.
+ */
+export function serverPlatform(app: AgentPlatform): AgentPlatform {
+  return {
+    openExternal: app.openExternal,
+    fileSource: app.fileSource,
+    choosePaths: app.choosePaths,
+    onDropPaths: app.onDropPaths,
+    readImagePath: app.readImagePath,
+  };
+}
+
 export function RelayAgentsPanel({
   link,
   project,
@@ -120,6 +137,7 @@ export function RelayAgentsPanel({
     }),
     [link],
   );
+  const platform = useMemo(() => serverPlatform(agentPlatform()), []);
   const [offered, setOffered] = useState<string[]>([]);
   useEffect(() => {
     const stop = link.onStatus((status) => setOffered(status.harnesses));
@@ -223,50 +241,52 @@ export function RelayAgentsPanel({
             },
           };
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {harnesses.length > 1 && (
-        <div className="flex shrink-0 items-center border-b border-border px-2 py-1.5">
-          <HarnessButtons
-            workspace={workspace}
-            harnesses={harnesses}
-            onChoose={(backend) => workspace.focus(backend)}
-          />
-        </div>
-      )}
-      <HarnessWorkspace
-        workspace={workspace}
-        visible={visible}
-        preferredBackend={first ?? "codex"}
-        harnesses={harnesses}
-        panels={PANELS}
-        panelProps={{
-          codex: { backend: backends.codex },
-          claude: { backend: backends.claude },
-          opencode: {
-            transport: backends.opencode,
-            baseUrl: OPENCODE_RELAY,
-            autoConnect: true,
-            daemonStatus: "running",
-            onShare: (id: string, shared: boolean) =>
-              link.request("thread.share", { threadId: id, shared }),
-          },
-        }}
-        history={history}
-        onBackendChange={() => {}}
-        shared={{
-          directory: project,
-          onFileClick: (reference) => {
-            const target = relayProjectPath(reference, project);
-            if (target) onOpenFile(target.path, target.line ?? 1);
-            else onError(i18n.t("relay.notInProject", { path: reference }));
-          },
-          editorSelection: selection?.project === project ? selection : null,
-          onClearSelection: () => onSelectionDone(null),
-          onSelectionSent: (sent) => onSelectionDone(sent),
-          // The runner copies the server's text before each turn.
-          onBeforeSend,
-        }}
-      />
-    </div>
+    <AgentPlatformScope platform={platform}>
+      <div className="flex h-full min-h-0 flex-col">
+        {harnesses.length > 1 && (
+          <div className="flex shrink-0 items-center border-b border-border px-2 py-1.5">
+            <HarnessButtons
+              workspace={workspace}
+              harnesses={harnesses}
+              onChoose={(backend) => workspace.focus(backend)}
+            />
+          </div>
+        )}
+        <HarnessWorkspace
+          workspace={workspace}
+          visible={visible}
+          preferredBackend={first ?? "codex"}
+          harnesses={harnesses}
+          panels={PANELS}
+          panelProps={{
+            codex: { backend: backends.codex },
+            claude: { backend: backends.claude },
+            opencode: {
+              transport: backends.opencode,
+              baseUrl: OPENCODE_RELAY,
+              autoConnect: true,
+              daemonStatus: "running",
+              onShare: (id: string, shared: boolean) =>
+                link.request("thread.share", { threadId: id, shared }),
+            },
+          }}
+          history={history}
+          onBackendChange={() => {}}
+          shared={{
+            directory: project,
+            onFileClick: (reference) => {
+              const target = relayProjectPath(reference, project);
+              if (target) onOpenFile(target.path, target.line ?? 1);
+              else onError(i18n.t("relay.notInProject", { path: reference }));
+            },
+            editorSelection: selection?.project === project ? selection : null,
+            onClearSelection: () => onSelectionDone(null),
+            onSelectionSent: (sent) => onSelectionDone(sent),
+            // The runner copies the server's text before each turn.
+            onBeforeSend,
+          }}
+        />
+      </div>
+    </AgentPlatformScope>
   );
 }

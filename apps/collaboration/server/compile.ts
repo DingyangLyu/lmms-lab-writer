@@ -72,6 +72,8 @@ export function runLatexmk(dir: string, main: string, engine: Engine, options: C
         TEXMFOUTPUT: dir,
         TEXINPUTS: `.${delimiter}${dir}${delimiter}`,
         BIBINPUTS: `.${delimiter}${dir}${delimiter}`,
+        // A bibliography style kept in the top folder, as the desktop finds it too.
+        BSTINPUTS: `.${delimiter}${dir}${delimiter}`,
       }
     : {};
   return new Promise<{ code: number | null; text: string; timedOut: boolean }>(

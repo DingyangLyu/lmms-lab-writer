@@ -5,28 +5,52 @@
  * edits into the server project, which the folder sync brings back). Remembered per folder.
  */
 import { type AgentLink, type AgentStatus, RelayAgentsPanel } from "@lmms-lab/workbench/agents";
-import { type ComponentProps, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { listAccounts, type SyncLink } from "@/lib/collab/accounts";
 import { desktopAgentLink } from "@/lib/collab/agent-link";
 import { useI18n } from "@/lib/i18n";
 
-type Location = "local" | "server";
+export type AgentLocationChoice = "local" | "server";
 const KEY = "writer-agent-location:";
-const saved = (project: string): Location => {
+const saved = (project: string): AgentLocationChoice => {
   try {
     return localStorage.getItem(KEY + project) === "server" ? "server" : "local";
   } catch {
     return "local";
   }
 };
+/** Where this folder's AI runs, remembered per folder (the page routes tasks by it). */
+export function useAgentLocation(projectPath: string | null) {
+  const [location, setLocation] = useState<AgentLocationChoice>("local");
+  useEffect(() => setLocation(projectPath ? saved(projectPath) : "local"), [projectPath]);
+  const choose = useCallback(
+    (next: AgentLocationChoice) => {
+      setLocation(next);
+      try {
+        if (projectPath) localStorage.setItem(KEY + projectPath, next);
+      } catch {}
+    },
+    [projectPath],
+  );
+  return [location, choose] as const;
+}
 
 export function AgentLocation({
-  projectPath,
+  location,
+  onLocation: choose,
   link,
   local,
   server,
 }: {
-  projectPath: string | null;
+  location: AgentLocationChoice;
+  onLocation: (location: AgentLocationChoice) => void;
   link: SyncLink | null;
   /** The column with this computer's agents. */
   local: ReactNode;
@@ -34,14 +58,6 @@ export function AgentLocation({
   server: Omit<ComponentProps<typeof RelayAgentsPanel>, "link" | "project" | "workspaceKey">;
 }) {
   const { t } = useI18n();
-  const [location, setLocation] = useState<Location>("local");
-  useEffect(() => setLocation(projectPath ? saved(projectPath) : "local"), [projectPath]);
-  const choose = (next: Location) => {
-    setLocation(next);
-    try {
-      if (projectPath) localStorage.setItem(KEY + projectPath, next);
-    } catch {}
-  };
   // The member this computer is signed in as on that server, for "your turn is running".
   const [me, setMe] = useState<string | null | undefined>(undefined);
   useEffect(() => {

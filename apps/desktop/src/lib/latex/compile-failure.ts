@@ -50,3 +50,44 @@ export function compileFailurePrompt({
     "Please inspect the relevant .tex, .bib, .sty, and .cls files, make the minimal fix needed to compile, rerun the local compilation, and summarize what changed.",
   ].join("\n");
 }
+
+/**
+ * The same handoff for the AI on the server (a folder linked to a server project): it works
+ * in the server's copy, so the message names the project's files, not this computer's paths,
+ * and asks for edits rather than a local rebuild.
+ */
+export function serverCompileFailurePrompt({
+  target,
+  result,
+  where,
+  capturedAt = new Date(),
+}: {
+  target: BuildTarget;
+  result: TargetBuildResult;
+  /** Where the build ran: on the server, or with this computer's TeX. */
+  where: "server" | "local";
+  capturedAt?: Date;
+}) {
+  return [
+    where === "server"
+      ? "The LaTeX build on the server failed. Please diagnose and fix this project."
+      : "The LaTeX build on a collaborator's computer failed. Please diagnose and fix this project.",
+    "",
+    `Captured at: ${capturedAt.toISOString()}`,
+    `Main file: ${target.mainFile}`,
+    `Engine: ${result.engine}`,
+    `Reported error: ${result.error || "compilation failed"}`,
+    "",
+    where === "server" ? "Errors and warnings:" : "Compiler output (tail):",
+    "~~~text",
+    tail(result.output.trim(), OUTPUT_LIMIT) || "(No output was captured.)",
+    "~~~",
+    "",
+    "LaTeX log (tail):",
+    "~~~log",
+    result.log?.trim() ? tail(result.log, LOG_LIMIT) : "(The compiler did not write a log.)",
+    "~~~",
+    "",
+    "Inspect the relevant .tex, .bib, .sty and .cls files of the project, make the minimal fix needed to compile, and summarize what changed. Your edits reach the shared project, and the user rebuilds.",
+  ].join("\n");
+}

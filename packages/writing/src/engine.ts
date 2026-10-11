@@ -107,7 +107,8 @@ function normalize(path: string): string | null {
 }
 /**
  * The engine for building `main`, given a reader of project files by path (from the project
- * root) and the directory LaTeX runs in, which `\input` paths are relative to.
+ * root) and the directory LaTeX runs in: `\input` paths are looked for there, then in the
+ * project's top folder, as TeX does with the search path both builds give it.
  */
 export function texEngine(
   read: (path: string) => string | null | undefined,
@@ -149,10 +150,13 @@ export function neededEngine(
     const source = withoutComments(content);
     for (const name of [...arguments_(source, "\\input"), ...arguments_(source, "\\include")]) {
       const file = name.trim();
-      for (const candidate of file.endsWith(".tex") ? [file] : [`${file}.tex`, file]) {
-        const resolved = normalize(base ? `${base}/${candidate}` : candidate);
-        if (resolved) pending.push(resolved);
-      }
+      // Where TeX finds it: name.tex, then name, each in the folder LaTeX runs in and then
+      // the project's top folder (both builds put it next on TeX's search path).
+      const found = (file.endsWith(".tex") ? [file] : [`${file}.tex`, file])
+        .flatMap((candidate) => [base ? `${base}/${candidate}` : candidate, candidate])
+        .map(normalize)
+        .find((path) => path !== null && read(path) != null);
+      if (found) pending.push(found);
     }
   }
   return need === 3 ? "lualatex" : need ? "xelatex" : "pdflatex";

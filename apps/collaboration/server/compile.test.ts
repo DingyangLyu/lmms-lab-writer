@@ -102,7 +102,7 @@ mkdir -p "$out"
 [ "$stem" = slow ] && sleep 1
 printf '%%PDF-1.4 fake\\n' > "$out/$stem.pdf"
 gunzip -c "${fixture}" | sed "s#/tmp/writer-build-fixture#$(pwd -P)#g" | gzip > "$out/$stem.synctex.gz"
-printf './main.tex:4: Undefined control sequence.\\nl.4 \\\\bad\\nran in %s with %s\\n' "$(pwd -P)" "$TEXINPUTS" > "$out/$stem.log"
+printf './main.tex:4: Undefined control sequence.\\nl.4 \\\\bad\\nran in %s with %s and %s\\n' "$(pwd -P)" "$TEXINPUTS" "$BSTINPUTS" > "$out/$stem.log"
 exit 12
 `,
   );
@@ -208,9 +208,10 @@ describe.skipIf(process.platform === "win32")("server builds", () => {
       // The next opening decides the engine again from the sources.
       expect((await s.call(`${prefix}/builds/latest`, undefined, s.cookie)).data.auto).toBe(true);
       expect(build.data.issues[0]).toMatchObject({ file: "paper/main.tex", line: 4 });
-      const ran = /ran in (\S+) with (\S+)/.exec(build.data.log);
+      const ran = /ran in (\S+) with (\S+) and (\S+)/.exec(build.data.log);
       expect(ran?.[1]).toMatch(/\/paper$/);
       expect(ran?.[2]).toBe(`.:${ran?.[1]?.replace(/\/paper$/, "")}:`);
+      expect(ran?.[3]).toBe(ran?.[2]);
       const forward = await s.call(
         `${prefix}/builds/${build.data.id}/forward?file=paper/main.tex&line=5`,
         undefined,

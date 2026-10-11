@@ -76,6 +76,28 @@ async function setup(user = "owner") {
 }
 
 describe("desktop folder sync against the real server", () => {
+  it("flushes only once the server has the folder's edits", async () => {
+    const s = await setup();
+    await s.api("/files", { path: "main.tex", content: "one\n" });
+    const sync = await s.engine();
+    await until(async () => (await s.local("main.tex")) === "one\n", "clone");
+    await s.put("main.tex", "two\n");
+    await sync.flush();
+    // No waiting: flush returned because the server had it.
+    expect((await s.remote("main.tex"))?.content).toBe("two\n");
+    // A folder that cannot reach its server does not pretend to be up to date.
+    const unreachable = new FolderSync({
+      project: s.f.project,
+      transport: nodeTransport("http://127.0.0.1:9", await s.token("owner")),
+      folder: nodeFolder(s.dir),
+      store: jsonFileStore(join(s.dir, ".writer", "other.json")),
+      textDelay: 20,
+      rescanInterval: 0,
+    });
+    stops.push(() => unreachable.stop());
+    void unreachable.start().catch(() => {});
+    await expect(unreachable.flush(600)).rejects.toThrow(/sync/);
+  });
   it("records a folder's edits as tracked changes while tracking, and decides them", async () => {
     const s = await setup();
     const id = (await s.api("/files", { path: "main.tex", content: "The cat sat on the mat.\n" }))

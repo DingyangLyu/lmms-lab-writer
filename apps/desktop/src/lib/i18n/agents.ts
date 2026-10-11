@@ -52,6 +52,8 @@ export const agentsZh = {
   "agentLocation.offline": "执行器未连接",
   "agentLocation.signIn": "请先在协作设置里登录 {server}，才能使用服务器上的 AI。",
   "agentLocation.notSynced": "这个文件夹还没和服务器同步完，稍后再发送。",
+  "agentLocation.buildFailureSent": "编译失败，日志已交给服务器上的 AI。",
+  "agentLocation.commentsRunHere": "本机批注要用本机 AI 处理，已切换到“本机”。",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "opencode.retry": "Retry",
@@ -114,4 +116,7 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
     "Sign in to {server} under Collaboration settings to use the server's AI.",
   "agentLocation.notSynced":
     "This folder has not finished syncing with the server; send again shortly.",
+  "agentLocation.buildFailureSent": "The build failed; its log went to the AI on the server.",
+  "agentLocation.commentsRunHere":
+    "This folder's comments are handled by this computer's AI; switched to This computer.",
 };

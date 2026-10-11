@@ -210,5 +210,26 @@
       "paper/sec/intro.tex": "中文"
     },
     "engine": "xelatex"
+  },
+  {
+    "name": "nested main inputs a preamble at the project's top",
+    "main": "paper/main.tex",
+    "base": "paper",
+    "files": {
+      "paper/main.tex": "\\documentclass{article}\n\\input{preamble}\n\\begin{document}\n\\end{document}\n",
+      "preamble.tex": "\\usepackage{ctex}\n"
+    },
+    "engine": "xelatex"
+  },
+  {
+    "name": "the main file's folder comes before the top folder",
+    "main": "paper/main.tex",
+    "base": "paper",
+    "files": {
+      "paper/main.tex": "\\documentclass{article}\n\\input{preamble}\n\\begin{document}\n\\end{document}\n",
+      "paper/preamble.tex": "\\usepackage{amsmath}\n",
+      "preamble.tex": "\\usepackage{fontspec}\n"
+    },
+    "engine": "pdflatex"
   }
 ]

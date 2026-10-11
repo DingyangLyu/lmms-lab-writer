@@ -284,6 +284,37 @@ export class FolderSync {
     throw new Error("sync did not settle");
   }
 
+  /**
+   * Uploads what changed in the folder now and resolves once the server has it: connected,
+   * every text file joined, nothing queued, scheduled or unacknowledged. Throws when that
+   * cannot happen in time (offline, paused, signed out, still connecting), so work that needs
+   * the server's copy to match the folder (an AI turn or a build there) does not start on an
+   * old one. `idle()` alone would also return while the connection is still being made.
+   */
+  async flush(timeout = 15_000) {
+    const until = Date.now() + timeout;
+    this.notifyLocal();
+    for (;;) {
+      await this.queue;
+      const joined = [...this.tracked.values()].every((t) => t.binary || t.joined);
+      if (
+        this.connected &&
+        this.state === "synced" &&
+        joined &&
+        !this.busy &&
+        !this.timers.has("scan") &&
+        !this.timers.has("text") &&
+        !this.dirty.size &&
+        !this.unacked.size
+      )
+        return;
+      if (["paused", "signed-out", "stopped"].includes(this.state))
+        throw new Error(`sync ${this.state}`);
+      if (Date.now() > until) throw new Error(`sync not settled (${this.state})`);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
   /** A text file's tracked changes, at their places in its shared text (and that text). */
   trackedChanges(path: string): { text: string; changes: ShownChange[] } | null {
     const t = this.byPath(path);

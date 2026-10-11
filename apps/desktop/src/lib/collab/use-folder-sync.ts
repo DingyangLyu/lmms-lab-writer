@@ -194,12 +194,18 @@ export function useFolderSync(projectPath: string | null) {
     },
     [linkTo],
   );
-  /** Uploads local changes now and waits until the server has them (before a server AI turn). */
+  /**
+   * Uploads local changes now and resolves once the server has them (before a server AI turn,
+   * build or version); throws while the sync is not connected and settled.
+   */
   const flush = useCallback(async () => {
     const sync = engine.current;
-    if (!sync) return;
-    sync.notifyLocal();
-    await sync.idle();
+    if (!sync) throw new Error(say.current.t("agentLocation.notSynced"));
+    try {
+      await sync.flush();
+    } catch {
+      throw new Error(say.current.t("agentLocation.notSynced"));
+    }
   }, []);
   const resolveMissing = useCallback((choice: "restore" | "delete") => {
     engine.current?.resolveMissing(choice);

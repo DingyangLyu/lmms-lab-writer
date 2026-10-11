@@ -29,7 +29,7 @@ import { conversationTitle } from "../context";
 import type { HarnessLifecycle } from "../harness/types";
 import { useAutoReconnect } from "../harness/use-auto-reconnect";
 import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
-import { agentPlatform, useBridge } from "../platform";
+import { useAgentPlatform, useBridge } from "../platform";
 import {
   type EditorSelectionContext,
   selectionRangeLabel,
@@ -162,6 +162,7 @@ export function CodexPanel({
 
   const [permissionMode, setPermissionMode] = useState<CodexPermissionMode>("askForApproval");
   const currentThread = threads.find((t) => t.id === threadId);
+  const platform = useAgentPlatform();
   const bridge = useBridge(
     "codex",
     threadId,
@@ -180,9 +181,12 @@ export function CodexPanel({
   useEffect(() => {
     onWorkingChange?.(busy || bridgeWorking);
   }, [busy, bridgeWorking, onWorkingChange]);
-  const handleOpenExternal = useCallback((url: string) => {
-    void agentPlatform().openExternal(url);
-  }, []);
+  const handleOpenExternal = useCallback(
+    (url: string) => {
+      void platform.openExternal(url);
+    },
+    [platform.openExternal],
+  );
   const threadIdRef = useRef<string | null>(lifecycle.initialSessionId ?? null);
   const permissionModeRef = useRef<CodexPermissionMode>("askForApproval");
   const sendingRef = useRef(false);
@@ -431,7 +435,7 @@ export function CodexPanel({
       let localId: string | undefined;
       try {
         await onBeforeSend?.(draft.selection);
-        const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files);
+        const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files, platform);
         if (threadIdRef.current !== expectedThread)
           throw new Error(t("codex.theConversationChangedTheMessageWasNotSe"));
         let id = expectedThread;
@@ -503,6 +507,7 @@ export function CodexPanel({
       bridge.register,
       t,
       backend,
+      platform,
     ],
   );
   const outbox = useChatOutbox({

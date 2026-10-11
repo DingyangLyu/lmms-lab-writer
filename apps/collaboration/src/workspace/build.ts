@@ -121,10 +121,11 @@ export function useBuild(
       setCompiling(true);
       try {
         setBuild(
+          // Automatic: the server chooses from the text it builds, which the page's copy of
+          // the sources may lag behind.
           await api<Build>(`${ws.prefix}/builds`, {
             main: chosenMain,
-            engine: chosenEngine,
-            auto: engineSetting === "auto",
+            engine: engineSetting === "auto" ? "auto" : chosenEngine,
           }),
         );
         setHighlight(null);

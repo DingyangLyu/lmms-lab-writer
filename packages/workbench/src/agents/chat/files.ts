@@ -25,11 +25,12 @@ export async function prepareChatFiles(
   project: string | undefined,
   text: string,
   files: ChatImageFile[],
+  platform = agentPlatform(),
 ) {
   const documents = files.filter(isDocument);
   if (documents.length) {
     if (!project) throw new Error(i18n.t("msg.openAProjectFirst"));
-    const validate = agentPlatform().validateDocuments;
+    const validate = platform.validateDocuments;
     if (!validate) throw new Error(i18n.t("msg.onlyImagesCanBeAttachedHere"));
     await validate(project, documents);
   }
@@ -41,9 +42,10 @@ export async function prepareChatFiles(
 export async function importBrowserDocument(
   project: string | undefined,
   file: File,
+  platform = agentPlatform(),
 ): Promise<ChatImageFile> {
   if (!project) throw new Error(i18n.t("msg.openAProjectBeforeAddingFiles"));
-  const importData = agentPlatform().importDocumentData;
+  const importData = platform.importDocumentData;
   if (!importData) throw new Error(i18n.t("msg.onlyImagesCanBeAttachedHere"));
   if (file.size > MAX_FILE_BYTES) throw new Error(i18n.t("msg.eachFileMustBe25MbOrSmaller"));
   const data = await new Promise<string>((resolve, reject) => {

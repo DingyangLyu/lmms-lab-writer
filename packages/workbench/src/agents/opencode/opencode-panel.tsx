@@ -12,7 +12,7 @@ import { ShareToggle } from "../chat/share-toggle";
 import { useChatOutbox } from "../chat/use-chat-outbox";
 import { useIdleTranscript } from "../chat/use-idle-transcript";
 import { usePanelLifecycle } from "../harness/use-panel-lifecycle";
-import { agentPlatform, useBridge } from "../platform";
+import { useAgentPlatform, useBridge } from "../platform";
 import { withEditorSelection } from "../selection-context";
 import { getOpenCodeErrorMessage } from "./client";
 import { PlusIcon } from "./icons";
@@ -279,6 +279,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
     [opencode],
   );
 
+  const platform = useAgentPlatform();
   const transmit = useCallback(
     async (draft: ChatDraft, steer = false) => {
       if (!opencode.ready) throw new Error(t("opencode.loadingTheConnectionOrHistorySendAgainIn"));
@@ -290,7 +291,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       setSendError(null);
       try {
         await onBeforeSend?.(draft.selection);
-        const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files);
+        const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files, platform);
         if (cancelSendRef.current || expectedSession !== sessionRef.current)
           throw new Error(t("opencode.sendingWasCancelledOrTheConversationChan"));
         if (!expectedSession) {
@@ -311,7 +312,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
         setPreparing(false);
       }
     },
-    [opencode, onBeforeSend, scrollToBottom, directory, t],
+    [opencode, onBeforeSend, scrollToBottom, directory, t, platform],
   );
 
   const handleAnswer = useCallback(
@@ -418,7 +419,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
   useEffect(() => {
     let cancelled = false;
     let stop: (() => void) | undefined;
-    const subscribe = agentPlatform().onConversationUpdated;
+    const subscribe = platform.onConversationUpdated;
     if (!subscribe) return;
     void subscribe((id) => {
       if (opencode.currentSessionId && id === `opencode:${opencode.currentSessionId}`)
@@ -431,7 +432,7 @@ export const OpenCodePanel = memo(function OpenCodePanel({
       cancelled = true;
       stop?.();
     };
-  }, [opencode.currentSessionId, opencode.selectSession]);
+  }, [opencode.currentSessionId, opencode.selectSession, platform.onConversationUpdated]);
 
   usePanelLifecycle(
     lifecycle,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ConversationTarget } from "@lmms-lab/workbench/agents";
+import type { ConversationTarget, RelayTask } from "@lmms-lab/workbench/agents";
 import {
   ChatImageDirectory,
   type EditorSelectionContext,
@@ -31,7 +31,7 @@ import { SaveStatus } from "@/components/editor/save-status";
 import { FileSidebarPanel } from "@/components/editor/sidebar-file-panel";
 import { GitSidebarPanel } from "@/components/editor/sidebar-git-panel";
 import { TerminalPanel } from "@/components/editor/terminal-panel";
-import { AgentLocation } from "@/components/harness/agent-location";
+import { AgentLocation, useAgentLocation } from "@/components/harness/agent-location";
 import { HarnessButtons, HarnessWorkspace } from "@/components/harness/workspace";
 import { LaTeXInstallPrompt, LaTeXSettingsDialog, SynctexInstallDialog } from "@/components/latex";
 import { BuildTargetsEditor } from "@/components/latex/build-targets-editor";
@@ -65,7 +65,7 @@ import { useGitActions } from "@/lib/git/use-git-actions";
 import { useHarnessWorkspace } from "@/lib/harness/use-workspace";
 import { useI18n } from "@/lib/i18n";
 import { findTexFiles, useLatexCompiler, useLatexSettings } from "@/lib/latex";
-import { compileFailurePrompt } from "@/lib/latex/compile-failure";
+import { compileFailurePrompt, serverCompileFailurePrompt } from "@/lib/latex/compile-failure";
 import type { BuildTarget, SynctexResult, TargetBuildResult } from "@/lib/latex/types";
 import { type ServerBuild, useTargetBuild } from "@/lib/latex/use-target-build";
 import { useOpenCodeDaemon } from "@/lib/opencode/use-opencode-daemon";
@@ -294,6 +294,10 @@ export default function EditorPage() {
   const gitStatus = daemon.gitStatus;
   const git = useGitActions({ daemon, flush: flushBeforeLeave, ensureOpenCode: opencode.ensure });
   const folderSync = useFolderSync(daemon.projectPath);
+  // Where this folder's AI runs; work from the page follows it (see the handoffs below).
+  const [agentLocation, setAgentLocation] = useAgentLocation(daemon.projectPath);
+  const serverAi = !!folderSync.link && agentLocation === "server";
+  const [serverTask, setServerTask] = useState<RelayTask | null>(null);
 
   // LaTeX settings and editor settings
   const latexSettings = useLatexSettings(daemon.projectPath);
@@ -317,6 +321,20 @@ export default function EditorPage() {
   const handOffBuildFailure = useCallback(
     async (target: BuildTarget, result: TargetBuildResult) => {
       if (!daemon.projectPath) return;
+      // The AI on the server gets the failure there, without this computer's paths.
+      if (serverAi) {
+        setServerTask({
+          id: Date.now(),
+          text: serverCompileFailurePrompt({
+            target,
+            result,
+            where: result.compilerPath.startsWith("http") ? "server" : "local",
+          }),
+        });
+        setShowRightPanel(true);
+        toast(t("agentLocation.buildFailureSent"), "error");
+        return;
+      }
       setPendingBackend(agentBackend);
       setPendingOpenCodeMessage(
         compileFailurePrompt({
@@ -344,7 +362,7 @@ export default function EditorPage() {
         "error",
       );
     },
-    [agentBackend, daemon.projectPath, opencode.ensure, toast, t],
+    [agentBackend, daemon.projectPath, opencode.ensure, toast, t, serverAi],
   );
   // A linked folder's tracked changes in the open file (from its sync's copy of the document).
   const openTracked =
@@ -677,11 +695,17 @@ export default function EditorPage() {
   ]);
   const handleAnnotationTask = useCallback(
     (ids: string[], target: ConversationTarget) => {
+      // These comments live in this folder and are worked through this computer's Writer
+      // tools, which only its own agents have: show that column, so the run is not hidden.
+      if (serverAi) {
+        setAgentLocation("local");
+        toast(t("agentLocation.commentsRunHere"));
+      }
       conversations.dispatch(target, annotationPrompt(ids, target.backend));
       setAgentBackend(target.backend);
       setShowRightPanel(true);
     },
-    [conversations.dispatch],
+    [conversations.dispatch, serverAi, setAgentLocation, toast, t],
   );
   const handleAnnotationSource = useCallback(
     async (file: string, line: number) => {
@@ -2628,10 +2652,14 @@ export default function EditorPage() {
                     >
                       <ChatImageDirectory.Provider value={daemon.projectPath ?? undefined}>
                         <AgentLocation
-                          projectPath={daemon.projectPath}
+                          location={agentLocation}
+                          onLocation={setAgentLocation}
                           link={folderSync.link}
                           server={{
                             visible: showRightPanel,
+                            task: serverTask,
+                            onTaskTaken: (id) =>
+                              setServerTask((current) => (current?.id === id ? null : current)),
                             // The server knows the project by its ID, not this folder's path.
                             selection:
                               folderSync.link && editorSelection?.project === daemon.projectPath

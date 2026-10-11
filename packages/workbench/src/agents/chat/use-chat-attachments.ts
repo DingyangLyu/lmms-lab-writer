@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { workbenchI18n as i18n } from "../../i18n";
-import { agentPlatform } from "../platform";
+import { useAgentPlatform } from "../platform";
 import { importBrowserDocument } from "./files";
 import { type ChatImageFile, imageMime, MAX_IMAGES, readBrowserImage } from "./images";
 
@@ -61,6 +61,7 @@ export function useChatAttachments(
 ) {
   const areaRef = useRef<HTMLFieldSetElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
+  const platform = useAgentPlatform();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const filesRef = useRef(files);
@@ -123,20 +124,20 @@ export function useChatAttachments(
             (path) => path.split(/[\\/]/).pop() || path,
             (path) => Boolean(imageMime(path)),
             (path) => {
-              const read = agentPlatform().readImagePath;
+              const read = platform.readImagePath;
               if (!read) throw new Error(i18n.t("msg.onlyImagesCanBeAttachedHere"));
               return read(path);
             },
             (path) => {
               if (!project) throw new Error(i18n.t("msg.openAProjectBeforeAddingFiles"));
-              const copy = agentPlatform().importDocumentPath;
+              const copy = platform.importDocumentPath;
               if (!copy) throw new Error(i18n.t("msg.onlyImagesCanBeAttachedHere"));
               return copy(project, path);
             },
           ),
         paths.length,
       ),
-    [add, project],
+    [add, project, platform],
   );
   const addFiles = (items: File[]) =>
     add(
@@ -147,12 +148,12 @@ export function useChatAttachments(
           (file) => file.name || i18n.t("msg.pastedFile"),
           (file) => Boolean(imageMime(file.name)) || IMAGE_MIMES.includes(file.type),
           readBrowserImage,
-          (file) => importBrowserDocument(project, file),
+          (file) => importBrowserDocument(project, file, platform),
         ),
       items.length,
     );
   const choose = async () => {
-    const choosePaths = agentPlatform().choosePaths;
+    const choosePaths = platform.choosePaths;
     if (!choosePaths) {
       pickerRef.current?.click();
       return;
@@ -165,7 +166,7 @@ export function useChatAttachments(
     }
   };
   useEffect(() => {
-    const onDropPaths = agentPlatform().onDropPaths;
+    const onDropPaths = platform.onDropPaths;
     if (!active || disabled || !onDropPaths) return;
     let cancelled = false;
     let unlisten: (() => void) | undefined;
@@ -183,7 +184,7 @@ export function useChatAttachments(
       cancelled = true;
       unlisten?.();
     };
-  }, [active, disabled, addPaths]);
+  }, [active, disabled, addPaths, platform.onDropPaths]);
   const onPaste = (event: ClipboardEvent) => {
     const images = Array.from(event.clipboardData.items)
       .filter((item) => item.kind === "file")

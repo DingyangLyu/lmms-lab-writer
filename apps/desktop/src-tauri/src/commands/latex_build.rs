@@ -190,11 +190,21 @@ async fn needed_engine(root: &Path, work: &Path, entry: &Path) -> u8 {
         inputs.extend(arguments(&source, "\\include"));
         for name in inputs {
             let name = name.trim();
-            if name.ends_with(".tex") {
-                pending.push(work.join(name));
+            // Where TeX finds it: name.tex, then name, each in the working folder and then the
+            // project's top folder (the search path the build gives TeX).
+            let names = if name.ends_with(".tex") {
+                vec![name.to_string()]
             } else {
-                pending.push(work.join(format!("{name}.tex")));
-                pending.push(work.join(name));
+                vec![format!("{name}.tex"), name.to_string()]
+            };
+            for candidate in names.iter().flat_map(|n| [work.join(n), root.join(n)]) {
+                if tokio::fs::metadata(&candidate)
+                    .await
+                    .is_ok_and(|m| m.is_file())
+                {
+                    pending.push(candidate);
+                    break;
+                }
             }
         }
     }

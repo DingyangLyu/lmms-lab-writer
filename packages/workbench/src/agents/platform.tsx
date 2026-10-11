@@ -4,7 +4,7 @@
  * bridge); the web app with the browser. Each app registers its platform once at start-up,
  * before any panel renders.
  */
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import type { ChatImageFile } from "./chat/images";
 
 /** Cross-conversation delegation (desktop): who is working, and the bridge's status bar. */
@@ -55,5 +55,26 @@ export function setAgentPlatform(platform: AgentPlatform) {
   current = platform;
 }
 export const agentPlatform = () => current;
-/** Stable for the app's lifetime, so calling it is an ordinary hook call. */
-export const useBridge: UseBridge = (...args) => (current.useBridge ?? noBridge)(...args);
+const Scope = createContext<AgentPlatform | null>(null);
+/**
+ * Panels below use `platform` instead of the app's. The desktop's server column needs this:
+ * its conversations run in the server's copy of the project, so the desktop's local-folder
+ * features (the cross-conversation bridge, attachments copied into the folder, the change
+ * review baseline) must not be given the server project's ID as if it were a folder.
+ */
+export function AgentPlatformScope({
+  platform,
+  children,
+}: {
+  platform: AgentPlatform;
+  children: ReactNode;
+}) {
+  return <Scope.Provider value={platform}>{children}</Scope.Provider>;
+}
+/** The platform for the panel rendering: its scope's, else the app's. */
+export const useAgentPlatform = () => useContext(Scope) ?? current;
+/** Stable for a panel's lifetime (its scope does not change), so this is an ordinary hook. */
+export const useBridge: UseBridge = (...args) => {
+  const platform = useAgentPlatform();
+  return (platform.useBridge ?? noBridge)(...args);
+};
