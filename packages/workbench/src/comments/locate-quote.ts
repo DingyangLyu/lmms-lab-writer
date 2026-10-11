@@ -45,25 +45,11 @@ export function locateQuote(source: string, quote: string, firstLine: number, la
   let start = find(words);
   let end = start >= 0 ? start + words.length - 1 : -1;
   if (start < 0) {
-    // Ligatures and macros can change the middle; anchor on both ends instead.
-    const head = words.slice(0, 12),
-      tail = words.slice(-12);
-    const a = find(head),
-      z = a >= 0 ? region.flat.indexOf(tail, a) : -1;
-    if (a >= 0 && z >= 0) {
-      start = a;
-      end = z + tail.length - 1;
-    }
-  }
-  if (start < 0) {
-    // A citation or formula at the end ("[1]" for \cite{…}): keep the longest opening that matches.
-    let length = 0;
-    const limit = Math.min(words.length, 240);
-    while (length < limit && region.flat.includes(words.slice(0, length + 1))) length++;
-    if (length >= 6) {
-      start = find(words.slice(0, length));
-      end = start + length - 1;
-    }
+    // Section numbers, citation numbers and formulas ("1 Introduction", "[1, 2]") are not in the
+    // source: anchor on the first stretch of the quote that is, and the last one after it, so a
+    // selection over several paragraphs keeps all of them.
+    const span = matchEnds(region.flat, words);
+    if (span) [start, end] = span;
   }
   if (start >= 0 && end >= start) {
     const from = region.at[start] ?? 0,
@@ -77,4 +63,27 @@ export function locateQuote(source: string, quote: string, firstLine: number, la
   const lead = text.length - text.trimStart().length,
     trail = text.length - text.trimEnd().length;
   return { from: from + lead, to: Math.max(from + lead + 1, to - trail), exact: false };
+}
+
+/** The longest stretch of the quote matched at a time when its ends are looked for, and the shortest. */
+const WINDOW = 12,
+  SHORTEST = 6;
+/** How far into the quote, from either end, unmatched characters are skipped. */
+const SKIP = 400;
+
+/** Where the quote's first and last matching stretches sit in `flat`, as indices. */
+function matchEnds(flat: string, words: string): [number, number] | null {
+  const shortest = Math.min(SHORTEST, words.length);
+  if (shortest < 4) return null;
+  let head = -1;
+  for (let k = 0; k + shortest <= words.length && k <= SKIP && head < 0; k++)
+    for (let size = Math.min(WINDOW, words.length - k); size >= shortest && head < 0; size--)
+      head = flat.indexOf(words.slice(k, k + size));
+  if (head < 0) return null;
+  for (let k = words.length; k - shortest >= 0 && words.length - k <= SKIP; k--)
+    for (let size = Math.min(WINDOW, k); size >= shortest; size--) {
+      const at = flat.indexOf(words.slice(k - size, k), head);
+      if (at >= 0) return [head, at + size - 1];
+    }
+  return null;
 }

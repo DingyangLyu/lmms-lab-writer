@@ -25,6 +25,25 @@ describe("PDF quotes in the source", () => {
     expect(exact).toBe(true);
     expect(SOURCE.slice(from, to)).toBe("decreases with temperature");
   });
+  it("keeps every paragraph of a selection over section headings and citations", () => {
+    const source = [
+      "\\begin{abstract}",
+      "State the problem, in about 150 words.赛季德国ka",
+      "\\end{abstract}",
+      "",
+      "\\section{Introduction}",
+      "\\label{sec:intro}",
+      "Introduce the gap your work fills~\\citep{knuth1984,lamport1994}.",
+      "Section~\\ref{sec:method} describes the method and Section~\\ref{sec:results} the results.",
+      "",
+      "\\section{Method}",
+    ].join("\n");
+    const quote =
+      "State the problem, in about 150 words. 赛季德国 ka 1 Introduction Introduce the gap your work fills [1, 2]. Section 2 describes the method and Section 3 the results. 2";
+    const { from, to, exact } = locateQuote(source, quote, 2, 10);
+    expect(exact).toBe(true);
+    expect(source.slice(from, to)).toMatch(/^State the problem[\s\S]*the results\.$/);
+  });
   it("falls back to the lines SyncTeX named, without their indentation", () => {
     const { from, to, exact } = locateQuote("a\n   Totally different words here\nb", "∑ x²", 2, 2);
     expect(exact).toBe(false);
