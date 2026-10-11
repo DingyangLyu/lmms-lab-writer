@@ -15,7 +15,7 @@ function serverMessages() {
         const text = readFileSync(path, "utf8");
         for (const m of text.matchAll(/fail\(\s*\d+,\s*"([^"]+)"/g)) found.add(m[1] ?? "");
         for (const m of text.matchAll(
-          /(?:closeWith\([^,]+,\s*\d+,|disconnectUser\([^,]+,|closeProject\([^,]+,|closeFile\([^,]+,)\s*"([^"]+)"/g,
+          /(?:closeWith\([^,]+,\s*\d+,|disconnect(?:User|Session)\([^,]+,|closeProject\([^,]+,|closeFile\([^,]+,)\s*"([^"]+)"/g,
         ))
           found.add(m[1] ?? "");
       }

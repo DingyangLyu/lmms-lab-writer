@@ -189,7 +189,8 @@ export async function sessionRoutes() {
           "Set-Cookie",
           "writer_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
         );
-        ctx.collab.disconnectUser(ctx.user.id, "已退出登录");
+        // Only this sign-in's pages: the account may stay signed in elsewhere.
+        ctx.collab.disconnectSession(digest(cookie(ctx.req)), "已退出登录");
         return { ok: true };
       }),
       route<Authed>("GET", /^\/api\/tokens$/, (ctx) =>

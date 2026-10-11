@@ -112,6 +112,8 @@ export class WriterProvider {
       `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/projects/${this.project}/socket?file=${this.file}&locale=${i18n.getLocale()}`,
     );
     this.socket = socket;
+    // What the server said when it refused something, shown if it then closes the connection.
+    let refused = "";
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -144,6 +146,7 @@ export class WriterProvider {
             this.status("saved");
           }
         } else if (msg.type === "error") {
+          refused = typeof msg.message === "string" ? msg.message : "";
           this.error(msg.message);
           this.status("denied");
           this.editable = false;
@@ -161,7 +164,8 @@ export class WriterProvider {
         this.status("denied");
         this.editable = false;
         this.role("viewer");
-        this.error(event.reason || i18n.t("sync.signedOut"));
+        // The server's own words: why it refused, or what access was lost.
+        this.error(event.reason || refused || i18n.t("sync.signedOut"));
         return;
       }
       this.status("offline");

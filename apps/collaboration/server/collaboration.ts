@@ -22,11 +22,19 @@ import {
   trackEdits,
   userHue,
 } from "../shared/tracked";
-import { allowedOrigin, bearer, userFor } from "./auth";
+import { allowedOrigin, bearer, cookie, userFor } from "./auth";
 import { type Sql, sql } from "./db";
 import { requestLocale, say } from "./messages";
 import type { Store, User } from "./store";
-import { accessDenied, fail, HttpError, normalizeEol, RETRY_CLOSE, transientFailure } from "./util";
+import {
+  accessDenied,
+  digest,
+  fail,
+  HttpError,
+  normalizeEol,
+  RETRY_CLOSE,
+  transientFailure,
+} from "./util";
 
 type Peer = {
   socket: WebSocket;
@@ -41,6 +49,10 @@ type Peer = {
   /** Wording of errors and close reasons for this client (`?locale=en`). */
   locale: Locale;
   authenticate: () => Promise<void>;
+  /** The digest of the sign-in it uses, so signing out closes only that one's pages. */
+  session: string;
+  /** Answered the last ping; a connection that stops answering is gone. */
+  alive: boolean;
 };
 /** The project file limit, so one sync socket can follow every document. */
 const MAX_SYNC_ROOMS = 2000;
@@ -137,10 +149,28 @@ export class Collaboration {
     /** Origins whose pages may connect; see allowedOrigin. */
     private trusted: () => readonly string[] = () => [origin()],
   ) {
-    this.sweep = setInterval(() => void this.recheck(), 30000);
+    this.sweep = setInterval(() => {
+      this.heartbeat();
+      void this.recheck();
+    }, 30000);
     this.sweep.unref();
     this.versions = setInterval(() => void this.autosave(), AUTOSAVE_CHECK);
     this.versions.unref();
+  }
+  /** Drops connections that stopped answering pings; the pages reconnect if they still can. */
+  heartbeat() {
+    for (const peer of this.peers) {
+      if (!peer.alive) {
+        peer.socket.terminate();
+        continue;
+      }
+      peer.alive = false;
+      try {
+        peer.socket.ping();
+      } catch {
+        peer.socket.terminate();
+      }
+    }
   }
   /**
    * Every open page's sign-in and membership, checked again. Only a real loss of access closes
@@ -150,8 +180,13 @@ export class Collaboration {
     await Promise.all(
       [...this.peers].map((peer) =>
         peer.authenticate().catch((error) => {
-          if (accessDenied(error)) closeWith(peer, 1008, "登录或项目权限已失效");
-          else logFailure("access check")(error);
+          if (accessDenied(error)) {
+            console.error(
+              `Writer closed ${peer.user.username}'s page (${peer.project}): access lost:`,
+              error instanceof HttpError ? error.template : error,
+            );
+            closeWith(peer, 1008, "登录或项目权限已失效");
+          } else logFailure("access check")(error);
         }),
       ),
     );
@@ -358,7 +393,12 @@ export class Collaboration {
         const live = await userFor(this.store, req);
         await this.store.require(project, live.id);
       },
+      session: digest(bearer(req) ?? cookie(req)),
+      alive: true,
     };
+    ws.on("pong", () => {
+      peer.alive = true;
+    });
     let closed = false;
     const detach = () => {
       this.peers.delete(peer);
@@ -379,8 +419,14 @@ export class Collaboration {
             logFailure("document sync")(e);
             closeWith(peer, RETRY_CLOSE, "同步失败");
           } else {
+            // Logged with who and where, and sent as the close reason too: the page shows
+            // it instead of a generic "sign in again".
+            console.error(
+              `Writer refused a message from ${peer.user.username} (${project}${file ? `:${file}` : ""}):`,
+              e instanceof HttpError ? e.template : e instanceof Error ? e.message : e,
+            );
             send(ws, { type: "error", message: wording(locale, e, "同步失败") });
-            ws.close(1008);
+            closeWith(peer, 1008, e instanceof HttpError ? e.template : "同步失败");
           }
         });
     });
@@ -448,8 +494,14 @@ export class Collaboration {
       // message must leave no half-registered cursor behind.
       const ids = awarenessClients(bytes);
       for (const id of ids)
-        if ([...room.peers].some((other) => other !== peer && other.clients.has(id)))
-          fail(403, "不能修改其他人的光标");
+        for (const other of room.peers)
+          if (other !== peer && other.clients.has(id)) {
+            if (other.user.id !== current.id) fail(403, "不能修改其他人的光标");
+            // The same page reconnected before its old connection was seen to drop (a
+            // sleeping laptop, a tunnel hiccup): the new one takes over and the old one goes.
+            other.clients.delete(id);
+            other.socket.terminate();
+          }
       if (new Set([...peer.clients, ...ids]).size > 2) fail(400, "光标数量超限");
       for (const id of ids) peer.clients.add(id);
       const user = { name: current.username, ...cursorColors(current.id) };
@@ -582,9 +634,13 @@ export class Collaboration {
       await this.release(project, room.file);
     }
   }
-  /** Close every connection of an account (logout, password change, removal). */
+  /** Close every connection of an account (password change, removal). */
   disconnectUser(user: string, reason: string) {
     for (const p of this.peers) if (p.user.id === user) closeWith(p, 1008, reason);
+  }
+  /** Close the connections of one sign-in (signing out), leaving the account's others. */
+  disconnectSession(session: string, reason: string) {
+    for (const p of this.peers) if (p.session === session) closeWith(p, 1008, reason);
   }
   closeFile(file: string, reason: string) {
     for (const p of this.peers) {
