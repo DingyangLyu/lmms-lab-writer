@@ -52,8 +52,7 @@ export const appEn: Record<keyof typeof appZh, string> = {
   "address.china.hint": "In China, off campus",
   "address.global": "International",
   "address.global.hint": "Outside China",
-  "address.note":
-    "Each address has its own sign-in; you may need to sign in again.",
+  "address.note": "Each address has its own sign-in; you may need to sign in again.",
   "role.owner": "Owner",
   "role.editor": "Editor",
   "role.commenter": "Commenter",
