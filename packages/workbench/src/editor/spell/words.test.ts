@@ -36,7 +36,7 @@ describe("spell checking words", () => {
     ]);
   });
 
-  const dir = join(import.meta.dirname, "../../node_modules/dictionary-en");
+  const dir = join(import.meta.dirname, "../../../node_modules/dictionary-en");
   const spell = NSpell(
     readFileSync(join(dir, "index.aff"), "utf8"),
     readFileSync(join(dir, "index.dic"), "utf8"),

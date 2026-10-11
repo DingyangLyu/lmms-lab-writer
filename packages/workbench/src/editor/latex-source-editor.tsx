@@ -63,7 +63,9 @@ import { memo, type ReactNode, useEffect, useLayoutEffect, useRef } from "react"
 import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../i18n";
 import { trackEditorDrag } from "./drag-selection";
 import { resolveMonoFontFamily } from "./font-stacks";
+import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { writerSearch } from "./search-panel";
+import { latexSpellcheck } from "./spellcheck";
 import type { EditorSettings, EditorTextRange, EditorTheme, SourceMark } from "./types";
 
 export type LatexSourceEditorProps = {
@@ -79,7 +81,12 @@ export type LatexSourceEditorProps = {
   onContentChange?: (content: string, previous?: string) => void;
   goToLine?: number;
   onSelectionChange?: (ranges: EditorTextRange[] | null) => void;
+  /** Citation keys and labels of the whole project, read on each completion. */
+  hints?: () => ProjectHints;
+  /** Spell check the prose (needs a SpellService registered; .tex files only). */
+  spellcheck?: boolean;
 };
+const NO_HINTS: ProjectHints = { citations: [], labels: [] };
 
 const setAnnotationMarks = StateEffect.define<DecorationSet>();
 const annotationDecorations = StateField.define<DecorationSet>({
@@ -92,28 +99,6 @@ const annotationDecorations = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-const commands = [
-  "begin",
-  "end",
-  "section",
-  "subsection",
-  "subsubsection",
-  "chapter",
-  "cite",
-  "ref",
-  "label",
-  "caption",
-  "includegraphics",
-  "textbf",
-  "textit",
-  "emph",
-  "footnote",
-  "item",
-  "frac",
-  "sqrt",
-  "usepackage",
-  "documentclass",
-];
 const ambiguousMatcher = new MatchDecorator({
   regexp: /[，。；：（）［］｛｝！＂＇]/g,
   decoration: Decoration.mark({ class: "cm-ambiguous-punctuation" }),
@@ -343,6 +328,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
   const initialProps = useRef(props);
   const currentProps = useRef(props);
   const config = useRef(new Compartment());
+  const spelling = useRef(new Compartment());
   const externalUpdate = useRef(false);
   const selectionEmitted = useRef(false);
   const syncRef = useRef<(content?: string) => void>(() => {});
@@ -394,18 +380,9 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           highlightActiveLineGutter(),
           highlightSelectionMatches(),
           highlightSpecialChars(),
+          // The web editor's completion: commands, environments, the project's keys and labels.
           autocompletion({
-            override: [
-              (context) => {
-                const word = context.matchBefore(/\\[a-zA-Z]*/);
-                return word
-                  ? {
-                      from: word.from + 1,
-                      options: commands.map((label) => ({ label, type: "keyword" })),
-                    }
-                  : null;
-              },
-            ],
+            override: [latexCompletion(() => currentProps.current.hints?.() ?? NO_HINTS)],
           }),
           writerSearch(),
           keymap.of([
@@ -428,10 +405,11 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           ),
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.latexEditor"),
-            spellcheck: "false",
             autocapitalize: "off",
             autocorrect: "off",
           }),
+          // The browser's own checker stays off: it would underline every command.
+          spelling.current.of(latexSpellcheck(!!initial.spellcheck && !initial.readOnly)),
           EditorView.domEventHandlers({
             click: (event) => {
               if (!(event.metaKey || event.ctrlKey)) return false;
@@ -489,6 +467,11 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
       ),
     });
   }, [props.editorSettings, props.editorTheme, props.readOnly]);
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: spelling.current.reconfigure(latexSpellcheck(!!props.spellcheck && !props.readOnly)),
+    });
+  }, [props.spellcheck, props.readOnly]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -4,6 +4,7 @@
  * those ignored for this visit.
  */
 
+import { setSpellService } from "@lmms-lab/workbench";
 // By path: the package exports only its Node entry, which reads these with fs.
 import affUrl from "../../node_modules/dictionary-en/index.aff?url";
 import dicUrl from "../../node_modules/dictionary-en/index.dic?url";
@@ -143,3 +144,4 @@ export async function suggestions(word: string) {
   await load();
   return (await call({ suggest: word })).suggestions ?? [];
 }
+setSpellService({ misspelled, suggestions, addWord, ignoreWord, onWordsChanged });

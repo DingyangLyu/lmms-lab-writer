@@ -4,7 +4,7 @@ import {
   type CompletionResult,
   snippetCompletion,
 } from "@codemirror/autocomplete";
-import { i18n } from "./i18n";
+import { workbenchI18n as i18n } from "../i18n";
 
 /** Project-wide knowledge the editor cannot see in the open file. */
 export type ProjectHints = {

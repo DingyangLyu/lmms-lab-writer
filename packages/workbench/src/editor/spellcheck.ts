@@ -16,9 +16,33 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
-import { i18n } from "./i18n";
-import { addWord, ignoreWord, misspelled, onWordsChanged, suggestions } from "./spell/client";
+import { workbenchI18n as i18n } from "../i18n";
 import { proseWords, type Word } from "./spell/words";
+
+/**
+ * What the checker needs from the app: the dictionary's verdicts (its worker), and the
+ * member's own words (an account's on the web, this computer's on the desktop).
+ */
+export type SpellService = {
+  /** Which of `words` are misspelled, the member's own and ignored words aside. */
+  misspelled: (words: string[]) => Promise<Set<string>>;
+  suggestions: (word: string) => Promise<string[]>;
+  addWord: (word: string) => void;
+  ignoreWord: (word: string) => void;
+  /** Called when the member adds or ignores a word, so every editor checks again. */
+  onWordsChanged: (listener: () => void) => () => void;
+};
+let service: SpellService | null = null;
+/** Each app registers its service once, before an editor turns checking on. */
+export function setSpellService(next: SpellService) {
+  service = next;
+}
+const misspelled = (words: string[]) =>
+  service?.misspelled(words) ?? Promise.resolve(new Set<string>());
+const suggestions = (word: string) => service?.suggestions(word) ?? Promise.resolve([]);
+const addWord = (word: string) => service?.addWord(word);
+const ignoreWord = (word: string) => service?.ignoreWord(word);
+const onWordsChanged = (listener: () => void) => service?.onWordsChanged(listener) ?? (() => {});
 
 /** Commands whose arguments are keys, names or code rather than prose. */
 const KEYS = new Set([

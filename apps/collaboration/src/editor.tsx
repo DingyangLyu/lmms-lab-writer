@@ -28,7 +28,10 @@ import {
   type EditorSettings,
   editorConfiguration,
   FoldToolbar,
+  latexCompletion,
   latexFoldExtensions,
+  latexSpellcheck,
+  type ProjectHints,
   symbolInsertion,
   writerSearch,
 } from "@lmms-lab/workbench";
@@ -40,10 +43,10 @@ import type { Comment, Role } from "../shared/api";
 import { changesOf, decideChanges } from "../shared/tracked";
 import { base64, errorText, unbase64 } from "./api";
 import { i18n } from "./i18n";
-import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { type FilePosition, readPosition, writePosition } from "./positions";
 import { type Person, type SyncStatus, WriterProvider } from "./provider";
-import { latexSpellcheck } from "./spellcheck";
+// Registers this page's dictionary worker and the account's words with the checker.
+import "./spell/client";
 import {
   changeTracker,
   followChanges,

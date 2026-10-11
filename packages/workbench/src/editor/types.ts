@@ -23,6 +23,8 @@ export interface EditorSettings {
   wordWrap: "off" | "on" | "wordWrapColumn" | "bounded";
   wordWrapColumn: number;
   highlightAmbiguousUnicode: boolean;
+  /** English spell checking of the prose in .tex files (spellcheck.ts). */
+  spellcheck: boolean;
 
   // Editing
   tabSize: number;
@@ -73,6 +75,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   wordWrap: "on",
   wordWrapColumn: 80,
   highlightAmbiguousUnicode: false,
+  spellcheck: true,
 
   // Editing
   tabSize: 2,

@@ -11,6 +11,7 @@ import {
   type PdfAnnotation,
   type PdfAnnotationHost,
   pathSync,
+  projectHints,
   TabBar,
   type TabItem,
   WorkbenchLocale,
@@ -47,7 +48,6 @@ import { useEditorSettings } from "../editor-settings";
 import { useI18n } from "../i18n";
 import { InboxList, useInbox } from "../inbox";
 import { roleKey, statusKey } from "../labels";
-import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
 import type { ShownChange } from "../tracked-changes";
 import { useAction } from "../use-action";

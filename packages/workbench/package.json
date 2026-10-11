@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./pdf-viewer": "./src/pdf/pdf-viewer.tsx",
+    "./spell-worker": "./src/editor/spell/worker.ts",
     "./theme.css": "./src/theme.css",
     "./scoped-preflight.css": "./src/scoped-preflight.css",
     "./agents": "./src/agents/index.ts",
@@ -19,7 +20,8 @@
   "dependencies": {
     "@lmms-lab/i18n": "workspace:*",
     "@lmms-lab/latex-editor": "workspace:*",
-    "@lmms-lab/writing": "workspace:*"
+    "@lmms-lab/writing": "workspace:*",
+    "nspell": "^2.1.5"
   },
   "peerDependencies": {
     "@codemirror/autocomplete": "^6.20.2",
@@ -53,8 +55,10 @@
     "@lezer/highlight": "^1.2.3",
     "@lmms-lab/writer-shared": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
+    "@types/nspell": "^2.1.6",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "dictionary-en": "^4.0.0",
     "framer-motion": "^12.40.0",
     "katex": "^0.17.0",
     "react": "^19.2.6",

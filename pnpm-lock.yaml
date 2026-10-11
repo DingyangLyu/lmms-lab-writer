@@ -276,6 +276,9 @@ importers:
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
+      dictionary-en:
+        specifier: ^4.0.0
+        version: 4.0.0
       diff:
         specifier: ^8.0.4
         version: 8.0.4
@@ -454,6 +457,9 @@ importers:
       '@lmms-lab/writing':
         specifier: workspace:*
         version: link:../writing
+      nspell:
+        specifier: ^2.1.5
+        version: 2.1.5
     devDependencies:
       '@codemirror/autocomplete':
         specifier: ^6.20.2
@@ -485,12 +491,18 @@ importers:
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/nspell':
+        specifier: ^2.1.6
+        version: 2.1.6
       '@types/react':
         specifier: ^19.2.15
         version: 19.2.15
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.15)
+      dictionary-en:
+        specifier: ^4.0.0
+        version: 4.0.0
       framer-motion:
         specifier: ^12.40.0
         version: 12.40.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)

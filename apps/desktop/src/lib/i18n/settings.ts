@@ -118,6 +118,9 @@ export const settingsZh = {
   "settings.marksFullWidthPunctuationThatIsEasilyCon":
     "标记容易与英文符号混淆的全角标点；关闭只改变显示，不改动文稿。",
   "settings.boxesAroundChinesePunctuation": "中文标点方框",
+  "settings.spellcheck": "拼写检查",
+  "settings.spellcheckDescription":
+    "检查 .tex 文件里英文正文的拼写（与网页相同），右键错词可改正、加入词典或忽略；命令、公式、注释和引用键不检查",
 };
 export const settingsEn: Record<keyof typeof settingsZh, string> = {
   "settings.autoModeChoosesShellPerOsFallbackRules":
@@ -240,4 +243,7 @@ export const settingsEn: Record<keyof typeof settingsZh, string> = {
   "settings.marksFullWidthPunctuationThatIsEasilyCon":
     "Marks full-width punctuation that is easily confused with ASCII; turning it off only changes the display, never the document.",
   "settings.boxesAroundChinesePunctuation": "Boxes around Chinese punctuation",
+  "settings.spellcheck": "Spell checking",
+  "settings.spellcheckDescription":
+    "Checks the English prose of .tex files (as on the web); right-click a word to correct it, add it to your dictionary or ignore it. Commands, math, comments and citation keys are left alone",
 };

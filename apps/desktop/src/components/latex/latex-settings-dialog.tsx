@@ -456,6 +456,13 @@ export function LaTeXSettingsDialog({
                 description={t("settings.marksFullWidthPunctuationThatIsEasilyCon")}
               />
 
+              <CheckboxItem
+                checked={editorSettings.spellcheck !== false}
+                onChange={(enabled) => onUpdateEditorSettings({ spellcheck: enabled })}
+                label={t("settings.spellcheck")}
+                description={t("settings.spellcheckDescription")}
+              />
+
               <div className="space-y-3 pt-1">
                 <CheckboxItem
                   checked={editorSettings.smoothScrolling}

@@ -8,10 +8,13 @@ import type { editor } from "monaco-editor";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { teamMarks, useTeamComments } from "@/lib/collab/team-comments";
 import { resolveMonoFontFamily } from "@/lib/editor/font-stacks";
+import { useProjectHints } from "@/lib/editor/project-hints";
 import { type SourceMark, useSourceAnnotations } from "@/lib/editor/source-annotations";
 import type { EditorSettings, EditorTheme } from "@/lib/editor/types";
 import { i18n, useI18n } from "@/lib/i18n";
 import { registerLaTeXLanguage } from "@/lib/monaco/latex";
+// Registers the spell checker's worker and this computer's word list (used when it is on).
+import "@/lib/spell/client";
 import { defineEditorThemes } from "@/lib/monaco/themes";
 import { LatexSourceEditor } from "./latex-source-editor";
 
@@ -66,6 +69,7 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
     props.content,
   );
   const team = useTeamComments();
+  const hints = useProjectHints();
   // Team comments are placed on the text shown now; local marks only while they match it.
   const content = props.content ?? "";
   const shared = useMemo(
@@ -86,6 +90,9 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
   const child = {
     ...props,
     className: "h-full",
+    hints,
+    // The web editor's checker, on the prose of .tex files.
+    spellcheck: props.editorSettings?.spellcheck !== false && /\.tex$/i.test(props.path ?? ""),
     annotationMarks: shared.length ? [...(current ? marks : []), ...shared] : marks,
     annotationContent: shared.length ? content : annotationContent,
     onAnnotationClick: (id: string) => {
