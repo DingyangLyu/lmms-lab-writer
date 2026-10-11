@@ -44,6 +44,12 @@ export type PdfAnnotation = {
   resolution: string;
   events?: AnnotationEvent[];
   submittedTo?: string | null;
+  /**
+   * The source text it is about (LaTeX, as in the file) and which of its repeats: found again
+   * in whichever build is shown, so comments made in the editor, or on an earlier build, are
+   * drawn on the PDF without compiling.
+   */
+  locate?: { text: string; occurrence: number } | null;
 };
 export function normalizeRect(
   rect: { left: number; top: number; right: number; bottom: number },

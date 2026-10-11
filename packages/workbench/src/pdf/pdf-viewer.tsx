@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Document, Page } from "react-pdf";
 import { useAnnotations } from "./annotation-bridge";
 import { collectSelection, MAX_MARKS, type PdfAnnotation, visibleTextMarks } from "./annotations";
+import { locateInPdf, type PdfText, readPdfText } from "./locate-text";
 import { attachPdfSelection } from "./text-selection";
 import { destinationFraction, fitPageWidth, pageScale, viewportAnchor } from "./viewport";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -141,12 +142,26 @@ function PdfPreview({
   const widthRef = useRef(0);
   const lastNavigation = useRef<string | null>(null);
   const pagesRef = useRef(new Map<number, { width: number; height: number }>());
-  const annotations = useMemo(
+  const [pdfText, setPdfText] = useState<PdfText | null>(null);
+  const listed = useMemo(
     () => notes?.items.filter((note) => note.pdf === pdfPath) ?? [],
     [notes?.items, pdfPath],
   );
+  // The notes drawn on this build: marks made on it, or their text found in it.
+  const annotations = useMemo(
+    () =>
+      listed.flatMap((note) => {
+        if (note.fingerprint === fingerprint && note.marks.length) return [note];
+        if (note.resolved || !note.locate || !pdfText) return [];
+        const marks = locateInPdf(pdfText, note.locate.text, note.locate.occurrence);
+        return marks ? [{ ...note, marks, fingerprint }] : [];
+      }),
+    [listed, fingerprint, pdfText],
+  );
+  const drawn = new Set(annotations.map((note) => note.id));
+  // Made on the PDF, but neither on this build nor findable in it.
   const staleCount = fingerprint
-    ? annotations.filter((note) => !note.resolved && note.fingerprint !== fingerprint).length
+    ? listed.filter((note) => !note.resolved && note.marks.length && !drawn.has(note.id)).length
     : 0;
   const effectiveScale = zoomMode === "fit" ? pageScale(availableWidth, firstWidth) : manualScale;
   const rememberAnchor = useCallback(() => {
@@ -495,6 +510,10 @@ function PdfPreview({
               setNumPages(pdf.numPages);
               setFingerprint(pdf.fingerprints[0] || "");
               setLoadError(null);
+              // Its text, to draw comments made in the source without compiling again.
+              void readPdfText(pdf)
+                .then(setPdfText)
+                .catch(() => setPdfText(null));
               try {
                 const page = await pdf.getPage(1);
                 setFirstWidth(page.getViewport({ scale: 1 }).width);

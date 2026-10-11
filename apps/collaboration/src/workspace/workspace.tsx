@@ -7,6 +7,7 @@
  * overlays.
  */
 import {
+  occurrenceBefore,
   type PdfAnnotation,
   type PdfAnnotationHost,
   pathSync,
@@ -414,7 +415,8 @@ export function Workspace({
   const [centerWidth, centerRef] = useWidth();
   const activate = (id: string | null) => {
     setActiveComment(id);
-    if (id && data.comments.find((c) => c.id === id)?.pdf) setPdfNavigation((n) => n + 1);
+    // The PDF shows it too (made there, or its text found there).
+    if (id) setPdfNavigation((n) => n + 1);
   };
   /**
    * Where the comment being written shows: the margin beside the text when there is room for
@@ -485,12 +487,21 @@ export function Workspace({
     focused.current = true;
     showComment(target);
   }, [focusComment, data.loaded, data.comments]);
-  // Comments made on the PDF are drawn on it again while it is the same build.
-  const pdfNotes: PdfAnnotationHost = {
-    items: data.comments
-      .filter((c) => c.pdf)
-      .map(
-        (c): PdfAnnotation => ({
+  // Every comment is drawn on the PDF: where it was made on this build, or wherever its text
+  // is found in the build shown (comments made in the editor appear without compiling).
+  const editorText = text;
+  const pdfItems = useMemo(() => {
+    const sourceOf = (id: string) => {
+      const path = data.files.find((f) => f.id === id)?.path;
+      if (editorText && editorText.file === path) return editorText.value;
+      return data.sources.find((f) => f.id === id)?.content ?? null;
+    };
+    return data.comments.flatMap((c): PdfAnnotation[] => {
+      const excerpt = c.excerpt ?? (c.pending ? c.quote : null);
+      if (!c.pdf && (c.from === null || !excerpt)) return [];
+      const content = sourceOf(c.file);
+      return [
+        {
           id: c.id,
           pdf: OUTPUT_PDF,
           quote: c.quote,
@@ -503,8 +514,20 @@ export function Workspace({
           source: null,
           mappingNote: "",
           resolution: "",
-        }),
-      ),
+          locate:
+            excerpt && c.from !== null
+              ? {
+                  text: excerpt,
+                  occurrence: content ? occurrenceBefore(content, c.from, excerpt) : 0,
+                }
+              : null,
+        },
+      ];
+    });
+  }, [data.comments, data.files, data.sources, editorText]);
+  // Comments made on the PDF are drawn on it again while it is the same build.
+  const pdfNotes: PdfAnnotationHost = {
+    items: pdfItems,
     draft,
     selectedId: activeComment,
     navigation: pdfNavigation,
