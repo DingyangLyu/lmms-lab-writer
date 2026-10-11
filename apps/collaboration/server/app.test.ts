@@ -35,161 +35,6 @@ describe("real collaboration service", () => {
     expect(statuses).toContain(429);
     // Two services and 25 scrypt checks: well past 30 s while the other test files load the CPU.
   }, 120_000);
-  it("leases shared tasks only to scoped runners and submits AI changes as unapplied proposals", async () => {
-    const f = await fixture();
-    const file = (
-      await f.call(
-        `/projects/${f.project}/files`,
-        { path: "main.tex", content: "Original.\n" },
-        f.owner,
-      )
-    ).data.id;
-    const token = (
-      await f.call(
-        `/projects/${f.project}/runners`,
-        { name: "test-worker", capabilities: ["codex"] },
-        f.owner,
-      )
-    ).data.token;
-    const runner = async (path: string, body: unknown) => {
-      const response = await fetch(`${f.app.origin}/api/runner/${path}`, {
-        method: "POST",
-        headers: {
-          Origin: f.app.origin,
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      return { status: response.status, data: await response.json() };
-    };
-    const id = (
-      await f.call(
-        `/projects/${f.project}/jobs`,
-        { harness: "codex", prompt: "Improve the paragraph." },
-        f.owner,
-      )
-    ).data.id;
-    const leased = await runner("lease", {});
-    expect(leased.data.job.id).toBe(id);
-    expect(leased.data.job.files[0].content).toBe("Original.\n");
-    expect((await runner("lease", {})).data.job).toBeNull();
-    expect(
-      (
-        await runner("result", {
-          id,
-          result: "ready",
-          files: [{ path: "main.tex", content: "Revised.\n" }],
-        })
-      ).status,
-    ).toBe(200);
-    expect(
-      (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
-    ).toBe("Original.\n");
-    const proposals = (await f.call(`/projects/${f.project}/proposals`, undefined, f.owner)).data;
-    expect(proposals).toHaveLength(1);
-    expect((await runner("result", { id, result: "duplicate", files: [] })).status).toBe(409);
-    const second = (
-      await f.call(
-        `/projects/${f.project}/jobs`,
-        { harness: "codex", prompt: "Next task" },
-        f.owner,
-      )
-    ).data.id;
-    await runner("lease", {});
-    await f.call(`/projects/${f.project}/jobs/${second}`, {}, f.owner, "DELETE");
-    expect((await runner("heartbeat", { id: second })).status).toBe(409);
-  });
-  it("lets the server's shared runner take tasks from every project, within its harnesses", async () => {
-    const token = "a".repeat(64);
-    const f = await fixture({
-      sharedRunner: { token, name: "Lab machine", capabilities: ["codex"] },
-    });
-    const other = (await f.call("/projects", { name: "second-paper" }, f.owner)).data.id;
-    const lease = async (bearer: string) => {
-      const response = await fetch(`${f.app.origin}/api/runner/lease`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
-        body: "{}",
-      });
-      return { status: response.status, data: await response.json() };
-    };
-    expect((await f.call(`/projects/${f.project}/shared-runner`, undefined, f.owner)).data).toEqual(
-      { runner: { name: "Lab machine", capabilities: ["codex"] } },
-    );
-    const skipped = (
-      await f.call(`/projects/${f.project}/jobs`, { harness: "opencode", prompt: "a" }, f.owner)
-    ).data.id;
-    const first = (
-      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "b" }, f.owner)
-    ).data.id;
-    const second = (
-      await f.call(`/projects/${other}/jobs`, { harness: "codex", prompt: "c" }, f.owner)
-    ).data.id;
-    expect((await lease("b".repeat(64))).status).toBe(401);
-    expect((await lease(token)).data.job.id).toBe(first);
-    expect((await lease(token)).data.job.id).toBe(second);
-    // OpenCode is not among its harnesses, so that task stays queued for another runner.
-    expect((await lease(token)).data.job).toBeNull();
-    const queued = (await f.call(`/projects/${f.project}/jobs`, undefined, f.owner)).data;
-    expect(queued.find((j: { id: string }) => j.id === skipped).status).toBe("queued");
-    const done = await fetch(`${f.app.origin}/api/runner/result`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ id: second, result: "done", files: [] }),
-    });
-    expect(done.status).toBe(200);
-    const without = await fixture();
-    expect(
-      (await without.call(`/projects/${without.project}/shared-runner`, undefined, without.owner))
-        .data,
-    ).toEqual({ runner: null });
-  });
-  it("skips tasks that can no longer run and follows renamed files", async () => {
-    const f = await fixture(),
-      editor = await f.invite("editor", "temporary");
-    const files = `/projects/${f.project}/files`;
-    const file = (await f.call(files, { path: "main.tex", content: "Old.\n" }, f.owner)).data.id;
-    const token = (
-      await f.call(
-        `/projects/${f.project}/runners`,
-        { name: "worker", capabilities: ["codex"] },
-        f.owner,
-      )
-    ).data.token;
-    const runner = async (path: string, body: unknown) => {
-      const response = await fetch(`${f.app.origin}/api/runner/${path}`, {
-        method: "POST",
-        headers: { Origin: f.app.origin, Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      return { status: response.status, data: await response.json() };
-    };
-    const orphan = (
-      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "a" }, editor)
-    ).data.id;
-    const kept = (
-      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "b" }, f.owner)
-    ).data.id;
-    const me = (await f.call("/me", undefined, editor)).data.id;
-    await f.call(`/projects/${f.project}/members/${me}`, {}, f.owner, "DELETE");
-    const leased = await runner("lease", {});
-    expect(leased.status).toBe(200);
-    expect(leased.data.job.id).toBe(kept);
-    const jobs = (await f.call(`/projects/${f.project}/jobs`, undefined, f.owner)).data;
-    expect(jobs.find((j: { id: string }) => j.id === orphan).status).toBe("failed");
-    await f.call(`${files}/${file}`, { path: "chapter.tex" }, f.owner, "PATCH");
-    const done = await runner("result", {
-      id: kept,
-      result: "ok",
-      files: [{ path: "main.tex", content: "New.\n" }],
-    });
-    expect(done.status).toBe(200);
-    const listed = (await f.call(files, undefined, f.owner)).data;
-    expect(listed.map((x: { path: string }) => x.path)).toEqual(["chapter.tex"]);
-    const proposals = (await f.call(`/projects/${f.project}/proposals`, undefined, f.owner)).data;
-    expect(proposals[0].file).toBe(file);
-  });
   it("merges concurrent Chinese edits, acknowledges durable writes and survives restart", async () => {
     const f = await fixture(),
       editor = await f.invite("editor", "coauthor");
@@ -397,25 +242,18 @@ describe("real collaboration service", () => {
     const audit = (await f.call(`/projects/${f.project}/audit`, undefined, f.owner)).data;
     expect(audit.some((a: { action: string }) => a.action === "file.delete")).toBe(true);
   });
-  it("bounds automatic versions without touching manual ones or queued task inputs", async () => {
+  it("bounds automatic versions without touching manual ones", async () => {
     const f = await fixture(),
       me = (await f.call("/me", undefined, f.owner)).data.id as string;
     const manual = await f.call(`/projects/${f.project}/snapshots`, {}, f.owner);
     expect(manual.status).toBe(201);
-    const job = (
-      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt: "x" }, f.owner)
-    ).data.id;
     for (let i = 0; i < AUTOMATIC_SNAPSHOTS + 5; i++)
       await f.app.store.snapshot(f.project, me, `auto ${i}`);
     const rows = await f.app.store.db.rows<{ id: string; label: string; manual: boolean }>(
       sql`SELECT id, label, manual FROM snapshots WHERE project=${f.project}`,
     );
-    expect(rows.filter((r) => !r.manual)).toHaveLength(AUTOMATIC_SNAPSHOTS + 1);
+    expect(rows.filter((r) => !r.manual)).toHaveLength(AUTOMATIC_SNAPSHOTS);
     expect(rows.find((r) => r.id === manual.data.id)?.label).toBe("手动版本");
-    const base = (
-      await f.app.store.db.row<{ base: string }>(sql`SELECT base FROM jobs WHERE id=${job}`)
-    )?.base;
-    expect(rows.some((r) => r.id === base)).toBe(true);
   });
   it("appends edits incrementally and compacts them when the last editor leaves", async () => {
     const f = await fixture();
@@ -449,29 +287,10 @@ describe("real collaboration service", () => {
       (await f.call(`/projects/${f.project}/files/${file}`, undefined, f.owner)).data.content,
     ).toBe("321base");
   });
-  it("never leases one task twice or applies two decisions on the same revision", async () => {
+  it("never applies two decisions on the same revision", async () => {
     const f = await fixture();
     const files = `/projects/${f.project}/files`;
     const file = (await f.call(files, { path: "m.tex", content: "a\nb\n" }, f.owner)).data.id;
-    const token = (
-      await f.call(
-        `/projects/${f.project}/runners`,
-        { name: "w", capabilities: ["codex"] },
-        f.owner,
-      )
-    ).data.token;
-    for (const prompt of ["one", "two"])
-      await f.call(`/projects/${f.project}/jobs`, { harness: "codex", prompt }, f.owner);
-    const lease = () =>
-      fetch(`${f.app.origin}/api/runner/lease`, {
-        method: "POST",
-        headers: { Origin: f.app.origin, Authorization: `Bearer ${token}` },
-        body: "{}",
-      }).then((r) => r.json());
-    const leased = await Promise.all([lease(), lease(), lease()]);
-    const ids = leased.map((l) => l.job?.id).filter(Boolean);
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
     const proposal = (
       await f.call(
         `/projects/${f.project}/proposals`,

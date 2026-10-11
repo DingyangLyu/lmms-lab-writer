@@ -29,7 +29,6 @@ import { commentRoutes } from "./routes/comments";
 import { downloadRoutes } from "./routes/downloads";
 import { fileRoutes } from "./routes/files";
 import { historyRoutes } from "./routes/history";
-import { jobRoutes, runnerRoute } from "./routes/jobs";
 import { notificationRoutes } from "./routes/notifications";
 import { addMemberRoute, peopleRoutes } from "./routes/people";
 import { projectListRoutes, projectRoutes } from "./routes/projects";
@@ -55,7 +54,7 @@ export type Options = {
   trustProxy?: boolean;
   staticDirectory?: string;
   compile?: CompileOptions;
-  /** A runner the server operator shares with every project (see routes/jobs.ts). */
+  /** The runner hosting the web's AI conversations for every project (see agents.ts). */
   sharedRunner?: SharedRunner;
   /** Extra project templates (a lab's thesis template…), added to the built-in ones. */
   templatesDirectory?: string;
@@ -216,7 +215,7 @@ export async function createWriterServer(options: Options) {
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
-  const publicRoutes = [...session.public, runnerRoute];
+  const publicRoutes = session.public;
   /** Still reachable while an account must replace a temporary password. */
   const accountRoutes = [...session.authed, passwordRoute];
   const signedInRoutes = [
@@ -238,7 +237,6 @@ export async function createWriterServer(options: Options) {
     ...historyRoutes,
     ...proposalRoutes,
     ...buildRoutes,
-    ...jobRoutes,
   ];
   // What the workbench reads on opening and after each change, in one request: separately
   // they cost an extra round trip over a slow link (a browser opens six at a time).

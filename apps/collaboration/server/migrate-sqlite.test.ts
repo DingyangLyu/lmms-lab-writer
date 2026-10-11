@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { createWriterServer } from "./app";
 import { passwordHash } from "./auth";
-import { connect } from "./db";
+import { connect, sql } from "./db";
 import { importSqlite } from "./migrate-sqlite";
 import { textDoc } from "./util";
 
@@ -111,8 +111,11 @@ describe("SQLite import", () => {
       const comments = (await call("/projects/p1/comments", undefined, login.cookie)).data;
       expect(comments[0]).toMatchObject({ quote: "迁移前", start, end, resolved: true });
       expect(comments[0].replies[0].body).toBe("已核对");
-      const jobs = (await call("/projects/p1/jobs", undefined, login.cookie)).data;
-      expect(jobs[0].status).toBe("failed");
+      // A task still queued at the move cannot run any more.
+      const job = await app.store.db.row<{ status: string }>(
+        sql`SELECT status FROM jobs WHERE project='p1'`,
+      );
+      expect(job?.status).toBe("failed");
     } finally {
       await app.close();
     }

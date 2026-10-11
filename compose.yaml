@@ -93,12 +93,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-  tex-image:
-    profiles: [tools]
-    image: writer-tex:local
-    build:
-      context: .
-      dockerfile: apps/collaboration/Dockerfile.tex
 volumes:
   writer-postgres:
   writer-backups:

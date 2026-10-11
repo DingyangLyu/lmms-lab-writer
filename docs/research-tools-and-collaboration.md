@@ -38,8 +38,7 @@
 - 网页编辑器支持查找替换（Ctrl/Cmd+F）、跳转行、LaTeX 命令与环境补全，`\cite{}` 中补全项目 .bib 的引用键，`\ref{}` 等命令中补全全部 .tex 的标签；文件可在列表中重命名、移动或删除。
 - 网页编译与 PDF 预览：点“编译”由服务器用 latexmk 编译（pdfLaTeX／XeLaTeX／LuaLaTeX，含中文宏包时默认 XeLaTeX），右侧显示 PDF、错误和警告列表（点击跳到对应行）与完整日志。双击 PDF 跳到源码，“定位到 PDF”从光标处跳到 PDF 并高亮，跨 `\input` 文件同样可用。每个项目保留最近两次编译结果，合作者打开项目即可看到最新 PDF。
 - **尚未写入的修改建议**：逐项接受、拒绝或撤销。应用时再合并当前正文，避免覆盖合作者后续独立编辑。
-- 项目快照、版本对比（列出该版本之后新增、删除、改名和修改的文件，文本逐行对比）、当前文稿恢复、项目 ZIP 导出。恢复前再保存快照，恢复通过协作事务同步，不是强制覆盖其他浏览器的状态。有人编辑时，服务器每 5 分钟检查一次，距上一个版本满半小时就自动保存“自动保存版本”（正文超过 20 MB 的项目不自动保存）。手动保存的版本全部保留；自动保存的版本，以及删除、导入、审阅决定等操作前的自动版本，每个项目保留最近 50 个（排队或执行中任务的输入版本不会被清理），批注本身不再触发整项目快照。删除文件后可在原路径重新创建或上传。
-- 共享 AI/编译任务队列；本机执行器领取快照，AI 文本输出进入审阅，二进制产物放在 `artifacts/<任务 ID>/`，不会覆盖现有图片。原生 CLI 登录凭据留在执行器机器。
+- 项目快照、版本对比（列出该版本之后新增、删除、改名和修改的文件，文本逐行对比）、当前文稿恢复、项目 ZIP 导出。恢复前再保存快照，恢复通过协作事务同步，不是强制覆盖其他浏览器的状态。有人编辑时，服务器每 5 分钟检查一次，距上一个版本满半小时就自动保存“自动保存版本”（正文超过 20 MB 的项目不自动保存）。手动保存的版本全部保留；自动保存的版本，以及删除、导入、审阅决定等操作前的自动版本，每个项目保留最近 50 个，批注本身不再触发整项目快照。删除文件后可在原路径重新创建或上传。
 
 桌面端打开与服务器关联的文件夹时，状态栏多一个“团队批注”：列出服务器上的同一批批注（回复、解决、编辑、删除，与网页一致），并在编辑器里高亮；本机文字与服务器不同时（还没同步）就先不画，以免标错位置。在这样的文件夹里新写批注时可以选择保存到“团队（服务器）”或“仅本机”：团队批注用本机文字的位置提交，PDF 上的选择先用本机 SyncTeX 定位到源码，服务器核对原文一致后才保存，没同步完会提示稍后再试。仅本机的批注仍保存在 `.writer/`，可以发给 AI 修改；已有的本机批注不会自动上传。
 
@@ -131,34 +130,20 @@ docker compose start writer
 
 - Codex 通过一个 `codex app-server`；Claude Code 每轮启动一次 stream-json CLI（和桌面端一样支持指导、审批和停止，对话记录保存在执行器上）；OpenCode 的客户端原样使用，请求和事件经服务器转发：服务器只放行面板用到的接口、逐个检查会话权限、过滤会话列表，执行器只把模型和智能体名称交给浏览器，不交出配置原文和密钥。
 
-## 共享任务执行器（一次性任务队列）
+## 共享执行器
 
-旧的一次性“共享任务”表单已从网页移除，由上面的 AI 对话取代；队列与执行器协议（`/api/projects/:id/jobs`、`/api/runner/lease|heartbeat|result`）仍保留在服务端。项目专属执行器令牌通过 `POST /api/projects/:id/runners` 创建，选定能力。令牌只显示本次，可从服务端撤销。执行器不需要管理员账号密码。
+网页的 AI 对话由共享执行器托管：一台已登录 Codex、Claude Code 或 OpenCode 的电脑运行 `pnpm --filter @lmms-lab/writer-collaboration runner`，用服务器 `WRITER_SHARED_RUNNER_TOKEN` 的同一个令牌连上服务器（`/api/runner/agents`）。执行器不需要管理员账号密码，原生 CLI 的登录凭据留在执行器上。
 
 ```sh
-# 编译镜像一次构建
-docker compose --profile tools build tex-image
-
 export WRITER_SERVER=http://127.0.0.1:8787
-export WRITER_RUNNER_TOKEN=你的项目执行器令牌
-export WRITER_ALLOWED_HARNESSES=compile
-pnpm --filter @lmms-lab/writer-collaboration runner
-```
-
-编译任务在独立 Docker 容器中执行：无网络、只读系统、单任务目录、非 root、CPU/内存/进程数及时间限制，并关闭 shell escape 和项目 latexmkrc。镜像已包含常用 TeX Live、XeLaTeX/LuaLaTeX 及中文宏包；自定义字体和特殊宏包仍需加入镜像。每次编译产生新的 PDF 产物，失败保留日志与之前 PDF。
-
-可信实验室成员需要共享 AI 任务时，在已有本机 CLI 登录的执行器上显式增加 `codex`、`claude` 或 `opencode` 能力，并使用对应能力的令牌：
-
-```sh
+export WRITER_RUNNER_TOKEN=服务器的 WRITER_SHARED_RUNNER_TOKEN
 export WRITER_ALLOWED_HARNESSES=codex,claude,opencode
 pnpm --filter @lmms-lab/writer-collaboration runner
 ```
 
-执行器默认沿用对应 CLI 的模型配置；也可设置 `WRITER_CODEX_MODEL`、`WRITER_CLAUDE_MODEL`、`WRITER_OPENCODE_MODEL`。请使用该 CLI 和账号实际支持的模型 ID。若供应商拒绝某个模型，任务会明确失败并保留日志，不会静默切换模型；修改执行器配置后再重新提交。
+两端启动 CLI 的方式（Codex 四种权限对应的 app-server 策略，Claude Code 的参数、权限和推理强度）写在 `packages/shared/agent-cli.json`，桌面端 Rust 和执行器读同一份。不同 CLI 的隔离能力不等同，不应把个人登录的执行器开放给不可信的成员；不要把个人 `auth.json` 复制给整个团队。
 
-AI 运行于项目快照的临时目录。Codex 使用 workspace-write 沙盒；Claude 限定文稿读写工具；OpenCode 禁止外部目录及 Bash。不同 CLI 的隔离能力不等同，不应把个人登录的本机 AI 执行器开放给不可信租户。不要把个人 `auth.json` 复制给整个团队。任务失败时执行器保留恢复目录并报告路径；成功提交后清理临时目录。
-
-网页通过事件推送收到状态与结果，用户或发送任务的模型无需循环查询回信。执行器自身通过队列领取任务并续租；取消或撤权会在下一次心跳时停止执行。提交者已失去编辑权限的排队任务会标记为失败并跳过，不阻塞后续任务。任务期间被合作者重命名的文件，AI 输出仍按原文件生成建议。任务超时或执行器失联不会自动重跑，以免重复修改；可由用户重新提交。
+以前的一次性“共享任务”队列（`/api/projects/:id/jobs`、项目执行器令牌和 `/api/runner/lease|heartbeat|result`）以及桌面端“用这台电脑执行组员的 AI 任务”已经删除：网页早已改用 AI 对话，没有界面再提交任务，实验室服务器上也没有过一条任务记录。数据库里的 `jobs`、`runners` 两张表暂时保留（为空），旧 SQLite 迁移仍会写入它们。
 
 ## 验证与当前边界
 
