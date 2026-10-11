@@ -19,7 +19,12 @@ import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
 const join = (...parts: Array<string | false | undefined>) => parts.filter(Boolean).join(" ");
-/** Above everything else on the page; inline where there is no page (server rendering). */
+/**
+ * Above everything else on the page; inline where there is no page (server rendering). The
+ * page's body carries the workbench's `.wb` while a project is open, so what is placed here
+ * gets its reset without the class itself, whose unlayered background would hide the
+ * Tailwind background these layers ask for (a dimmed backdrop, a note's colour).
+ */
 export const onTop = (node: ReactNode) =>
   typeof document === "undefined" ? node : createPortal(node, document.body);
 
@@ -108,7 +113,7 @@ export function Dialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   return onTop(
-    <div className="wb fixed inset-0 z-[175] flex items-center justify-center bg-black/30 p-3 sm:p-5">
+    <div className="fixed inset-0 z-[175] flex items-center justify-center bg-black/30 p-3 sm:p-5">
       <div
         role="dialog"
         aria-modal="true"
@@ -208,7 +213,7 @@ export function Popover({
       role="dialog"
       aria-label={label}
       style={{ ...position, position: "fixed" }}
-      className="wb z-[160] flex flex-col overflow-hidden border border-border bg-background text-xs text-foreground shadow-xl"
+      className="z-[160] flex flex-col overflow-hidden border border-border bg-background text-xs text-foreground shadow-xl"
     >
       {children}
     </div>,

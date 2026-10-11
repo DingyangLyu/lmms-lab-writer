@@ -104,11 +104,21 @@ const logFailure = (what: string) => (error: unknown) =>
  */
 /** The tracked changes' size as JSON; a root of another kind counts as too large. */
 function trackedBytes(doc: Y.Doc) {
+  if (!doc.share.has(CHANGES)) return 0;
   try {
     return Buffer.byteLength(JSON.stringify(changesOf(doc).toJSON()));
   } catch {
     return Number.POSITIVE_INFINITY;
   }
+}
+/**
+ * Whether `after` holds more tracked changes than allowed and more than `before` did: only
+ * an edit that adds to them is refused, so typing, accepting and rejecting still work in a
+ * file that is over the limit (an editor refused an update stops editing the file).
+ */
+export function tooManyChanges(before: Y.Doc, after: Y.Doc) {
+  const size = trackedBytes(after);
+  return size > CHANGES_BYTES && size > trackedBytes(before);
 }
 
 export class Collaboration {
@@ -528,10 +538,11 @@ export class Collaboration {
         // The text, and the tracked changes beside it (shared/tracked.ts).
         if (
           Buffer.byteLength(candidate.getText("content").toString()) > 2_000_000 ||
-          [...candidate.share.keys()].some((k) => k !== "content" && k !== CHANGES) ||
-          (candidate.share.has(CHANGES) && trackedBytes(candidate) > CHANGES_BYTES)
+          [...candidate.share.keys()].some((k) => k !== "content" && k !== CHANGES)
         )
           fail(413, "文档超过限制");
+        if (tooManyChanges(room.doc, candidate))
+          fail(413, "修订太多，请先接受或拒绝一些修订再继续修改");
         if (Y.encodeStateAsUpdate(candidate).length > 8_000_000)
           fail(413, "文档历史过大，请创建新文档快照");
       } finally {
@@ -664,6 +675,8 @@ export class Collaboration {
                   trackEdits(clone, before, editsFromOperations(plan.expected, edits), track);
               });
               if (Y.encodeStateAsUpdate(clone).length > 8_000_000) fail(413, "文档历史过大");
+              if (track && tooManyChanges(room.doc, clone))
+                fail(413, "修订太多，请先接受或拒绝一些修订再继续修改");
               prepared.push({
                 room,
                 update: Y.encodeStateAsUpdate(clone, Y.encodeStateVector(room.doc)),

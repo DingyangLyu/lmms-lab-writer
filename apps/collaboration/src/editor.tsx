@@ -499,8 +499,11 @@ export function Editor({
     callbacks.current.onLayout?.(v);
     callbacks.current.onText?.(v.state.doc.toString());
     reportPeers();
-    const stopChanges = followChanges(v, p.doc, (changes) =>
-      callbacks.current.onChanges?.(changes),
+    const stopChanges = followChanges(
+      v,
+      p.doc,
+      (changes) => callbacks.current.onChanges?.(changes),
+      () => p.editable,
     );
     callbacks.current.onReady({
       text: () => v.state.doc.toString(),

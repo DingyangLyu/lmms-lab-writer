@@ -223,7 +223,7 @@ export function CommentsPanel({
         onTop(
           <aside
             aria-label={t("notes.column")}
-            className="wb fixed top-12 right-0 bottom-0 z-[150] flex w-[22rem] max-w-[94vw] flex-col border-l border-border bg-background text-xs text-foreground shadow-xl"
+            className="fixed top-12 right-0 bottom-0 z-[150] flex w-[22rem] max-w-[94vw] flex-col border-l border-border bg-background text-xs text-foreground shadow-xl"
           >
             <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
               <NoteIcon className="size-4 text-amber-500" weight="fill" aria-hidden="true" />

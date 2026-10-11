@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import type { Member, ProjectOverview } from "../shared/api";
 import { changesOf, resolveChanges, trackEdits } from "../shared/tracked";
+import { tooManyChanges } from "./collaboration";
 import { fixture } from "./test-fixture";
 
 describe("track changes on the server", () => {
@@ -67,7 +69,25 @@ describe("track changes on the server", () => {
       "u3",
       c.capture(() => changesOf(c.doc).set("big", { text: "x".repeat(1_100_000) } as never)),
     );
-    expect((await c.next("error")).message).toMatch(/超过限制/);
+    expect((await c.next("error")).message).toMatch(/修订太多/);
+  });
+
+  it("refuses only edits that add to tracked changes beyond the limit", () => {
+    const doc = (changes: number) => {
+      const d = new Y.Doc();
+      d.getText("content").insert(0, "text");
+      for (let i = 0; i < changes; i++)
+        changesOf(d).set(`c${i}`, { text: "x".repeat(100_000) } as never);
+      return d;
+    };
+    // Over the limit already (made before it, or by a server-side edit): typing and accepting
+    // still go through, so the file never locks; adding more does not.
+    const over = doc(11);
+    expect(tooManyChanges(over, over)).toBe(false);
+    expect(tooManyChanges(over, doc(10))).toBe(false);
+    expect(tooManyChanges(over, doc(12))).toBe(true);
+    expect(tooManyChanges(doc(9), doc(11))).toBe(true);
+    expect(tooManyChanges(doc(0), doc(9))).toBe(false);
   });
 
   it("tracks a member's replacements from outside the editor only while their tracking is on", async () => {

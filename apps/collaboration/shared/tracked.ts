@@ -94,6 +94,18 @@ export function resolveChanges(doc: Y.Doc): { changes: ResolvedChange[]; lost: s
   return { changes, lost };
 }
 
+/**
+ * Lost changes old enough to forget: younger ones may only be waiting for the text they
+ * point into (an update can bring a change before the edit it records reaches this copy).
+ */
+export function staleChanges(doc: Y.Doc, now = Date.now(), age = 120_000) {
+  const map = changesOf(doc);
+  return resolveChanges(doc).lost.filter((id) => {
+    const at = (map.get(id) as Partial<TrackedChange> | undefined)?.at;
+    return typeof at !== "number" || now - at > age;
+  });
+}
+
 let sequence = 0;
 const newId = (doc: Y.Doc, now: number) =>
   `${doc.clientID.toString(36)}.${now.toString(36)}.${(sequence++).toString(36)}`;

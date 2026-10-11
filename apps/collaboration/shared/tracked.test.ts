@@ -6,6 +6,7 @@ import {
   decideChanges,
   editsFromOperations,
   resolveChanges,
+  staleChanges,
   trackEdits,
 } from "./tracked";
 
@@ -91,6 +92,20 @@ describe("tracked changes", () => {
     edit(doc, ana, 1, 3);
     expect(show(doc)).toBe("ab");
     expect(changesOf(doc).size).toBe(0);
+  });
+
+  it("forgets lost changes once they are old enough", () => {
+    const doc = start("ab");
+    type(doc, ana, 1, "XYZ");
+    // Someone not tracking deletes the inserted text: nothing is left to show.
+    doc.getText("content").delete(1, 3);
+    const [id] = resolveChanges(doc).lost;
+    expect(id).toBeDefined();
+    const at = (changesOf(doc).get(id as string) as { at: number }).at;
+    expect(staleChanges(doc, at + 60_000)).toEqual([]);
+    expect(staleChanges(doc, at + 180_000)).toEqual([id]);
+    changesOf(doc).set("odd", { kind: "insert" } as never);
+    expect(staleChanges(doc, at)).toEqual(["odd"]);
   });
 
   it("deletes across original text and an insertion: only the original is kept", () => {

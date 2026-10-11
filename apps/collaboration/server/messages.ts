@@ -146,6 +146,8 @@ export const englishMessages: Record<string, string> = {
   "执行器：{error}": "Runner: {error}",
   "AI 对话操作失败": "The AI conversation request failed",
   无效对话: "Invalid conversation",
+  "修订太多，请先接受或拒绝一些修订再继续修改":
+    "There are too many tracked changes; accept or reject some before editing further",
   对话不存在或未共享: "This conversation does not exist or is not shared with you",
   没有这个安装包: "There is no such installer",
   "只有正在运行的对话可以使用 Writer 工具":

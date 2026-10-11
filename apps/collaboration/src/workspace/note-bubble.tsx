@@ -156,7 +156,7 @@ export function NoteBubble({
         width: position?.width ?? 340,
         visibility: position ? "visible" : "hidden",
       }}
-      className="wb z-[160] flex max-h-[min(70vh,560px)] flex-col border border-amber-300 border-t-4 border-t-amber-400 bg-[#fffdf3] text-xs text-foreground shadow-xl"
+      className="z-[160] flex max-h-[min(70vh,560px)] flex-col border border-amber-300 border-t-4 border-t-amber-400 bg-[#fffdf3] text-xs text-foreground shadow-xl"
     >
       <header className="flex shrink-0 items-center gap-1.5 border-b border-amber-200 px-2.5 py-1.5">
         <NoteIcon className="size-4 shrink-0 text-amber-500" weight="fill" aria-hidden="true" />

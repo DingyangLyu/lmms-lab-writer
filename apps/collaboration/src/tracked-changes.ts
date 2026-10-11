@@ -13,6 +13,7 @@ import {
   changesOf,
   type ResolvedChange,
   resolveChanges,
+  staleChanges,
   type TextEdit,
   trackEdits,
   userHue,
@@ -25,6 +26,8 @@ export type ShownChange = ResolvedChange & { quote: string };
 
 /** Tracked edits and decisions: undone together with the text they belong to. */
 export const TRACK_ORIGIN = { trackChanges: true };
+/** Forgetting lost changes: housekeeping, not something to undo. */
+const PRUNE_ORIGIN = { pruneChanges: true };
 
 const setTracked = StateEffect.define<ResolvedChange[]>();
 
@@ -180,6 +183,8 @@ export function followChanges(
   view: EditorView,
   doc: Y.Doc,
   report: (changes: ShownChange[]) => void,
+  /** Whether this member may edit the file, and so tidy its changes. */
+  editable: () => boolean = () => false,
 ) {
   const map = changesOf(doc);
   let stopped = false,
@@ -191,6 +196,13 @@ export function followChanges(
     if (timer) clearTimeout(timer);
     timer = null;
     if (stopped) return;
+    // Changes nobody can see any more (their text deleted by someone not tracking) would
+    // otherwise pile up towards the server's limit.
+    const stale = editable() ? staleChanges(doc) : [];
+    if (stale.length)
+      doc.transact(() => {
+        for (const id of stale) map.delete(id);
+      }, PRUNE_ORIGIN);
     const { changes } = resolveChanges(doc);
     // Positions are the Yjs text's; skip a moment when the editor has not caught up.
     if (doc.getText("content").length !== view.state.doc.length) return;
