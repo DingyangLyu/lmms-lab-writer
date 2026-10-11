@@ -20,6 +20,7 @@ const TEXT = {
     now: "该处现在的源码",
     request: "修改要求",
     replies: "讨论",
+    missing: "批注已被删除或解决，请刷新后重新选择。",
     build: "网页上的 LaTeX 编译失败了，请诊断并修复这个项目。",
     main: "主文件",
     engine: "编译器",
@@ -38,6 +39,7 @@ const TEXT = {
     now: "Source there now",
     request: "Request",
     replies: "Discussion",
+    missing: "A comment was deleted or resolved. Refresh and select the comments again.",
     build: "The LaTeX build on the web failed. Please diagnose and fix this project.",
     main: "Main file",
     engine: "Engine",
@@ -76,6 +78,25 @@ export function commentsTask(comments: Comment[], files: FileInfo[], locale: Loc
     return lines.join("\n");
   });
   return [w.comments(comments.length), ...parts].join("\n\n");
+}
+
+/** Resolve anchors and excerpts again at handoff, after edits or review decisions. */
+export async function currentCommentsTask(
+  ids: string[],
+  files: FileInfo[],
+  locale: Locale,
+  read: () => Promise<Comment[]>,
+) {
+  const comments = await read();
+  const chosen = ids.map((id) =>
+    comments.find((comment) => comment.id === id && !comment.resolved),
+  );
+  if (chosen.some((comment) => !comment)) throw new Error(TEXT[locale].missing);
+  return commentsTask(
+    chosen.filter((comment): comment is Comment => !!comment),
+    files,
+    locale,
+  );
 }
 
 export function buildTask(build: Build, locale: Locale) {

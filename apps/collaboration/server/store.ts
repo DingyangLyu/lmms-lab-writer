@@ -26,6 +26,10 @@ export type FileMeta = {
 export type FileRow = FileMeta & { state: Uint8Array };
 export const AUTOMATIC_SNAPSHOTS = 50;
 const meta = `id, project, path, is_binary AS "binary", deleted, revision`;
+// One SQL snapshot must contain both the compacted base and its pending updates. Reading
+// them separately can miss acknowledged edits if compaction commits between the SELECTs.
+const documentState = `state, ARRAY(SELECT data FROM file_updates WHERE file=files.id ORDER BY id) AS updates`;
+type DocumentState = { state: Uint8Array; updates: Uint8Array[] };
 const bytes = (value: Uint8Array) => (value instanceof Uint8Array ? value : new Uint8Array(value));
 const merged = (state: Uint8Array, updates: Uint8Array[]) =>
   updates.length ? Y.mergeUpdates([state, ...updates]) : state;
@@ -92,19 +96,21 @@ export class Store {
     ));
   }
   async fileState(id: string, q: Sql = this.db) {
-    const base = await q.row<{ state: Uint8Array }>(sql`SELECT state FROM files WHERE id=${id}`);
-    if (!base) fail(404, "文档不存在");
-    const updates = await q.rows<{ data: Uint8Array }>(
-      sql`SELECT data FROM file_updates WHERE file=${id} ORDER BY id`,
-    );
-    return merged(
-      bytes(base.state),
-      updates.map((u) => bytes(u.data)),
-    );
+    const row = await q.row<DocumentState>({
+      text: `SELECT ${documentState} FROM files WHERE id=$1`,
+      values: [id],
+    });
+    if (!row) fail(404, "文档不存在");
+    return merged(bytes(row.state), row.updates.map(bytes));
   }
   async file(project: string, id: string, q: Sql = this.db): Promise<FileRow> {
-    const row = await this.fileMeta(project, id, q);
-    return { ...row, state: await this.fileState(id, q) };
+    const row = await q.row<FileRow & DocumentState>({
+      text: `SELECT ${meta}, ${documentState} FROM files WHERE project=$1 AND id=$2 AND NOT deleted`,
+      values: [project, id],
+    });
+    if (!row) fail(404, "文档不存在");
+    const { updates, ...file } = row;
+    return { ...file, state: merged(bytes(file.state), updates.map(bytes)) };
   }
   /** Every acknowledged edit is one small row; compaction folds them into `files.state`. */
   async appendUpdate(file: string, update: Uint8Array, q: Sql = this.db) {
@@ -149,18 +155,16 @@ export class Store {
       await tx.run(sql`DELETE FROM file_updates WHERE file=${file} AND id<=${last.id}`);
     });
   }
-  /** All files of a project with their merged states, in two queries. */
+  /** All files and pending edits in one database snapshot, including binary revisions. */
   async projectFiles(project: string, q: Sql = this.db, includeDeleted = false) {
-    const rows = await q.rows<FileRow>({
-      text: `SELECT ${meta}, state FROM files WHERE project=$1 ${includeDeleted ? "" : "AND NOT deleted"} ORDER BY path`,
+    const rows = await q.rows<FileRow & DocumentState>({
+      text: `SELECT ${meta}, ${documentState} FROM files WHERE project=$1 ${includeDeleted ? "" : "AND NOT deleted"} ORDER BY path`,
       values: [project],
     });
-    const updates = await q.rows<{ file: string; data: Uint8Array }>(
-      sql`SELECT u.file, u.data FROM file_updates u JOIN files f ON f.id=u.file WHERE f.project=${project} ORDER BY u.id`,
-    );
-    const pending = new Map<string, Uint8Array[]>();
-    for (const u of updates) pending.set(u.file, [...(pending.get(u.file) ?? []), bytes(u.data)]);
-    return rows.map((f) => ({ ...f, state: merged(bytes(f.state), pending.get(f.id) ?? []) }));
+    return rows.map(({ updates, ...file }) => ({
+      ...file,
+      state: merged(bytes(file.state), updates.map(bytes)),
+    }));
   }
   async textFiles(project: string, q: Sql = this.db) {
     return (await this.projectFiles(project, q))

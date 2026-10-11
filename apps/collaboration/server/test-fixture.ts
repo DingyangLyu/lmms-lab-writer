@@ -131,8 +131,9 @@ export async function fixture(options: Partial<Options> = {}) {
     return { ws, doc, next, send, capture };
   };
   const restart = async () => {
+    const port = Number(new URL(app.origin).port);
     await app.close();
-    app = await createWriterServer({ databaseUrl: db.url, port: 0 });
+    app = await createWriterServer({ ...options, databaseUrl: db.url, port });
   };
   return {
     call,

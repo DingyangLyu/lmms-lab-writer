@@ -457,15 +457,15 @@ export class Agents {
       if (!Array.isArray(paths) || paths.length > 50) fail(400, "无效字段 {key}", { key: "paths" });
       const files = [];
       for (const path of paths) {
-        const row = await this.store.db.row<{ id: string; revision: number }>(
-          sql`SELECT id, revision FROM files
+        const row = await this.store.db.row<{ state: Uint8Array; revision: number }>(
+          sql`SELECT state, revision FROM files
               WHERE project=${project} AND path=${safePath(String(path))} AND is_binary AND NOT deleted`,
         );
         if (row)
           files.push({
             path,
             revision: row.revision,
-            base64: Buffer.from(await this.store.fileState(row.id)).toString("base64"),
+            base64: Buffer.from(row.state).toString("base64"),
           });
       }
       return { files };

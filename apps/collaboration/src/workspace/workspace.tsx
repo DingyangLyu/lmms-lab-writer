@@ -59,7 +59,7 @@ import {
   resolveChoice,
   useAiChoice,
 } from "./ai-target";
-import { commentsTask } from "./ai-tasks";
+import { commentsTask, currentCommentsTask } from "./ai-tasks";
 import { BinaryPreview } from "./binary-preview";
 import { useBuild } from "./build";
 import { useCommentOps } from "./comment-ops";
@@ -402,9 +402,18 @@ export function Workspace({
     askAi:
       role === "owner" || role === "editor"
         ? (text, notes) => {
-            setAiTask({ id: Date.now(), text, target: resolveChoice(aiChoice, conversations) });
-            if (notes?.length) ops.handoff(notes, choiceLabel(aiChoice, conversations, t));
-            setRightOpen(true);
+            const target = resolveChoice(aiChoice, conversations);
+            const label = choiceLabel(aiChoice, conversations, t);
+            run(async () => {
+              const current = notes?.length
+                ? await currentCommentsTask(notes, data.files, locale, () =>
+                    api<Comment[]>(`${prefix}/comments`),
+                  )
+                : text;
+              setAiTask({ id: Date.now(), text: current, target });
+              if (notes?.length) ops.handoff(notes, label);
+              setRightOpen(true);
+            });
           }
         : null,
     ai: { choice: aiChoice, setChoice: setAiChoice, conversations },

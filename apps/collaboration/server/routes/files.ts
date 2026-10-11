@@ -126,16 +126,15 @@ export const fileRoutes = [
     return created(info);
   }),
   route<InProject>("GET", /^files\/([^/]+)$/, async (ctx, [id = ""]): Promise<FileContent> => {
-    const file = await ctx.store.fileMeta(ctx.project, id);
-    const state = await ctx.store.fileState(file.id);
+    const file = await ctx.store.file(ctx.project, id);
     return {
       id: file.id,
       path: file.path,
       binary: file.binary,
       revision: file.revision,
       ...(file.binary
-        ? { base64: Buffer.from(state).toString("base64") }
-        : { content: decodeText(state) }),
+        ? { base64: Buffer.from(file.state).toString("base64") }
+        : { content: decodeText(file.state) }),
     };
   }),
   route<InProject>("PUT", /^files\/([^/]+)$/, async (ctx, [id = ""]) => {

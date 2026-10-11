@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,7 +60,13 @@ async function setup(user = "owner") {
     return file ? (await api(`/files/${file.id}`)).data : null;
   };
   const local = (path: string) => readFile(join(dir, path), "utf8").catch(() => null);
-  const put = (path: string, content: string | Uint8Array) => writeFile(join(dir, path), content);
+  // Match the desktop editor's atomic save. An in-place writeFile also exposes its temporary
+  // truncation to the scanner, which legitimately creates a separate binary revision.
+  const put = async (path: string, content: string | Uint8Array) => {
+    const temporary = join(dir, `.save-${randomUUID()}`);
+    await writeFile(temporary, content);
+    await rename(temporary, join(dir, path));
+  };
   return { f, dir, engine, api, files, remote, local, put, notices, token };
 }
 
@@ -194,6 +201,29 @@ describe("desktop folder sync against the real server", () => {
     const merged = "ONE\ntwo\nTHREE\nthree\n";
     await until(async () => (await s.local("main.tex")) === merged, "merged after restart");
     await until(async () => (await s.remote("main.tex"))?.content === merged, "server merged");
+  });
+
+  it("reconnects after a server restart and merges edits made while the socket was down", async () => {
+    const s = await setup();
+    const id = (await s.api("/files", { path: "main.tex", content: "one\ntwo\n" })).data.id;
+    const sync = await s.engine();
+    await until(async () => (await s.local("main.tex")) === "one\ntwo\n", "clone");
+    await sync.idle();
+    await s.f.restart();
+    await s.put("main.tex", "ONE\ntwo\n");
+    sync.notifyLocal(["main.tex"]);
+    const web = await s.f.peer(s.f.owner, id);
+    web.send(
+      "remote",
+      web.capture(() => web.doc.getText("content").insert(8, "three\n")),
+    );
+    await web.next("ack");
+    const merged = "ONE\ntwo\nthree\n";
+    await until(async () => (await s.local("main.tex")) === merged, "reconnected local file");
+    await until(async () => (await s.remote("main.tex"))?.content === merged, "reconnected server");
+    await sync.idle();
+    expect(sync.status().state).toBe("synced");
+    expect(s.notices).toEqual([]);
   });
 
   it("pauses instead of deleting when many files vanish at once", async () => {

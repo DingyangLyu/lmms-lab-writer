@@ -141,7 +141,8 @@ export class WriterProvider {
           applyAwarenessUpdate(this.awareness, unbase64(msg.update), this);
         else if (msg.type === "ack") {
           this.pending.delete(msg.id);
-          if (!this.pending.size) {
+          // An earlier batch may be acknowledged while newer keystrokes still wait to send.
+          if (this.ready && !this.pending.size && !this.outgoing.length) {
             this.unsynced = false;
             this.status("saved");
           }

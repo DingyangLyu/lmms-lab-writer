@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Build, Comment } from "../../shared/api";
-import { buildTask, commentsTask } from "./ai-tasks";
+import { buildTask, commentsTask, currentCommentsTask } from "./ai-tasks";
 
 const comment: Comment = {
   id: "c1",
@@ -39,6 +39,24 @@ const comment: Comment = {
 };
 
 describe("tasks for the AI conversation", () => {
+  it("reads the current excerpt and line again before handing a comment to AI", async () => {
+    const text = await currentCommentsTask([comment.id], [], "en", async () => [
+      { ...comment, excerpt: "The source after rejecting a revision", line: 12 },
+    ]);
+    expect(text).toContain("line 12");
+    expect(text).toContain("The source after rejecting a revision");
+    expect(text).not.toContain("line 4");
+  });
+
+  it("does not hand deleted or resolved comments to AI from a stale panel", async () => {
+    await expect(currentCommentsTask([comment.id], [], "en", async () => [])).rejects.toThrow(
+      "deleted or resolved",
+    );
+    await expect(
+      currentCommentsTask([comment.id], [], "en", async () => [{ ...comment, resolved: true }]),
+    ).rejects.toThrow("deleted or resolved");
+  });
+
   it("quotes each comment with its file, line, page, request and discussion", () => {
     const text = commentsTask(
       [comment],

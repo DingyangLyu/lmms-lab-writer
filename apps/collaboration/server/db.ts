@@ -5,6 +5,8 @@
  * Rule: inside `transaction(tx => …)` use only `tx`. PGlite has one connection, so touching the
  * outer database from inside a transaction would wait for that transaction forever.
  */
+import { mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 
@@ -80,6 +82,7 @@ function postgres(url: string): Database {
 }
 
 async function pglite(location: string): Promise<Database> {
+  if (location !== "memory") await mkdir(dirname(resolve(location)), { recursive: true });
   const db = new PGlite(location === "memory" ? undefined : location);
   await db.waitReady;
   const of = (client: Pick<PGlite, "query" | "exec">) =>
