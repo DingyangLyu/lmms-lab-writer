@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import type { ProjectSummary, PublicUser } from "../shared/api";
+import type { Notice, ProjectSummary, PublicUser } from "../shared/api";
 import { ChangePassword } from "./account";
 import { AdminConsole } from "./admin";
 import { api } from "./api";
@@ -24,6 +24,10 @@ export function App() {
   const [user, setUser] = useState<PublicUser | null>(null),
     [ready, setReady] = useState(false),
     [project, setProject] = useState<ProjectSummary | null>(null),
+    // A comment to show in the project being opened (from a message).
+    [focus, setFocus] = useState<string | null>(() =>
+      typeof location === "undefined" ? null : new URL(location.href).searchParams.get("comment"),
+    ),
     [view, setView] = useState<Page>(() => {
       const params = new URL(location.href).searchParams;
       if (params.has("templates") || params.has("template")) return "templates";
@@ -71,6 +75,16 @@ export function App() {
     setProject(next);
     history.replaceState(null, "", next ? `/?project=${encodeURIComponent(next.id)}` : "/");
   }, []);
+  /** A message about a comment: its project opens on that comment. */
+  const openNotice = useCallback(
+    (notice: Notice) =>
+      void summary(notice.project).then((found) => {
+        if (!found) return;
+        setFocus(notice.comment);
+        openProject(found);
+      }),
+    [summary, openProject],
+  );
   const navigate = useCallback((next: Page) => {
     setView(next);
     if (next === "templates") setTemplate(null);
@@ -107,7 +121,17 @@ export function App() {
           </div>
         }
       >
-        <Workspace project={project} user={user} onBack={() => openProject(null)} />
+        <Workspace
+          key={project.id}
+          project={project}
+          user={user}
+          focusComment={focus}
+          onOpenNotice={openNotice}
+          onBack={() => {
+            setFocus(null);
+            openProject(null);
+          }}
+        />
       </Suspense>
     );
   const page = view === "admin" && !user.admin ? "projects" : view;
@@ -117,6 +141,7 @@ export function App() {
         user={user}
         page={page}
         onNavigate={navigate}
+        onOpenNotice={openNotice}
         onSignOut={() => void api("/logout", {}).finally(() => setUser(null))}
       />
       {page === "admin" ? (

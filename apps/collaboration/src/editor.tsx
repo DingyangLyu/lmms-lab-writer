@@ -194,6 +194,8 @@ export type EditorHandle = {
   selection: () => Selection | null;
   /** Where each highlighted comment is now, following edits since the comments loaded. */
   commentRanges: () => Map<string, { from: number; to: number }>;
+  /** Yjs positions (base64) that keep `from…to` anchored through edits, as comments store them. */
+  anchor: (from: number, to: number) => { start: string; end: string };
   insert: (text: string) => void;
   /** A command from the symbol palette, spaced from a letter that follows. */
   insertSymbol: (command: string) => void;
@@ -522,6 +524,10 @@ export function Editor({
           ),
         };
       },
+      anchor: (from, to) => ({
+        start: base64(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, from))),
+        end: base64(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(text, to, -1))),
+      }),
       commentRanges: () => {
         const ranges = new Map<string, { from: number; to: number }>();
         v.state.field(commentMarks).between(0, v.state.doc.length, (from, to, deco) => {

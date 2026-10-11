@@ -152,6 +152,7 @@ export const workbenchZh = {
   "thread.reopen": "重新打开",
   "thread.replyLabel": "回复批注",
   "thread.replyPlaceholder": "回复…",
+  "thread.replyMention": "回复…（@ 提及成员）",
   "thread.reply": "回复",
 };
 export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
@@ -306,6 +307,7 @@ export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
   "thread.reopen": "Reopen",
   "thread.replyLabel": "Reply to the comment",
   "thread.replyPlaceholder": "Reply…",
+  "thread.replyMention": "Reply… (@ to mention)",
   "thread.reply": "Reply",
 };
 const zh = { ...workbenchZh, ...agentsZh };

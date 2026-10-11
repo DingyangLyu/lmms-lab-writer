@@ -29,6 +29,7 @@ import { downloadRoutes } from "./routes/downloads";
 import { fileRoutes } from "./routes/files";
 import { historyRoutes } from "./routes/history";
 import { jobRoutes, runnerRoute } from "./routes/jobs";
+import { notificationRoutes } from "./routes/notifications";
 import { addMemberRoute, peopleRoutes } from "./routes/people";
 import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
@@ -214,6 +215,7 @@ export async function createWriterServer(options: Options) {
     ...projectListRoutes,
     ...templateRoutes,
     ...peopleRoutes,
+    ...notificationRoutes,
     ...downloadRoutes,
   ];
   const projectScoped = [

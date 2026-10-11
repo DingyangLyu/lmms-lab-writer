@@ -27,7 +27,8 @@ export function useDraft(key: string, report: (message: string) => void, failed:
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "null");
-      if (saved && typeof saved.file === "string" && typeof saved.body === "string")
+      // A PDF selection still being located when the page closed is not kept.
+      if (saved && typeof saved.file === "string" && saved.file && typeof saved.body === "string")
         setDraft(saved);
     } catch {}
   }, [key]);
@@ -42,9 +43,11 @@ export function useDraft(key: string, report: (message: string) => void, failed:
   return [draft, setDraft] as const;
 }
 
-export function postDraft(prefix: string, draft: CommentDraft) {
+/** Posts a draft under the id the page chose for it. */
+export function postDraft(prefix: string, draft: CommentDraft, id: string) {
   return draft.start && draft.end
     ? api(`${prefix}/comments`, {
+        id,
         file: draft.file,
         start: draft.start,
         end: draft.end,
@@ -52,6 +55,7 @@ export function postDraft(prefix: string, draft: CommentDraft) {
         body: draft.body,
       })
     : api(`${prefix}/comments`, {
+        id,
         file: draft.file,
         from: draft.from,
         to: draft.to,
@@ -109,30 +113,4 @@ export async function draftFromPdf(
       })),
     },
   };
-}
-
-/** Which conversation each comment was last handed to, and when (this browser). */
-export type SentNotes = Record<string, { to: string; at: number }>;
-export function useSentNotes(project: string) {
-  const key = `writer-note-sent:${project}`;
-  const [sent, setSent] = useState<SentNotes>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(key) || "{}");
-      return saved && typeof saved === "object" ? saved : {};
-    } catch {
-      return {};
-    }
-  });
-  const mark = (ids: string[], to: string) =>
-    setSent((current) => {
-      const next = { ...current };
-      for (const id of ids) next[id] = { to, at: Date.now() };
-      try {
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch {
-        /* Remembered for this visit only. */
-      }
-      return next;
-    });
-  return [sent, mark] as const;
 }

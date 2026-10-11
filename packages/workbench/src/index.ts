@@ -6,6 +6,7 @@
  */
 export * from "./comments/comment-thread";
 export * from "./comments/locate-quote";
+export * from "./comments/mentions";
 export * from "./editor/drag-selection";
 export * from "./editor/font-stacks";
 export * from "./editor/latex-source-editor";

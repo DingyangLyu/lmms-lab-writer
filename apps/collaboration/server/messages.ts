@@ -111,6 +111,11 @@ export const englishMessages: Record<string, string> = {
   文献库已有新的修改: "The bibliography has changed meanwhile",
   // comments
   批注不存在: "Comment not found",
+  批注已存在: "That comment already exists",
+  回复已存在: "That reply already exists",
+  无效的编号: "Invalid id",
+  "请选择 AI 对话": "Choose an AI conversation",
+  "请选择要交给 AI 的批注": "Choose the comments to send to the AI",
   请选择源码段落批注: "Select source text to comment on",
   "选区已失效，请重新选择": "The selection is no longer valid; select again",
   "选文已被修改，请核对后重新批注": "The selected text changed; check it and comment again",

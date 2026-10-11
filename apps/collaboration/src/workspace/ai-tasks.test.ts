@@ -35,6 +35,7 @@ const comment: Comment = {
       edited: null,
     },
   ],
+  handoffs: [],
 };
 
 describe("tasks for the AI conversation", () => {

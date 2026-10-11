@@ -612,9 +612,16 @@ export class Collaboration {
     });
     await this.auditEdit(peer.project, room.file, current.id, update.length);
   }
-  changed(project: string) {
+  /** Open pages reload the project; `scope` "comments" asks for the comments alone. */
+  changed(project: string, scope?: "comments") {
     for (const peer of this.peers)
-      if (peer.project === project) send(peer.socket, { type: "project-changed" });
+      if (peer.project === project) send(peer.socket, { type: "project-changed", scope });
+  }
+  /** Something arrived in these members' inboxes: every page they have open looks. */
+  notify(users: string[]) {
+    if (!users.length) return;
+    for (const peer of this.peers)
+      if (users.includes(peer.user.id)) send(peer.socket, { type: "notification" });
   }
   revoke(project: string, user: string) {
     for (const p of this.peers)

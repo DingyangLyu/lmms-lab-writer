@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Comment } from "../shared/api";
+import type { Comment, Inbox } from "../shared/api";
 import { fixture } from "./test-fixture";
 
 const TEXT = "\\section{Intro}\nWe measure the barrier.\nIt is low.\n";
@@ -130,5 +130,95 @@ describe("comment threads", () => {
     expect((await f.call(`${base}/comments/${id}`, {}, editor, "DELETE")).status).toBe(403);
     expect((await f.call(`${base}/comments/${id}`, {}, f.owner, "DELETE")).status).toBe(200);
     expect(await list()).toEqual([]);
+  });
+
+  it("takes the page's id, answers with the comment, and tells the members it names", async () => {
+    const { f, file, list } = await setup();
+    const base = `/projects/${f.project}`;
+    const wang = await f.invite("editor", "wang");
+    const ann = await f.invite("commenter", "Ann Lee");
+    const inbox = async (cookie: string) =>
+      (await f.call("/notifications", undefined, cookie)).data as Inbox;
+    const made = await f.call(
+      `${base}/comments`,
+      {
+        id: "page-chosen-id-1",
+        file,
+        from: 1,
+        to: 8,
+        excerpt: "section",
+        body: "@wang and @Ann Lee, please check. @nobody",
+      },
+      f.owner,
+    );
+    expect(made.status).toBe(201);
+    expect(made.data.comment).toMatchObject({
+      id: "page-chosen-id-1",
+      line: 1,
+      excerpt: "section",
+      authorName: "owner",
+      replies: [],
+      handoffs: [],
+    });
+    // The same id twice is refused.
+    expect(
+      (
+        await f.call(
+          `${base}/comments`,
+          { id: "page-chosen-id-1", file, from: 1, to: 8, excerpt: "section", body: "again" },
+          f.owner,
+        )
+      ).status,
+    ).toBe(409);
+    const named = await inbox(wang);
+    expect(named.unread).toBe(1);
+    expect(named.items[0]).toMatchObject({
+      kind: "mention",
+      comment: "page-chosen-id-1",
+      actorName: "owner",
+      projectName: "test-paper",
+      quote: "section",
+      read: false,
+    });
+    expect((await inbox(ann)).unread).toBe(1);
+    expect((await inbox(f.owner)).unread).toBe(0);
+
+    // A reply tells the others in the thread (the author), and whoever it names.
+    const replied = await f.call(
+      `${base}/comments/page-chosen-id-1/reply`,
+      { id: "page-chosen-reply-1", body: "Done, @Ann Lee" },
+      wang,
+    );
+    expect(replied.data.reply).toMatchObject({ id: "page-chosen-reply-1", authorName: "wang" });
+    expect((await inbox(f.owner)).items[0]).toMatchObject({ kind: "reply", actorName: "wang" });
+    expect((await inbox(ann)).items.map((n) => n.kind)).toEqual(["mention", "mention"]);
+    expect((await inbox(wang)).unread).toBe(1);
+
+    // Reading one, then all.
+    const first = (await inbox(ann)).items[0]?.id;
+    await f.call("/notifications/read", { ids: [first] }, ann);
+    expect((await inbox(ann)).unread).toBe(1);
+    await f.call("/notifications/read", {}, ann);
+    expect((await inbox(ann)).unread).toBe(0);
+
+    // Handing comments to an AI conversation is recorded for everyone (editors only).
+    expect(
+      (
+        await f.call(
+          `${base}/comments/handoff`,
+          { ids: ["page-chosen-id-1"], target: "Codex · 文献" },
+          ann,
+        )
+      ).status,
+    ).toBe(403);
+    await f.call(
+      `${base}/comments/handoff`,
+      { ids: ["page-chosen-id-1"], target: "Codex · 文献" },
+      wang,
+    );
+    const [comment] = await list(ann);
+    expect(comment?.handoffs).toEqual([
+      expect.objectContaining({ actorName: "wang", target: "Codex · 文献" }),
+    ]);
   });
 });

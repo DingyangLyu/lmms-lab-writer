@@ -3,17 +3,14 @@
  * compile button with its settings, and the menu that holds what is used less often.
  */
 import {
-  BooksIcon,
   CaretDownIcon,
   ClockCounterClockwiseIcon,
   DesktopIcon,
   DownloadIcon,
   DownloadSimpleIcon,
-  GitDiffIcon,
   ListIcon,
   PlayCircleIcon,
   SquaresFourIcon,
-  TextAaIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -154,32 +151,27 @@ export function CompileButton({ b, disabled }: { b: BuildState; disabled: boolea
   );
 }
 
-/** What the header used to show in a second row (references, review, export, language), and the desktop app. */
+/**
+ * The account and what is used least: all projects, export, the desktop app. References, word
+ * count, AI changes and settings live in the left rail.
+ */
 export function WorkspaceMenu({
   user,
   role,
-  pendingReview,
   exportHref,
   desktopHref,
   onProjects,
-  onReferences,
-  onReview,
-  onWordCount,
   onShare,
 }: {
   user: PublicUser;
   role: Role;
-  pendingReview: number;
   exportHref: string;
   desktopHref: string;
   onProjects: () => void;
-  onReferences: () => void;
-  onReview: () => void;
-  onWordCount: () => void;
   /** Phones have no room for the Share button beside the menu. */
   onShare: () => void;
 }) {
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const item = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs hover:bg-accent-hover";
@@ -207,9 +199,6 @@ export function WorkspaceMenu({
       >
         <ListIcon className="size-4" weight="bold" aria-hidden="true" />
         <span className="hidden 2xl:inline">{t("shell.menu")}</span>
-        {pendingReview > 0 && (
-          <span className="absolute -top-1 -right-1 size-2 bg-orange-600" aria-hidden="true" />
-        )}
       </button>
       <Popover
         open={open}
@@ -232,18 +221,6 @@ export function WorkspaceMenu({
             {t("shell.share")}
           </button>
           {entry(<SquaresFourIcon className={icon} />, t("shell.allProjects"), onProjects)}
-          {entry(<BooksIcon className={icon} />, t("tab.bibliography"), onReferences)}
-          {entry(<TextAaIcon className={icon} />, t("count.title"), onWordCount)}
-          {entry(
-            <GitDiffIcon className={icon} />,
-            <>
-              <span className="flex-1">{t("tab.review")}</span>
-              {pendingReview > 0 && (
-                <span className="bg-orange-600 px-1.5 text-[10px] text-white">{pendingReview}</span>
-              )}
-            </>,
-            onReview,
-          )}
           <a href={exportHref} className={item} onClick={() => setOpen(false)}>
             <DownloadSimpleIcon className={icon} />
             {t("workspace.export")}
@@ -269,23 +246,47 @@ export function WorkspaceMenu({
             {t("desktop.title")}
           </a>
         </nav>
-        <EditorSettingsSection />
-        <div className="flex items-center gap-2 border-t border-border px-3 py-2">
-          <span className="flex-1 text-muted">{t("language.label")}</span>
-          {(["zh", "en"] as const).map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              aria-pressed={locale === lang}
-              onClick={() => setLocale(lang)}
-              className={`border px-2 py-0.5 ${locale === lang ? "border-foreground" : "border-border hover:bg-accent-hover"}`}
-            >
-              {lang === "zh" ? "中文" : "English"}
-            </button>
-          ))}
-        </div>
       </Popover>
     </>
+  );
+}
+
+/** The rail's settings: the editor (this browser) and the page's language. */
+export function SettingsPanel() {
+  const { t, locale, setLocale } = useI18n();
+  return (
+    <section aria-label={t("settings.title")} className="flex min-h-0 flex-1 flex-col text-xs">
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+        <strong>{t("settings.title")}</strong>
+      </header>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        <div>
+          <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+            {t("settings.editor")}
+          </h3>
+          <EditorSettingsSection />
+          <p className="mt-2 leading-relaxed text-muted">{t("settings.spellHint")}</p>
+        </div>
+        <div>
+          <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+            {t("settings.language")}
+          </h3>
+          <div className="flex gap-2">
+            {(["zh", "en"] as const).map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                aria-pressed={locale === lang}
+                onClick={() => setLocale(lang)}
+                className={`rounded-md border px-3 py-1 ${locale === lang ? "border-foreground bg-foreground text-background" : "border-border hover:bg-accent-hover"}`}
+              >
+                {lang === "zh" ? "中文" : "English"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -306,9 +307,9 @@ function EditorSettingsSection() {
     </label>
   );
   return (
-    <div className="flex flex-col gap-1 border-t border-border px-3 py-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="flex-1 text-muted">{t("shell.editorSettings")}</span>
+        <span className="flex-1">{t("shell.editorSettings")}</span>
         <span className="text-muted">{t("shell.fontSize")}</span>
         <button
           type="button"

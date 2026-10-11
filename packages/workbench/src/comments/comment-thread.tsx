@@ -1,7 +1,9 @@
 /**
- * One comment thread as the web review margin and the desktop's team comments show it:
- * author, time, quoted text, comment, replies and the actions the viewer may take. The host
- * makes the requests; this component only reports what was asked.
+ * One comment thread as the web review margin, the sticky notes and the desktop's team
+ * comments show it, in the manner of Zotero's annotation cards: who and when, the quoted text
+ * under a coloured bar, the comment, replies, and the actions the viewer may take. Names
+ * written with @ stand out, and the reply field offers the people to name. The host makes the
+ * requests; this component only reports what was asked.
  */
 import {
   ArrowCounterClockwiseIcon,
@@ -12,6 +14,9 @@ import {
 } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
 import { useWorkbenchI18n as useI18n } from "../i18n";
+import { MentionField, type MentionPerson, personColor, WithMentions } from "./mentions";
+
+export { personColor } from "./mentions";
 
 export type ThreadReply = {
   id: string;
@@ -41,10 +46,6 @@ export type ThreadComment = {
   replies: ThreadReply[];
 };
 
-/** The same colour a person's cursor has in the web editor. */
-export const personColor = (id: string) =>
-  `hsl(${[...id].reduce((n, c) => n + c.charCodeAt(0), 0) % 360},65%,42%)`;
-
 function useWhen() {
   const { t, locale } = useI18n();
   return (time: number) => {
@@ -59,11 +60,32 @@ function useWhen() {
 }
 
 const iconButton =
-  "flex h-5 w-5 items-center justify-center text-muted hover:bg-accent-hover hover:text-foreground disabled:opacity-40";
+  "flex size-6 items-center justify-center rounded text-muted transition-colors hover:bg-accent-hover hover:text-foreground disabled:opacity-40";
 const field =
-  "border border-border bg-background px-2 py-1 text-xs focus:border-foreground focus:outline-none";
+  "rounded-md border border-border bg-background px-2 py-1.5 text-xs transition-colors focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300/40";
 const button =
-  "inline-flex shrink-0 items-center justify-center border px-2 py-1 text-xs transition-colors disabled:opacity-40";
+  "inline-flex shrink-0 items-center justify-center rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40";
+
+/** A person's initial in their colour. */
+export function Initial({
+  id,
+  name,
+  size = "size-5",
+}: {
+  id: string;
+  name: string;
+  size?: string;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex ${size} shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white`}
+      style={{ background: personColor(id) }}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
 
 function Byline({
   id,
@@ -81,20 +103,16 @@ function Byline({
   const { t } = useI18n();
   const when = useWhen();
   return (
-    <div className="flex items-center gap-1.5">
-      <span
-        aria-hidden="true"
-        className="flex h-4 w-4 shrink-0 items-center justify-center text-[9px] font-medium text-white"
-        style={{ background: personColor(id) }}
-      >
-        {name.slice(0, 1).toUpperCase()}
-      </span>
-      <strong className="truncate font-medium">{name}</strong>
-      <span className="shrink-0 text-muted" title={new Date(time).toLocaleString()}>
+    <div className="flex min-h-6 items-center gap-1.5">
+      <Initial id={id} name={name} />
+      <strong className="truncate font-semibold">{name}</strong>
+      <span className="shrink-0 text-[11px] text-muted" title={new Date(time).toLocaleString()}>
         {when(time)}
         {edited ? ` · ${t("thread.edited")}` : ""}
       </span>
-      <span className="ml-auto flex shrink-0 items-center gap-1">{children}</span>
+      <span className="ml-auto flex shrink-0 items-center opacity-60 transition-opacity group-hover/thread:opacity-100 group-focus-within/thread:opacity-100">
+        {children}
+      </span>
     </div>
   );
 }
@@ -103,17 +121,24 @@ function Byline({
 function Editable({
   value,
   editing,
+  people,
   onSave,
   onCancel,
 }: {
   value: string;
   editing: boolean;
+  people: MentionPerson[];
   onSave: (next: string) => void;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
   const [text, setText] = useState(value);
-  if (!editing) return <p className="whitespace-pre-wrap break-words">{value}</p>;
+  if (!editing)
+    return (
+      <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
+        <WithMentions text={value} people={people} />
+      </p>
+    );
   return (
     <form
       className="space-y-1.5"
@@ -122,13 +147,18 @@ function Editable({
         if (text.trim()) onSave(text);
       }}
     >
-      <textarea
+      <MentionField
+        multiline
         aria-label={t("thread.edit")}
         rows={3}
         value={text}
-        // biome-ignore lint/a11y/noAutofocus: editing starts from the Edit button just clicked.
+        onValue={setText}
+        people={people}
         autoFocus
-        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && text.trim()) onSave(text);
+          if (e.key === "Escape") onCancel();
+        }}
         className={`${field} w-full resize-y p-2`}
       />
       <div className="flex gap-2">
@@ -158,6 +188,8 @@ export function CommentThread({
   onActivate,
   heading,
   footer,
+  people = [],
+  pending,
   onResolve,
   onEdit,
   onDelete,
@@ -178,6 +210,10 @@ export function CommentThread({
   onActivate?: () => void;
   heading?: ReactNode;
   footer?: ReactNode;
+  /** The people comments can name with @. */
+  people?: MentionPerson[];
+  /** Shown before the server has confirmed it. */
+  pending?: boolean;
   onResolve: (resolved: boolean) => void;
   onEdit: (body: string) => void;
   onDelete: () => void;
@@ -188,18 +224,30 @@ export function CommentThread({
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<string | null>(null),
-    [reply, setReply] = useState("");
+    [reply, setReply] = useState(""),
+    [sending, setSending] = useState(false);
   const mine = (author: string) => author === me;
+  const send = () => {
+    const body = reply.trim();
+    if (!body || sending) return;
+    setSending(true);
+    setReply("");
+    // The host reports a failure; the typed reply comes back for another try.
+    void Promise.resolve(onReply(body))
+      .catch(() => setReply((now) => now || body))
+      .finally(() => setSending(false));
+  };
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the thread is also reached through its buttons.
     <article
       onClick={onActivate}
-      className={`space-y-2 border bg-background p-2.5 text-xs transition-shadow ${active ? "border-foreground shadow-md" : "border-border"} ${c.resolved ? "opacity-70" : ""}`}
+      data-thread={c.id}
+      className={`group/thread space-y-2 rounded-lg border bg-background p-2.5 text-xs shadow-sm transition-[box-shadow,border-color,opacity] duration-150 ${active ? "border-amber-400 shadow-md ring-2 ring-amber-300/40" : "border-border hover:border-foreground/25 hover:shadow"} ${c.resolved ? "opacity-70" : ""} ${pending ? "opacity-80" : ""}`}
     >
       {heading}
       <Byline id={c.author} name={c.authorName} time={c.created} edited={c.edited}>
         {c.pdf ? (
-          <span title={t("thread.fromPdf")} className="text-muted">
+          <span title={t("thread.fromPdf")} className="px-1 text-muted">
             <FilePdfIcon className="size-3.5" />
           </span>
         ) : null}
@@ -218,7 +266,7 @@ export function CommentThread({
             {c.resolved ? (
               <ArrowCounterClockwiseIcon className="size-3.5" />
             ) : (
-              <CheckIcon className="size-3.5" />
+              <CheckIcon className="size-3.5" weight="bold" />
             )}
           </button>
         )}
@@ -236,7 +284,7 @@ export function CommentThread({
         {(mine(c.author) || canDeleteAny) && (
           <button
             type="button"
-            className={iconButton}
+            className={`${iconButton} hover:text-red-600`}
             disabled={busy}
             title={t("thread.delete")}
             aria-label={t("thread.delete")}
@@ -248,77 +296,84 @@ export function CommentThread({
           </button>
         )}
       </Byline>
-      <blockquote className="line-clamp-2 border-l-2 border-orange-400 pl-2 text-muted">
-        {c.quote}
-      </blockquote>
+      {c.quote && (
+        <blockquote className="line-clamp-3 rounded-r-sm border-l-[3px] border-amber-400 bg-amber-50/80 px-2 py-1 leading-snug text-foreground/75 dark:bg-amber-400/10">
+          {c.quote}
+        </blockquote>
+      )}
       <Editable
         key={`${c.id}:${c.body}`}
         value={c.body}
         editing={editing === c.id}
+        people={people}
         onCancel={() => setEditing(null)}
         onSave={(body) => {
           setEditing(null);
           onEdit(body);
         }}
       />
-      {c.replies.map((r) => (
-        <div key={r.id} className="space-y-1 border-l-2 border-border pl-2">
-          <Byline id={r.author} name={r.authorName} time={r.created} edited={r.edited}>
-            {mine(r.author) && (
-              <button
-                type="button"
-                className={iconButton}
-                title={t("thread.edit")}
-                aria-label={t("thread.edit")}
-                onClick={() => setEditing(r.id)}
-              >
-                <PencilSimpleIcon className="size-3" />
-              </button>
-            )}
-            {(mine(r.author) || canDeleteAny) && (
-              <button
-                type="button"
-                className={iconButton}
-                disabled={busy}
-                title={t("thread.delete")}
-                aria-label={t("thread.delete")}
-                onClick={() => {
-                  if (confirm(t("thread.deleteReplyConfirm"))) onDeleteReply(r.id);
-                }}
-              >
-                <TrashIcon className="size-3" />
-              </button>
-            )}
-          </Byline>
-          <Editable
-            key={`${r.id}:${r.body}`}
-            value={r.body}
-            editing={editing === r.id}
-            onCancel={() => setEditing(null)}
-            onSave={(body) => {
-              setEditing(null);
-              onEditReply(r.id, body);
-            }}
-          />
+      {c.replies.length > 0 && (
+        <div className="space-y-2 border-t border-border/70 pt-2">
+          {c.replies.map((r) => (
+            <div key={r.id} className="space-y-0.5 pl-1">
+              <Byline id={r.author} name={r.authorName} time={r.created} edited={r.edited}>
+                {mine(r.author) && (
+                  <button
+                    type="button"
+                    className={iconButton}
+                    title={t("thread.edit")}
+                    aria-label={t("thread.edit")}
+                    onClick={() => setEditing(r.id)}
+                  >
+                    <PencilSimpleIcon className="size-3" />
+                  </button>
+                )}
+                {(mine(r.author) || canDeleteAny) && (
+                  <button
+                    type="button"
+                    className={`${iconButton} hover:text-red-600`}
+                    disabled={busy}
+                    title={t("thread.delete")}
+                    aria-label={t("thread.delete")}
+                    onClick={() => {
+                      if (confirm(t("thread.deleteReplyConfirm"))) onDeleteReply(r.id);
+                    }}
+                  >
+                    <TrashIcon className="size-3" />
+                  </button>
+                )}
+              </Byline>
+              <div className="pl-[26px]">
+                <Editable
+                  key={`${r.id}:${r.body}`}
+                  value={r.body}
+                  editing={editing === r.id}
+                  people={people}
+                  onCancel={() => setEditing(null)}
+                  onSave={(body) => {
+                    setEditing(null);
+                    onEditReply(r.id, body);
+                  }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-      {canComment && !c.resolved && (active || reply) && (
+      )}
+      {canComment && !c.resolved && !pending && (active || reply) && (
         <form
           className="flex gap-1.5"
           onSubmit={(e) => {
             e.preventDefault();
-            const body = reply;
-            // The host reports a failure; the typed reply stays for another try.
-            void Promise.resolve(onReply(body))
-              .then(() => setReply(""))
-              .catch(() => {});
+            send();
           }}
         >
-          <input
+          <MentionField
             aria-label={t("thread.replyLabel")}
             value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            placeholder={t("thread.replyPlaceholder")}
+            onValue={setReply}
+            people={people}
+            placeholder={people.length ? t("thread.replyMention") : t("thread.replyPlaceholder")}
             className={`${field} min-w-0 flex-1`}
           />
           <button

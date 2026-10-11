@@ -325,6 +325,28 @@ export const migrations: string[] = [
   // 12: track changes, for everyone in a project or for single members.
   `ALTER TABLE projects ADD COLUMN track_all BOOLEAN NOT NULL DEFAULT false;
    ALTER TABLE members ADD COLUMN track BOOLEAN NOT NULL DEFAULT false;`,
+  // 13: comments handed to an AI conversation (for everyone to see), and each member's inbox:
+  // mentions and replies in comment threads.
+  `CREATE TABLE comment_handoffs(
+     id TEXT PRIMARY KEY,
+     comment TEXT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+     actor TEXT NOT NULL REFERENCES users(id),
+     target TEXT NOT NULL,
+     created BIGINT NOT NULL
+   );
+   CREATE INDEX comment_handoffs_comment ON comment_handoffs(comment, created);
+   CREATE TABLE notifications(
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     comment TEXT REFERENCES comments(id) ON DELETE CASCADE,
+     actor TEXT NOT NULL REFERENCES users(id),
+     kind TEXT NOT NULL,
+     body TEXT NOT NULL,
+     created BIGINT NOT NULL,
+     read BOOLEAN NOT NULL DEFAULT false
+   );
+   CREATE INDEX notifications_user ON notifications(user_id, created);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

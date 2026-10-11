@@ -18,7 +18,7 @@ vi.stubGlobal("location", new URL("http://127.0.0.1:8787/"));
 const html = (node: Parameters<typeof renderToString>[0]) =>
   renderToString(node).replaceAll("<!-- -->", "");
 const { App } = await import("./app");
-const { CommentsPanel } = await import("./workspace/comments-panel");
+const { CommentsList } = await import("./workspace/comments-panel");
 const { HistoryPanel } = await import("./workspace/history-panel");
 const { LogPanel } = await import("./workspace/log-panel");
 const { PdfPane } = await import("./workspace/pdf-pane");
@@ -54,7 +54,20 @@ const ws: WorkspaceContext = {
     choice: "front",
     setChoice: () => {},
     conversations: { tabs: [], harnesses: ["codex"], active: null },
-    sent: {},
+  },
+  members: [
+    { id: "u1", username: "lab", role: "owner", avatar: null },
+    { id: "u2", username: "wang", role: "editor", avatar: null },
+  ],
+  comments: {
+    post: () => ({ id: "c9", done: Promise.resolve(null) }),
+    reply: async () => {},
+    resolve: () => {},
+    edit: () => {},
+    remove: () => {},
+    editReply: () => {},
+    removeReply: () => {},
+    handoff: () => {},
   },
 };
 const comment: Comment = {
@@ -86,6 +99,7 @@ const comment: Comment = {
       edited: null,
     },
   ],
+  handoffs: [],
 };
 const proposal: Proposal = {
   id: "p",
@@ -124,11 +138,9 @@ describe("client panels render", () => {
   it("renders the workbench panels with data", () => {
     const rendered = [
       html(
-        <CommentsPanel
+        <CommentsList
           ws={ws}
           comments={[comment]}
-          open
-          setOpen={() => {}}
           draft={{ file: "f1", quote: "选中", body: "", from: 0, to: 2, start: "a", end: "b" }}
           setDraft={() => {}}
           onSubmit={() => {}}

@@ -4,6 +4,7 @@
  * comment there. Resolved threads, and threads whose text was deleted, are listed on demand.
  */
 import type { EditorView } from "@codemirror/view";
+import { MentionField } from "@lmms-lab/workbench";
 import { CaretDownIcon, ChatCircleTextIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Comment } from "../../shared/api";
@@ -11,8 +12,8 @@ import type { EditorHandle } from "../editor";
 import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 import type { CommentDraft } from "./notes";
-import { ThreadCard } from "./thread-card";
-import { Btn, TextArea } from "./ui";
+import { peopleOf, ThreadCard } from "./thread-card";
+import { Btn } from "./ui";
 
 /** The editor view, and an event fired on every scroll, resize or edit. */
 export type MarginLayout = { view: EditorView | null; events: EventTarget };
@@ -33,40 +34,58 @@ export function DraftCard({
   const { t } = useI18n();
   // A selection in the editor must be saved on the server before it can be anchored.
   const waiting = !!draft.start && ws.status !== "saved";
+  // A selection on the PDF whose place in the source is still being looked up.
+  const locating = !draft.file;
+  const people = peopleOf(ws).filter((p) => p.id !== ws.user.id);
+  const ready = ws.canComment && !!draft.body.trim() && !waiting && !locating;
   return (
     <form
       aria-label={t("shell.newComment")}
-      className="space-y-2 border border-orange-400 bg-background p-2.5 text-xs shadow-md"
+      className="pop-in space-y-2 rounded-lg border border-amber-400 bg-background p-2.5 text-xs shadow-md ring-2 ring-amber-300/30"
       onSubmit={(e) => {
         e.preventDefault();
-        if (draft.body.trim()) onSubmit();
+        if (ready) onSubmit();
       }}
     >
       {heading && <strong className="block truncate">{heading}</strong>}
-      <blockquote className="line-clamp-3 border-l-2 border-orange-400 pl-2 text-muted">
+      <blockquote className="line-clamp-3 rounded-r-sm border-l-[3px] border-amber-400 bg-amber-50/80 px-2 py-1 leading-snug text-foreground/75 dark:bg-amber-400/10">
         {draft.quote}
       </blockquote>
-      <TextArea
+      <MentionField
+        multiline
         aria-label={t("comments.body")}
         rows={3}
         value={draft.body}
+        onValue={(body) => setDraft({ ...draft, body })}
+        people={people}
         autoFocus
         placeholder={t("comments.placeholder")}
-        onChange={(e) => setDraft({ ...draft, body: e.target.value })}
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && draft.body.trim()) onSubmit();
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && ready) onSubmit();
         }}
+        className="w-full resize-y rounded-md border border-border bg-background p-2 text-xs focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300/40"
       />
+      {people.length > 0 && <p className="text-[11px] text-muted">{t("comments.mentionHint")}</p>}
       <div className="flex items-center gap-2">
         <Btn
           type="submit"
           tone="solid"
-          disabled={ws.busy || !ws.canComment || !draft.body.trim() || waiting}
-          title={waiting ? t("notes.waitSync") : undefined}
+          className="rounded-md"
+          disabled={!ready}
+          title={locating ? t("notes.locating") : waiting ? t("notes.waitSync") : undefined}
         >
           {t("comments.post")}
         </Btn>
-        <Btn onClick={() => setDraft(null)}>{t("common.cancel")}</Btn>
+        <Btn className="rounded-md" onClick={() => setDraft(null)}>
+          {t("common.cancel")}
+        </Btn>
+        <span className="ml-auto text-[11px] text-muted">
+          {locating ? (
+            <span className="animate-pulse">{t("notes.locating")}</span>
+          ) : (
+            "⌘/Ctrl + Enter"
+          )}
+        </span>
       </div>
     </form>
   );

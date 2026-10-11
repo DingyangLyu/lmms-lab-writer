@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Build,
   Comment,
@@ -13,11 +13,26 @@ import type {
 } from "../../shared/api";
 import { api, errorText } from "../api";
 import { i18n } from "../i18n";
+import { INBOX_EVENT } from "../inbox";
+
+/**
+ * A change to the comments shown before the server has it (a comment just posted, a reply,
+ * a thread resolved), laid over what the server last sent until a reload made after the
+ * request finished includes it.
+ */
+export type CommentChange = {
+  /** Shows the change again (with the server's answer, say). */
+  update: (apply: (list: Comment[]) => Comment[]) => void;
+  /** The server has it: the next reload shows it by itself. */
+  settle: () => void;
+  /** The request failed: the comments are shown as the server has them. */
+  undo: () => void;
+};
 
 /**
  * Everything the workspace shows about a project, reloaded whenever the server reports a
  * change. Bursts of change events collapse into one reload at a time, so an older response
- * can never overwrite a newer one.
+ * can never overwrite a newer one. Comment changes reload the comments alone.
  */
 export function useProject(
   prefix: string,
@@ -36,18 +51,68 @@ export function useProject(
     [filesLoaded, setFilesLoaded] = useState(false),
     [sourcesLoaded, setSourcesLoaded] = useState(false);
   const { onRole, onError } = callbacks;
+  // The server's comments, the changes laid over them, and how many loads have started.
+  const served = useRef<Comment[]>([]),
+    overlays = useRef(
+      new Map<number, { apply: (list: Comment[]) => Comment[]; settled: number | null }>(),
+    ),
+    loads = useRef(0),
+    nextChange = useRef(0);
+  const showComments = useCallback(() => {
+    let list = served.current;
+    for (const overlay of overlays.current.values()) list = overlay.apply(list);
+    setComments(list);
+  }, []);
+  /** The server's list from a load started as number `started`. */
+  const received = useCallback(
+    (list: Comment[], started: number) => {
+      served.current = list;
+      // Loads begun after a request finished include its change.
+      for (const [key, overlay] of overlays.current)
+        if (overlay.settled !== null && started > overlay.settled) overlays.current.delete(key);
+      showComments();
+    },
+    [showComments],
+  );
+  const changeComments = useCallback(
+    (apply: (list: Comment[]) => Comment[]): CommentChange => {
+      const key = ++nextChange.current;
+      const overlay = { apply, settled: null as number | null };
+      overlays.current.set(key, overlay);
+      showComments();
+      return {
+        update: (next) => {
+          overlay.apply = next;
+          showComments();
+        },
+        settle: () => {
+          overlay.settled = loads.current;
+        },
+        undo: () => {
+          overlays.current.delete(key);
+          showComments();
+        },
+      };
+    },
+    [showComments],
+  );
+  const reloadComments = useCallback(async () => {
+    const started = ++loads.current;
+    received(await api<Comment[]>(`${prefix}/comments`), started);
+  }, [prefix, received]);
   const reload = useCallback(async () => {
+    const started = ++loads.current;
     const all = await api<ProjectOverview>(`${prefix}/overview`);
     setSummary(all.summary);
     setFiles(all.files);
-    setComments(all.comments);
+    received(all.comments, started);
     setMembers(all.members);
     setSnapshots(all.snapshots);
     setProposals(all.proposals);
     const b = all.latestBuild;
     setLatestBuild((old) => (old?.id === b?.id ? old : b));
     setFilesLoaded(true);
-  }, [prefix]);
+  }, [prefix, received]);
   /** Project text for citation and label completion and the bibliography tab. */
   const refreshSources = useCallback(async () => {
     const next = await api<SourceFile[]>(`${prefix}/sources`);
@@ -59,20 +124,22 @@ export function useProject(
       stopped = false,
       retry: ReturnType<typeof setTimeout> | null = null,
       loading = false,
-      again = false;
-    const refresh = () => {
+      // What the next load must cover: everything, or the comments alone.
+      again: "all" | "comments" | null = null;
+    const refresh = (what: "all" | "comments" = "all") => {
       if (loading) {
-        again = true;
+        again = again === "all" || what === "all" ? "all" : "comments";
         return;
       }
       loading = true;
-      void reload()
+      void (what === "comments" ? reloadComments() : reload())
         .catch((e) => onError(errorText(e)))
         .finally(() => {
           loading = false;
           if (again && !stopped) {
-            again = false;
-            refresh();
+            const next = again;
+            again = null;
+            refresh(next);
           }
         });
     };
@@ -87,7 +154,8 @@ export function useProject(
       );
       socket.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.type === "project-changed") refresh();
+        if (m.type === "project-changed") refresh(m.scope === "comments" ? "comments" : "all");
+        if (m.type === "notification") window.dispatchEvent(new Event(INBOX_EVENT));
         if (m.type === "ready") onRole(m.role);
       };
       socket.onclose = (e) => {
@@ -121,7 +189,7 @@ export function useProject(
       socket?.close();
       if (retry) clearTimeout(retry);
     };
-  }, [prefix, reload, refreshSources, onRole, onError]);
+  }, [prefix, reload, reloadComments, refreshSources, onRole, onError]);
   return {
     loaded: filesLoaded && sourcesLoaded,
     summary,
@@ -133,6 +201,8 @@ export function useProject(
     latestBuild,
     sources,
     reload,
+    reloadComments,
+    changeComments,
     refreshSources,
   };
 }

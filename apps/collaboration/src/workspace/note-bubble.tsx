@@ -156,9 +156,9 @@ export function NoteBubble({
         width: position?.width ?? 340,
         visibility: position ? "visible" : "hidden",
       }}
-      className="z-[160] flex max-h-[min(70vh,560px)] flex-col border border-amber-300 border-t-4 border-t-amber-400 bg-[#fffdf3] text-xs text-foreground shadow-xl"
+      className="pop-in z-[160] flex max-h-[min(70vh,560px)] flex-col overflow-hidden rounded-xl border border-border bg-background text-xs text-foreground shadow-2xl ring-1 ring-black/5"
     >
-      <header className="flex shrink-0 items-center gap-1.5 border-b border-amber-200 px-2.5 py-1.5">
+      <header className="flex shrink-0 items-center gap-1.5 border-b border-amber-200/80 bg-amber-50 px-2.5 py-1.5 dark:border-amber-400/20 dark:bg-amber-400/10">
         <NoteIcon className="size-4 shrink-0 text-amber-500" weight="fill" aria-hidden="true" />
         <strong className="min-w-0 flex-1 truncate">
           {state.kind === "draft"
@@ -172,12 +172,12 @@ export function NoteBubble({
           aria-label={t("notes.close")}
           title={t("notes.close")}
           onClick={onClose}
-          className="p-0.5 hover:text-accent"
+          className="rounded p-0.5 text-muted hover:bg-accent-hover hover:text-foreground"
         >
           <XIcon className="size-4" />
         </button>
       </header>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain bg-surface-secondary/40 p-2">
         {state.kind === "draft" && draft && (
           <DraftCard ws={ws} draft={draft} setDraft={setDraft} onSubmit={() => onSubmit()} />
         )}
@@ -186,7 +186,7 @@ export function NoteBubble({
         ))}
       </div>
       {target && (state.kind === "draft" ? !!draft : notes.length > 0) && (
-        <footer className="flex shrink-0 items-center gap-2 border-t border-amber-200 px-2.5 py-2">
+        <footer className="flex shrink-0 items-center gap-2 border-t border-border px-2.5 py-2">
           {target}
           {state.kind === "draft" ? (
             <Btn
@@ -194,7 +194,8 @@ export function NoteBubble({
                 ws.busy ||
                 !ws.canComment ||
                 !draft?.body.trim() ||
-                (!!draft?.start && ws.status !== "saved")
+                !draft.file ||
+                (!!draft.start && ws.status !== "saved")
               }
               title={t("comments.askAiTitle")}
               onClick={() => onSubmit(true)}

@@ -1,8 +1,10 @@
 /**
- * The project workbench in the browser, laid out like the desktop app: one header row with the
- * project, its save state, panel toggles, compiling and a menu, Files and History in the left sidebar, open-file tabs
- * with the editor and the PDF beside it, the build log below (the desktop's terminal) and AI
- * conversations on the right (the desktop's assistant). Phones get the side panels as overlays.
+ * The project workbench in the browser, laid out like Overleaf's editor and the desktop app: one
+ * header row with the project, its save state, panel toggles, compiling and a menu; a rail of
+ * icons at the left opening files, search, comments, versions, messages and settings beside
+ * it; open-file tabs with the editor and the PDF; the build log below (the desktop's terminal)
+ * and AI conversations on the right (the desktop's assistant). Phones get the side panels as
+ * overlays.
  */
 import {
   type PdfAnnotation,
@@ -37,11 +39,12 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Comment, FileInfo, ProjectSummary, PublicUser, Role } from "../../shared/api";
-import { api, download } from "../api";
+import type { Comment, FileInfo, Notice, ProjectSummary, PublicUser, Role } from "../../shared/api";
+import { api, download, errorText } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
 import { useEditorSettings } from "../editor-settings";
 import { useI18n } from "../i18n";
+import { InboxList, useInbox } from "../inbox";
 import { roleKey, statusKey } from "../labels";
 import { projectHints } from "../latex-completion";
 import type { SyncStatus } from "../provider";
@@ -58,16 +61,18 @@ import {
 import { commentsTask } from "./ai-tasks";
 import { BinaryPreview } from "./binary-preview";
 import { useBuild } from "./build";
-import { CommentsPanel } from "./comments-panel";
+import { useCommentOps } from "./comment-ops";
+import { CommentsList } from "./comments-panel";
 import type { WorkspaceContext } from "./context";
 import { FilePanel } from "./file-panel";
-import { CompileButton, VersionStatus, WorkspaceMenu } from "./header";
+import { CompileButton, SettingsPanel, VersionStatus, WorkspaceMenu } from "./header";
 import { HistoryPanel } from "./history-panel";
 import { LogPanel } from "./log-panel";
 import { type BubbleState, NoteBubble, toggleBubble } from "./note-bubble";
-import { draftFromPdf, postDraft, useDraft, useSentNotes } from "./notes";
+import { draftFromPdf, useDraft } from "./notes";
 import { OUTPUT_PDF, PdfPane } from "./pdf-pane";
 import { ProjectSearchPanel } from "./project-search-panel";
+import { Rail, type RailPanel } from "./rail";
 import { ReferencesDialog } from "./references-dialog";
 import { ReviewDialog } from "./review-dialog";
 import { type MarginLayout, ReviewMargin } from "./review-margin";
@@ -204,10 +209,16 @@ export function Workspace({
   project,
   user,
   onBack,
+  focusComment,
+  onOpenNotice,
 }: {
   project: ProjectSummary;
   user: PublicUser;
   onBack: () => void;
+  /** A comment to show once the project has loaded (opened from a message). */
+  focusComment?: string | null;
+  /** Opens a message about another project. */
+  onOpenNotice: (notice: Notice) => void;
 }) {
   const { t, locale } = useI18n();
   const prefix = `/projects/${project.id}`;
@@ -237,27 +248,30 @@ export function Workspace({
   const windowWidth = useWindowWidth();
   const aiBeside = !narrow && windowWidth >= AI_BESIDE;
   const [editorSettings] = useEditorSettings();
-  const [sidebar, setSidebar] = useState(!narrow),
-    [sidebarTab, setSidebarTab] = useState<"files" | "search" | "history">("files"),
+  // The rail's panel open beside it (null: closed); on phones it opens over the editor.
+  const [panel, setPanel] = useState<RailPanel | null>(narrow ? null : "files"),
     // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
     // where to write, what it gives, and whom to ask; a laptop opens the AI when asked.
     [rightOpen, setRightOpen] = useState(aiBeside),
     [logOpen, setLogOpen] = useState(false),
-    [commentsOpen, setCommentsOpen] = useState(false),
     [dialog, setDialog] = useState<"share" | "references" | "review" | "count" | null>(null);
   // Smaller windows narrow the side panels first, leaving the editor and the PDF their room.
   const sidebarSize = useStoredSize(
       "writer-web-sidebar",
-      260,
-      180,
-      520,
-      Math.round(windowWidth * 0.17),
+      280,
+      200,
+      560,
+      Math.round(windowWidth * 0.19),
     ),
     rightSize = useStoredSize("writer-web-right", 380, 280, 720, Math.round(windowWidth * 0.27)),
     pdfSize = useStoredSize("writer-web-pdf", 560, 260, 1600),
     logSize = useStoredSize("writer-web-log", 220, 120, 640);
   const { busy, error, setError, run } = useAction();
   const data = useProject(prefix, { onRole: setRole, onError: setError });
+  const ops = useCommentOps({ prefix, user, change: data.changeComments, report: setError });
+  const { inbox, markRead } = useInbox();
+  /** Opens a panel of the rail, or closes it when it is the one open. */
+  const togglePanel = (next: RailPanel) => setPanel((open) => (open === next ? null : next));
   // Track changes: on for everyone, or per member; the open file's changes for the toolbar.
   const trackAll = data.summary?.trackAll === true;
   const [trackedChanges, setTrackedChanges] = useState<ShownChange[]>([]);
@@ -288,7 +302,6 @@ export function Workspace({
   // The sticky note open beside the text or the PDF.
   const [bubble, setBubble] = useState<BubbleState | null>(null);
   const closeBubble = useCallback(() => setBubble(null), []);
-  const [sentNotes, markSent] = useSentNotes(project.id);
   const layout = useMemo<MarginLayout>(() => ({ view: null, events: new EventTarget() }), []);
   useEffect(() => {
     try {
@@ -306,7 +319,7 @@ export function Workspace({
   }, []);
   useEffect(() => {
     if (narrow) {
-      setSidebar(false);
+      setPanel(null);
       setRightOpen(false);
     }
   }, [narrow]);
@@ -382,18 +395,20 @@ export function Workspace({
     openFile: (next: FileInfo) => {
       setActiveId(next.id);
       setSelected(null);
-      if (narrow) setSidebar(false);
+      if (narrow) setPanel(null);
     },
     status,
     askAi:
       role === "owner" || role === "editor"
         ? (text, notes) => {
             setAiTask({ id: Date.now(), text, target: resolveChoice(aiChoice, conversations) });
-            if (notes?.length) markSent(notes, choiceLabel(aiChoice, conversations, t));
+            if (notes?.length) ops.handoff(notes, choiceLabel(aiChoice, conversations, t));
             setRightOpen(true);
           }
         : null,
-    ai: { choice: aiChoice, setChoice: setAiChoice, conversations, sent: sentNotes },
+    ai: { choice: aiChoice, setChoice: setAiChoice, conversations },
+    members: data.members,
+    comments: ops,
   };
   const b = useBuild(ws, data.latestBuild, data.sources, data.loaded);
   const [centerWidth, centerRef] = useWidth();
@@ -407,7 +422,7 @@ export function Workspace({
    */
   const showDraftPlace = () => {
     if (marginFits) showReview();
-    else setCommentsOpen(true);
+    else setPanel("comments");
   };
   const commentOnSelection = () => {
     const s = editor.current?.selection();
@@ -418,29 +433,58 @@ export function Workspace({
     setDraft({ file: file.id, body: draft?.body ?? "", ...s });
     setBubble({ kind: "draft", where: "editor" });
   };
-  /** Posts the comment being written; `andAsk` hands it to the chosen AI conversation too. */
-  const submitDraft = (andAsk = false) =>
-    draft &&
-    run(async () => {
-      const { id } = (await postDraft(prefix, draft)) as { id: string };
-      await data.reload();
-      // The note stays open, now on the posted comment.
-      setDraft(null);
-      setActiveComment(id);
-      setBubble((open) =>
-        open?.kind === "draft" ? { kind: "notes", ids: [id], where: open.where } : open,
-      );
-      if (andAsk && ws.askAi) {
-        const made = (await api<Comment[]>(`${prefix}/comments`)).find((c) => c.id === id);
-        if (made) ws.askAi(commentsTask([made], data.files, locale), [id]);
+  /**
+   * Posts the comment being written; `andAsk` hands it to the chosen AI conversation too. It
+   * shows at once (the note stays open, now on the comment); a refusal brings the draft back.
+   */
+  const submitDraft = (andAsk = false) => {
+    if (!draft) return;
+    const posting = draft;
+    const here = posting.file === file?.id ? editor.current : null;
+    const text = here?.text() ?? null;
+    const place = {
+      line: text === null ? null : text.slice(0, posting.from).split("\n").length,
+      ...(posting.start ? {} : (here?.anchor(posting.from, posting.to) ?? {})),
+    };
+    setError("");
+    const { id, done } = ops.post(posting, place);
+    // The note stays open, now on the comment.
+    const where = bubble?.kind === "draft" ? bubble.where : null;
+    if (where) setBubble({ kind: "notes", ids: [id], where });
+    setDraft(null);
+    setActiveComment(id);
+    void done.then((made) => {
+      if (!made) {
+        // Refused: the words come back to try again.
+        setDraft((now) => now ?? posting);
+        if (where) setBubble({ kind: "draft", where });
+        return;
       }
+      if (andAsk && ws.askAi) ws.askAi(commentsTask([made], data.files, locale), [made.id]);
     });
+  };
+  /** A comment someone was told about: its text, with the note open beside it. */
+  const showComment = (c: Comment) => {
+    locate(c);
+    if (narrow || !c.line) setPanel("comments");
+    else setBubble({ kind: "notes", ids: [c.id], where: "editor" });
+  };
   const locate = (c: { id: string; file: string; line: number | null }) => {
     const target = data.files.find((f) => f.id === c.file);
     if (target && c.line) b.openLocation(target.path, c.line);
     activate(c.id);
     if (!narrow) showReview();
   };
+  // A comment opened from a message is shown once the project has loaded.
+  const focused = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the comment first appears.
+  useEffect(() => {
+    if (!focusComment || focused.current || !data.loaded) return;
+    const target = data.comments.find((c) => c.id === focusComment);
+    if (!target) return;
+    focused.current = true;
+    showComment(target);
+  }, [focusComment, data.loaded, data.comments]);
   // Comments made on the PDF are drawn on it again while it is the same build.
   const pdfNotes: PdfAnnotationHost = {
     items: data.comments
@@ -464,7 +508,7 @@ export function Workspace({
     draft,
     selectedId: activeComment,
     navigation: pdfNavigation,
-    setOpen: setCommentsOpen,
+    setOpen: (open) => setPanel(open ? "comments" : null),
     openNotes: (ids) => {
       activate(ids[0] ?? null);
       setBubble((open) => toggleBubble(open, { kind: "notes", ids, where: "pdf" }));
@@ -472,20 +516,30 @@ export function Workspace({
     beginDraft: (selection) => {
       const build = b.build;
       if (!build) return;
-      // The note opens where the words were selected on the PDF.
+      // The note opens at once where the words were selected on the PDF, while their place in
+      // the source is looked up (Post waits for it).
       const chosen = document.getSelection();
       const rect = chosen?.rangeCount ? chosen.getRangeAt(0).getBoundingClientRect() : null;
-      run(async () => {
-        const next = await draftFromPdf(prefix, build.id, data.files, selection, (f) =>
-          f.id === file?.id ? (editor.current?.text() ?? null) : null,
-        );
-        if (draft?.body.trim() && !next.body) next.body = draft.body;
-        setDraft(next);
-        const target = data.files.find((f) => f.id === next.file);
-        if (target && target.id !== file?.id) ws.openFile(target);
-        if (rect && rect.height > 0) setBubble({ kind: "draft", where: "pdf", rect });
-        else showDraftPlace();
-      });
+      const typed = draft?.body.trim() ? draft.body : "";
+      setDraft({ file: "", quote: selection.quote, body: typed, from: 0, to: 0 });
+      if (rect && rect.height > 0) setBubble({ kind: "draft", where: "pdf", rect });
+      else showDraftPlace();
+      void draftFromPdf(prefix, build.id, data.files, selection, (f) =>
+        f.id === file?.id ? (editor.current?.text() ?? null) : null,
+      )
+        .then((next) => {
+          setDraft((now) =>
+            now && !now.file && now.quote === selection.quote
+              ? { ...next, body: now.body || next.body }
+              : now,
+          );
+          const target = data.files.find((f) => f.id === next.file);
+          if (target && target.id !== file?.id) ws.openFile(target);
+        })
+        .catch((e) => {
+          setError(errorText(e));
+          setDraft((now) => (now && !now.file ? null : now));
+        });
     },
   };
   const compileRef = useRef(b.compile);
@@ -502,8 +556,7 @@ export function Workspace({
       // Search the whole project, as on Overleaf.
       if (mod && event.shiftKey && key === "f") {
         event.preventDefault();
-        setSidebar(true);
-        setSidebarTab("search");
+        setPanel("search");
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
@@ -601,35 +654,72 @@ export function Workspace({
       )}
     </div>
   );
-  const sidebarContent = (
-    <>
-      <TabBar
-        tabs={[
-          { id: "files", label: t("shell.files") },
-          { id: "search", label: t("psearch.tab") },
-          { id: "history", label: t("shell.history"), badge: data.snapshots.length || undefined },
-        ]}
-        activeTab={sidebarTab}
-        onTabSelect={(id) => setSidebarTab(id as "files" | "search" | "history")}
-        variant="sidebar"
+  /** A message: this project's opens the comment; another project's opens that project. */
+  const openNotice = (notice: Notice) => {
+    markRead([notice.id]);
+    if (notice.project !== project.id) {
+      onOpenNotice(notice);
+      return;
+    }
+    const target = data.comments.find((c) => c.id === notice.comment);
+    if (!target) {
+      setPanel("comments");
+      return;
+    }
+    showComment(target);
+  };
+  const panelContent =
+    panel === "files" ? (
+      <FilePanel
+        ws={ws}
+        outlinePath={outlinePath}
+        outlineSource={text && text.file === outlinePath ? text.value : undefined}
+        onOutline={(path, line) => b.openLocation(path, line)}
       />
-      {sidebarTab === "files" ? (
-        <FilePanel
-          ws={ws}
-          outlinePath={outlinePath}
-          outlineSource={text && text.file === outlinePath ? text.value : undefined}
-          onOutline={(path, line) => b.openLocation(path, line)}
+    ) : panel === "search" ? (
+      <ProjectSearchPanel
+        ws={ws}
+        refresh={data.refreshSources}
+        onOpen={(path, line) => b.openLocation(path, line)}
+      />
+    ) : panel === "comments" ? (
+      <CommentsList
+        ws={ws}
+        comments={data.comments}
+        draft={draft}
+        setDraft={setDraft}
+        onSubmit={submitDraft}
+        showDraft={bubble?.kind !== "draft" && (!marginShown || draft?.file !== file?.id)}
+        onLocate={locate}
+      />
+    ) : panel === "history" ? (
+      <HistoryPanel ws={ws} snapshots={data.snapshots} />
+    ) : panel === "inbox" ? (
+      <section aria-label={t("inbox.title")} className="flex min-h-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs">
+          <strong>{t("inbox.title")}</strong>
+        </header>
+        <InboxList
+          inbox={inbox}
+          project={project.id}
+          onOpen={openNotice}
+          onReadAll={() => markRead()}
         />
-      ) : sidebarTab === "search" ? (
-        <ProjectSearchPanel
-          ws={ws}
-          refresh={data.refreshSources}
-          onOpen={(path, line) => b.openLocation(path, line)}
-        />
-      ) : (
-        <HistoryPanel ws={ws} snapshots={data.snapshots} />
-      )}
-    </>
+      </section>
+    ) : panel === "settings" ? (
+      <SettingsPanel />
+    ) : null;
+  const rail = (
+    <Rail
+      panel={panel}
+      onPanel={togglePanel}
+      openComments={data.comments.filter((c) => !c.resolved).length}
+      unread={inbox?.unread ?? 0}
+      pendingReview={pendingReview}
+      onReferences={() => setDialog("references")}
+      onWordCount={() => setDialog("count")}
+      onReview={() => setDialog("review")}
+    />
   );
   const assistant = (
     <Suspense fallback={null}>
@@ -680,7 +770,7 @@ export function Workspace({
         activeComment={activeComment}
         onCommentClick={(id) => {
           activate(id);
-          if (narrow) setCommentsOpen(true);
+          if (narrow) setPanel("comments");
           else showReview();
         }}
         onSelect={(next) => {
@@ -761,10 +851,7 @@ export function Workspace({
             <VersionStatus
               snapshots={data.snapshots}
               members={data.members}
-              onOpen={() => {
-                setSidebarTab("history");
-                setSidebar(true);
-              }}
+              onOpen={() => setPanel("history")}
             />
           </span>
           {peers.length > 0 && (
@@ -785,30 +872,25 @@ export function Workspace({
             </span>
           )}
           <div className="ml-auto flex h-8 shrink-0 items-center gap-1 sm:gap-2">
-            <CommentsPanel
-              ws={ws}
-              comments={data.comments}
-              open={commentsOpen}
-              setOpen={setCommentsOpen}
-              draft={draft}
-              setDraft={setDraft}
-              onSubmit={submitDraft}
-              showDraft={bubble?.kind !== "draft" && (!marginShown || draft?.file !== file?.id)}
-              onLocate={locate}
-            />
             {pendingReview > 0 && (
               <Btn className="hidden h-8 md:inline-flex" onClick={() => setDialog("review")}>
                 {t("shell.reviewCount", { count: pendingReview })}
               </Btn>
             )}
-            <span className="hidden select-none text-lg text-border sm:inline">/</span>
-            <ToggleButton
-              pressed={sidebar}
-              label={t("shell.toggleSidebar")}
-              onClick={() => setSidebar((v) => !v)}
-            >
-              <SidebarSimpleIcon className="size-4" weight="bold" />
-            </ToggleButton>
+            {/* Phones have no rail: this opens it, with its panel, over the editor. */}
+            {narrow && (
+              <ToggleButton
+                pressed={panel !== null}
+                label={t("shell.toggleSidebar")}
+                onClick={() => setPanel((open) => (open ? null : "files"))}
+                className="relative"
+              >
+                <SidebarSimpleIcon className="size-4" weight="bold" />
+                {(inbox?.unread ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-sky-500" />
+                )}
+              </ToggleButton>
+            )}
             <ToggleButton
               pressed={logOpen}
               label={t("shell.toggleLog")}
@@ -847,13 +929,9 @@ export function Workspace({
             <WorkspaceMenu
               user={user}
               role={role}
-              pendingReview={pendingReview}
               exportHref={`/api${prefix}/export`}
               desktopHref={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
               onProjects={onBack}
-              onReferences={() => setDialog("references")}
-              onReview={() => setDialog("review")}
-              onWordCount={() => setDialog("count")}
               onShare={() => setDialog("share")}
             />
             <button
@@ -887,24 +965,37 @@ export function Workspace({
           )}
         </div>
         <main className="relative flex min-h-0 flex-1 overflow-hidden">
-          {sidebar &&
-            (narrow ? (
-              overlay("left", sidebarContent, () => setSidebar(false))
-            ) : (
-              <>
-                <aside
-                  style={{ width: sidebarSize.size }}
-                  className="flex shrink-0 flex-col overflow-hidden border-r border-border"
-                >
-                  {sidebarContent}
-                </aside>
-                <ResizeHandle
-                  label={t("shell.resizeSidebar")}
-                  onResize={sidebarSize.resize}
-                  onDone={sidebarSize.save}
-                />
-              </>
-            ))}
+          {narrow ? (
+            panel &&
+            overlay(
+              "left",
+              <div className="flex min-h-0 flex-1">
+                {rail}
+                <div className="flex min-w-0 flex-1 flex-col">{panelContent}</div>
+              </div>,
+              () => setPanel(null),
+            )
+          ) : (
+            <>
+              {rail}
+              {panel && (
+                <>
+                  <aside
+                    key={panel}
+                    style={{ width: Math.max(sidebarSize.size, panel === "comments" ? 320 : 0) }}
+                    className="slide-in-left flex shrink-0 flex-col overflow-hidden border-r border-border"
+                  >
+                    {panelContent}
+                  </aside>
+                  <ResizeHandle
+                    label={t("shell.resizeSidebar")}
+                    onResize={sidebarSize.resize}
+                    onDone={sidebarSize.save}
+                  />
+                </>
+              )}
+            </>
+          )}
           <div ref={centerRef} className="flex w-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex min-h-0 flex-1">
               {narrow && b.open ? (

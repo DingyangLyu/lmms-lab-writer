@@ -206,7 +206,31 @@ export type Comment = {
   excerpt: string | null;
   pdf: CommentPdf | null;
   replies: Reply[];
+  /** The AI conversations it was handed to, oldest first. */
+  handoffs: Handoff[];
+  /** Set by the page on a comment it shows before the server has confirmed it. */
+  pending?: boolean;
 };
+/** A comment handed to an AI conversation: by whom, to which one, and when. */
+export type Handoff = { actor: string; actorName: string; target: string; created: number };
+
+/** Something in a member's inbox: a mention, or a reply in a thread they take part in. */
+export type Notice = {
+  id: string;
+  kind: "mention" | "reply";
+  project: string;
+  projectName: string;
+  /** The thread, while it exists. */
+  comment: string | null;
+  actor: string;
+  actorName: string;
+  /** What was written, and the text the thread is about. */
+  body: string;
+  quote: string;
+  created: number;
+  read: boolean;
+};
+export type Inbox = { items: Notice[]; unread: number };
 
 export type Snapshot = {
   id: string;
