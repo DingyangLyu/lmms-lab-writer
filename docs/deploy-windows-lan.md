@@ -141,6 +141,11 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 - 浏览器开着全局代理时，国内地址也会绕到国外，访问 Writer 前请把这些地址设为直连；
 - 网页的脚本和样式已压缩（Brotli/gzip）并长期缓存，第一次打开之后再进只需下载很少的数据。
 
+**隧道怎么运行**：Writer Server 任务启动 `C:\writer\run-writer.ps1` 时，会为北京和洛杉矶各启动一个隐藏的 `C:\writer\network\run-writer-tunnel.ps1`（仓库里是 `deploy/lab/run-writer-tunnel.ps1`，文件锁保证每条线路只有一个），断线后自动重连，日志在 `C:\writer\logs\tunnel-beijing.log` 和 `tunnel-la.log`。连接悄悄断掉时（实验室网络切换、NAT 遗忘），中转服务器的 sshd 察觉不到，旧会话会一直占着 18090 端口，新隧道被拒（日志里反复出现 `remote port forwarding failed for listen port 18090`）；脚本遇到这种立即失败，会登录中转服务器结束占着端口的旧会话再重连（2026-10-12 加入，此前两条线路因此断了约 50 分钟）。
+
+- 要重启隧道，重启 Writer Server 任务即可（网页会断开十几秒）。不要在 SSH 会话里用 `Start-Process` 启动隧道：Windows OpenSSH 在会话结束时会结束会话里启动的所有进程。
+- 在 Windows PowerShell 5 里用 `& ssh.exe ... 2>&1` 捕获 ssh 的输出会卡住不返回；需要输出时用 `Start-Process` 把输入输出重定向到文件。
+
 首页和登录页右上角有“线路”切换，列出 `server.env` 里 `WRITER_ADDRESSES=campus=http://10.100.147.57,china=http://101.200.37.236:18089,global=https://writer.desire-drive.com` 的三个地址（内网、国内、海外），访问者按自己所在的位置换到更快的那个。切换时停在同一页（登录、注册表单和邀请链接都保留）；各地址的登录状态互不相通，换过去可能要重新登录。改地址后重启 Writer Server。
 
 ## 常见问题
