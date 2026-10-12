@@ -1,6 +1,6 @@
 {
   "name": "@lmms-lab/writer-shared",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Types and settings shared by the desktop app and the collaboration server",
   "type": "module",
