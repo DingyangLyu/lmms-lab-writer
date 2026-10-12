@@ -30,6 +30,7 @@ const app = await createWriterServer({
   downloadsDirectory:
     process.env.WRITER_DOWNLOADS_DIR ||
     resolve(process.env.WRITER_DATA_DIR || ".data", "downloads"),
+  zoteroApi: process.env.WRITER_ZOTERO_API || undefined,
   adminUser: process.env.WRITER_ADMIN_USER,
   adminPassword: process.env.WRITER_ADMIN_PASSWORD,
   sharedRunner: process.env.WRITER_SHARED_RUNNER_TOKEN

@@ -36,9 +36,11 @@ import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
 import { publishTemplateRoute, templateRoutes } from "./routes/templates";
 import { wordRoutes } from "./routes/words";
+import { zoteroAccountRoutes, zoteroRoutes } from "./routes/zotero";
 import { Store } from "./store";
 import { TemplateLibrary } from "./templates";
 import { fail, HttpError } from "./util";
+import { ZOTERO_API } from "./zotero";
 
 export type Options = {
   /** `postgres://…` for production, `pglite:<dir>` or `pglite:memory` for tests and trials. */
@@ -67,6 +69,8 @@ export type Options = {
   ghostscript?: string;
   /** Desktop installers offered to members (see routes/downloads.ts). */
   downloadsDirectory?: string;
+  /** Zotero's web API; default api.zotero.org. */
+  zoteroApi?: string;
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -212,6 +216,7 @@ export async function createWriterServer(options: Options) {
     }),
     downloads: options.downloadsDirectory ?? null,
     addresses,
+    zotero: options.zoteroApi ?? ZOTERO_API,
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
@@ -225,6 +230,7 @@ export async function createWriterServer(options: Options) {
     ...peopleRoutes,
     ...notificationRoutes,
     ...wordRoutes,
+    ...zoteroAccountRoutes,
     ...downloadRoutes,
   ];
   const projectScoped = [
@@ -233,6 +239,7 @@ export async function createWriterServer(options: Options) {
     addMemberRoute,
     ...fileRoutes,
     ...bibliographyRoutes,
+    ...zoteroRoutes,
     ...commentRoutes,
     ...historyRoutes,
     ...proposalRoutes,
@@ -272,7 +279,8 @@ export async function createWriterServer(options: Options) {
         fail(403, "请求来源不匹配");
       if (path === "/api/health") {
         await store.db.row(sql`SELECT 1`);
-        return json(res, { ok: true });
+        // Whether the shared runner (the web's AI conversations) is connected, for monitoring.
+        return json(res, { ok: true, ai: options.sharedRunner ? agents.status().online : null });
       }
       if (!path.startsWith("/api/")) return await serveStatic(ctx, staticRoot);
       if (await dispatch(publicRoutes, ctx, path)) return;

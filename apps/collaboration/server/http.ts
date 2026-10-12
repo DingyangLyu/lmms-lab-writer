@@ -90,6 +90,8 @@ export type Services = {
   downloads: string | null;
   /** The addresses offered to visitors (WRITER_ADDRESSES). */
   addresses: ServerAddress[];
+  /** Zotero's web API (another address in tests). */
+  zotero: string;
 };
 export type Context = Services & {
   req: IncomingMessage;

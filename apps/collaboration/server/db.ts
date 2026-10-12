@@ -360,6 +360,27 @@ export const migrations: string[] = [
   // 15: whether a build's engine was chosen by the project's sources (the desktop's "auto"),
   // so the next build decides again rather than keeping it.
   `ALTER TABLE builds ADD COLUMN auto BOOLEAN NOT NULL DEFAULT false;`,
+  // 16: members' Zotero keys, and .bib files kept up to date from a Zotero library: a link
+  // refreshes with the key of the member who made it, so any editor can update it.
+  `CREATE TABLE zotero_accounts(
+     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+     api_key TEXT NOT NULL,
+     zotero_user TEXT NOT NULL,
+     username TEXT NOT NULL,
+     created BIGINT NOT NULL
+   );
+   CREATE TABLE zotero_links(
+     file TEXT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     library TEXT NOT NULL,
+     library_name TEXT NOT NULL,
+     collection TEXT,
+     collection_name TEXT,
+     items INTEGER NOT NULL DEFAULT 0,
+     synced BIGINT NOT NULL
+   );
+   CREATE INDEX zotero_links_project ON zotero_links(project);`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

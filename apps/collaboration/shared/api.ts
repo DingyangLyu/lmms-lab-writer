@@ -265,6 +265,27 @@ export type BibliographyImport = {
   skipped: string[];
   renamed: Record<string, string>;
 };
+/** The member's connected Zotero account: its user name, or null when not connected. */
+export type ZoteroAccount = { username: string | null };
+/** `users/<id>` is the member's own library (name ""), `groups/<id>` a group's. */
+export type ZoteroLibrary = { id: string; name: string };
+export type ZoteroCollection = { key: string; name: string };
+/** A .bib file kept up to date from a Zotero library, with the key of the member who linked it. */
+export type ZoteroLink = {
+  file: string;
+  path: string;
+  library: string;
+  libraryName: string;
+  collection: string | null;
+  collectionName: string | null;
+  items: number;
+  synced: number;
+  owner: string;
+  ownerName: string;
+  /** Whether the member who linked it still has Zotero connected (updates need their key). */
+  ownerConnected: boolean;
+};
+export type ZoteroSync = { file: string; path: string; items: number; changed: boolean };
 
 export type Engine = "pdflatex" | "xelatex" | "lualatex";
 export type BuildIssue = {

@@ -109,6 +109,23 @@ export const englishMessages: Record<string, string> = {
   元数据过大: "The metadata is too large",
   "请选择 BibTeX 文件": "Choose a BibTeX file",
   文献库已有新的修改: "The bibliography has changed meanwhile",
+  // Zotero
+  "无效的 Zotero 密钥": "Invalid Zotero key",
+  "无效的 Zotero 文库": "Invalid Zotero library",
+  "无效的 Zotero 分类": "Invalid Zotero collection",
+  "连不上 Zotero，请稍后再试": "Cannot reach Zotero; try again later",
+  "Zotero 密钥无效，或没有读取这个文库的权限":
+    "The Zotero key is invalid or cannot read this library",
+  "Zotero 找不到这个文库或分类": "Zotero cannot find this library or collection",
+  "Zotero 暂时繁忙，请稍后再试": "Zotero is busy; try again later",
+  "Zotero 请求失败（{status}）": "The Zotero request failed ({status})",
+  "Zotero 返回了无法识别的内容": "Zotero returned something unexpected",
+  "Zotero 文库超过 {count} 条，请选择一个分类":
+    "The Zotero library has more than {count} items; choose a collection",
+  "请先连接 Zotero": "Connect Zotero first",
+  "这个文件没有关联 Zotero": "This file is not linked to Zotero",
+  "关联这个文件的成员已断开 Zotero，请重新关联":
+    "The member who linked this file has disconnected Zotero; link it again",
   // comments
   批注不存在: "Comment not found",
   批注已存在: "That comment already exists",

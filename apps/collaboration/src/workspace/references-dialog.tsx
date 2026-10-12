@@ -6,6 +6,7 @@ import { api, errorText } from "../api";
 import { useI18n } from "../i18n";
 import type { WorkspaceContext } from "./context";
 import { Btn, Dialog, Input, Select, TextArea } from "./ui";
+import { ZoteroSection } from "./zotero-section";
 
 export function ReferencesDialog({
   ws,
@@ -107,6 +108,7 @@ export function ReferencesDialog({
           >
             {t("bib.importButton")}
           </Btn>
+          <ZoteroSection ws={ws} bibFile={bibFile} refreshSources={refreshSources} />
         </aside>
         <section className="flex min-w-0 flex-1 flex-col gap-2">
           <Input
