@@ -135,10 +135,11 @@ def request(url, body=None, headers=None, timeout=15):
 
 
 def health(url):
-    """(ok, detail, ai) for one Writer address."""
+    """(ok, detail, ai) for one address: Writer's /api/health ({"ok": true, "ai": ...}) or
+    Y-Translator's /health ({"status": "ok"}), which the same lab machine serves."""
     try:
         data = request(url, timeout=10)
-        return bool(data.get("ok")), "", data.get("ai")
+        return data.get("ok") is True or data.get("status") == "ok", "", data.get("ai")
     except urllib.error.HTTPError as error:
         return False, f"HTTP {error.code}", None
     except Exception as error:  # noqa: BLE001

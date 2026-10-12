@@ -6,6 +6,12 @@
       "url": "http://127.0.0.1:18089/api/health",
       "direct": "http://127.0.0.1:18090/api/health",
       "proxy": "北京服务器的 nginx "
+    },
+    {
+      "name": "Y-Translator 北京线路 http://101.200.37.236:18189",
+      "url": "http://127.0.0.1:18189/health",
+      "direct": "http://127.0.0.1:18190/health",
+      "proxy": "北京服务器的 nginx "
     }
   ],
   "lab_status": "lab-status.json",
