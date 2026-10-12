@@ -155,6 +155,18 @@ export function CompileButton({ b, disabled }: { b: BuildState; disabled: boolea
               <option value="lualatex">LuaLaTeX</option>
             </Select>
           </div>
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              checked={b.autoBuild}
+              onChange={(e) => b.setAutoBuild(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              {t("build.autoCompile")}
+              <span className="block text-muted">{t("build.autoCompileHint")}</span>
+            </span>
+          </label>
         </div>
       </Popover>
     </>
@@ -429,6 +441,29 @@ function EditorSettingsSection() {
         change({ highlightAmbiguousUnicode: on }),
       )}
       {toggle(t("shell.spellcheck"), settings.spellcheck, (on) => change({ spellcheck: on }))}
+      {toggle(t("shell.closeBrackets"), settings.autoClosingBrackets !== "never", (on) =>
+        change({ autoClosingBrackets: on ? "always" : "never" }),
+      )}
+      <div className="flex items-center gap-2 pt-1">
+        <span className="flex-1">{t("shell.theme")}</span>
+        {(["light", "dark", "system"] as const).map((theme) => (
+          <button
+            key={theme}
+            type="button"
+            aria-pressed={settings.theme === theme}
+            onClick={() => change({ theme })}
+            className={`border px-2 leading-5 ${settings.theme === theme ? "border-foreground bg-foreground text-background" : "border-border hover:bg-accent-hover"}`}
+          >
+            {t(
+              theme === "light"
+                ? "shell.themeLight"
+                : theme === "dark"
+                  ? "shell.themeDark"
+                  : "shell.themeSystem",
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

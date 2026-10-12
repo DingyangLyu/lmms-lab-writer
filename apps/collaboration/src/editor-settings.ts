@@ -7,10 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 
 export type WebEditorSettings = Pick<
   EditorSettings,
-  "fontSize" | "wordWrap" | "lineNumbers" | "highlightAmbiguousUnicode"
+  "fontSize" | "wordWrap" | "lineNumbers" | "highlightAmbiguousUnicode" | "autoClosingBrackets"
 > & {
   /** The browser's English checker on the prose of .tex files; see spellcheck.ts. */
   spellcheck: boolean;
+  /** The project page's colours; "system" follows the computer's setting. */
+  theme: "light" | "dark" | "system";
 };
 const KEY = "writer-editor-settings";
 const CHANGED = "writer-editor-settings";
@@ -22,7 +24,9 @@ export function readEditorSettings(): WebEditorSettings {
     wordWrap: DEFAULT_EDITOR_SETTINGS.wordWrap,
     lineNumbers: DEFAULT_EDITOR_SETTINGS.lineNumbers,
     highlightAmbiguousUnicode: DEFAULT_EDITOR_SETTINGS.highlightAmbiguousUnicode,
+    autoClosingBrackets: "always",
     spellcheck: true,
+    theme: "light",
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -32,7 +36,9 @@ export function readEditorSettings(): WebEditorSettings {
       wordWrap: saved.wordWrap === "off" ? "off" : "on",
       lineNumbers: saved.lineNumbers === "off" ? "off" : "on",
       highlightAmbiguousUnicode: saved.highlightAmbiguousUnicode === true,
+      autoClosingBrackets: saved.autoClosingBrackets === "never" ? "never" : "always",
       spellcheck: saved.spellcheck !== false,
+      theme: saved.theme === "dark" || saved.theme === "system" ? saved.theme : "light",
     };
   } catch {
     return fallback;
@@ -62,4 +68,18 @@ export function useEditorSettings() {
     window.dispatchEvent(new Event(CHANGED));
   }, []);
   return [settings, change] as const;
+}
+
+/** Whether the page shows dark: the setting, or the computer's when it says "system". */
+export function useDarkTheme(theme: WebEditorSettings["theme"]) {
+  const query =
+    typeof matchMedia === "undefined" ? null : matchMedia("(prefers-color-scheme: dark)");
+  const [systemDark, setSystemDark] = useState(() => !!query?.matches);
+  useEffect(() => {
+    if (!query) return;
+    const changed = () => setSystemDark(query.matches);
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, [query]);
+  return theme === "dark" || (theme === "system" && systemDark);
 }

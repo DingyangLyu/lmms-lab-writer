@@ -44,7 +44,7 @@ import {
 import type { Comment, FileInfo, Notice, ProjectSummary, PublicUser, Role } from "../../shared/api";
 import { api, download, errorText } from "../api";
 import { Editor, type EditorHandle, type Peer } from "../editor";
-import { useEditorSettings } from "../editor-settings";
+import { useDarkTheme, useEditorSettings } from "../editor-settings";
 import { useI18n } from "../i18n";
 import { InboxList, useInbox } from "../inbox";
 import { roleKey, statusKey } from "../labels";
@@ -250,6 +250,12 @@ export function Workspace({
   const windowWidth = useWindowWidth();
   const aiBeside = !narrow && windowWidth >= AI_BESIDE;
   const [editorSettings] = useEditorSettings();
+  const dark = useDarkTheme(editorSettings.theme);
+  // The workbench's colours follow the `dark` class (theme.css), on the whole page while open.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    return () => document.documentElement.classList.remove("dark");
+  }, [dark]);
   // Code or visual mode, remembered in this browser.
   const [visual, setVisual] = useState(() => {
     try {
@@ -814,6 +820,7 @@ export function Workspace({
         visual={visual}
         onVisualChange={chooseVisual}
         issues={fileIssues}
+        dark={dark}
         resolveImage={(path) => {
           // As TeX looks: from the project's top and beside the file, with or without extension.
           const folder = file.path.includes("/")
@@ -886,7 +893,7 @@ export function Workspace({
           >
             <img src="/favicon.svg" alt="Y-Writer" className="size-7 lg:hidden" />
             <img
-              src="/logo-small-light.svg"
+              src={dark ? "/logo-dark.svg" : "/logo-small-light.svg"}
               alt="Y-Writer"
               className="hidden h-7 w-auto lg:block"
             />

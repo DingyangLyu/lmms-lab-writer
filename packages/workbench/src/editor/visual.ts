@@ -16,7 +16,15 @@ import {
   StateEffect,
   StateField,
 } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  type PluginValue,
+  ViewPlugin,
+  type ViewUpdate,
+  WidgetType,
+} from "@codemirror/view";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { workbenchI18n as i18n } from "../i18n";
@@ -838,12 +846,54 @@ export const revealOnClick = EditorView.domEventHandlers({
 });
 
 /** Visual mode on, or nothing; put it in a Compartment to switch. */
+/**
+ * Where the body's text starts: the first line after \begin{document} that is not blank or
+ * \maketitle (which would show its source with the cursor on it); null without a body.
+ */
+function bodyStart(state: EditorState) {
+  const match = /\\begin\{document\}/.exec(state.doc.toString());
+  if (!match) return null;
+  let line = state.doc.lineAt(match.index);
+  while (line.number < state.doc.lines) {
+    line = state.doc.line(line.number + 1);
+    if (line.text.trim() && line.text.trim() !== "\\maketitle") return line.from;
+  }
+  return line.to;
+}
+/**
+ * A file opens with the cursor at its top, which would unfold the preamble: until the member
+ * moves the cursor, it waits at the start of the body instead.
+ */
+const startInBody = ViewPlugin.fromClass(
+  class implements PluginValue {
+    moved = false;
+    constructor(view: EditorView) {
+      this.place(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input")))
+        this.moved = true;
+      if (!this.moved && update.docChanged) this.place(update.view);
+    }
+    place(view: EditorView) {
+      const head = view.state.selection.main.head;
+      const start = bodyStart(view.state);
+      if (start !== null && head < start && view.state.selection.main.empty && head === 0)
+        queueMicrotask(() => {
+          if (view.state.selection.main.head === 0 && !this.moved)
+            view.dispatch({ selection: EditorSelection.cursor(start) });
+        });
+    }
+  },
+);
+
 export function visualMode(on: boolean, options: VisualOptions = {}): Extension {
   if (!on) return [];
   return [
     visualField(options),
     visualTheme,
     revealOnClick,
+    startInBody,
     EditorView.editorAttributes.of({ class: "cm-visual" }),
   ];
 }

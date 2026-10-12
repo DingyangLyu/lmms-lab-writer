@@ -231,6 +231,8 @@ describe("client panels render", () => {
       chosenEngine: "pdflatex" as const,
       engineSetting: "pdflatex" as const,
       setEngine: () => {},
+      autoBuild: false,
+      setAutoBuild: () => {},
       highlight: null,
       compile: () => {},
       chinese: null,

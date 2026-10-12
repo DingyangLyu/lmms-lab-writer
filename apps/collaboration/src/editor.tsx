@@ -191,10 +191,10 @@ function noteGutter(onIcon: (ids: string[], draft: boolean) => void) {
   ];
 }
 /** The desktop editor's theme, gutters, wrapping and brackets with the member's settings, read-only by role. */
-const configuration = (settings: Partial<EditorSettings>, role: Role) =>
+const configuration = (settings: Partial<EditorSettings>, role: Role, dark = false) =>
   editorConfiguration(
     { ...DEFAULT_EDITOR_SETTINGS, ...settings },
-    false,
+    dark,
     !["owner", "editor"].includes(role),
   );
 export type EditorHandle = {
@@ -245,6 +245,7 @@ export function Editor({
   onVisualChange,
   resolveImage,
   issues,
+  dark = false,
 }: {
   project: string;
   file: string;
@@ -290,6 +291,8 @@ export function Editor({
   resolveImage?: (path: string) => string | null;
   /** The last build's errors and warnings in this file, marked beside their lines. */
   issues?: EditorIssue[];
+  /** Dark colours for the text. */
+  dark?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
@@ -337,6 +340,8 @@ export function Editor({
   checked.current = spellcheck;
   const visualOn = useRef(visual);
   visualOn.current = visual;
+  const darkRef = useRef(dark);
+  darkRef.current = dark;
   const tracks = useRef(tracking);
   tracks.current = tracking;
   useEffect(() => {
@@ -423,7 +428,7 @@ export function Editor({
           ]),
           yCollab(text, p.awareness, { undoManager: undo }),
           // The desktop editor's theme, gutters, wrapping and brackets, read-only by role.
-          editability.current.of(configuration(chosen.current, readOnly.current)),
+          editability.current.of(configuration(chosen.current, readOnly.current, darkRef.current)),
           trackedChanges,
           trackedTheme,
           trackedTooltip(() => (p.editable ? decide : null)),
@@ -633,9 +638,9 @@ export function Editor({
   }, [project, file, user]);
   useEffect(() => {
     view.current?.dispatch({
-      effects: editability.current.reconfigure(configuration(settings, role)),
+      effects: editability.current.reconfigure(configuration(settings, role, dark)),
     });
-  }, [role, settings]);
+  }, [role, settings, dark]);
   useEffect(() => {
     view.current?.dispatch({ effects: spelling.current.reconfigure(latexSpellcheck(spellcheck)) });
   }, [spellcheck]);

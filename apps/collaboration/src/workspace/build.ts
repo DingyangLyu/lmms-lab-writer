@@ -143,6 +143,53 @@ export function useBuild(
     autoCompiled.current = true;
     compile(!phone());
   }, [loaded, latest, build, chosenMain, ws.canComment]);
+  // Automatic builds (this browser's choice): a few seconds after the member's edits are saved.
+  const [autoBuild, setAutoBuildState] = useState(() => {
+    try {
+      return localStorage.getItem("writer-auto-compile") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setAutoBuild = (on: boolean) => {
+    setAutoBuildState(on);
+    try {
+      localStorage.setItem("writer-auto-compile", on ? "1" : "0");
+    } catch {}
+  };
+  const lastStatus = useRef(status);
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoPending = useRef(false);
+  // The timer runs later: it calls the newest compile, with the newest settings.
+  const compileNow = useRef(compile);
+  compileNow.current = compile;
+  const compilingNow = useRef(compiling);
+  compilingNow.current = compiling;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to saves only.
+  useEffect(() => {
+    const saved = lastStatus.current === "saving" && status === "saved";
+    lastStatus.current = status;
+    if (!autoBuild || !saved || !ws.canComment) return;
+    if (autoTimer.current) clearTimeout(autoTimer.current);
+    autoTimer.current = setTimeout(() => {
+      autoTimer.current = null;
+      if (compilingNow.current) autoPending.current = true;
+      else compileNow.current(false);
+    }, 2500);
+  }, [status, autoBuild]);
+  // A build asked for while another ran starts when that one ends.
+  useEffect(() => {
+    if (!compiling && autoPending.current) {
+      autoPending.current = false;
+      compileNow.current(false);
+    }
+  }, [compiling]);
+  useEffect(
+    () => () => {
+      if (autoTimer.current) clearTimeout(autoTimer.current);
+    },
+    [],
+  );
   const showCursorInPdf = () =>
     build &&
     file &&
@@ -174,6 +221,8 @@ export function useBuild(
     chosenEngine,
     engineSetting,
     setEngine,
+    autoBuild,
+    setAutoBuild,
     highlight,
     compile,
     chinese,
