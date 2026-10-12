@@ -1,6 +1,6 @@
 {
   "name": "@lmms-lab/writer-desktop",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
