@@ -361,7 +361,7 @@
   },
   {
     "id": "acm-sigconf",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/acmart.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/acmart.zip",
     "archive": "acmart.zip",
     "root": "acmart",
     "generate": ["acmart.ins", "samples/samples.ins"],
@@ -457,7 +457,7 @@
   },
   {
     "id": "springer-lncs",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/llncs.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/llncs.zip",
     "archive": "llncs.zip",
     "include": ["llncs.cls", "splncs04.bst", "README.md"],
     "add": {
@@ -533,7 +533,7 @@
   },
   {
     "id": "ieee-tpami",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/IEEEtran.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/IEEEtran.zip",
     "archive": "ieeetran.zip",
     "include": ["IEEEtran.cls", "bare_jrnl_compsoc.tex", "bibtex/IEEEtran.bst"],
     "rename": {
@@ -585,7 +585,7 @@
   },
   {
     "id": "acs-journals",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/achemso.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/achemso.zip",
     "archive": "achemso.zip",
     "generate": ["achemso.ins"],
     "include": [
@@ -629,7 +629,7 @@
   },
   {
     "id": "elsevier-elsarticle",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/elsarticle.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/elsarticle.zip",
     "archive": "elsarticle.zip",
     "generate": ["elsarticle.ins"],
     "include": ["elsarticle.cls", "*.bst", "elsarticle-template-num.tex"],
@@ -655,7 +655,7 @@
   },
   {
     "id": "elsevier-cas",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/els-cas-templates.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/els-cas-templates.zip",
     "archive": "els-cas-templates.zip",
     "include": [
       "cas-dc.cls",
@@ -687,7 +687,7 @@
   },
   {
     "id": "aps-physical-review",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/revtex.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/revtex.zip",
     "archive": "revtex.zip",
     "include": ["sample/aps/apstemplate.tex"],
     "rename": {
@@ -719,7 +719,7 @@
   },
   {
     "id": "thuthesis",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/thuthesis.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/thuthesis.zip",
     "archive": "thuthesis.zip",
     "generate": ["thuthesis.ins"],
     "exclude": [
@@ -752,7 +752,7 @@
   },
   {
     "id": "pkuthss",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/pkuthss.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/pkuthss.zip",
     "archive": "pkuthss.zip",
     "include": [
       "tex/pkuthss.cls",
@@ -862,7 +862,7 @@
   },
   {
     "id": "moderncv",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/moderncv.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/moderncv.zip",
     "archive": "moderncv.zip",
     "include": [
       "*.sty",
@@ -893,7 +893,7 @@
   },
   {
     "id": "tikzposter",
-    "url": "https://ctan.math.utah.edu/ctan/tex-archive/graphics/pgf/contrib/tikzposter.zip",
+    "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/graphics/pgf/contrib/tikzposter.zip",
     "archive": "tikzposter.zip",
     "generate": ["tikzposter.ins"],
     "include": ["tikzposter.cls", "tikzposter*.tex"],
