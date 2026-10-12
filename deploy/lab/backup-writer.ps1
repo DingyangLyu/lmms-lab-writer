@@ -1,4 +1,5 @@
-# Writer backup on the lab workstation (task "\Writer\Writer Backup", every 6 hours).
+﻿# Writer backup on the lab workstation (task "\Writer\Writer Backup", every 6 hours). Saved as
+# UTF-8 with a BOM: Windows PowerShell 5.1 reads a file without one in the system code page (GBK).
 #
 # 1. pg_dump of the database (projects, files, history, comments: everything but templates) to
 #    D:\writer-backups, kept 14 days; C:\writer\backups while D: is unplugged. Each dump is
