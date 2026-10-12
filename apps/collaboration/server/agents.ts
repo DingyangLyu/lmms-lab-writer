@@ -12,11 +12,9 @@ import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { Locale } from "@lmms-lab/i18n";
-import { mergeText, reviewHunks } from "@lmms-lab/writing";
 import { WebSocket, WebSocketServer } from "ws";
 import {
   type AgentBusy,
-  type AgentChangeResult,
   type AgentEvent,
   type AgentFile,
   type AgentStatus,
@@ -27,27 +25,15 @@ import {
   OPENCODE_EVENT,
   THREADS_EVENT,
 } from "../shared/agents";
-import type { ChangeAuthor } from "../shared/tracked";
 import { answerTo, delegatedPrompt, resultPrompt, transcript } from "./agent-bridge";
 import { allowedOrigin, bearer, userFor } from "./auth";
 import type { Collaboration } from "./collaboration";
 import { sql } from "./db";
+import { applyFileChanges } from "./file-changes";
 import type { SharedRunner } from "./http";
 import { requestLocale, say } from "./messages";
-import { createFile, PROJECT_BYTES, projectTooLarge } from "./routes/files";
 import type { Store, User } from "./store";
-import {
-  accessDenied,
-  checked,
-  decodeText,
-  digest,
-  fail,
-  HttpError,
-  isTextPath,
-  normalizeEol,
-  safePath,
-  uid,
-} from "./util";
+import { accessDenied, decodeText, digest, fail, HttpError, safePath, uid } from "./util";
 
 type Params = Record<string, unknown>;
 type Browser = {
@@ -478,7 +464,9 @@ export class Agents {
       // Normally the member whose turn it is; after a server restart, whoever started it.
       const actor = turn?.thread === thread.id ? turn.user : thread.owner;
       if (!(await this.store.can(project, actor, "edit"))) fail(403, "当前角色不允许此操作");
-      const results = await this.applyChanges(
+      const results = await applyFileChanges(
+        this.store,
+        this.collab,
         project,
         actor,
         params.files,
@@ -1345,142 +1333,5 @@ ${message}`,
         ? { path: f.path, binary: true, revision: f.revision }
         : { path: f.path, binary: false, revision: f.revision, content: decodeText(f.state) },
     );
-  }
-
-  /** Each change on its own: one that cannot be applied does not hold back the others. */
-  private async applyChanges(project: string, actor: string, raw: unknown, track?: ChangeAuthor) {
-    if (!Array.isArray(raw) || raw.length > 200) fail(400, "AI 改动无效");
-    const results: AgentChangeResult[] = [];
-    for (const value of raw) {
-      if (!isObject(value)) fail(400, "AI 改动无效");
-      const path = safePath(text(value, "path", 240));
-      try {
-        results.push(await this.applyChange(project, actor, path, value, track));
-      } catch (error) {
-        if (!(error instanceof HttpError) || error.status >= 500) throw error;
-        results.push({ path, status: "skipped", reason: error.template });
-      }
-    }
-    return results;
-  }
-  private async applyChange(
-    project: string,
-    actor: string,
-    path: string,
-    change: Params,
-    track?: ChangeAuthor,
-  ): Promise<AgentChangeResult> {
-    const file = await this.store.db.row<{ id: string; binary: boolean; revision: number }>(
-      sql`SELECT id, is_binary AS "binary", revision FROM files
-          WHERE project=${project} AND path=${path} AND NOT deleted`,
-    );
-    // An agent on Windows may write "\r\n"; the shared text has "\n" only.
-    const base = typeof change.base === "string" ? normalizeEol(change.base) : null;
-    if (typeof change.content === "string") change.content = normalizeEol(change.content);
-    const revision = typeof change.revision === "number" ? change.revision : null;
-    if (change.deleted === true) {
-      if (!file) return { path, status: "applied" };
-      const unchanged = file.binary
-        ? revision === file.revision
-        : (await this.collab.text(project, file.id)) === base;
-      // Someone else's newer work is never deleted.
-      if (!unchanged) return { path, status: "skipped", reason: "文件已被其他人修改，未删除" };
-      await this.store.db.transaction(async (tx) => {
-        await tx.run(sql`UPDATE files SET deleted=true WHERE id=${file.id}`);
-        await this.store.audit(
-          project,
-          actor,
-          "file.delete",
-          { file: file.id, path, agent: true },
-          tx,
-        );
-      });
-      this.collab.closeFile(file.id, "文件已删除");
-      return { path, status: "applied" };
-    }
-    if (typeof change.content === "string") {
-      if (!isTextPath(path) || file?.binary)
-        return { path, status: "skipped", reason: "文件类型已改变" };
-      if (Buffer.byteLength(change.content) > 2_000_000) fail(413, "文本文件超过 2 MB");
-      if (!file) {
-        await createFile(this.store, project, actor, path, change.content);
-        return { path, status: "applied" };
-      }
-      // A collaborator may type between reading and replacing; try again with the new text.
-      for (let attempt = 0; ; attempt++) {
-        const current = await this.collab.text(project, file.id);
-        const merged = mergeText(base ?? "", current, change.content);
-        if (merged.content === null) {
-          await this.propose(project, file.id, actor, base ?? "", change.content);
-          return { path, status: "proposal" };
-        }
-        if (merged.content === current) return { path, status: "applied" };
-        try {
-          await this.collab.replaceMany(
-            project,
-            [{ file: file.id, expected: current, content: merged.content }],
-            actor,
-            undefined,
-            track,
-          );
-          return { path, status: "applied" };
-        } catch (error) {
-          if (!(error instanceof HttpError) || error.status !== 409 || attempt >= 2) throw error;
-        }
-      }
-    }
-    if (typeof change.base64 === "string") {
-      if (isTextPath(path) || (file && !file.binary))
-        return { path, status: "skipped", reason: "文件类型已改变" };
-      if (change.base64.length > 14_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(change.base64))
-        fail(400, "无效文件编码");
-      const bytes = Buffer.from(change.base64, "base64");
-      if (bytes.length > 10_000_000) fail(413, "单文件超过 10 MB");
-      if (!file) {
-        const created = await createFile(this.store, project, actor, path, bytes);
-        return { path, status: "applied", revision: created.revision };
-      }
-      if (revision !== file.revision)
-        return { path, status: "skipped", reason: "文件已被其他人替换" };
-      const saved = await this.store.db.transaction(async (tx) => {
-        const size = await tx.row<{ bytes: number }>(
-          sql`SELECT coalesce(sum(length(state)),0) AS bytes FROM files WHERE project=${project} AND id<>${file.id}`,
-        );
-        if ((size?.bytes ?? 0) + bytes.length > PROJECT_BYTES) projectTooLarge();
-        const row =
-          (await tx.row<{ revision: number }>(
-            sql`UPDATE files SET state=${bytes}, revision=revision+1
-                WHERE id=${file.id} AND revision=${file.revision} AND NOT deleted RETURNING revision`,
-          )) ?? fail(409, "文件已被其他人替换");
-        await this.store.audit(
-          project,
-          actor,
-          "file.replace",
-          { file: file.id, path, agent: true },
-          tx,
-        );
-        return row.revision;
-      });
-      return { path, status: "applied", revision: saved };
-    }
-    return fail(400, "AI 改动无效");
-  }
-  /** Overlapping edits stay reviewable hunk by hunk, as a member's suggestion would. */
-  private async propose(
-    project: string,
-    file: string,
-    actor: string,
-    base: string,
-    proposed: string,
-  ) {
-    const id = uid(),
-      hunks = checked(() => reviewHunks(base, proposed));
-    await this.store.db.transaction(async (tx) => {
-      await tx.run(
-        sql`INSERT INTO proposals(id, project, file, author, base, proposed, hunks, revision, created)
-            VALUES(${id}, ${project}, ${file}, ${actor}, ${base}, ${proposed}, ${JSON.stringify(hunks)}, 1, ${Date.now()})`,
-      );
-      await this.store.audit(project, actor, "proposal.create", { id, file, agent: true }, tx);
-    });
   }
 }

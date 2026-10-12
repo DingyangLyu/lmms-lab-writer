@@ -10,6 +10,7 @@ import { allowedOrigin, bearer, bootstrap, userFor } from "./auth";
 import { Collaboration } from "./collaboration";
 import { type CompileOptions, Compiler } from "./compile";
 import { sql } from "./db";
+import { GitSync } from "./git";
 import type { SharedRunner } from "./http";
 import {
   type Authed,
@@ -28,6 +29,7 @@ import { buildRoutes } from "./routes/builds";
 import { commentRoutes } from "./routes/comments";
 import { downloadRoutes } from "./routes/downloads";
 import { fileRoutes } from "./routes/files";
+import { gitAccountRoutes, gitRoutes } from "./routes/git";
 import { historyRoutes } from "./routes/history";
 import { notificationRoutes } from "./routes/notifications";
 import { addMemberRoute, peopleRoutes } from "./routes/people";
@@ -71,6 +73,8 @@ export type Options = {
   downloadsDirectory?: string;
   /** Zotero's web API; default api.zotero.org. */
   zoteroApi?: string;
+  /** Where projects' Git repositories are kept; the git program; file:// remotes (tests only). */
+  git?: { directory: string; binary?: string; allowFile?: boolean };
 };
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -217,6 +221,13 @@ export async function createWriterServer(options: Options) {
     downloads: options.downloadsDirectory ?? null,
     addresses,
     zotero: options.zoteroApi ?? ZOTERO_API,
+    git: new GitSync(
+      store,
+      collab,
+      options.git?.directory ?? resolve(".data", "git"),
+      options.git?.binary,
+      options.git?.allowFile,
+    ),
   };
   const staticRoot = resolve(options.staticDirectory ?? join(import.meta.dirname, "../dist"));
   const session = await sessionRoutes();
@@ -231,6 +242,7 @@ export async function createWriterServer(options: Options) {
     ...notificationRoutes,
     ...wordRoutes,
     ...zoteroAccountRoutes,
+    ...gitAccountRoutes,
     ...downloadRoutes,
   ];
   const projectScoped = [
@@ -240,6 +252,7 @@ export async function createWriterServer(options: Options) {
     ...fileRoutes,
     ...bibliographyRoutes,
     ...zoteroRoutes,
+    ...gitRoutes,
     ...commentRoutes,
     ...historyRoutes,
     ...proposalRoutes,

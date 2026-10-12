@@ -381,6 +381,30 @@ export const migrations: string[] = [
      synced BIGINT NOT NULL
    );
    CREATE INDEX zotero_links_project ON zotero_links(project);`,
+  // 17: Git sync. Each member's access token or SSH key per host, and the repository branch a
+  // project follows with the commit it last matched (see git.ts).
+  `CREATE TABLE git_credentials(
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     host TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     username TEXT,
+     secret TEXT NOT NULL,
+     author_name TEXT,
+     author_email TEXT,
+     created BIGINT NOT NULL,
+     PRIMARY KEY (user_id, host, kind)
+   );
+   CREATE TABLE git_remotes(
+     project TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+     url TEXT NOT NULL,
+     branch TEXT NOT NULL,
+     base TEXT,
+     untracked TEXT NOT NULL DEFAULT '[]',
+     created_by TEXT NOT NULL REFERENCES users(id),
+     synced BIGINT,
+     synced_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+     action TEXT
+   );`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

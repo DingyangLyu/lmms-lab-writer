@@ -8,6 +8,7 @@ import {
   DesktopIcon,
   DownloadIcon,
   DownloadSimpleIcon,
+  GitBranchIcon,
   ListIcon,
   PlayCircleIcon,
   SquaresFourIcon,
@@ -171,6 +172,7 @@ export function WorkspaceMenu({
   desktopHref,
   onProjects,
   onShare,
+  onGit,
 }: {
   user: PublicUser;
   role: Role;
@@ -179,6 +181,7 @@ export function WorkspaceMenu({
   onProjects: () => void;
   /** Phones have no room for the Share button beside the menu. */
   onShare: () => void;
+  onGit: () => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -230,6 +233,7 @@ export function WorkspaceMenu({
             {t("shell.share")}
           </button>
           {entry(<SquaresFourIcon className={icon} />, t("shell.allProjects"), onProjects)}
+          {entry(<GitBranchIcon className={icon} />, t("shell.git"), onGit)}
           <a href={exportHref} className={item} onClick={() => setOpen(false)}>
             <DownloadSimpleIcon className={icon} />
             {t("workspace.export")}

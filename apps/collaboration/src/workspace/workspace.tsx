@@ -66,6 +66,7 @@ import { useCommentOps } from "./comment-ops";
 import { CommentsList } from "./comments-panel";
 import type { WorkspaceContext } from "./context";
 import { FilePanel } from "./file-panel";
+import { GitDialog } from "./git-dialog";
 import { CompileButton, SettingsPanel, VersionStatus, WorkspaceMenu } from "./header";
 import { HistoryPanel } from "./history-panel";
 import { LogPanel } from "./log-panel";
@@ -255,7 +256,9 @@ export function Workspace({
     // where to write, what it gives, and whom to ask; a laptop opens the AI when asked.
     [rightOpen, setRightOpen] = useState(aiBeside),
     [logOpen, setLogOpen] = useState(false),
-    [dialog, setDialog] = useState<"share" | "references" | "review" | "count" | null>(null);
+    [dialog, setDialog] = useState<"share" | "references" | "review" | "count" | "git" | null>(
+      null,
+    );
   // Smaller windows narrow the side panels first, leaving the editor and the PDF their room.
   const sidebarSize = useStoredSize(
       "writer-web-sidebar",
@@ -965,6 +968,7 @@ export function Workspace({
               desktopHref={`lmms-writer://open?server=${encodeURIComponent(location.origin)}&project=${encodeURIComponent(project.id)}`}
               onProjects={onBack}
               onShare={() => setDialog("share")}
+              onGit={() => setDialog("git")}
             />
             <button
               type="button"
@@ -1151,6 +1155,7 @@ export function Workspace({
             onDeleted={onBack}
           />
         )}
+        {dialog === "git" && <GitDialog ws={ws} onClose={() => setDialog(null)} />}
         {dialog === "references" && (
           <ReferencesDialog
             ws={ws}

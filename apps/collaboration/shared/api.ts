@@ -286,6 +286,40 @@ export type ZoteroLink = {
   ownerConnected: boolean;
 };
 export type ZoteroSync = { file: string; path: string; items: number; changed: boolean };
+/** A member's saved Git access for one host: an HTTPS access token or an SSH private key. */
+export type GitCredentialInfo = {
+  host: string;
+  kind: "token" | "ssh";
+  username: string | null;
+  authorName: string | null;
+  authorEmail: string | null;
+  created: number;
+};
+export type GitStatus = {
+  remote: {
+    url: string;
+    branch: string;
+    host: string;
+    /** What the address needs from the member; null for a local test repository. */
+    kind: "token" | "ssh" | null;
+    base: string | null;
+    synced: number | null;
+    syncedBy: string | null;
+    action: "pull" | "push" | null;
+    /** Files the repository has that the project cannot hold; they are left as they are. */
+    untracked: number;
+  } | null;
+  /** Project files changed since the last sync, or null before the first one. */
+  changed: number | null;
+  /** Whether this member has saved access for the repository's host. */
+  hasCredential: boolean;
+};
+export type GitPullResult = {
+  commit: string | null;
+  applied: number;
+  proposals: number;
+  skipped: { path: string; reason: string }[];
+};
 
 export type Engine = "pdflatex" | "xelatex" | "lualatex";
 export type BuildIssue = {

@@ -4,6 +4,7 @@ import type { ServerAddress } from "../shared/api";
 import { allowedOrigin } from "./auth";
 import type { Collaboration } from "./collaboration";
 import type { Compiler } from "./compile";
+import type { GitSync } from "./git";
 import { sizeText } from "./limits";
 import type { Store, User } from "./store";
 import type { TemplateLibrary } from "./templates";
@@ -92,6 +93,8 @@ export type Services = {
   addresses: ServerAddress[];
   /** Zotero's web API (another address in tests). */
   zotero: string;
+  /** Projects' Git repositories (see git.ts). */
+  git: GitSync;
 };
 export type Context = Services & {
   req: IncomingMessage;

@@ -109,6 +109,33 @@ export const englishMessages: Record<string, string> = {
   元数据过大: "The metadata is too large",
   "请选择 BibTeX 文件": "Choose a BibTeX file",
   文献库已有新的修改: "The bibliography has changed meanwhile",
+  // Git
+  无效的仓库地址: "Invalid repository address",
+  "仓库地址需以 https:// 开头，或是 git@主机:路径 形式的 SSH 地址":
+    "The repository address must start with https://, or be an SSH address such as git@host:path",
+  "不要把用户名或令牌写在仓库地址里，请填在下面的凭据里":
+    "Do not put a user name or token in the address; enter it with your credentials below",
+  无效的分支名: "Invalid branch name",
+  "服务器上没有找到 git，请安装 Git 或设置 WRITER_GIT":
+    "git was not found on the server; install Git or set WRITER_GIT",
+  "仓库分支有新的提交，请先拉取": "The branch has new commits; pull first",
+  "连不上 Git 仓库，请检查地址和网络":
+    "Cannot reach the repository; check the address and the network",
+  "仓库拒绝了你的凭据，请检查令牌或 SSH 密钥及其权限":
+    "The repository refused your credentials; check the token or SSH key and its permissions",
+  "找不到这个仓库，或你的凭据没有访问权限":
+    "Repository not found, or your credentials cannot access it",
+  "Git 操作失败：{detail}": "Git failed: {detail}",
+  无效的凭据类型: "Invalid credential type",
+  无效的主机名: "Invalid host name",
+  "这个项目还没有关联 Git 仓库": "This project is not linked to a Git repository",
+  "请先保存你在 {host} 的访问令牌": "Save your access token for {host} first",
+  "请先保存你在 {host} 的 SSH 私钥": "Save your SSH private key for {host} first",
+  无效的访问令牌: "Invalid access token",
+  "请粘贴完整的 SSH 私钥（-----BEGIN … PRIVATE KEY----- 开头）":
+    "Paste the whole SSH private key (starting with -----BEGIN … PRIVATE KEY-----)",
+  无效的邮箱: "Invalid email address",
+  "不是 UTF-8 文本": "Not UTF-8 text",
   // Zotero
   "无效的 Zotero 密钥": "Invalid Zotero key",
   "无效的 Zotero 文库": "Invalid Zotero library",
