@@ -93,11 +93,23 @@ export const templateCategories = [
   "paper",
   "thesis",
   "presentation",
+  "poster",
+  "cv",
   "basic",
   "other",
 ] as const;
 /** Research fields a template is used in. */
-export const templateFields = ["ml", "cv", "nlp", "ai", "data", "robotics", "speech"] as const;
+export const templateFields = [
+  "ml",
+  "cv",
+  "nlp",
+  "ai",
+  "data",
+  "robotics",
+  "speech",
+  "chem",
+  "physics",
+] as const;
 export type Localized = { zh: string; en: string };
 export type TemplateInfo = {
   id: string;

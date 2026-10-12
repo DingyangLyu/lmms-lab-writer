@@ -1,0 +1,70 @@
+% Physical Review paper (PRL, PRB, PRX, PR Applied, PR Materials and other APS journals).
+% Uses the revtex4-2 class that TeX Live ships; the options choose the journal and layout:
+% prl / prb / prx / prapplied / prmaterials, and preprint (one column) or reprint (as printed).
+% See APS's author guide (apsguide4-2.pdf on CTAN) for the full list.
+\documentclass[aps,prb,reprint,superscriptaddress,amsmath,amssymb]{revtex4-2}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\begin{document}
+
+\title{Ion transport in a concentrated electrolyte near a lithium-metal interface}
+
+\author{First Author}
+\email{first.author@example.edu}
+\affiliation{Department of Physics, Example University, City 100000, Country}
+\author{Second Author}
+\affiliation{Department of Physics, Example University, City 100000, Country}
+\affiliation{Institute of Materials, Example Laboratory, City 100000, Country}
+
+\date{\today}
+
+\begin{abstract}
+Abstracts in Physical Review journals are a single paragraph of up to 600 characters for
+PRL and 500 words elsewhere. State the problem, the approach, and the main quantitative
+result. This sample shows the parts of a paper: sections, an equation, a table and citations.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+Concentrated electrolytes change the solvation of lithium ions and the chemistry of the solid
+electrolyte interphase~\cite{yamada2019,xu2004}. Here we model transport through such an
+interphase with a one-dimensional drift--diffusion equation.
+
+\section{Model}
+The lithium concentration $c(x,t)$ obeys
+\begin{equation}
+  \frac{\partial c}{\partial t} = D \frac{\partial^2 c}{\partial x^2}
+  - \frac{D e}{k_B T} \frac{\partial}{\partial x}\left(c \, E\right),
+  \label{eq:transport}
+\end{equation}
+where $D$ is the diffusion coefficient and $E$ the electric field. Equation~(\ref{eq:transport})
+reduces to Fick's law when $E = 0$.
+
+\section{Results}
+Table~\ref{tab:conductivity} lists the conductivity for three salt concentrations.
+
+\begin{table}[b]
+  \caption{Ionic conductivity $\sigma$ at 25\,$^\circ$C.}
+  \label{tab:conductivity}
+  \begin{ruledtabular}
+    \begin{tabular}{lcc}
+      Concentration (mol/kg) & $\sigma$ (mS/cm) & Transference number \\
+      \colrule
+      1.0 & 9.8 & 0.35 \\
+      3.0 & 6.1 & 0.48 \\
+      5.5 & 2.4 & 0.62 \\
+    \end{tabular}
+  \end{ruledtabular}
+\end{table}
+
+\begin{acknowledgments}
+We thank the members of the laboratory for discussions.
+\end{acknowledgments}
+
+\bibliography{refs}
+
+\end{document}

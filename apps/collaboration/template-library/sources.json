@@ -5,7 +5,10 @@
     "archive": "neurips2026.zip",
     "main": "neurips_2026.tex",
     "meta": {
-      "name": { "zh": "NeurIPS 2026", "en": "NeurIPS 2026" },
+      "name": {
+        "zh": "NeurIPS 2026",
+        "en": "NeurIPS 2026"
+      },
       "description": {
         "zh": "NeurIPS 2026 官方模板（neurips_2026.sty），附论文清单 checklist.tex。默认生成匿名投稿版；录用后用 final 选项，arXiv 版用 preprint；position、eandd、creativeai 等选项对应其他投稿类型。",
         "en": "The official NeurIPS 2026 style (neurips_2026.sty) with the paper checklist. It builds the anonymous submission by default; use the final option once accepted and preprint for arXiv. Options such as position, eandd and creativeai select the other tracks."
@@ -26,7 +29,10 @@
     "exclude": ["example_paper.pdf"],
     "main": "example_paper.tex",
     "meta": {
-      "name": { "zh": "ICML 2026", "en": "ICML 2026" },
+      "name": {
+        "zh": "ICML 2026",
+        "en": "ICML 2026"
+      },
       "description": {
         "zh": "ICML 2026 官方模板（icml2026.sty），含 algorithm 宏包和示例图表。默认匿名投稿；录用后用 accepted 选项，arXiv 版用 preprint。",
         "en": "The official ICML 2026 style (icml2026.sty) with the algorithm packages and a sample figure. Anonymous submission by default; accepted for the camera-ready version, preprint for arXiv."
@@ -46,7 +52,10 @@
     "archive": "iclr2027.zip",
     "main": "iclr2027_conference.tex",
     "meta": {
-      "name": { "zh": "ICLR 2027", "en": "ICLR 2027" },
+      "name": {
+        "zh": "ICLR 2027",
+        "en": "ICLR 2027"
+      },
       "description": {
         "zh": "ICLR 2027 官方模板（ICLR/Master-Template），含常用数学记号 math_commands.tex。默认匿名投稿；终稿取消注释 \\iclrfinalcopy。",
         "en": "The official ICLR 2027 template (ICLR/Master-Template) with math_commands.tex for common notation. Anonymous by default; uncomment \\iclrfinalcopy for the final version."
@@ -72,7 +81,10 @@
     ],
     "main": "AnonymousSubmission2027.tex",
     "meta": {
-      "name": { "zh": "AAAI-27", "en": "AAAI-27" },
+      "name": {
+        "zh": "AAAI-27",
+        "en": "AAAI-27"
+      },
       "description": {
         "zh": "AAAI-27 官方作者包（aaai2027.sty），双栏。AnonymousSubmission2027.tex 为匿名投稿稿（submission 选项），另附终稿样例 CameraReady2027.tex 和可复现性清单。",
         "en": "The official AAAI-27 author kit (aaai2027.sty), two columns. AnonymousSubmission2027.tex is the anonymous submission (submission option); CameraReady2027.tex and the reproducibility checklist are included."
@@ -93,7 +105,10 @@
     "exclude": ["*.docx"],
     "main": "ijcai26.tex",
     "meta": {
-      "name": { "zh": "IJCAI-ECAI 2026", "en": "IJCAI-ECAI 2026" },
+      "name": {
+        "zh": "IJCAI-ECAI 2026",
+        "en": "IJCAI-ECAI 2026"
+      },
       "description": {
         "zh": "IJCAI-ECAI 2026 官方格式包（ijcai26.sty，named.bst），双栏。",
         "en": "The official IJCAI-ECAI 2026 formatting kit (ijcai26.sty, named.bst), two columns."
@@ -114,7 +129,10 @@
     "archive": "cvpr2026.zip",
     "main": "main.tex",
     "meta": {
-      "name": { "zh": "CVPR 2026", "en": "CVPR 2026" },
+      "name": {
+        "zh": "CVPR 2026",
+        "en": "CVPR 2026"
+      },
       "description": {
         "zh": "CVPR 2026 官方作者包（cvpr-org/author-kit），双栏，正文按 sec/ 分文件，含 rebuttal.tex。默认 review 匿名评审版；终稿去掉 review，arXiv 版用 pagenumbers。",
         "en": "The official CVPR 2026 author kit (cvpr-org/author-kit): two columns, sections in sec/, and rebuttal.tex. The review option gives the anonymous version; drop it for the camera-ready, use pagenumbers for arXiv."
@@ -134,7 +152,10 @@
     "archive": "iccv2025.zip",
     "main": "main.tex",
     "meta": {
-      "name": { "zh": "ICCV 2025", "en": "ICCV 2025" },
+      "name": {
+        "zh": "ICCV 2025",
+        "en": "ICCV 2025"
+      },
       "description": {
         "zh": "ICCV 2025 官方作者包，与 CVPR 同一套格式（iccv.sty），含 rebuttal 模板。ICCV 每两年一届，这是最近一届的模板。",
         "en": "The official ICCV 2025 author kit, the CVPR format with iccv.sty, plus a rebuttal template. ICCV is held every other year; this is the latest edition's kit."
@@ -155,7 +176,10 @@
     "exclude": ["ECCV_2026_Paper_Template.pdf", "llncsdoc.pdf", "*.eps"],
     "main": "main.tex",
     "meta": {
-      "name": { "zh": "ECCV 2026", "en": "ECCV 2026" },
+      "name": {
+        "zh": "ECCV 2026",
+        "en": "ECCV 2026"
+      },
       "description": {
         "zh": "ECCV 2026 官方模板：Springer LNCS 格式（llncs.cls）加 eccv.sty，默认 review 匿名评审版。",
         "en": "The official ECCV 2026 template: Springer's LNCS format (llncs.cls) with eccv.sty; the review option gives the anonymous version."
@@ -175,7 +199,10 @@
     "archive": "wacv2027.zip",
     "main": "main.tex",
     "meta": {
-      "name": { "zh": "WACV 2027", "en": "WACV 2027" },
+      "name": {
+        "zh": "WACV 2027",
+        "en": "WACV 2027"
+      },
       "description": {
         "zh": "WACV 2027 官方作者包，双栏。按投稿方向选择 algorithms、applications 或 datasets 选项，含 rebuttal 模板。",
         "en": "The official WACV 2027 author kit, two columns. Choose the algorithms, applications or datasets option for your track; a rebuttal template is included."
@@ -196,7 +223,10 @@
     "exclude": ["*.docx", "bmvc_final.pdf", "bmvc_review.pdf"],
     "main": "bmvc_review.tex",
     "meta": {
-      "name": { "zh": "BMVC 2026", "en": "BMVC 2026" },
+      "name": {
+        "zh": "BMVC 2026",
+        "en": "BMVC 2026"
+      },
       "description": {
         "zh": "BMVC 2026 官方模板（bmvc2k.cls）：bmvc_review.tex 为投稿版，bmvc_final.tex 为终稿。",
         "en": "The official BMVC 2026 template (bmvc2k.cls): bmvc_review.tex for submission, bmvc_final.tex for the final paper."
@@ -217,7 +247,10 @@
     "exclude": ["tests/**"],
     "main": "acl_latex.tex",
     "meta": {
-      "name": { "zh": "ACL / EMNLP / NAACL（ARR）", "en": "ACL / EMNLP / NAACL (ARR)" },
+      "name": {
+        "zh": "ACL / EMNLP / NAACL（ARR）",
+        "en": "ACL / EMNLP / NAACL (ARR)"
+      },
       "description": {
         "zh": "ACL 系列会议的官方样式（acl-org/acl-style-files），ACL、EMNLP、NAACL、EACL、AACL 和 ACL Rolling Review 通用。默认 review 匿名版；终稿去掉 review，arXiv 版用 preprint。另附 LuaLaTeX 版 acl_lualatex.tex。",
         "en": "The official ACL style (acl-org/acl-style-files), shared by ACL, EMNLP, NAACL, EACL, AACL and ACL Rolling Review. The review option gives the anonymous version; drop it for the final paper, use preprint for arXiv. acl_lualatex.tex is the LuaLaTeX variant."
@@ -239,7 +272,10 @@
     "exclude": ["colm2026_conference.pdf"],
     "main": "colm2026_conference.tex",
     "meta": {
-      "name": { "zh": "COLM 2026", "en": "COLM 2026" },
+      "name": {
+        "zh": "COLM 2026",
+        "en": "COLM 2026"
+      },
       "description": {
         "zh": "COLM 2026（Conference on Language Modeling）官方模板。默认 submission 匿名版；终稿用 final，arXiv 版用 preprint。",
         "en": "The official COLM 2026 (Conference on Language Modeling) template. submission by default; final for the camera-ready, preprint for arXiv."
@@ -260,7 +296,10 @@
     "exclude": ["sample_paper.pdf"],
     "main": "sample_paper.tex",
     "meta": {
-      "name": { "zh": "AISTATS 2027", "en": "AISTATS 2027" },
+      "name": {
+        "zh": "AISTATS 2027",
+        "en": "AISTATS 2027"
+      },
       "description": {
         "zh": "AISTATS 2027 官方 Paper Pack（aistats2027.sty）。默认匿名投稿；录用后用 accepted 选项，arXiv 版用 preprint。",
         "en": "The official AISTATS 2027 paper pack (aistats2027.sty). Anonymous by default; accepted once accepted, preprint for arXiv."
@@ -280,7 +319,10 @@
     "archive": "uai2026.zip",
     "main": "uai2026-template.tex",
     "meta": {
-      "name": { "zh": "UAI 2026", "en": "UAI 2026" },
+      "name": {
+        "zh": "UAI 2026",
+        "en": "UAI 2026"
+      },
       "description": {
         "zh": "UAI 2026 官方模板（uai2026.cls），默认投稿版；终稿用 accepted 选项。",
         "en": "The official UAI 2026 class (uai2026.cls); submission by default, the accepted option for the final paper."
@@ -300,7 +342,10 @@
     "archive": "colt2026.zip",
     "main": "colt2026-sample.tex",
     "meta": {
-      "name": { "zh": "COLT 2026", "en": "COLT 2026" },
+      "name": {
+        "zh": "COLT 2026",
+        "en": "COLT 2026"
+      },
       "description": {
         "zh": "COLT 2026 官方样式（colt2026.cls，基于 JMLR 的 jmlr.cls），样例默认 anon 匿名投稿。",
         "en": "The official COLT 2026 class (colt2026.cls, built on JMLR's jmlr.cls); the sample uses anon for an anonymous submission."
@@ -368,7 +413,10 @@
     "exclude": ["*.doc", "*.ps", "*.eps", "Template.pdf", "format.pdf", "Author-PDF-Guide-V32.pdf"],
     "main": "Template.tex",
     "meta": {
-      "name": { "zh": "ICASSP 2027", "en": "ICASSP 2027" },
+      "name": {
+        "zh": "ICASSP 2027",
+        "en": "ICASSP 2027"
+      },
       "description": {
         "zh": "ICASSP 2027 官方 Paper Kit（spconf.sty，IEEEbib.bst），双栏 IEEE 格式。",
         "en": "The official ICASSP 2027 paper kit (spconf.sty, IEEEbib.bst), two-column IEEE format."
@@ -412,7 +460,9 @@
     "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/llncs.zip",
     "archive": "llncs.zip",
     "include": ["llncs.cls", "splncs04.bst", "README.md"],
-    "add": { "main.tex": "extra/lncs/main.tex" },
+    "add": {
+      "main.tex": "extra/lncs/main.tex"
+    },
     "main": "main.tex",
     "meta": {
       "name": {
@@ -440,7 +490,10 @@
     "exclude": ["main.pdf", "main-accepted.pdf"],
     "main": "main.tex",
     "meta": {
-      "name": { "zh": "TMLR", "en": "TMLR" },
+      "name": {
+        "zh": "TMLR",
+        "en": "TMLR"
+      },
       "description": {
         "zh": "TMLR（Transactions on Machine Learning Research）官方样式。默认匿名投稿；录用后用 accepted，arXiv 版用 preprint。",
         "en": "The official style of TMLR (Transactions on Machine Learning Research). Anonymous by default; accepted once accepted, preprint for arXiv."
@@ -461,7 +514,10 @@
     "exclude": ["sample.pdf"],
     "main": "sample.tex",
     "meta": {
-      "name": { "zh": "JMLR", "en": "JMLR" },
+      "name": {
+        "zh": "JMLR",
+        "en": "JMLR"
+      },
       "description": {
         "zh": "JMLR（Journal of Machine Learning Research）官方样式（jmlr2e.sty）及示例。",
         "en": "The official style (jmlr2e.sty) and sample of JMLR, the Journal of Machine Learning Research."
@@ -480,7 +536,9 @@
     "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/IEEEtran.zip",
     "archive": "ieeetran.zip",
     "include": ["IEEEtran.cls", "bare_jrnl_compsoc.tex", "bibtex/IEEEtran.bst"],
-    "rename": { "bibtex/IEEEtran.bst": "IEEEtran.bst" },
+    "rename": {
+      "bibtex/IEEEtran.bst": "IEEEtran.bst"
+    },
     "main": "bare_jrnl_compsoc.tex",
     "meta": {
       "name": {
@@ -508,7 +566,10 @@
     "exclude": ["template.pdf"],
     "main": "template.tex",
     "meta": {
-      "name": { "zh": "arXiv 预印本", "en": "arXiv preprint" },
+      "name": {
+        "zh": "arXiv 预印本",
+        "en": "arXiv preprint"
+      },
       "description": {
         "zh": "常用的 arXiv 预印本样式（kourgeorge/arxiv-style，MIT 许可），单栏，排版简洁。",
         "en": "A widely used arXiv preprint style (kourgeorge/arxiv-style, MIT licence): one column, clean layout."
@@ -520,6 +581,340 @@
       "tags": ["preprint", "预印本"],
       "homepage": "https://github.com/kourgeorge/arxiv-style",
       "order": 95
+    }
+  },
+  {
+    "id": "acs-journals",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/achemso.zip",
+    "archive": "achemso.zip",
+    "generate": ["achemso.ins"],
+    "include": [
+      "achemso.cls",
+      "achemso.sty",
+      "natmove.sty",
+      "*.bst",
+      "achemso-*.cfg",
+      "achemso-demo.tex",
+      "achemso-demo.bib"
+    ],
+    "main": "achemso-demo.tex",
+    "meta": {
+      "name": {
+        "zh": "ACS 期刊（JACS / ACS Energy Letters / Nano Letters 等）",
+        "en": "ACS journals (JACS, ACS Energy Letters, Nano Letters and others)"
+      },
+      "description": {
+        "zh": "美国化学会官方 achemso 类，JACS、ACS Energy Letters、ACS Nano、Nano Letters、Chemistry of Materials、ACS AMI 等期刊使用。用 journal 选项指定期刊（如 journal=jacsat），manuscript=letter 等选项切换稿件类型。类文件和样例由 CTAN 上的 achemso 源码生成。",
+        "en": "The American Chemical Society's achemso class, used by JACS, ACS Energy Letters, ACS Nano, Nano Letters, Chemistry of Materials, ACS AMI and others. Choose the journal with the journal option (e.g. journal=jacsat) and the manuscript type with options such as manuscript=letter. The class and sample are generated from the achemso sources on CTAN."
+      },
+      "category": "journal",
+      "venue": "ACS",
+      "year": null,
+      "venues": ["JACS", "ACS Energy Lett.", "ACS Nano", "Nano Lett.", "Chem. Mater.", "ACS AMI"],
+      "fields": ["chem"],
+      "tags": [
+        "achemso",
+        "chemistry",
+        "化学",
+        "materials",
+        "材料",
+        "electrochemistry",
+        "电化学",
+        "battery",
+        "电池"
+      ],
+      "homepage": "https://www.ctan.org/pkg/achemso",
+      "order": 100
+    }
+  },
+  {
+    "id": "elsevier-elsarticle",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/elsarticle.zip",
+    "archive": "elsarticle.zip",
+    "generate": ["elsarticle.ins"],
+    "include": ["elsarticle.cls", "*.bst", "elsarticle-template-num.tex"],
+    "main": "elsarticle-template-num.tex",
+    "meta": {
+      "name": {
+        "zh": "Elsevier 期刊（elsarticle）",
+        "en": "Elsevier journals (elsarticle)"
+      },
+      "description": {
+        "zh": "Elsevier 官方 elsarticle 类，Journal of Power Sources、Electrochimica Acta、Energy Storage Materials、Chemical Engineering Journal 等大多数 Elsevier 期刊接受。模板为数字引用格式；preprint、1p、3p、5p 选项控制版式。",
+        "en": "Elsevier's elsarticle class, accepted by most Elsevier journals such as Journal of Power Sources, Electrochimica Acta, Energy Storage Materials and Chemical Engineering Journal. The template uses numbered citations; the preprint, 1p, 3p and 5p options set the layout."
+      },
+      "category": "journal",
+      "venue": "Elsevier",
+      "year": null,
+      "venues": ["J. Power Sources", "Electrochim. Acta", "Energy Storage Mater.", "Chem. Eng. J."],
+      "fields": ["chem", "physics"],
+      "tags": ["elsevier", "elsarticle", "journal", "期刊", "materials", "材料"],
+      "homepage": "https://www.ctan.org/pkg/elsarticle",
+      "order": 101
+    }
+  },
+  {
+    "id": "elsevier-cas",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/els-cas-templates.zip",
+    "archive": "els-cas-templates.zip",
+    "include": [
+      "cas-dc.cls",
+      "cas-common.sty",
+      "cas-model2-names.bst",
+      "cas-refs.bib",
+      "cas-dc-template.tex",
+      "thumbnails/*"
+    ],
+    "main": "cas-dc-template.tex",
+    "meta": {
+      "name": {
+        "zh": "Elsevier CAS 双栏期刊模板",
+        "en": "Elsevier CAS double-column template"
+      },
+      "description": {
+        "zh": "Elsevier 新的 CAS 模板（cas-dc.cls），排版接近正式出版的双栏版式，Energy Storage Materials、Nano Energy 等期刊提供。单栏版本为同一软件包里的 cas-sc。",
+        "en": "Elsevier's newer CAS template (cas-dc.cls), close to the printed double-column layout, offered by journals such as Energy Storage Materials and Nano Energy. The single-column version is cas-sc in the same package."
+      },
+      "category": "journal",
+      "venue": "Elsevier",
+      "year": null,
+      "venues": ["Nano Energy", "Energy Storage Mater."],
+      "fields": ["chem", "physics"],
+      "tags": ["elsevier", "cas", "double column", "双栏", "期刊"],
+      "homepage": "https://www.ctan.org/pkg/els-cas-templates",
+      "order": 102
+    }
+  },
+  {
+    "id": "aps-physical-review",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/revtex.zip",
+    "archive": "revtex.zip",
+    "include": ["sample/aps/apstemplate.tex"],
+    "rename": {
+      "sample/aps/apstemplate.tex": "apstemplate-reference.tex"
+    },
+    "add": {
+      "main.tex": "extra/aps/main.tex",
+      "refs.bib": "extra/aps/refs.bib"
+    },
+    "main": "main.tex",
+    "meta": {
+      "name": {
+        "zh": "Physical Review（APS / revtex4-2）",
+        "en": "Physical Review (APS, revtex4-2)"
+      },
+      "description": {
+        "zh": "美国物理学会 revtex4-2 类，PRL、PRB、PRX、PR Applied、PR Materials 等期刊使用；AIP 的 J. Chem. Phys.、APL 也用它（选 aip 选项）。示例正文由 Y-Writer 编写，附官方模板 apstemplate.tex 作参考。",
+        "en": "The American Physical Society's revtex4-2 class, used by PRL, PRB, PRX, PR Applied, PR Materials and other APS journals; AIP's J. Chem. Phys. and APL use it too (with the aip option). The sample text is Y-Writer's; APS's own apstemplate.tex is included for reference."
+      },
+      "category": "journal",
+      "venue": "APS",
+      "year": null,
+      "venues": ["PRL", "PRB", "PRX", "PR Applied", "J. Chem. Phys."],
+      "fields": ["physics", "chem"],
+      "tags": ["revtex", "aps", "aip", "physics", "物理", "journal", "期刊"],
+      "homepage": "https://www.ctan.org/pkg/revtex",
+      "order": 103
+    }
+  },
+  {
+    "id": "thuthesis",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/thuthesis.zip",
+    "archive": "thuthesis.zip",
+    "generate": ["thuthesis.ins"],
+    "exclude": [
+      "*.dtx",
+      "*.ins",
+      "thuthesis.pdf",
+      "thuthesis-example.pdf",
+      "README.md",
+      "CHANGELOG.md"
+    ],
+    "main": "thuthesis-example.tex",
+    "engine": "xelatex",
+    "meta": {
+      "name": {
+        "zh": "清华大学学位论文（ThuThesis）",
+        "en": "Tsinghua University thesis (ThuThesis)"
+      },
+      "description": {
+        "zh": "清华大学本科、硕士、博士学位论文模板 ThuThesis，按研究生院和本科生培养要求排版。在 thusetup.tex 里填写学位类型、题目和作者等信息，正文在 data/ 目录。用 XeLaTeX 编译。",
+        "en": "ThuThesis, the Tsinghua University template for bachelor's, master's and doctoral theses, set to the university's requirements. Fill in the degree, title and author in thusetup.tex; the chapters are in data/. Compiles with XeLaTeX."
+      },
+      "category": "thesis",
+      "venue": "清华大学",
+      "year": null,
+      "fields": [],
+      "tags": ["thesis", "学位论文", "清华", "tsinghua", "中文", "博士", "硕士"],
+      "homepage": "https://github.com/tuna/thuthesis",
+      "order": 110
+    }
+  },
+  {
+    "id": "pkuthss",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/pkuthss.zip",
+    "archive": "pkuthss.zip",
+    "include": [
+      "tex/pkuthss.cls",
+      "tex/pkuthss-utf8.def",
+      "tex/pkulogo.pdf",
+      "doc/example/thesis.tex",
+      "doc/example/thesis.bib",
+      "doc/example/ctexopts.cfg",
+      "doc/example/ctex-fontset-pkuthss.def",
+      "doc/example/chap/*.tex"
+    ],
+    "rename": {
+      "tex/pkuthss.cls": "pkuthss.cls",
+      "tex/pkuthss-utf8.def": "pkuthss-utf8.def",
+      "tex/pkulogo.pdf": "pkulogo.pdf",
+      "doc/example/thesis.tex": "thesis.tex",
+      "doc/example/thesis.bib": "thesis.bib",
+      "doc/example/ctexopts.cfg": "ctexopts.cfg",
+      "doc/example/ctex-fontset-pkuthss.def": "ctex-fontset-pkuthss.def",
+      "doc/example/chap/abs.tex": "chap/abs.tex",
+      "doc/example/chap/ack.tex": "chap/ack.tex",
+      "doc/example/chap/chap1.tex": "chap/chap1.tex",
+      "doc/example/chap/chap2.tex": "chap/chap2.tex",
+      "doc/example/chap/chap3.tex": "chap/chap3.tex",
+      "doc/example/chap/copy.tex": "chap/copy.tex",
+      "doc/example/chap/encl1.tex": "chap/encl1.tex",
+      "doc/example/chap/origin.tex": "chap/origin.tex"
+    },
+    "main": "thesis.tex",
+    "engine": "xelatex",
+    "meta": {
+      "name": {
+        "zh": "北京大学学位论文（pkuthss）",
+        "en": "Peking University thesis (pkuthss)"
+      },
+      "description": {
+        "zh": "北京大学研究生学位论文模板 pkuthss，按学校的论文格式要求排版。论文信息在 thesis.tex 开头填写，各章在 chap/ 目录。用 XeLaTeX 编译。",
+        "en": "pkuthss, the Peking University template for graduate theses, set to the university's format. Fill in the thesis details at the top of thesis.tex; the chapters are in chap/. Compiles with XeLaTeX."
+      },
+      "category": "thesis",
+      "venue": "北京大学",
+      "year": null,
+      "fields": [],
+      "tags": ["thesis", "学位论文", "北大", "peking", "中文", "博士", "硕士"],
+      "homepage": "https://www.ctan.org/pkg/pkuthss",
+      "order": 111
+    }
+  },
+  {
+    "id": "ucasthesis",
+    "url": "https://github.com/mohuangrui/ucasthesis/archive/refs/heads/master.zip",
+    "archive": "ucasthesis.zip",
+    "include": ["Biblio/**", "Img/**", "Style/**", "Tex/**", "Thesis.tex"],
+    "main": "Thesis.tex",
+    "engine": "xelatex",
+    "meta": {
+      "name": {
+        "zh": "中国科学院大学学位论文（ucasthesis）",
+        "en": "UCAS thesis (ucasthesis)"
+      },
+      "description": {
+        "zh": "中国科学院大学学位论文模板 ucasthesis（社区维护），覆盖本科、硕士、博士和博士后报告。论文信息在 Tex/Frontinfo.tex，章节在 Tex/ 目录，参考文献按 GB/T 7714 格式。用 XeLaTeX 编译。",
+        "en": "ucasthesis, the community template for University of Chinese Academy of Sciences theses: bachelor's, master's, doctoral and postdoctoral reports. Thesis details are in Tex/Frontinfo.tex, the chapters in Tex/, references in GB/T 7714 style. Compiles with XeLaTeX."
+      },
+      "category": "thesis",
+      "venue": "国科大",
+      "year": null,
+      "fields": [],
+      "tags": ["thesis", "学位论文", "国科大", "中科院", "ucas", "中文", "gb7714"],
+      "homepage": "https://github.com/mohuangrui/ucasthesis",
+      "order": 112
+    }
+  },
+  {
+    "id": "ustcthesis",
+    "url": "https://github.com/ustctug/ustcthesis/archive/refs/heads/master.zip",
+    "archive": "ustcthesis.zip",
+    "include": [
+      "ustcthesis.cls",
+      "ustcthesis-*.bst",
+      "ustcthesis-*.bbx",
+      "ustcthesis-*.cbx",
+      "main.tex",
+      "references.bib",
+      "chapters/*.tex",
+      "figures/*"
+    ],
+    "main": "main.tex",
+    "engine": "xelatex",
+    "meta": {
+      "name": {
+        "zh": "中国科学技术大学学位论文（ustcthesis）",
+        "en": "USTC thesis (ustcthesis)"
+      },
+      "description": {
+        "zh": "中国科学技术大学学位论文模板 ustcthesis，由 USTC TeX 用户组维护，按研究生院和教务处的格式要求排版。论文信息在 main.tex 的 \\ustcsetup 里填写，章节在 chapters/。用 XeLaTeX 编译。",
+        "en": "ustcthesis, the University of Science and Technology of China thesis template maintained by the USTC TeX user group to the graduate school's format. Fill in the details in \\ustcsetup in main.tex; the chapters are in chapters/. Compiles with XeLaTeX."
+      },
+      "category": "thesis",
+      "venue": "中国科大",
+      "year": null,
+      "fields": [],
+      "tags": ["thesis", "学位论文", "科大", "ustc", "中文", "博士", "硕士"],
+      "homepage": "https://github.com/ustctug/ustcthesis",
+      "order": 113
+    }
+  },
+  {
+    "id": "moderncv",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/moderncv.zip",
+    "archive": "moderncv.zip",
+    "include": [
+      "*.sty",
+      "*.cls",
+      "template.tex",
+      "picture.jpg",
+      "publications.bib",
+      "signature.png"
+    ],
+    "main": "template.tex",
+    "meta": {
+      "name": {
+        "zh": "简历（moderncv）",
+        "en": "CV (moderncv)"
+      },
+      "description": {
+        "zh": "常用的 LaTeX 简历模板 moderncv，有 classic、banking、casual 等多种样式和配色，适合申请学校、求职和项目申报时附的个人简历。",
+        "en": "moderncv, a widely used CV template with several styles (classic, banking, casual) and colour schemes, for applications, job searches and grant forms."
+      },
+      "category": "cv",
+      "venue": null,
+      "year": null,
+      "fields": [],
+      "tags": ["cv", "resume", "简历", "求职"],
+      "homepage": "https://www.ctan.org/pkg/moderncv",
+      "order": 120
+    }
+  },
+  {
+    "id": "tikzposter",
+    "url": "https://ctan.math.utah.edu/ctan/tex-archive/graphics/pgf/contrib/tikzposter.zip",
+    "archive": "tikzposter.zip",
+    "generate": ["tikzposter.ins"],
+    "include": ["tikzposter.cls", "tikzposter*.tex"],
+    "exclude": ["tikzposter-example.tex"],
+    "main": "tikzposter-template.tex",
+    "meta": {
+      "name": {
+        "zh": "学术海报（tikzposter）",
+        "en": "Academic poster (tikzposter)"
+      },
+      "description": {
+        "zh": "用 tikzposter 制作 A0 等尺寸的学术会议海报，支持多种主题、配色和分栏版式。类文件和模板由 CTAN 上的 tikzposter 源码生成。",
+        "en": "An academic conference poster in A0 or other sizes with tikzposter, with several themes, colour schemes and column layouts. The class and template are generated from the tikzposter sources on CTAN."
+      },
+      "category": "poster",
+      "venue": null,
+      "year": null,
+      "fields": [],
+      "tags": ["poster", "海报", "conference", "会议"],
+      "homepage": "https://www.ctan.org/pkg/tikzposter",
+      "order": 125
     }
   }
 ]
