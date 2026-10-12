@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { Notice, ProjectSummary, PublicUser } from "../shared/api";
 import { ChangePassword } from "./account";
 import { AdminConsole } from "./admin";
-import { api } from "./api";
+import { api, errorText } from "./api";
 import { AuthPage } from "./auth";
 import { Dashboard } from "./dashboard";
 import { DesktopPage } from "./desktop";
@@ -72,6 +72,8 @@ export function App() {
   // `/?project=<id>` opens a project directly, e.g. from the desktop app: asked for together
   // with the account, so the dashboard never shows in between.
   const [wanted] = useState(() => new URL(location.href).searchParams.get("project"));
+  // `/?share=<token>`: a project's share link; joined once signed in, then opened.
+  const [share, setShare] = useState(() => new URL(location.href).searchParams.get("share"));
   const opened = useRef(false);
   const summary = useCallback(
     (id: string) => api<ProjectSummary>(`/projects/${encodeURIComponent(id)}`).catch(() => null),
@@ -100,6 +102,16 @@ export function App() {
     setProject(next);
     history.replaceState(null, "", next ? `/?project=${encodeURIComponent(next.id)}` : "/");
   }, []);
+  useEffect(() => {
+    if (!user || user.mustChange || !share) return;
+    setShare(null);
+    void api<ProjectSummary>("/share/join", { token: share })
+      .then(openProject)
+      .catch((e) => {
+        history.replaceState(null, "", "/");
+        window.alert(errorText(e));
+      });
+  }, [user, share, openProject]);
   /** A message about a comment: its project opens on that comment. */
   const openNotice = useCallback(
     (notice: Notice) =>
@@ -123,7 +135,7 @@ export function App() {
       </div>
     );
   // An address naming a project goes straight to signing in.
-  if (!user && !link && !wanted && entry === "landing")
+  if (!user && !link && !wanted && !share && entry === "landing")
     return (
       <Suspense fallback={<div className="landing-wait" />}>
         <Landing

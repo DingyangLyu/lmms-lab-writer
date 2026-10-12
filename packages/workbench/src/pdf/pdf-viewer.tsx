@@ -369,6 +369,40 @@ function PdfPreview({
     if (!container) return;
     return attachPdfSelection(container, () => captureRef.current());
   }, []);
+  // The page at the top third of the view, for the page box; typing a number goes there.
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new width moves the pages; look again.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !numPages) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const rect = container.getBoundingClientRect();
+        const probe = rect.top + rect.height / 3;
+        for (const page of container.querySelectorAll<HTMLElement>("[data-pdf-page]"))
+          if (page.getBoundingClientRect().bottom > probe) {
+            setCurrentPage(Number(page.dataset.pdfPage));
+            return;
+          }
+      });
+    };
+    container.addEventListener("scroll", update, { passive: true });
+    update();
+    return () => {
+      container.removeEventListener("scroll", update);
+      cancelAnimationFrame(frame);
+    };
+  }, [numPages, availableWidth]);
+  const showPage = (page: number) => {
+    const target = Math.max(1, Math.min(numPages, Math.round(page)));
+    containerRef.current
+      ?.querySelector<HTMLElement>(`[data-pdf-page="${target}"]`)
+      ?.scrollIntoView({ block: "start" });
+    setCurrentPage(target);
+  };
   const zoom = (amount: number) => {
     rememberAnchor();
     setManualScale(Math.max(0.1, Math.min(4, effectiveScale + amount)));
@@ -377,13 +411,54 @@ function PdfPreview({
   return (
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-secondary px-2 py-1.5 text-xs">
-        <span className="text-muted">
-          {loadError
-            ? t("pdf.pdfPreviewFailed")
-            : numPages
-              ? t("pdf.countCountPagePages", { count: numPages })
-              : t("pdf.loadingPdf2")}
-        </span>
+        {numPages && !loadError ? (
+          <span className="flex items-center gap-1 text-muted">
+            <button
+              type="button"
+              aria-label={t("pdf.previousPage")}
+              title={t("pdf.previousPage")}
+              disabled={currentPage <= 1}
+              onClick={() => showPage(currentPage - 1)}
+              className="px-1 disabled:opacity-30"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              aria-label={t("pdf.nextPage")}
+              title={t("pdf.nextPage")}
+              disabled={currentPage >= numPages}
+              onClick={() => showPage(currentPage + 1)}
+              className="px-1 disabled:opacity-30"
+            >
+              ↓
+            </button>
+            <input
+              aria-label={t("pdf.pageNumber")}
+              inputMode="numeric"
+              value={pageInput ?? String(currentPage)}
+              onFocus={(e) => {
+                setPageInput(String(currentPage));
+                e.currentTarget.select();
+              }}
+              onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ""))}
+              onBlur={() => setPageInput(null)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && pageInput) {
+                  showPage(Number(pageInput));
+                  e.currentTarget.blur();
+                }
+                if (e.key === "Escape") e.currentTarget.blur();
+              }}
+              className="w-9 border border-border bg-background px-1 py-0.5 text-center text-foreground"
+            />
+            <span>/ {numPages}</span>
+          </span>
+        ) : (
+          <span className="text-muted">
+            {loadError ? t("pdf.pdfPreviewFailed") : t("pdf.loadingPdf2")}
+          </span>
+        )}
         <div className="flex flex-wrap items-center gap-1">
           {notes && (
             <select

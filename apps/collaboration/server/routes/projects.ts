@@ -21,7 +21,7 @@ type NewFile = { path: string; data: Uint8Array };
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 
 /** The dashboard's view of every project a user belongs to, or of one. */
-const summaries = (q: Sql, user: string, project?: string) =>
+export const summaries = (q: Sql, user: string, project?: string) =>
   q.rows<ProjectSummary>(
     sql`SELECT p.id, p.name, p.created, p.updated, m.role, m.archived, p.track_all AS "trackAll",
                m.trashed IS NOT NULL AS trashed,
@@ -30,7 +30,9 @@ const summaries = (q: Sql, user: string, project?: string) =>
                (SELECT u.id FROM members o JOIN users u ON u.id=o.user_id
                 WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS "ownerId",
                (SELECT u.avatar_updated FROM members o JOIN users u ON u.id=o.user_id
-                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS "ownerAvatar"
+                WHERE o.project=p.id AND o.role='owner' ORDER BY u.username LIMIT 1) AS "ownerAvatar",
+               ARRAY(SELECT t.tag FROM project_tags t WHERE t.user_id=${user} AND t.project=p.id
+                     ORDER BY t.tag) AS tags
         FROM projects p JOIN members m ON p.id=m.project
         WHERE m.user_id=${user} AND (${project ?? null}::text IS NULL OR p.id=${project ?? null})
         ORDER BY p.updated DESC, p.created DESC`,

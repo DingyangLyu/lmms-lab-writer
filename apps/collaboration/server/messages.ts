@@ -110,6 +110,9 @@ export const englishMessages: Record<string, string> = {
   "请选择 BibTeX 文件": "Choose a BibTeX file",
   文献库已有新的修改: "The bibliography has changed meanwhile",
   不是图片: "Not an image",
+  // sharing, chat and tags
+  "标签需为 1–40 个字符": "Tags need 1\u201340 characters",
+  分享链接已失效: "This share link no longer works",
   // Git
   无效的仓库地址: "Invalid repository address",
   "仓库地址需以 https:// 开头，或是 git@主机:路径 形式的 SSH 地址":

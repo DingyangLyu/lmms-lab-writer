@@ -30,6 +30,8 @@ export function AuthPage({
   const { t } = useI18n();
   const [projectInvite] = useState(() => params().get("invite"));
   const [signup] = useState(() => params().get("signup"));
+  // Arrived from a project's share link: it is joined once signed in (see app.tsx).
+  const [shared] = useState(() => params().has("share"));
   const [info, setInfo] = useState<RegistrationInfo | null>(null);
   const [tab, setTab] = useState<"login" | "register">(signup ? "register" : initial);
   const [waiting, setWaiting] = useState<"register" | "join" | null>(null);
@@ -84,6 +86,7 @@ export function AuthPage({
     body =
       tab === "login" || !canRegister ? (
         <>
+          {shared && <p className="muted">{t("share.signInToJoin")}</p>}
           <Credentials
             submit={t("signIn.submit")}
             onSubmit={async (username, password) =>

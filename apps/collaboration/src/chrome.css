@@ -1460,3 +1460,50 @@ button.link:hover:not(:disabled) {
     white-space: nowrap;
   }
 }
+
+/* The member's own tags under the filters. */
+.dash-tags {
+  margin-top: 4px;
+}
+.dash-tags h2 {
+  margin: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--yw-muted, #6b7280);
+}
+.dash-tag-row {
+  display: flex;
+  align-items: center;
+}
+.dash-tag-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.dash-tag-row > button:first-child span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-tag-row > button.icon {
+  display: none;
+  padding: 4px;
+}
+.dash-tag-row:hover > button.icon,
+.dash-tag-row:focus-within > button.icon {
+  display: inline-flex;
+}
+.dash-tag-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+.dash-tag-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

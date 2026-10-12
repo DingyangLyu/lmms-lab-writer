@@ -1,6 +1,6 @@
 /** Members, invitations and project settings, opened from the header's Share button. */
 import { useEffect, useState } from "react";
-import type { Friends, Invite, Member, Person, Role } from "../../shared/api";
+import type { Friends, Invite, Member, Person, Role, ShareLinks } from "../../shared/api";
 import { api } from "../api";
 import { Avatar } from "../avatar";
 import { copyText } from "../clipboard";
@@ -33,6 +33,13 @@ export function ShareDialog({
         .then((f) => setFriends(f.friends))
         .catch(() => setFriends([]));
   }, [owner]);
+  const [links, setLinks] = useState<ShareLinks | null>(null);
+  useEffect(() => {
+    if (owner)
+      void api<ShareLinks>(`${prefix}/share-links`)
+        .then(setLinks)
+        .catch(() => setLinks(null));
+  }, [owner, prefix]);
   const addable = (friends ?? []).filter((f) => !members.some((m) => m.id === f.id));
   return (
     <Dialog title={t("members.title")} onClose={onClose}>
@@ -123,6 +130,51 @@ export function ShareDialog({
                 <Btn onClick={() => void copyText(inviteLink)}>{t("members.copyLink")}</Btn>
               </div>
             )}
+          </section>
+        )}
+        {owner && links && (
+          <section className="space-y-2">
+            <h3 className="font-medium">{t("share.links")}</h3>
+            <p className="text-xs text-muted">{t("share.linksLead")}</p>
+            {(["viewer", "editor"] as const).map((role) => {
+              const url = links[role];
+              return (
+                <div key={role} className="flex flex-wrap items-center gap-2">
+                  <span className="w-24 shrink-0 text-xs">
+                    {t(role === "viewer" ? "share.viewLink" : "share.editLink")}
+                  </span>
+                  {url ? (
+                    <>
+                      <Input
+                        readOnly
+                        aria-label={t(role === "viewer" ? "share.viewLink" : "share.editLink")}
+                        value={url}
+                        className="min-w-0 flex-1"
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <Btn onClick={() => void copyText(url)}>{t("members.copyLink")}</Btn>
+                    </>
+                  ) : (
+                    <span className="min-w-0 flex-1 text-xs text-muted">{t("share.linkOff")}</span>
+                  )}
+                  <Btn
+                    disabled={busy}
+                    onClick={() =>
+                      run(async () => {
+                        setLinks(
+                          await api<ShareLinks>(`${prefix}/share-links`, {
+                            role,
+                            enabled: !url,
+                          }),
+                        );
+                      })
+                    }
+                  >
+                    {url ? t("share.turnOff") : t("share.turnOn")}
+                  </Btn>
+                </div>
+              );
+            })}
           </section>
         )}
         <section>

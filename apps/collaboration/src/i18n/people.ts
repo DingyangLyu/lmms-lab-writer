@@ -40,6 +40,15 @@ export const peopleZh = {
   "share.friendsLead": "直接加入，对方的项目列表里会立刻出现这个项目。",
   "share.noFriends": "还没有可添加的好友，可在顶部“好友”里添加。",
   "share.addFriend": "添加",
+  "share.links": "链接分享",
+  "share.linksLead":
+    "开启后，任何已登录的人打开链接就会以对应角色加入项目（不会降低已有成员的角色）。关闭链接后它立刻失效，再开启会换一个新链接。",
+  "share.viewLink": "只读链接",
+  "share.editLink": "可编辑链接",
+  "share.linkOff": "未开启",
+  "share.turnOn": "开启",
+  "share.turnOff": "关闭",
+  "share.signInToJoin": "登录后即可加入分享给你的项目。",
   "console.lead": "审核注册申请、管理账号、邀请链接和注册方式。",
 };
 export const peopleEn: Record<keyof typeof peopleZh, string> = {
@@ -85,6 +94,15 @@ export const peopleEn: Record<keyof typeof peopleZh, string> = {
   "share.friendsLead": "They are added at once; the project appears in their list right away.",
   "share.noFriends": "No friends to add yet; add them under Friends at the top.",
   "share.addFriend": "Add",
+  "share.links": "Link sharing",
+  "share.linksLead":
+    "When on, anyone signed in who opens the link joins the project with that role (a member's role is never lowered). Turning a link off stops it at once; turning it on again makes a new one.",
+  "share.viewLink": "View link",
+  "share.editLink": "Edit link",
+  "share.linkOff": "Off",
+  "share.turnOn": "Turn on",
+  "share.turnOff": "Turn off",
+  "share.signInToJoin": "Sign in to join the project shared with you.",
   "console.lead":
     "Approve registrations and manage accounts, invitation links and how people sign up.",
 };

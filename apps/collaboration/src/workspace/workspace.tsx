@@ -62,6 +62,7 @@ import {
 import { commentsTask, currentCommentsTask } from "./ai-tasks";
 import { BinaryPreview } from "./binary-preview";
 import { useBuild } from "./build";
+import { ChatPanel } from "./chat-panel";
 import { useCommentOps } from "./comment-ops";
 import { CommentsList } from "./comments-panel";
 import type { WorkspaceContext } from "./context";
@@ -82,7 +83,7 @@ import { ShareDialog } from "./share-dialog";
 import { SymbolButton } from "./symbol-button";
 import { TrackedButton } from "./tracked-button";
 import { Btn, ResizeHandle, ToggleButton, useStoredSize } from "./ui";
-import { useProject } from "./use-project";
+import { CHAT_EVENT, useProject } from "./use-project";
 import { WordCountDialog } from "./word-count-dialog";
 
 /** The chat panel (with its Markdown renderer) loads when the right column first opens. */
@@ -279,6 +280,22 @@ export function Workspace({
     [dialog, setDialog] = useState<"share" | "references" | "review" | "count" | "git" | null>(
       null,
     );
+  // Chat messages from others that arrived while the chat was closed.
+  const [unreadChat, setUnreadChat] = useState(0);
+  const chatOpen = useRef(false);
+  chatOpen.current = panel === "chat";
+  useEffect(() => {
+    if (panel === "chat") setUnreadChat(0);
+  }, [panel]);
+  useEffect(() => {
+    const arrived = (event: Event) => {
+      const { detail } = event as CustomEvent<{ project: string; message: { author: string } }>;
+      if (detail.project === project.id && detail.message.author !== user.id && !chatOpen.current)
+        setUnreadChat((n) => n + 1);
+    };
+    window.addEventListener(CHAT_EVENT, arrived);
+    return () => window.removeEventListener(CHAT_EVENT, arrived);
+  }, [project.id, user.id]);
   // Smaller windows narrow the side panels first, leaving the editor and the PDF their room.
   const sidebarSize = useStoredSize(
       "writer-web-sidebar",
@@ -755,6 +772,8 @@ export function Workspace({
         showDraft={bubble?.kind !== "draft" && (!marginShown || draft?.file !== file?.id)}
         onLocate={locate}
       />
+    ) : panel === "chat" ? (
+      <ChatPanel ws={ws} />
     ) : panel === "history" ? (
       <HistoryPanel ws={ws} snapshots={data.snapshots} />
     ) : panel === "inbox" ? (
@@ -778,6 +797,7 @@ export function Workspace({
       onPanel={togglePanel}
       openComments={data.comments.filter((c) => !c.resolved).length}
       unread={inbox?.unread ?? 0}
+      unreadChat={unreadChat}
       pendingReview={pendingReview}
       onReferences={() => setDialog("references")}
       onWordCount={() => setDialog("count")}

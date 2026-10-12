@@ -19,6 +19,7 @@ import {
   PlusIcon,
   SignOutIcon,
   SquaresFourIcon,
+  TagIcon,
   TrashIcon,
   TrayArrowUpIcon,
   UsersIcon,
@@ -39,7 +40,8 @@ type Dialog =
   | { kind: "blank" }
   | { kind: "upload" }
   | { kind: "copy" | "rename" | "delete" | "leave" | "publish"; project: ProjectSummary }
-  | { kind: "skipped"; project: ProjectSummary; skipped: string[] };
+  | { kind: "skipped"; project: ProjectSummary; skipped: string[] }
+  | { kind: "tags"; projects: ProjectSummary[] };
 
 const FILTERS: Array<[Filter, MessageKey, typeof FolderIcon]> = [
   ["all", "dash.filter.all", FolderIcon],
@@ -245,7 +247,9 @@ export function Dashboard({
 }) {
   const { t, locale } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(initialProjects ?? null),
-    [filter, setFilter] = useState<Filter>("all"),
+    [filter, setFilterState] = useState<Filter>("all"),
+    // One of the member's own tags, shown instead of a filter.
+    [tag, setTag] = useState<string | null>(null),
     [query, setQuery] = useState(""),
     [sort, setSort] = useState<{ key: SortKey; ascending: boolean }>({
       key: "updated",
@@ -254,6 +258,10 @@ export function Dashboard({
     [selected, setSelected] = useState<Set<string>>(new Set()),
     [menu, setMenu] = useState(false),
     [dialog, setDialog] = useState<Dialog | null>(null);
+  const setFilter = (next: Filter) => {
+    setFilterState(next);
+    setTag(null);
+  };
   const { busy, error, setError, run } = useAction();
   const dialogAction = useAction();
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -278,7 +286,7 @@ export function Dashboard({
   }, [menu]);
   // Selections belong to one filter.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the filter changes.
-  useEffect(() => setSelected(new Set()), [filter]);
+  useEffect(() => setSelected(new Set()), [filter, tag]);
 
   const all = projects ?? [];
   const counts = Object.fromEntries(
@@ -289,7 +297,7 @@ export function Dashboard({
     const needle = query.trim().toLowerCase();
     const list = (projects ?? []).filter(
       (p) =>
-        inFilter(p, filter) &&
+        (tag ? !p.trashed && !!p.tags?.includes(tag) : inFilter(p, filter)) &&
         (!needle || `${p.name} ${p.owner ?? ""}`.toLowerCase().includes(needle)),
     );
     const direction = sort.ascending ? 1 : -1;
@@ -300,7 +308,15 @@ export function Dashboard({
         right = sort.key === "name" ? b.name : (b.owner ?? "");
       return direction * left.localeCompare(right, locale === "zh" ? "zh-CN" : "en");
     });
-  }, [projects, filter, query, sort, locale]);
+  }, [projects, filter, tag, query, sort, locale]);
+  // The member's tags, with how many of their (untrashed) projects carry each.
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of projects ?? [])
+      if (!p.trashed)
+        for (const name of p.tags ?? []) counts.set(name, (counts.get(name) ?? 0) + 1);
+    return [...counts].sort(([a], [b]) => a.localeCompare(b, locale === "zh" ? "zh-CN" : "en"));
+  }, [projects, locale]);
   const chosen = visible.filter((p) => selected.has(p.id));
 
   const close = () => {
@@ -417,6 +433,13 @@ export function Dashboard({
             false,
             true,
           )}
+        {iconButton(
+          "dash.tags",
+          TagIcon,
+          () => setDialog({ kind: "tags", projects: [p] }),
+          false,
+          true,
+        )}
         {iconButton("dash.download", DownloadSimpleIcon, () => download([p]), false, true)}
         {p.archived
           ? iconButton("dash.unarchive", ArchiveIcon, () =>
@@ -482,8 +505,8 @@ export function Dashboard({
               <button
                 key={id}
                 type="button"
-                aria-current={filter === id ? "page" : undefined}
-                className={filter === id ? "selected" : ""}
+                aria-current={!tag && filter === id ? "page" : undefined}
+                className={!tag && filter === id ? "selected" : ""}
                 onClick={() => setFilter(id)}
               >
                 <Icon aria-hidden="true" />
@@ -492,6 +515,56 @@ export function Dashboard({
               </button>
             ))}
           </nav>
+          {!!tagCounts.length && (
+            <nav aria-label={t("dash.tagsHeading")} className="dash-tags">
+              <h2>{t("dash.tagsHeading")}</h2>
+              {tagCounts.map(([name, count]) => (
+                <div key={name} className="dash-tag-row">
+                  <button
+                    type="button"
+                    aria-current={tag === name ? "page" : undefined}
+                    className={tag === name ? "selected" : ""}
+                    onClick={() => setTag(name)}
+                  >
+                    <TagIcon aria-hidden="true" />
+                    <span>{name}</span>
+                    <span className="dash-count">{count}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="icon"
+                    title={t("dash.renameTag")}
+                    aria-label={t("dash.renameTag")}
+                    onClick={() => {
+                      const to = prompt(t("dash.renameTagPrompt"), name)?.trim();
+                      if (to && to !== name)
+                        act(async () => {
+                          await api("/tags/rename", { from: name, to });
+                          if (tag === name) setTag(to);
+                        });
+                    }}
+                  >
+                    <PencilSimpleIcon aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon"
+                    title={t("dash.deleteTag")}
+                    aria-label={t("dash.deleteTag")}
+                    onClick={() => {
+                      if (confirm(t("dash.deleteTagConfirm", { name })))
+                        act(async () => {
+                          await api("/tags/delete", { tag: name });
+                          if (tag === name) setTag(null);
+                        });
+                    }}
+                  >
+                    <TrashIcon aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </nav>
+          )}
           <button type="button" className="dash-templates-link" onClick={() => onTemplates()}>
             <SquaresFourIcon aria-hidden="true" />
             <span>{t("tpl.open")}</span>
@@ -547,6 +620,14 @@ export function Dashboard({
                       </button>
                     ) : (
                       <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setDialog({ kind: "tags", projects: chosen })}
+                        >
+                          <TagIcon aria-hidden="true" />
+                          {t("dash.tags")}
+                        </button>
                         <button type="button" disabled={busy} onClick={() => download(chosen)}>
                           <DownloadSimpleIcon aria-hidden="true" />
                           {t("dash.download")}
@@ -774,6 +855,22 @@ export function Dashboard({
           }
         />
       )}
+      {dialog?.kind === "tags" && (
+        <TagsDialog
+          projects={dialog.projects}
+          known={tagCounts.map(([name]) => name)}
+          busy={dialogAction.busy}
+          error={dialogAction.error}
+          onClose={close}
+          onSave={(changes) =>
+            dialogAction.run(async () => {
+              for (const [id, tags] of changes) await api(`/projects/${id}/tags`, { tags }, "PUT");
+              close();
+              await reload();
+            })
+          }
+        />
+      )}
       {dialog?.kind === "leave" && (
         <Modal title={t("dash.dialogLeaveTitle")} onClose={close}>
           <p>{t("dash.dialogLeaveLead", { name: dialog.project.name })}</p>
@@ -824,5 +921,110 @@ export function Dashboard({
         </Modal>
       )}
     </div>
+  );
+}
+
+/**
+ * The member's tags for one or more projects: a tag ticked is on all of them, cleared on none,
+ * and a half-ticked one (on some) stays as it is unless clicked.
+ */
+function TagsDialog({
+  projects,
+  known,
+  busy,
+  error,
+  onClose,
+  onSave,
+}: {
+  projects: ProjectSummary[];
+  known: string[];
+  busy: boolean;
+  error: string;
+  onClose: () => void;
+  onSave: (changes: [string, string[]][]) => void;
+}) {
+  const { t } = useI18n();
+  const initial = (name: string) => {
+    const having = projects.filter((p) => p.tags?.includes(name)).length;
+    return having === projects.length ? true : having ? null : false;
+  };
+  const [names, setNames] = useState(known);
+  const [state, setState] = useState<Record<string, boolean | null>>(() =>
+    Object.fromEntries(known.map((name) => [name, initial(name)])),
+  );
+  const [adding, setAdding] = useState("");
+  const add = () => {
+    const name = adding.trim().replace(/\s+/g, " ");
+    if (!name || name.length > 40) return;
+    if (!names.includes(name)) setNames((old) => [...old, name]);
+    setState((old) => ({ ...old, [name]: true }));
+    setAdding("");
+  };
+  return (
+    <Modal title={t("dash.tagsTitle", { count: projects.length })} onClose={onClose}>
+      <div className="dash-tag-choices">
+        {names.map((name) => (
+          <label key={name} className="dash-tag-choice">
+            <input
+              type="checkbox"
+              checked={state[name] === true}
+              ref={(input) => {
+                if (input) input.indeterminate = state[name] === null;
+              }}
+              onChange={(e) => setState((old) => ({ ...old, [name]: e.target.checked }))}
+            />
+            {name}
+          </label>
+        ))}
+        {!names.length && <p className="muted">{t("dash.noTags")}</p>}
+      </div>
+      <form
+        className="row"
+        onSubmit={(event) => {
+          event.preventDefault();
+          add();
+        }}
+      >
+        <input
+          value={adding}
+          onChange={(e) => setAdding(e.target.value)}
+          placeholder={t("dash.newTag")}
+          aria-label={t("dash.newTag")}
+          maxLength={40}
+        />
+        <button type="submit" disabled={!adding.trim()}>
+          {t("dash.addTag")}
+        </button>
+      </form>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <footer>
+        <button type="button" onClick={onClose}>
+          {t("common.cancel")}
+        </button>
+        <button
+          type="button"
+          className="primary"
+          disabled={busy}
+          onClick={() =>
+            onSave(
+              projects.map((p) => {
+                const tags = new Set(p.tags ?? []);
+                for (const name of names) {
+                  if (state[name] === true) tags.add(name);
+                  else if (state[name] === false) tags.delete(name);
+                }
+                return [p.id, [...tags]];
+              }),
+            )
+          }
+        >
+          {t("common.save")}
+        </button>
+      </footer>
+    </Modal>
   );
 }

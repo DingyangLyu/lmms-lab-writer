@@ -29,6 +29,7 @@
     "@lmms-lab/writer-shared": "workspace:*",
     "@lmms-lab/writing": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
+    "@replit/codemirror-vim": "^6.4.0",
     "dictionary-en": "^4.0.0",
     "diff": "^8.0.4",
     "fflate": "^0.8.3",

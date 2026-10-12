@@ -444,6 +444,7 @@ function EditorSettingsSection() {
       {toggle(t("shell.closeBrackets"), settings.autoClosingBrackets !== "never", (on) =>
         change({ autoClosingBrackets: on ? "always" : "never" }),
       )}
+      {toggle(t("shell.vim"), settings.vim, (on) => change({ vim: on }))}
       <div className="flex items-center gap-2 pt-1">
         <span className="flex-1">{t("shell.theme")}</span>
         {(["light", "dark", "system"] as const).map((theme) => (

@@ -15,6 +15,9 @@ import { api, errorText } from "../api";
 import { i18n } from "../i18n";
 import { INBOX_EVENT } from "../inbox";
 
+/** The project socket's chat messages, as a window event (see chat-panel.tsx). */
+export const CHAT_EVENT = "writer-chat";
+
 /**
  * A change to the comments shown before the server has it (a comment just posted, a reply,
  * a thread resolved), laid over what the server last sent until a reload made after the
@@ -156,6 +159,12 @@ export function useProject(
         const m = JSON.parse(e.data);
         if (m.type === "project-changed") refresh(m.scope === "comments" ? "comments" : "all");
         if (m.type === "notification") window.dispatchEvent(new Event(INBOX_EVENT));
+        if (m.type === "chat")
+          window.dispatchEvent(
+            new CustomEvent(CHAT_EVENT, {
+              detail: { project: prefix.slice(prefix.lastIndexOf("/") + 1), message: m.message },
+            }),
+          );
         if (m.type === "ready") onRole(m.role);
       };
       socket.onclose = (e) => {

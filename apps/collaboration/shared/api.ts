@@ -71,6 +71,18 @@ export type ProjectSummary = {
   trashed?: boolean;
   /** Track changes is on for every member (see shared/tracked.ts). */
   trackAll?: boolean;
+  /** The signed-in member's own tags for it. */
+  tags?: string[];
+};
+/** A project's share links (owners only): anyone signed in who opens one joins with its role. */
+export type ShareLinks = { viewer: string | null; editor: string | null };
+export type ChatMessage = {
+  id: string;
+  author: string;
+  authorName: string;
+  authorAvatar: number | null;
+  body: string;
+  created: number;
 };
 /** A starting point for a new project (see server/templates.ts). */
 /** Template categories, as the gallery groups them. */

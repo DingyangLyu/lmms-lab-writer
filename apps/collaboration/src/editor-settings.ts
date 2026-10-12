@@ -13,6 +13,8 @@ export type WebEditorSettings = Pick<
   spellcheck: boolean;
   /** The project page's colours; "system" follows the computer's setting. */
   theme: "light" | "dark" | "system";
+  /** Vim key bindings in the editor. */
+  vim: boolean;
 };
 const KEY = "writer-editor-settings";
 const CHANGED = "writer-editor-settings";
@@ -27,6 +29,7 @@ export function readEditorSettings(): WebEditorSettings {
     autoClosingBrackets: "always",
     spellcheck: true,
     theme: "light",
+    vim: false,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -39,6 +42,7 @@ export function readEditorSettings(): WebEditorSettings {
       autoClosingBrackets: saved.autoClosingBrackets === "never" ? "never" : "always",
       spellcheck: saved.spellcheck !== false,
       theme: saved.theme === "dark" || saved.theme === "system" ? saved.theme : "light",
+      vim: saved.vim === true,
     };
   } catch {
     return fallback;

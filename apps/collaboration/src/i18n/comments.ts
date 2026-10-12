@@ -1,4 +1,9 @@
 export const commentsZh = {
+  "chat.title": "项目聊天",
+  "chat.empty": "还没有消息。这里的消息项目成员都能看到。",
+  "chat.message": "聊天消息",
+  "chat.placeholder": "发消息给项目成员（Enter 发送，Shift+Enter 换行）",
+  "chat.send": "发送",
   "comments.title": "讨论与批注",
   "comments.body": "批注内容",
   "comments.placeholder": "提出修改建议…",
@@ -32,6 +37,11 @@ export const commentsZh = {
   "notes.noteCount": "{count} 条批注",
 };
 export const commentsEn: Record<keyof typeof commentsZh, string> = {
+  "chat.title": "Project chat",
+  "chat.empty": "No messages yet. Everyone in the project sees what is written here.",
+  "chat.message": "Chat message",
+  "chat.placeholder": "Message the project (Enter sends, Shift+Enter for a new line)",
+  "chat.send": "Send",
   "comments.title": "Discussion and comments",
   "comments.body": "Comment",
   "comments.placeholder": "Suggest a change…",

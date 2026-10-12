@@ -36,6 +36,13 @@ import { addMemberRoute, peopleRoutes } from "./routes/people";
 import { projectListRoutes, projectRoutes } from "./routes/projects";
 import { proposalRoutes } from "./routes/proposals";
 import { sessionRoutes } from "./routes/session";
+import {
+  chatRoutes,
+  joinByLinkRoute,
+  shareRoutes,
+  tagAccountRoutes,
+  tagRoutes,
+} from "./routes/sharing";
 import { publishTemplateRoute, templateRoutes } from "./routes/templates";
 import { wordRoutes } from "./routes/words";
 import { zoteroAccountRoutes, zoteroRoutes } from "./routes/zotero";
@@ -243,6 +250,8 @@ export async function createWriterServer(options: Options) {
     ...wordRoutes,
     ...zoteroAccountRoutes,
     ...gitAccountRoutes,
+    joinByLinkRoute,
+    ...tagAccountRoutes,
     ...downloadRoutes,
   ];
   const projectScoped = [
@@ -253,6 +262,9 @@ export async function createWriterServer(options: Options) {
     ...bibliographyRoutes,
     ...zoteroRoutes,
     ...gitRoutes,
+    ...shareRoutes,
+    ...chatRoutes,
+    ...tagRoutes,
     ...commentRoutes,
     ...historyRoutes,
     ...proposalRoutes,

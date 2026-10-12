@@ -51,6 +51,9 @@ export const workbenchZh = {
   "editor.multiLineAndLongSingleLineCommentsTheFil": "包括多行注释和单条长注释；不修改文件内容",
   "editor.resolved": "已解决 · ",
   "editor.unfold": "展开内容",
+  "pdf.previousPage": "上一页",
+  "pdf.nextPage": "下一页",
+  "pdf.pageNumber": "页码（输入后按 Enter 跳转）",
   "editor.visualShowPreamble": "▸ 显示导言区",
   "editor.visualHidePreamble": "▾ 隐藏导言区",
   "editor.visualEndOfDocument": "文档结束",
@@ -158,7 +161,6 @@ export const workbenchZh = {
   "pdf.checkingThePdfTextMappingFailedError": "文字映射检查失败：{error}",
   "pdf.countCommentsWereMadeOnAnEarlierBuild":
     "{count} 条批注做在旧版 PDF 上，位置可能已变，未在页面上标出 · 点此打开批注",
-  "pdf.countCountPagePages": "{count} 页",
   "pdf.dragOverTextToCommentManageThemUnderComm":
     "拖选文字添加批注 · 顶部“批注”管理历史 · ⌘/Ctrl + 点击定位源码",
   "pdf.fitWidth": "适应宽度",
@@ -289,6 +291,9 @@ export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
     "Multi-line and long single-line comments; the file is not changed",
   "editor.resolved": "Resolved · ",
   "editor.unfold": "Unfold",
+  "pdf.previousPage": "Previous page",
+  "pdf.nextPage": "Next page",
+  "pdf.pageNumber": "Page (type a number and press Enter)",
   "editor.visualShowPreamble": "▸ Show document preamble",
   "editor.visualHidePreamble": "▾ Hide document preamble",
   "editor.visualEndOfDocument": "End of document",
@@ -399,7 +404,6 @@ export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
   "pdf.checkingThePdfTextMappingFailedError": "Checking the PDF text mapping failed: {error}",
   "pdf.countCommentsWereMadeOnAnEarlierBuild":
     "{count} {count|comment was|comments were} made on an earlier build of this PDF and may have moved, so {count|it is|they are} not drawn · open Comments",
-  "pdf.countCountPagePages": "{count} {count|page|pages}",
   "pdf.dragOverTextToCommentManageThemUnderComm":
     "Drag over text to comment · manage them under Comments · ⌘/Ctrl + click jumps to the source",
   "pdf.fitWidth": "Fit width",

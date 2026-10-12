@@ -405,6 +405,30 @@ export const migrations: string[] = [
      synced_by TEXT REFERENCES users(id) ON DELETE SET NULL,
      action TEXT
    );`,
+  // 18: links that let anyone signed in join a project as a viewer or editor; the project's
+  // chat; each member's own tags for sorting their project list.
+  `CREATE TABLE share_links(
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     role TEXT NOT NULL,
+     token TEXT NOT NULL UNIQUE,
+     created_by TEXT NOT NULL REFERENCES users(id),
+     created BIGINT NOT NULL,
+     PRIMARY KEY (project, role)
+   );
+   CREATE TABLE chat_messages(
+     id TEXT PRIMARY KEY,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     author TEXT NOT NULL REFERENCES users(id),
+     body TEXT NOT NULL,
+     created BIGINT NOT NULL
+   );
+   CREATE INDEX chat_messages_project ON chat_messages(project, created);
+   CREATE TABLE project_tags(
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+     tag TEXT NOT NULL,
+     PRIMARY KEY (user_id, project, tag)
+   );`,
 ];
 
 /** Applies pending migrations atomically; concurrent starts wait on an advisory lock. */

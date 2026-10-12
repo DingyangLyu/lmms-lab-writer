@@ -638,6 +638,11 @@ export class Collaboration {
     for (const peer of this.peers)
       if (peer.project === project) send(peer.socket, { type: "project-changed", scope });
   }
+  /** A chat message, to every page of the project that is open. */
+  chat(project: string, message: unknown) {
+    for (const peer of this.peers)
+      if (peer.project === project && !peer.sync) send(peer.socket, { type: "chat", message });
+  }
   /** Something arrived in these members' inboxes: every page they have open looks. */
   notify(users: string[]) {
     if (!users.length) return;

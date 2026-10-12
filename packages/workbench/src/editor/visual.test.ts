@@ -48,7 +48,7 @@ describe("visual mode", () => {
   });
 
   it("matches braces past escapes and comments", () => {
-    const text = String.raw`{a \} {b} % }` + "\n}";
+    const text = "{a \\} {b} % }\n}";
     expect(closing(text, 0)).toBe(text.length);
     expect(closing("{unclosed", 0)).toBe(-1);
   });

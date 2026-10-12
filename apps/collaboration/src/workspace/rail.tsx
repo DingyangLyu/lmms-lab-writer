@@ -7,6 +7,7 @@ import {
   BellIcon,
   BooksIcon,
   ChatsCircleIcon,
+  ChatTeardropTextIcon,
   ClockCounterClockwiseIcon,
   FilesIcon,
   GearSixIcon,
@@ -17,7 +18,7 @@ import {
 import type { ReactNode } from "react";
 import { useI18n } from "../i18n";
 
-export type RailPanel = "files" | "search" | "comments" | "history" | "inbox" | "settings";
+export type RailPanel = "files" | "search" | "comments" | "chat" | "history" | "inbox" | "settings";
 
 function RailButton({
   label,
@@ -71,6 +72,7 @@ export function Rail({
   onPanel,
   openComments,
   unread,
+  unreadChat,
   pendingReview,
   onReferences,
   onWordCount,
@@ -81,6 +83,8 @@ export function Rail({
   onPanel: (panel: RailPanel) => void;
   openComments: number;
   unread: number;
+  /** Chat messages that arrived while the chat was closed. */
+  unreadChat: number;
   pendingReview: number;
   onReferences: () => void;
   onWordCount: () => void;
@@ -107,6 +111,7 @@ export function Rail({
       {item("files", t("rail.files"), <FilesIcon className={icon} />)}
       {item("search", t("rail.search"), <MagnifyingGlassIcon className={icon} />)}
       {item("comments", t("rail.comments"), <ChatsCircleIcon className={icon} />, openComments)}
+      {item("chat", t("rail.chat"), <ChatTeardropTextIcon className={icon} />, unreadChat, "sky")}
       {item("history", t("rail.history"), <ClockCounterClockwiseIcon className={icon} />)}
       <span className="my-1 h-px w-6 bg-border" aria-hidden="true" />
       <RailButton label={t("rail.references")} onClick={onReferences}>

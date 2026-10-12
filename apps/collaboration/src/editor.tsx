@@ -5,6 +5,7 @@ import { gotoLine, highlightSelectionMatches, searchKeymap } from "@codemirror/s
 import {
   Compartment,
   EditorState,
+  Prec,
   RangeSetBuilder,
   StateEffect,
   StateField,
@@ -41,6 +42,7 @@ import {
   writerSearch,
 } from "@lmms-lab/workbench";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
+import { vim } from "@replit/codemirror-vim";
 import { type ReactNode, useEffect, useRef } from "react";
 import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next";
 import * as Y from "yjs";
@@ -277,7 +279,8 @@ export function Editor({
   /** A click on a note beside the text: the comments on that line, or the draft. */
   onNoteIcon?: (ids: string[], draft: boolean) => void;
   /** Text size, wrapping and the like, as the member chose them. */
-  settings?: Partial<EditorSettings>;
+  /** The member's editor settings, plus Vim key bindings. */
+  settings?: Partial<EditorSettings> & { vim?: boolean };
   /** The browser's spell checker on the prose; see spellcheck.ts. */
   spellcheck?: boolean;
   /** Record this member's edits as tracked changes (shared/tracked.ts). */
@@ -299,7 +302,8 @@ export function Editor({
     provider = useRef<WriterProvider | null>(null);
   const editability = useRef(new Compartment()),
     spelling = useRef(new Compartment()),
-    visuals = useRef(new Compartment());
+    visuals = useRef(new Compartment()),
+    keys = useRef(new Compartment());
   const callbacks = useRef({
     onRole,
     onStatus,
@@ -342,6 +346,8 @@ export function Editor({
   visualOn.current = visual;
   const darkRef = useRef(dark);
   darkRef.current = dark;
+  const vimOn = useRef(!!settings.vim);
+  vimOn.current = !!settings.vim;
   const tracks = useRef(tracking);
   tracks.current = tracking;
   useEffect(() => {
@@ -404,6 +410,8 @@ export function Editor({
             }
             return transaction;
           }),
+          // Vim goes first, so its keys win over the editor's own.
+          keys.current.of(vimOn.current ? Prec.highest(vim({ status: true })) : []),
           latexLanguage,
           latexFoldExtensions(),
           drawSelection(),
@@ -656,6 +664,12 @@ export function Editor({
   useEffect(() => {
     view.current?.dispatch({ effects: setEditorIssues.of(issues ?? []) });
   }, [issues]);
+  const vimSetting = !!settings.vim;
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: keys.current.reconfigure(vimSetting ? Prec.highest(vim({ status: true })) : []),
+    });
+  }, [vimSetting]);
   useEffect(() => {
     const v = view.current,
       p = provider.current;
