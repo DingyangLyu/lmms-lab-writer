@@ -116,7 +116,9 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 
 提醒由飞书应用 `cli_aa42ca90e8b8dbc0` 的机器人发给管理员本人（`~/writer-monitor/feishu.json`：`app_id`、`app_secret`、`receive_id_type`、`receive_id`，只有所有者能读）。要发到群里：把机器人拉进群，`receive_id_type` 改为 `chat_id`、`receive_id` 填群的 `oc_…`。`python3 ~/writer-monitor/writer-monitor.py --test` 发一条测试消息。日志 `monitor.log`，状态 `state.json`。
 
-**离线页**：北京 nginx（`/etc/nginx/conf.d/writer-18089.conf`）连不上实验室时，网页返回 `/var/www/writer/writer-offline.html`（说明情况，每 20 秒检查一次，恢复后自动刷新），API 返回 JSON 错误，状态码都是 503。洛杉矶的 Caddy 配置了 `admin off`，改配置必须重启 Caddy（会让那台服务器上的其他网站断开一两秒），同样的离线页配置已放在 `/etc/caddy/writer.caddy.offline-pending`，择时 `sudo cp /etc/caddy/writer.caddy.offline-pending /etc/caddy/writer.caddy && sudo systemctl restart caddy` 启用。
+**离线页**：北京 nginx（`/etc/nginx/conf.d/writer-18089.conf`）和洛杉矶 Caddy（`/etc/caddy/writer.caddy`）连不上实验室时，网页返回 `/var/www/writer/writer-offline.html`（说明情况，每 20 秒检查一次，恢复后自动刷新），API 返回 `writer-offline.json` 的 JSON 错误，状态码都是 503。洛杉矶的 Caddy 配置了 `admin off`，改配置后要 `sudo systemctl restart caddy`（那台服务器上的其他网站会断开一两秒），不能 reload。
+
+**这台电脑上的飞书 CLI**：全局装了 `lark-cli`（`npm.cmd install -g @larksuite/cli`，`.ps1` 包装脚本已改名，用 `lark-cli.cmd`），配置为同一个飞书应用（`lark-cli config init --app-id cli_aa42ca90e8b8dbc0 --app-secret-stdin`），密钥存在 yuanbai 的 Windows 凭据里，后台任务（Writer Runner、Writer Backup）也能用。以机器人身份发消息：`lark-cli im +messages-send --as bot --user-id <open_id> --text "…"`。以管理员本人身份用文档、日历等要先 `lark-cli auth login`（设备码登录，在手机上打开它给的链接确认）。
 
 **还需要人工做的**：给这台电脑配一台 UPS；在 BIOS 里打开“来电自动开机”（Restore on AC Power Loss），停电恢复后服务会随开机自动启动。
 
