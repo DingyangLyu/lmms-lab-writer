@@ -16,8 +16,15 @@
       "category": "conference",
       "venue": "NeurIPS",
       "year": 2026,
-      "fields": ["ml"],
-      "tags": ["nips", "machine learning", "机器学习", "double-blind"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "nips",
+        "machine learning",
+        "机器学习",
+        "double-blind"
+      ],
       "homepage": "https://neurips.cc/Conferences/2026/CallForPapers",
       "order": 10
     }
@@ -26,7 +33,9 @@
     "id": "icml-2026",
     "url": "https://media.icml.cc/Conferences/ICML2026/Styles/icml2026.zip",
     "archive": "icml2026.zip",
-    "exclude": ["example_paper.pdf"],
+    "exclude": [
+      "example_paper.pdf"
+    ],
     "main": "example_paper.tex",
     "meta": {
       "name": {
@@ -40,8 +49,14 @@
       "category": "conference",
       "venue": "ICML",
       "year": 2026,
-      "fields": ["ml"],
-      "tags": ["machine learning", "机器学习", "double-blind"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "machine learning",
+        "机器学习",
+        "double-blind"
+      ],
       "homepage": "https://icml.cc/Conferences/2026/AuthorInstructions",
       "order": 11
     }
@@ -63,8 +78,15 @@
       "category": "conference",
       "venue": "ICLR",
       "year": 2027,
-      "fields": ["ml"],
-      "tags": ["representation learning", "machine learning", "机器学习", "openreview"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "representation learning",
+        "machine learning",
+        "机器学习",
+        "openreview"
+      ],
       "homepage": "https://github.com/ICLR/Master-Template",
       "order": 12
     }
@@ -92,8 +114,15 @@
       "category": "conference",
       "venue": "AAAI",
       "year": 2027,
-      "fields": ["ai", "ml"],
-      "tags": ["artificial intelligence", "人工智能", "double-blind"],
+      "fields": [
+        "ai",
+        "ml"
+      ],
+      "tags": [
+        "artificial intelligence",
+        "人工智能",
+        "double-blind"
+      ],
       "homepage": "https://aaai.org/conference/aaai/aaai-27/submission-instructions/",
       "order": 20
     }
@@ -102,7 +131,9 @@
     "id": "ijcai-ecai-2026",
     "url": "https://www.ijcai.org/sites/default/files/Guidelines/FormattingGuidelines-IJCAI-ECAI-26.zip",
     "archive": "ijcai2026.zip",
-    "exclude": ["*.docx"],
+    "exclude": [
+      "*.docx"
+    ],
     "main": "ijcai26.tex",
     "meta": {
       "name": {
@@ -116,9 +147,16 @@
       "category": "conference",
       "venue": "IJCAI",
       "year": 2026,
-      "venues": ["ECAI"],
-      "fields": ["ai"],
-      "tags": ["artificial intelligence", "人工智能"],
+      "venues": [
+        "ECAI"
+      ],
+      "fields": [
+        "ai"
+      ],
+      "tags": [
+        "artificial intelligence",
+        "人工智能"
+      ],
       "homepage": "https://www.ijcai.org/authors_kit",
       "order": 21
     }
@@ -140,8 +178,14 @@
       "category": "conference",
       "venue": "CVPR",
       "year": 2026,
-      "fields": ["cv"],
-      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "fields": [
+        "cv"
+      ],
+      "tags": [
+        "computer vision",
+        "计算机视觉",
+        "rebuttal"
+      ],
       "homepage": "https://github.com/cvpr-org/author-kit",
       "order": 30
     }
@@ -163,8 +207,14 @@
       "category": "conference",
       "venue": "ICCV",
       "year": 2025,
-      "fields": ["cv"],
-      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "fields": [
+        "cv"
+      ],
+      "tags": [
+        "computer vision",
+        "计算机视觉",
+        "rebuttal"
+      ],
       "homepage": null,
       "order": 31
     }
@@ -173,7 +223,11 @@
     "id": "eccv-2026",
     "url": "https://github.com/paolo-favaro/paper-template/archive/refs/tags/Latest.zip",
     "archive": "eccv2026.zip",
-    "exclude": ["ECCV_2026_Paper_Template.pdf", "llncsdoc.pdf", "*.eps"],
+    "exclude": [
+      "ECCV_2026_Paper_Template.pdf",
+      "llncsdoc.pdf",
+      "*.eps"
+    ],
     "main": "main.tex",
     "meta": {
       "name": {
@@ -187,8 +241,15 @@
       "category": "conference",
       "venue": "ECCV",
       "year": 2026,
-      "fields": ["cv"],
-      "tags": ["computer vision", "计算机视觉", "lncs", "springer"],
+      "fields": [
+        "cv"
+      ],
+      "tags": [
+        "computer vision",
+        "计算机视觉",
+        "lncs",
+        "springer"
+      ],
       "homepage": "https://eccv.ecva.net/Conferences/2026/SubmissionPolicies",
       "order": 32
     }
@@ -210,8 +271,14 @@
       "category": "conference",
       "venue": "WACV",
       "year": 2027,
-      "fields": ["cv"],
-      "tags": ["computer vision", "计算机视觉", "rebuttal"],
+      "fields": [
+        "cv"
+      ],
+      "tags": [
+        "computer vision",
+        "计算机视觉",
+        "rebuttal"
+      ],
       "homepage": "https://wacv.thecvf.com/Conferences/2027/AuthorGuides",
       "order": 33
     }
@@ -220,7 +287,11 @@
     "id": "bmvc-2026",
     "url": "https://github.com/BritishMachineVisionAssociation/BMVCTemplate/archive/refs/heads/master.zip",
     "archive": "bmvc2026.zip",
-    "exclude": ["*.docx", "bmvc_final.pdf", "bmvc_review.pdf"],
+    "exclude": [
+      "*.docx",
+      "bmvc_final.pdf",
+      "bmvc_review.pdf"
+    ],
     "main": "bmvc_review.tex",
     "meta": {
       "name": {
@@ -234,8 +305,13 @@
       "category": "conference",
       "venue": "BMVC",
       "year": 2026,
-      "fields": ["cv"],
-      "tags": ["computer vision", "计算机视觉"],
+      "fields": [
+        "cv"
+      ],
+      "tags": [
+        "computer vision",
+        "计算机视觉"
+      ],
       "homepage": "https://bmvc2026.bmva.org/authors/author-guidelines/",
       "order": 34
     }
@@ -244,7 +320,9 @@
     "id": "acl-arr",
     "url": "https://github.com/acl-org/acl-style-files/archive/refs/heads/master.zip",
     "archive": "acl.zip",
-    "exclude": ["tests/**"],
+    "exclude": [
+      "tests/**"
+    ],
     "main": "acl_latex.tex",
     "meta": {
       "name": {
@@ -258,9 +336,21 @@
       "category": "conference",
       "venue": "ACL",
       "year": null,
-      "venues": ["EMNLP", "NAACL", "EACL", "AACL", "ARR"],
-      "fields": ["nlp"],
-      "tags": ["natural language processing", "自然语言处理", "computational linguistics"],
+      "venues": [
+        "EMNLP",
+        "NAACL",
+        "EACL",
+        "AACL",
+        "ARR"
+      ],
+      "fields": [
+        "nlp"
+      ],
+      "tags": [
+        "natural language processing",
+        "自然语言处理",
+        "computational linguistics"
+      ],
       "homepage": "https://github.com/acl-org/acl-style-files",
       "order": 40
     }
@@ -269,7 +359,9 @@
     "id": "colm-2026",
     "url": "https://github.com/COLM-org/Template/archive/refs/heads/master.zip",
     "archive": "colm2026.zip",
-    "exclude": ["colm2026_conference.pdf"],
+    "exclude": [
+      "colm2026_conference.pdf"
+    ],
     "main": "colm2026_conference.tex",
     "meta": {
       "name": {
@@ -283,8 +375,15 @@
       "category": "conference",
       "venue": "COLM",
       "year": 2026,
-      "fields": ["nlp", "ml"],
-      "tags": ["language models", "llm", "大模型"],
+      "fields": [
+        "nlp",
+        "ml"
+      ],
+      "tags": [
+        "language models",
+        "llm",
+        "大模型"
+      ],
       "homepage": "https://github.com/COLM-org/Template",
       "order": 41
     }
@@ -293,7 +392,9 @@
     "id": "aistats-2027",
     "url": "https://aistats.org/aistats2027/AISTATS2027PaperPack.zip",
     "archive": "aistats2027.zip",
-    "exclude": ["sample_paper.pdf"],
+    "exclude": [
+      "sample_paper.pdf"
+    ],
     "main": "sample_paper.tex",
     "meta": {
       "name": {
@@ -307,8 +408,14 @@
       "category": "conference",
       "venue": "AISTATS",
       "year": 2027,
-      "fields": ["ml"],
-      "tags": ["statistics", "统计学习", "machine learning"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "statistics",
+        "统计学习",
+        "machine learning"
+      ],
       "homepage": "https://virtual.aistats.org/Conferences/2027/CallForPapers",
       "order": 50
     }
@@ -330,8 +437,15 @@
       "category": "conference",
       "venue": "UAI",
       "year": 2026,
-      "fields": ["ml", "ai"],
-      "tags": ["uncertainty", "probabilistic", "machine learning"],
+      "fields": [
+        "ml",
+        "ai"
+      ],
+      "tags": [
+        "uncertainty",
+        "probabilistic",
+        "machine learning"
+      ],
       "homepage": "https://www.auai.org/uai2026/submission_instructions",
       "order": 51
     }
@@ -353,8 +467,14 @@
       "category": "conference",
       "venue": "COLT",
       "year": 2026,
-      "fields": ["ml"],
-      "tags": ["learning theory", "学习理论", "pmlr"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "learning theory",
+        "学习理论",
+        "pmlr"
+      ],
       "homepage": "https://learningtheory.org/colt2026/cfp.html",
       "order": 52
     }
@@ -364,7 +484,10 @@
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/acmart.zip",
     "archive": "acmart.zip",
     "root": "acmart",
-    "generate": ["acmart.ins", "samples/samples.ins"],
+    "generate": [
+      "acmart.ins",
+      "samples/samples.ins"
+    ],
     "include": [
       "acmart.cls",
       "ACM-Reference-Format.bst",
@@ -392,8 +515,20 @@
       "category": "conference",
       "venue": "ACM",
       "year": null,
-      "venues": ["KDD", "WWW", "SIGIR", "CIKM", "WSDM", "MM", "CHI", "RecSys"],
-      "fields": ["data", "ai"],
+      "venues": [
+        "KDD",
+        "WWW",
+        "SIGIR",
+        "CIKM",
+        "WSDM",
+        "MM",
+        "CHI",
+        "RecSys"
+      ],
+      "fields": [
+        "data",
+        "ai"
+      ],
       "tags": [
         "acmart",
         "data mining",
@@ -410,7 +545,14 @@
     "id": "icassp-2027",
     "url": "https://cmsworkshops.com/ICASSP2027/papers/PaperFormat/ICASSP2027_Paper_Templates.zip",
     "archive": "icassp2027.zip",
-    "exclude": ["*.doc", "*.ps", "*.eps", "Template.pdf", "format.pdf", "Author-PDF-Guide-V32.pdf"],
+    "exclude": [
+      "*.doc",
+      "*.ps",
+      "*.eps",
+      "Template.pdf",
+      "format.pdf",
+      "Author-PDF-Guide-V32.pdf"
+    ],
     "main": "Template.tex",
     "meta": {
       "name": {
@@ -424,8 +566,17 @@
       "category": "conference",
       "venue": "ICASSP",
       "year": 2027,
-      "fields": ["speech"],
-      "tags": ["signal processing", "信号处理", "speech", "语音", "audio", "ieee"],
+      "fields": [
+        "speech"
+      ],
+      "tags": [
+        "signal processing",
+        "信号处理",
+        "speech",
+        "语音",
+        "audio",
+        "ieee"
+      ],
       "homepage": "https://cmsworkshops.com/ICASSP2027/papers/paper_kit.php",
       "order": 70
     }
@@ -434,7 +585,9 @@
     "id": "ieee-ras-conference",
     "url": "https://ras.papercept.net/conferences/support/files/ieeeconf.zip",
     "archive": "ieeeconf.zip",
-    "exclude": ["root.pdf"],
+    "exclude": [
+      "root.pdf"
+    ],
     "main": "root.tex",
     "meta": {
       "name": {
@@ -448,9 +601,19 @@
       "category": "conference",
       "venue": "ICRA",
       "year": null,
-      "venues": ["IROS", "CASE"],
-      "fields": ["robotics"],
-      "tags": ["robotics", "机器人", "ieee", "papercept"],
+      "venues": [
+        "IROS",
+        "CASE"
+      ],
+      "fields": [
+        "robotics"
+      ],
+      "tags": [
+        "robotics",
+        "机器人",
+        "ieee",
+        "papercept"
+      ],
       "homepage": "https://ras.papercept.net/conferences/support/tex.php",
       "order": 80
     }
@@ -459,7 +622,11 @@
     "id": "springer-lncs",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/llncs.zip",
     "archive": "llncs.zip",
-    "include": ["llncs.cls", "splncs04.bst", "README.md"],
+    "include": [
+      "llncs.cls",
+      "splncs04.bst",
+      "README.md"
+    ],
     "add": {
       "main.tex": "extra/lncs/main.tex"
     },
@@ -476,9 +643,19 @@
       "category": "conference",
       "venue": "LNCS",
       "year": null,
-      "venues": ["MICCAI", "ECML PKDD"],
-      "fields": ["cv", "ml"],
-      "tags": ["springer", "medical imaging", "医学影像"],
+      "venues": [
+        "MICCAI",
+        "ECML PKDD"
+      ],
+      "fields": [
+        "cv",
+        "ml"
+      ],
+      "tags": [
+        "springer",
+        "medical imaging",
+        "医学影像"
+      ],
       "homepage": "https://www.ctan.org/pkg/llncs",
       "order": 85
     }
@@ -487,7 +664,10 @@
     "id": "tmlr",
     "url": "https://github.com/JmlrOrg/tmlr-style-file/archive/refs/heads/main.zip",
     "archive": "tmlr.zip",
-    "exclude": ["main.pdf", "main-accepted.pdf"],
+    "exclude": [
+      "main.pdf",
+      "main-accepted.pdf"
+    ],
     "main": "main.tex",
     "meta": {
       "name": {
@@ -501,8 +681,15 @@
       "category": "journal",
       "venue": "TMLR",
       "year": null,
-      "fields": ["ml"],
-      "tags": ["journal", "期刊", "openreview", "machine learning"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "journal",
+        "期刊",
+        "openreview",
+        "machine learning"
+      ],
       "homepage": "https://github.com/JmlrOrg/tmlr-style-file",
       "order": 90
     }
@@ -511,7 +698,9 @@
     "id": "jmlr",
     "url": "https://github.com/JmlrOrg/jmlr-style-file/archive/refs/heads/master.zip",
     "archive": "jmlr.zip",
-    "exclude": ["sample.pdf"],
+    "exclude": [
+      "sample.pdf"
+    ],
     "main": "sample.tex",
     "meta": {
       "name": {
@@ -525,8 +714,14 @@
       "category": "journal",
       "venue": "JMLR",
       "year": null,
-      "fields": ["ml"],
-      "tags": ["journal", "期刊", "machine learning"],
+      "fields": [
+        "ml"
+      ],
+      "tags": [
+        "journal",
+        "期刊",
+        "machine learning"
+      ],
       "homepage": "https://www.jmlr.org/format/format.html",
       "order": 91
     }
@@ -535,7 +730,11 @@
     "id": "ieee-tpami",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/IEEEtran.zip",
     "archive": "ieeetran.zip",
-    "include": ["IEEEtran.cls", "bare_jrnl_compsoc.tex", "bibtex/IEEEtran.bst"],
+    "include": [
+      "IEEEtran.cls",
+      "bare_jrnl_compsoc.tex",
+      "bibtex/IEEEtran.bst"
+    ],
     "rename": {
       "bibtex/IEEEtran.bst": "IEEEtran.bst"
     },
@@ -552,9 +751,20 @@
       "category": "journal",
       "venue": "TPAMI",
       "year": null,
-      "venues": ["TKDE", "IEEE Transactions"],
-      "fields": ["cv", "ml"],
-      "tags": ["ieee", "journal", "期刊", "ieeetran"],
+      "venues": [
+        "TKDE",
+        "IEEE Transactions"
+      ],
+      "fields": [
+        "cv",
+        "ml"
+      ],
+      "tags": [
+        "ieee",
+        "journal",
+        "期刊",
+        "ieeetran"
+      ],
       "homepage": "https://www.ctan.org/pkg/ieeetran",
       "order": 92
     }
@@ -563,7 +773,9 @@
     "id": "arxiv-preprint",
     "url": "https://github.com/kourgeorge/arxiv-style/archive/refs/heads/master.zip",
     "archive": "arxiv.zip",
-    "exclude": ["template.pdf"],
+    "exclude": [
+      "template.pdf"
+    ],
     "main": "template.tex",
     "meta": {
       "name": {
@@ -578,7 +790,10 @@
       "venue": "arXiv",
       "year": null,
       "fields": [],
-      "tags": ["preprint", "预印本"],
+      "tags": [
+        "preprint",
+        "预印本"
+      ],
       "homepage": "https://github.com/kourgeorge/arxiv-style",
       "order": 95
     }
@@ -587,7 +802,9 @@
     "id": "acs-journals",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/achemso.zip",
     "archive": "achemso.zip",
-    "generate": ["achemso.ins"],
+    "generate": [
+      "achemso.ins"
+    ],
     "include": [
       "achemso.cls",
       "achemso.sty",
@@ -610,8 +827,17 @@
       "category": "journal",
       "venue": "ACS",
       "year": null,
-      "venues": ["JACS", "ACS Energy Lett.", "ACS Nano", "Nano Lett.", "Chem. Mater.", "ACS AMI"],
-      "fields": ["chem"],
+      "venues": [
+        "JACS",
+        "ACS Energy Lett.",
+        "ACS Nano",
+        "Nano Lett.",
+        "Chem. Mater.",
+        "ACS AMI"
+      ],
+      "fields": [
+        "chem"
+      ],
       "tags": [
         "achemso",
         "chemistry",
@@ -631,8 +857,14 @@
     "id": "elsevier-elsarticle",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/elsarticle.zip",
     "archive": "elsarticle.zip",
-    "generate": ["elsarticle.ins"],
-    "include": ["elsarticle.cls", "*.bst", "elsarticle-template-num.tex"],
+    "generate": [
+      "elsarticle.ins"
+    ],
+    "include": [
+      "elsarticle.cls",
+      "*.bst",
+      "elsarticle-template-num.tex"
+    ],
     "main": "elsarticle-template-num.tex",
     "meta": {
       "name": {
@@ -646,9 +878,24 @@
       "category": "journal",
       "venue": "Elsevier",
       "year": null,
-      "venues": ["J. Power Sources", "Electrochim. Acta", "Energy Storage Mater.", "Chem. Eng. J."],
-      "fields": ["chem", "physics"],
-      "tags": ["elsevier", "elsarticle", "journal", "期刊", "materials", "材料"],
+      "venues": [
+        "J. Power Sources",
+        "Electrochim. Acta",
+        "Energy Storage Mater.",
+        "Chem. Eng. J."
+      ],
+      "fields": [
+        "chem",
+        "physics"
+      ],
+      "tags": [
+        "elsevier",
+        "elsarticle",
+        "journal",
+        "期刊",
+        "materials",
+        "材料"
+      ],
       "homepage": "https://www.ctan.org/pkg/elsarticle",
       "order": 101
     }
@@ -678,9 +925,21 @@
       "category": "journal",
       "venue": "Elsevier",
       "year": null,
-      "venues": ["Nano Energy", "Energy Storage Mater."],
-      "fields": ["chem", "physics"],
-      "tags": ["elsevier", "cas", "double column", "双栏", "期刊"],
+      "venues": [
+        "Nano Energy",
+        "Energy Storage Mater."
+      ],
+      "fields": [
+        "chem",
+        "physics"
+      ],
+      "tags": [
+        "elsevier",
+        "cas",
+        "double column",
+        "双栏",
+        "期刊"
+      ],
       "homepage": "https://www.ctan.org/pkg/els-cas-templates",
       "order": 102
     }
@@ -689,7 +948,9 @@
     "id": "aps-physical-review",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/revtex.zip",
     "archive": "revtex.zip",
-    "include": ["sample/aps/apstemplate.tex"],
+    "include": [
+      "sample/aps/apstemplate.tex"
+    ],
     "rename": {
       "sample/aps/apstemplate.tex": "apstemplate-reference.tex"
     },
@@ -710,9 +971,26 @@
       "category": "journal",
       "venue": "APS",
       "year": null,
-      "venues": ["PRL", "PRB", "PRX", "PR Applied", "J. Chem. Phys."],
-      "fields": ["physics", "chem"],
-      "tags": ["revtex", "aps", "aip", "physics", "物理", "journal", "期刊"],
+      "venues": [
+        "PRL",
+        "PRB",
+        "PRX",
+        "PR Applied",
+        "J. Chem. Phys."
+      ],
+      "fields": [
+        "physics",
+        "chem"
+      ],
+      "tags": [
+        "revtex",
+        "aps",
+        "aip",
+        "physics",
+        "物理",
+        "journal",
+        "期刊"
+      ],
       "homepage": "https://www.ctan.org/pkg/revtex",
       "order": 103
     }
@@ -721,7 +999,9 @@
     "id": "thuthesis",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/macros/latex/contrib/thuthesis.zip",
     "archive": "thuthesis.zip",
-    "generate": ["thuthesis.ins"],
+    "generate": [
+      "thuthesis.ins"
+    ],
     "exclude": [
       "*.dtx",
       "*.ins",
@@ -745,7 +1025,15 @@
       "venue": "清华大学",
       "year": null,
       "fields": [],
-      "tags": ["thesis", "学位论文", "清华", "tsinghua", "中文", "博士", "硕士"],
+      "tags": [
+        "thesis",
+        "学位论文",
+        "清华",
+        "tsinghua",
+        "中文",
+        "博士",
+        "硕士"
+      ],
       "homepage": "https://github.com/tuna/thuthesis",
       "order": 110
     }
@@ -796,7 +1084,15 @@
       "venue": "北京大学",
       "year": null,
       "fields": [],
-      "tags": ["thesis", "学位论文", "北大", "peking", "中文", "博士", "硕士"],
+      "tags": [
+        "thesis",
+        "学位论文",
+        "北大",
+        "peking",
+        "中文",
+        "博士",
+        "硕士"
+      ],
       "homepage": "https://www.ctan.org/pkg/pkuthss",
       "order": 111
     }
@@ -805,7 +1101,13 @@
     "id": "ucasthesis",
     "url": "https://github.com/mohuangrui/ucasthesis/archive/refs/heads/master.zip",
     "archive": "ucasthesis.zip",
-    "include": ["Biblio/**", "Img/**", "Style/**", "Tex/**", "Thesis.tex"],
+    "include": [
+      "Biblio/**",
+      "Img/**",
+      "Style/**",
+      "Tex/**",
+      "Thesis.tex"
+    ],
     "main": "Thesis.tex",
     "engine": "xelatex",
     "meta": {
@@ -821,7 +1123,15 @@
       "venue": "国科大",
       "year": null,
       "fields": [],
-      "tags": ["thesis", "学位论文", "国科大", "中科院", "ucas", "中文", "gb7714"],
+      "tags": [
+        "thesis",
+        "学位论文",
+        "国科大",
+        "中科院",
+        "ucas",
+        "中文",
+        "gb7714"
+      ],
       "homepage": "https://github.com/mohuangrui/ucasthesis",
       "order": 112
     }
@@ -832,6 +1142,7 @@
     "archive": "ustcthesis.zip",
     "include": [
       "ustcthesis.cls",
+      "ustcsetup.tex",
       "ustcthesis-*.bst",
       "ustcthesis-*.bbx",
       "ustcthesis-*.cbx",
@@ -848,14 +1159,22 @@
         "en": "USTC thesis (ustcthesis)"
       },
       "description": {
-        "zh": "中国科学技术大学学位论文模板 ustcthesis，由 USTC TeX 用户组维护，按研究生院和教务处的格式要求排版。论文信息在 main.tex 的 \\ustcsetup 里填写，章节在 chapters/。用 XeLaTeX 编译。",
-        "en": "ustcthesis, the University of Science and Technology of China thesis template maintained by the USTC TeX user group to the graduate school's format. Fill in the details in \\ustcsetup in main.tex; the chapters are in chapters/. Compiles with XeLaTeX."
+        "zh": "中国科学技术大学学位论文模板 ustcthesis，由 USTC TeX 用户组维护，按研究生院和教务处的格式要求排版。论文信息在 ustcsetup.tex 里填写，章节在 chapters/。用 XeLaTeX 编译。",
+        "en": "ustcthesis, the University of Science and Technology of China thesis template maintained by the USTC TeX user group to the graduate school's format. Fill in the details in ustcsetup.tex; the chapters are in chapters/. Compiles with XeLaTeX."
       },
       "category": "thesis",
       "venue": "中国科大",
       "year": null,
       "fields": [],
-      "tags": ["thesis", "学位论文", "科大", "ustc", "中文", "博士", "硕士"],
+      "tags": [
+        "thesis",
+        "学位论文",
+        "科大",
+        "ustc",
+        "中文",
+        "博士",
+        "硕士"
+      ],
       "homepage": "https://github.com/ustctug/ustcthesis",
       "order": 113
     }
@@ -886,7 +1205,12 @@
       "venue": null,
       "year": null,
       "fields": [],
-      "tags": ["cv", "resume", "简历", "求职"],
+      "tags": [
+        "cv",
+        "resume",
+        "简历",
+        "求职"
+      ],
       "homepage": "https://www.ctan.org/pkg/moderncv",
       "order": 120
     }
@@ -895,9 +1219,16 @@
     "id": "tikzposter",
     "url": "https://mirrors.tuna.tsinghua.edu.cn/CTAN/graphics/pgf/contrib/tikzposter.zip",
     "archive": "tikzposter.zip",
-    "generate": ["tikzposter.ins"],
-    "include": ["tikzposter.cls", "tikzposter*.tex"],
-    "exclude": ["tikzposter-example.tex"],
+    "generate": [
+      "tikzposter.ins"
+    ],
+    "include": [
+      "tikzposter.cls",
+      "tikzposter*.tex"
+    ],
+    "exclude": [
+      "tikzposter-example.tex"
+    ],
     "main": "tikzposter-template.tex",
     "meta": {
       "name": {
@@ -912,7 +1243,12 @@
       "venue": null,
       "year": null,
       "fields": [],
-      "tags": ["poster", "海报", "conference", "会议"],
+      "tags": [
+        "poster",
+        "海报",
+        "conference",
+        "会议"
+      ],
       "homepage": "https://www.ctan.org/pkg/tikzposter",
       "order": 125
     }
