@@ -7,6 +7,35 @@ import { createContext, type ReactNode, useCallback, useContext } from "react";
 import { agentsEn, agentsZh } from "./agents/messages";
 
 export const workbenchZh = {
+  "build.hintPackage":
+    "缺少宏包或文档类：检查名字拼写；服务器的 TeX Live 是完整版，常见宏包都有，自定义的 .sty/.cls 需要上传到项目里。",
+  "build.hintUndefinedControl":
+    "命令拼写有误，或没有加载定义它的宏包：检查拼写，或在导言区用 \\usepackage 加载需要的宏包。",
+  "build.hintMissingDollar":
+    "数学符号（如 _、^、\\alpha）只能写在公式里：用 $…$ 包起来；普通文字里的下划线写成 \\_。",
+  "build.hintFileNotFound": "找不到文件：检查文件名和路径（区分大小写），并确认文件已在项目里。",
+  "build.hintCitation":
+    "引用的文献键在 .bib 里找不到：检查拼写，或在“参考文献”里导入这条文献；修改后再编译一次。",
+  "build.hintReference":
+    "\\ref 指向的标签不存在：检查 \\label 的拼写；新加的标签要编译两次才会生效。",
+  "build.hintBraces": "大括号不配对：多了一个 }，或前面少了 {。",
+  "build.hintRunaway": "某个命令的参数没有闭合，或参数里有空行：检查附近是否少了 }。",
+  "build.hintBeginDocument":
+    "正文必须写在 \\begin{document} 之后：导言区里出现了正文内容，或缺少 \\begin{document}。",
+  "build.hintEnvironment": "这个环境没有定义：检查拼写，或加载提供它的宏包。",
+  "build.hintBeginEnd": "\\begin 和 \\end 的环境名不匹配，或嵌套顺序不对。",
+  "build.hintOverfull": "这一行太长，超出了版心：调整措辞、允许断词，长网址用 \\url 包起来。",
+  "build.hintUnderfull": "这一行排得太稀疏（警告，通常可以忽略），常见于 \\\\ 后面紧跟空行。",
+  "build.hintUnicode":
+    "文档里有 pdfLaTeX 不支持的字符（如中文）：中文请用 XeLaTeX 编译，或使用 ctex 宏包。",
+  "build.hintFont":
+    "找不到字体：XeLaTeX/LuaLaTeX 需要服务器装有这个字体，换成已安装的字体或上传字体文件。",
+  "build.hintAmpersand": "& 只能用在表格和对齐环境里；普通文字里写成 \\&。",
+  "build.hintItem": "列表环境里缺少 \\item，或在列表外用了 \\item。",
+  "build.hintDoubleScript": "同一个符号写了两次上标或下标：用 {} 分组，如 x^{a^b}。",
+  "build.hintOptionClash": "同一个宏包被以不同选项加载了两次：把选项合并到第一次 \\usepackage 里。",
+  "build.failedExit": "编译失败（latexmk 退出码 {code}），请查看日志",
+  "build.timedOut": "编译超时，已停止",
   "chat.dragToResizeTheInputArea": "拖动调整输入区高度",
   "chat.labelUpToHalfTheScreenDoubleClickForTheD": "{label} · 最多半屏 · 双击恢复默认高度",
   "common.cancel": "取消",
@@ -22,6 +51,34 @@ export const workbenchZh = {
   "editor.multiLineAndLongSingleLineCommentsTheFil": "包括多行注释和单条长注释；不修改文件内容",
   "editor.resolved": "已解决 · ",
   "editor.unfold": "展开内容",
+  "editor.visualShowPreamble": "▸ 显示导言区",
+  "editor.visualHidePreamble": "▾ 隐藏导言区",
+  "editor.visualEndOfDocument": "文档结束",
+  "editor.visualAbstract": "摘要",
+  "editor.modeCode": "代码",
+  "editor.modeVisual": "可视化",
+  "editor.modeTitle": "代码模式显示 LaTeX 源码；可视化模式按排版效果显示，光标所在处恢复源码",
+  "editor.undo": "撤销（⌘Z）",
+  "editor.redo": "重做（⌘⇧Z）",
+  "editor.textStyle": "文字样式",
+  "editor.styleNormal": "正文",
+  "editor.styleSection": "章节",
+  "editor.styleSubsection": "小节",
+  "editor.styleSubsubsection": "子小节",
+  "editor.styleParagraph": "段落标题",
+  "editor.bold": "加粗（⌘B）",
+  "editor.italic": "斜体（⌘I）",
+  "editor.inlineMath": "行内公式",
+  "editor.displayMath": "行间公式",
+  "editor.link": "链接",
+  "editor.reference": "交叉引用",
+  "editor.citation": "引用文献",
+  "editor.figure": "插入图片",
+  "editor.table": "插入表格",
+  "editor.bulletList": "无序列表",
+  "editor.numberedList": "有序列表",
+  "editor.findReplace": "查找替换（⌘F）",
+  "editor.foldMenu": "折叠",
   "editor.unfoldAll": "全部展开",
   "complete.section": "节",
   "complete.subsection": "小节",
@@ -176,6 +233,44 @@ export const workbenchZh = {
   "thread.reply": "回复",
 };
 export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
+  "build.hintPackage":
+    "A package or document class is missing: check its name. The server has the full TeX Live; your own .sty or .cls files need to be in the project.",
+  "build.hintUndefinedControl":
+    "A command is misspelt, or the package that defines it is not loaded: check the spelling, or load the package with \\usepackage in the preamble.",
+  "build.hintMissingDollar":
+    "Math symbols such as _, ^ or \\alpha only work in math: wrap them in $…$; write an underscore in text as \\_.",
+  "build.hintFileNotFound":
+    "A file cannot be found: check its name and folder (capitals count) and that it is in the project.",
+  "build.hintCitation":
+    "A citation key is not in the .bib file: check its spelling, or import the reference under References; then compile again.",
+  "build.hintReference":
+    "A \\ref points to a label that does not exist: check the \\label's spelling; new labels need two compiles.",
+  "build.hintBraces": "Braces do not match: there is an extra }, or a { is missing before it.",
+  "build.hintRunaway":
+    "A command's argument is not closed, or has a blank line in it: look for a missing } nearby.",
+  "build.hintBeginDocument":
+    "Text must come after \\begin{document}: there is text in the preamble, or \\begin{document} is missing.",
+  "build.hintEnvironment":
+    "This environment is not defined: check its spelling, or load the package that provides it.",
+  "build.hintBeginEnd":
+    "A \\begin and its \\end name different environments, or are nested in the wrong order.",
+  "build.hintOverfull":
+    "A line is too long for the text width: reword it, allow hyphenation, or wrap long addresses in \\url.",
+  "build.hintUnderfull":
+    "A line is set too loosely (a warning, usually harmless); common after \\\\ followed by a blank line.",
+  "build.hintUnicode":
+    "The document has characters pdfLaTeX does not handle (such as Chinese): compile with XeLaTeX, or use the ctex package.",
+  "build.hintFont":
+    "A font cannot be found: XeLaTeX and LuaLaTeX need it installed on the server; use an installed font or upload the font file.",
+  "build.hintAmpersand":
+    "& only works in tables and alignment environments; write it in text as \\&.",
+  "build.hintItem": "A list has no \\item, or \\item is used outside a list.",
+  "build.hintDoubleScript":
+    "A symbol has two superscripts or subscripts: group them with {}, as in x^{a^b}.",
+  "build.hintOptionClash":
+    "A package is loaded twice with different options: put all the options in the first \\usepackage.",
+  "build.failedExit": "The build failed (latexmk exit code {code}); see the log",
+  "build.timedOut": "The build took too long and was stopped",
   "chat.dragToResizeTheInputArea": "Drag to resize the input area",
   "chat.labelUpToHalfTheScreenDoubleClickForTheD":
     "{label} · up to half the screen · double-click for the default height",
@@ -194,6 +289,35 @@ export const workbenchEn: Record<keyof typeof workbenchZh, string> = {
     "Multi-line and long single-line comments; the file is not changed",
   "editor.resolved": "Resolved · ",
   "editor.unfold": "Unfold",
+  "editor.visualShowPreamble": "▸ Show document preamble",
+  "editor.visualHidePreamble": "▾ Hide document preamble",
+  "editor.visualEndOfDocument": "End of document",
+  "editor.visualAbstract": "Abstract",
+  "editor.modeCode": "Code",
+  "editor.modeVisual": "Visual",
+  "editor.modeTitle":
+    "Code shows the LaTeX source; Visual shows it as it prints, with the source back wherever the cursor is",
+  "editor.undo": "Undo (⌘Z)",
+  "editor.redo": "Redo (⌘⇧Z)",
+  "editor.textStyle": "Text style",
+  "editor.styleNormal": "Normal text",
+  "editor.styleSection": "Section",
+  "editor.styleSubsection": "Subsection",
+  "editor.styleSubsubsection": "Subsubsection",
+  "editor.styleParagraph": "Paragraph",
+  "editor.bold": "Bold (⌘B)",
+  "editor.italic": "Italic (⌘I)",
+  "editor.inlineMath": "Inline math",
+  "editor.displayMath": "Display math",
+  "editor.link": "Link",
+  "editor.reference": "Cross-reference",
+  "editor.citation": "Citation",
+  "editor.figure": "Insert figure",
+  "editor.table": "Insert table",
+  "editor.bulletList": "Bulleted list",
+  "editor.numberedList": "Numbered list",
+  "editor.findReplace": "Find and replace (⌘F)",
+  "editor.foldMenu": "Fold",
   "editor.unfoldAll": "Unfold all",
   "complete.section": "Section",
   "complete.subsection": "Subsection",

@@ -25,14 +25,19 @@ import {
 import { latexLanguage } from "@lmms-lab/latex-editor";
 import {
   DEFAULT_EDITOR_SETTINGS,
+  type EditorIssue,
   type EditorSettings,
   editorConfiguration,
+  editorIssues,
   FoldToolbar,
+  formatKeymap,
   latexCompletion,
   latexFoldExtensions,
   latexSpellcheck,
   type ProjectHints,
+  setEditorIssues,
   symbolInsertion,
+  visualMode,
   writerSearch,
 } from "@lmms-lab/workbench";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
@@ -236,6 +241,10 @@ export function Editor({
   spellcheck = false,
   tracking = false,
   onChanges,
+  visual = false,
+  onVisualChange,
+  resolveImage,
+  issues,
 }: {
   project: string;
   file: string;
@@ -274,12 +283,20 @@ export function Editor({
   tracking?: boolean;
   /** The file's tracked changes, whenever they change. */
   onChanges?: (changes: ShownChange[]) => void;
+  /** Visual mode (see the workbench's visual.ts) and the toolbar's switch for it. */
+  visual?: boolean;
+  onVisualChange?: (visual: boolean) => void;
+  /** A URL for a project image, for figures in visual mode. */
+  resolveImage?: (path: string) => string | null;
+  /** The last build's errors and warnings in this file, marked beside their lines. */
+  issues?: EditorIssue[];
 }) {
   const host = useRef<HTMLDivElement>(null),
     view = useRef<EditorView | null>(null),
     provider = useRef<WriterProvider | null>(null);
   const editability = useRef(new Compartment()),
-    spelling = useRef(new Compartment());
+    spelling = useRef(new Compartment()),
+    visuals = useRef(new Compartment());
   const callbacks = useRef({
     onRole,
     onStatus,
@@ -293,6 +310,7 @@ export function Editor({
     onLayout,
     onNoteIcon,
     onChanges,
+    resolveImage,
   });
   callbacks.current = {
     onRole,
@@ -307,6 +325,7 @@ export function Editor({
     onLayout,
     onNoteIcon,
     onChanges,
+    resolveImage,
   };
   const draftRef = useRef(draftStart);
   draftRef.current = draftStart;
@@ -316,6 +335,8 @@ export function Editor({
   chosen.current = settings;
   const checked = useRef(spellcheck);
   checked.current = spellcheck;
+  const visualOn = useRef(visual);
+  visualOn.current = visual;
   const tracks = useRef(tracking);
   tracks.current = tracking;
   useEffect(() => {
@@ -413,6 +434,13 @@ export function Editor({
           draftAt,
           noteGutter((ids, draft) => callbacks.current.onNoteIcon?.(ids, draft)),
           spelling.current.of(latexSpellcheck(checked.current)),
+          formatKeymap,
+          editorIssues(),
+          visuals.current.of(
+            visualMode(visualOn.current, {
+              resolveImage: (path) => callbacks.current.resolveImage?.(path) ?? null,
+            }),
+          ),
           EditorView.contentAttributes.of({
             "aria-label": i18n.t("editor.label"),
             autocapitalize: "off",
@@ -612,6 +640,18 @@ export function Editor({
     view.current?.dispatch({ effects: spelling.current.reconfigure(latexSpellcheck(spellcheck)) });
   }, [spellcheck]);
   useEffect(() => {
+    view.current?.dispatch({
+      effects: visuals.current.reconfigure(
+        visualMode(visual, {
+          resolveImage: (path) => callbacks.current.resolveImage?.(path) ?? null,
+        }),
+      ),
+    });
+  }, [visual]);
+  useEffect(() => {
+    view.current?.dispatch({ effects: setEditorIssues.of(issues ?? []) });
+  }, [issues]);
+  useEffect(() => {
     const v = view.current,
       p = provider.current;
     if (!v || !p) return;
@@ -667,7 +707,13 @@ export function Editor({
   }, [draftStart]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <FoldToolbar view={() => view.current} actions={actions} />
+      <FoldToolbar
+        view={() => view.current}
+        actions={actions}
+        visual={visual}
+        onVisualChange={onVisualChange}
+        readOnly={!["owner", "editor"].includes(role)}
+      />
       <div ref={host} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   );

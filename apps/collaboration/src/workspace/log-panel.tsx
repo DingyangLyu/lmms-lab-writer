@@ -1,9 +1,18 @@
 /** Errors, warnings and the full TeX log below the editor, where the desktop has its terminal. */
+import { texErrorHint, workbenchI18n } from "@lmms-lab/workbench";
 import { XIcon } from "@phosphor-icons/react";
 import { useI18n } from "../i18n";
 import type { BuildState } from "./build";
 import type { WorkspaceContext } from "./context";
 import { AskAiToFix, BuildSummary, ChineseHint } from "./pdf-pane";
+
+/** The server words two messages itself (in Chinese); the rest are TeX's own. */
+export function issueText(message: string) {
+  const failed = /^编译失败（latexmk 退出码 (-?\d+)），请查看日志$/.exec(message);
+  if (failed) return workbenchI18n.t("build.failedExit", { code: failed[1] ?? "" });
+  if (message === "编译超时，已停止") return workbenchI18n.t("build.timedOut");
+  return message;
+}
 
 export function LogPanel({
   ws,
@@ -58,7 +67,12 @@ export function LogPanel({
                 {issue.file}:{issue.line}
               </span>
             )}
-            <span className="min-w-0 break-words">{issue.message}</span>
+            <span className="min-w-0 break-words">
+              {issueText(issue.message)}
+              {texErrorHint(issue.message) && (
+                <span className="mt-0.5 block text-muted">{texErrorHint(issue.message)}</span>
+              )}
+            </span>
           </button>
         ))}
         {build ? (

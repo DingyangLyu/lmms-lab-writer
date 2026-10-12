@@ -101,6 +101,14 @@ export async function createFile(
   return { id, path, binary, revision: 1 };
 }
 
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+};
 export const fileRoutes = [
   route<InProject>("GET", /^files$/, (ctx) =>
     ctx.store.db.rows<FileInfo>(
@@ -136,6 +144,20 @@ export const fileRoutes = [
         ? { base64: Buffer.from(file.state).toString("base64") }
         : { content: decodeText(file.state) }),
     };
+  }),
+  // An image as itself, for figures in the editor's visual mode. Sandboxed, so an SVG opened
+  // on its own cannot run scripts in the page's origin.
+  route<InProject>("GET", /^files\/([^/]+)\/raw$/, async (ctx, [id = ""]) => {
+    const file = await ctx.store.file(ctx.project, id);
+    const type = IMAGE_TYPES[file.path.split(".").pop()?.toLowerCase() ?? ""];
+    if (!file.binary || !type) fail(415, "不是图片");
+    ctx.res.writeHead(200, {
+      "Content-Type": type,
+      "Cache-Control": "private, max-age=86400",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    });
+    ctx.res.end(Buffer.from(file.state));
+    return handled;
   }),
   route<InProject>("PUT", /^files\/([^/]+)$/, async (ctx, [id = ""]) => {
     await ctx.need("edit");

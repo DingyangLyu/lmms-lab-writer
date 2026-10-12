@@ -26,7 +26,12 @@ import {
   unfoldCode,
   unfoldEffect,
 } from "@codemirror/language";
-import { gotoLine, highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import {
+  gotoLine,
+  highlightSelectionMatches,
+  openSearchPanel,
+  searchKeymap,
+} from "@codemirror/search";
 import {
   Compartment,
   EditorSelection,
@@ -50,6 +55,7 @@ import {
   lineNumbers,
   MatchDecorator,
   rectangularSelection,
+  runScopeHandlers,
   ViewPlugin,
 } from "@codemirror/view";
 import {
@@ -60,10 +66,37 @@ import {
 } from "@lmms-lab/latex-editor";
 import type { ResolvedChange } from "@lmms-lab/sync/tracked";
 import { documentEdits } from "@lmms-lab/writing";
-import { memo, type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  ArrowClockwiseIcon,
+  ArrowCounterClockwiseIcon,
+  BookOpenTextIcon,
+  HashIcon,
+  ImageSquareIcon,
+  LinkSimpleIcon,
+  ListBulletsIcon,
+  ListNumbersIcon,
+  MagnifyingGlassIcon,
+  SigmaIcon,
+  TableIcon,
+  TextBIcon,
+  TextItalicIcon,
+} from "@phosphor-icons/react";
+import { memo, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { workbenchI18n as i18n, useWorkbenchI18n as useI18n } from "../i18n";
 import { trackEditorDrag } from "./drag-selection";
 import { resolveMonoFontFamily } from "./font-stacks";
+import {
+  DISPLAY_MATH_SNIPPET,
+  FIGURE_SNIPPET,
+  formatKeymap,
+  type HeadingLevel,
+  headingAt,
+  insertList,
+  insertSnippet,
+  setHeading,
+  TABLE_SNIPPET,
+  wrapSelection,
+} from "./format-commands";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
 import { writerSearch } from "./search-panel";
 import { latexSpellcheck } from "./spellcheck";
@@ -75,6 +108,7 @@ import {
   trackedTooltip,
 } from "./tracked-changes";
 import type { EditorSettings, EditorTextRange, EditorTheme, SourceMark } from "./types";
+import { visualMode } from "./visual";
 
 export type LatexSourceEditorProps = {
   annotationMarks?: SourceMark[];
@@ -101,6 +135,11 @@ export type LatexSourceEditorProps = {
   trackedText?: string;
   /** Accept or reject from a change's hover card; absent: shown without the buttons. */
   onDecideChanges?: DecideChanges;
+  /** Visual mode (see visual.ts); with `onVisualChange`, the toolbar offers the switch. */
+  visual?: boolean;
+  onVisualChange?: (visual: boolean) => void;
+  /** A URL for a project image, for figures in visual mode. */
+  resolveImage?: (path: string) => string | null;
 };
 const NO_HINTS: ProjectHints = { citations: [], labels: [] };
 
@@ -250,15 +289,43 @@ export function latexFoldExtensions(): Extension {
   ];
 }
 
-/** The strip above the editor: fold the current block or all comments, unfold; `actions` go right. */
+/**
+ * The strip above the editor: code or visual mode, undo and redo, text style and formatting,
+ * insertions (math, references, citations, figures, tables, lists), find, and folding.
+ * `actions` go right. It scrolls sideways when the editor is narrow.
+ */
 export function FoldToolbar({
   view,
   actions,
+  visual,
+  onVisualChange,
+  readOnly,
 }: {
   view: () => EditorView | null;
   actions?: ReactNode;
+  /** Visual mode on; with `onVisualChange`, the Code / Visual switch shows. */
+  visual?: boolean;
+  onVisualChange?: (visual: boolean) => void;
+  readOnly?: boolean;
 }) {
   const { t } = useI18n();
+  const [foldOpen, setFoldOpen] = useState(false);
+  const [heading, setHeadingValue] = useState<HeadingLevel | "">("");
+  const run = (action: (current: EditorView) => unknown) => () => {
+    const current = view();
+    if (current) action(current);
+  };
+  // The editor's own keymap (history on the desktop, Yjs undo on the web) handles undo/redo.
+  const key = (name: string, shift = false) =>
+    run((current) => {
+      const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+      runScopeHandlers(
+        current,
+        new KeyboardEvent("keydown", { key: name, metaKey: mac, ctrlKey: !mac, shiftKey: shift }),
+        "editor",
+      );
+      current.focus();
+    });
   const foldComments = () => {
     const current = view();
     if (!current) return;
@@ -274,65 +341,194 @@ export function FoldToolbar({
     });
     current.focus();
   };
+  const foldCurrent = () => {
+    const current = view();
+    if (!current) return;
+    const line = current.state.doc.lineAt(current.state.selection.main.head).number;
+    const range = latexFoldRanges(current.state.doc)
+      .filter((fold) => fold.startLine <= line && current.state.doc.lineAt(fold.to).number >= line)
+      .at(-1);
+    if (range)
+      current.dispatch({
+        selection: EditorSelection.cursor(range.from),
+        effects: foldEffect.of(range),
+      });
+    else foldCode(current);
+    current.focus();
+  };
+  const button =
+    "flex size-6 shrink-0 items-center justify-center text-muted hover:bg-accent-hover hover:text-foreground disabled:opacity-40";
+  const icon = { size: 15, "aria-hidden": true } as const;
+  const tool = (label: string, glyph: ReactNode, action: () => void) => (
+    <button
+      type="button"
+      className={button}
+      title={label}
+      aria-label={label}
+      disabled={readOnly}
+      onClick={action}
+    >
+      {glyph}
+    </button>
+  );
+  const divider = <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />;
   return (
-    // One line that scrolls sideways when the editor is narrow, instead of wrapping each label.
     // A container, so `actions` can drop their labels by the editor's width, not the window's.
-    <div className="@container flex shrink-0 items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-border bg-background px-3 py-1 text-[11px] text-muted [scrollbar-width:none] [&>*]:shrink-0">
-      <span>{t("editor.fold")}</span>
-      <button
-        type="button"
-        onClick={() => {
+    <div className="@container relative flex shrink-0 items-center gap-0.5 overflow-x-auto whitespace-nowrap border-b border-border bg-background px-2 py-1 text-[11px] text-muted [scrollbar-width:none] [&>*]:shrink-0">
+      {onVisualChange && (
+        <fieldset className="mr-1 flex border border-border" title={t("editor.modeTitle")}>
+          {[false, true].map((on) => (
+            <button
+              key={String(on)}
+              type="button"
+              aria-pressed={!!visual === on}
+              onClick={() => onVisualChange(on)}
+              className={`px-2 py-0.5 ${!!visual === on ? "bg-foreground text-background" : "hover:bg-accent-hover"}`}
+            >
+              {on ? t("editor.modeVisual") : t("editor.modeCode")}
+            </button>
+          ))}
+        </fieldset>
+      )}
+      {tool(t("editor.undo"), <ArrowCounterClockwiseIcon {...icon} />, key("z"))}
+      {tool(t("editor.redo"), <ArrowClockwiseIcon {...icon} />, key("z", true))}
+      {divider}
+      <select
+        aria-label={t("editor.textStyle")}
+        title={t("editor.textStyle")}
+        disabled={readOnly}
+        value={heading}
+        onFocus={() => {
           const current = view();
-          if (!current) return;
-          const line = current.state.doc.lineAt(current.state.selection.main.head).number;
-          const range = latexFoldRanges(current.state.doc)
-            .filter(
-              (fold) => fold.startLine <= line && current.state.doc.lineAt(fold.to).number >= line,
-            )
-            .at(-1);
-          if (range)
-            current.dispatch({
-              selection: EditorSelection.cursor(range.from),
-              effects: foldEffect.of(range),
-            });
-          else foldCode(current);
-          current.focus();
+          setHeadingValue(current ? (headingAt(current.state) ?? "") : "");
         }}
-        className="hover:text-foreground"
-        title={t("editor.foldTheSectionOrEnvironmentAtTheCursor")}
-      >
-        {t("editor.currentBlock")}
-      </button>
-      <button
-        type="button"
-        onClick={foldComments}
-        className="hover:text-foreground"
-        title={t("editor.multiLineAndLongSingleLineCommentsTheFil")}
-      >
-        {t("editor.comments")}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
+        onChange={(event) => {
+          const level = (event.target.value || null) as HeadingLevel | null;
+          setHeadingValue(level ?? "");
           const current = view();
-          if (current) unfoldCode(current);
+          if (current) setHeading(current, level);
         }}
-        className="hover:text-foreground"
-        title={t("editor.unfoldTheBlockAtTheCursor")}
+        className="h-6 shrink-0 border border-border bg-background px-1 text-[11px] text-foreground"
       >
-        {t("editor.unfoldCurrent")}
+        <option value="">{t("editor.styleNormal")}</option>
+        <option value="section">{t("editor.styleSection")}</option>
+        <option value="subsection">{t("editor.styleSubsection")}</option>
+        <option value="subsubsection">{t("editor.styleSubsubsection")}</option>
+        <option value="paragraph">{t("editor.styleParagraph")}</option>
+      </select>
+      {tool(
+        t("editor.bold"),
+        <TextBIcon {...icon} weight="bold" />,
+        run((v) => wrapSelection(v, "\\textbf{", "}")),
+      )}
+      {tool(
+        t("editor.italic"),
+        <TextItalicIcon {...icon} />,
+        run((v) => wrapSelection(v, "\\textit{", "}")),
+      )}
+      {divider}
+      {tool(
+        t("editor.inlineMath"),
+        <span className="font-serif text-[13px] italic">x²</span>,
+        run((v) => wrapSelection(v, "$", "$")),
+      )}
+      {tool(
+        t("editor.displayMath"),
+        <SigmaIcon {...icon} />,
+        run((v) => insertSnippet(v, DISPLAY_MATH_SNIPPET, { block: true })),
+      )}
+      {tool(
+        t("editor.link"),
+        <LinkSimpleIcon {...icon} />,
+        run((v) => wrapSelection(v, "\\href{https://}{", "}")),
+      )}
+      {tool(
+        t("editor.reference"),
+        <HashIcon {...icon} />,
+        run((v) => insertSnippet(v, "\\ref{|}", { complete: true })),
+      )}
+      {tool(
+        t("editor.citation"),
+        <BookOpenTextIcon {...icon} />,
+        run((v) => insertSnippet(v, "\\cite{|}", { complete: true })),
+      )}
+      {divider}
+      {tool(
+        t("editor.figure"),
+        <ImageSquareIcon {...icon} />,
+        run((v) => insertSnippet(v, FIGURE_SNIPPET, { block: true })),
+      )}
+      {tool(
+        t("editor.table"),
+        <TableIcon {...icon} />,
+        run((v) => insertSnippet(v, TABLE_SNIPPET, { block: true })),
+      )}
+      {tool(
+        t("editor.bulletList"),
+        <ListBulletsIcon {...icon} />,
+        run((v) => insertList(v, "itemize")),
+      )}
+      {tool(
+        t("editor.numberedList"),
+        <ListNumbersIcon {...icon} />,
+        run((v) => insertList(v, "enumerate")),
+      )}
+      {divider}
+      <button
+        type="button"
+        className={button}
+        title={t("editor.findReplace")}
+        aria-label={t("editor.findReplace")}
+        onClick={run((v) => {
+          openSearchPanel(v);
+        })}
+      >
+        <MagnifyingGlassIcon {...icon} />
       </button>
       <button
         type="button"
-        onClick={() => {
-          const current = view();
-          if (current) unfoldAll(current);
-        }}
-        className="hover:text-foreground"
+        className="ml-1 shrink-0 px-1.5 py-0.5 hover:bg-accent-hover hover:text-foreground"
+        aria-expanded={foldOpen}
+        onClick={() => setFoldOpen((v) => !v)}
       >
-        {t("editor.unfoldAll")}
+        {t("editor.foldMenu")} ▾
       </button>
-      {actions && <div className="ml-auto flex items-center gap-3">{actions}</div>}
+      {foldOpen && (
+        <span className="flex shrink-0 items-center gap-2 pl-1">
+          <button
+            type="button"
+            onClick={foldCurrent}
+            className="hover:text-foreground"
+            title={t("editor.foldTheSectionOrEnvironmentAtTheCursor")}
+          >
+            {t("editor.currentBlock")}
+          </button>
+          <button
+            type="button"
+            onClick={foldComments}
+            className="hover:text-foreground"
+            title={t("editor.multiLineAndLongSingleLineCommentsTheFil")}
+          >
+            {t("editor.comments")}
+          </button>
+          <button
+            type="button"
+            onClick={run((v) => unfoldCode(v))}
+            className="hover:text-foreground"
+            title={t("editor.unfoldTheBlockAtTheCursor")}
+          >
+            {t("editor.unfoldCurrent")}
+          </button>
+          <button
+            type="button"
+            onClick={run((v) => unfoldAll(v))}
+            className="hover:text-foreground"
+          >
+            {t("editor.unfoldAll")}
+          </button>
+        </span>
+      )}
+      {actions && <div className="ml-auto flex items-center gap-3 pl-3">{actions}</div>}
     </div>
   );
 }
@@ -345,6 +541,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
   const currentProps = useRef(props);
   const config = useRef(new Compartment());
   const spelling = useRef(new Compartment());
+  const visualMode_ = useRef(new Compartment());
   const externalUpdate = useRef(false);
   const selectionEmitted = useRef(false);
   const syncRef = useRef<(content?: string) => void>(() => {});
@@ -429,6 +626,12 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           trackedChanges,
           trackedTheme,
           trackedTooltip(() => currentProps.current.onDecideChanges ?? null),
+          formatKeymap,
+          visualMode_.current.of(
+            visualMode(!!initial.visual, {
+              resolveImage: (path) => currentProps.current.resolveImage?.(path) ?? null,
+            }),
+          ),
           EditorView.domEventHandlers({
             click: (event) => {
               if (!(event.metaKey || event.ctrlKey)) return false;
@@ -491,6 +694,15 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
       effects: spelling.current.reconfigure(latexSpellcheck(!!props.spellcheck && !props.readOnly)),
     });
   }, [props.spellcheck, props.readOnly]);
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: visualMode_.current.reconfigure(
+        visualMode(!!props.visual, {
+          resolveImage: (path) => currentProps.current.resolveImage?.(path) ?? null,
+        }),
+      ),
+    });
+  }, [props.visual]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `content` changes mean the text may match again (or no longer).
   useEffect(() => {
     const view = viewRef.current;
@@ -572,7 +784,12 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
 
   return (
     <div className={`flex min-h-0 flex-col ${props.className ?? ""}`}>
-      <FoldToolbar view={() => viewRef.current} />
+      <FoldToolbar
+        view={() => viewRef.current}
+        visual={props.visual}
+        onVisualChange={props.onVisualChange}
+        readOnly={props.readOnly}
+      />
       <div ref={container} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   );

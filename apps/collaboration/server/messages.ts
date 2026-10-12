@@ -109,6 +109,7 @@ export const englishMessages: Record<string, string> = {
   元数据过大: "The metadata is too large",
   "请选择 BibTeX 文件": "Choose a BibTeX file",
   文献库已有新的修改: "The bibliography has changed meanwhile",
+  不是图片: "Not an image",
   // Git
   无效的仓库地址: "Invalid repository address",
   "仓库地址需以 https:// 开头，或是 git@主机:路径 形式的 SSH 地址":

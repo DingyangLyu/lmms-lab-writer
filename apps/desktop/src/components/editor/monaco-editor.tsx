@@ -5,6 +5,7 @@ import "@/lib/monaco/config";
 import type { ResolvedChange } from "@lmms-lab/sync/tracked";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import Editor, { type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type { editor } from "monaco-editor";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { teamMarks, useTeamComments } from "@/lib/collab/team-comments";
@@ -84,6 +85,20 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
   const current = annotationContent === content;
   const [ranges, setRanges] = useState<EditorTextRange[] | null>(null);
   const [style, setStyle] = useState<"highlight" | "underline">("highlight");
+  // Code or visual mode, remembered on this computer.
+  const [visual, setVisual] = useState(() => {
+    try {
+      return localStorage.getItem("writer-editor-visual") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const chooseVisual = (on: boolean) => {
+    setVisual(on);
+    try {
+      localStorage.setItem("writer-editor-visual", on ? "1" : "0");
+    } catch {}
+  };
   const annotate = (selection: EditorTextRange[], content: string) => {
     if (props.project && props.path)
       notes?.beginTextDraft(
@@ -107,6 +122,14 @@ export const MonacoEditor = memo(function SourceEditor(props: Props) {
       } else notes?.focusAnnotation(id);
     },
     onAnnotate: annotate,
+    visual,
+    onVisualChange: chooseVisual,
+    // A figure from the project folder, as TeX finds it from the main file at the top; with
+    // TeX's usual extension when none is given.
+    resolveImage: (image: string) =>
+      props.project
+        ? convertFileSrc(`${props.project}/${/\.[a-z0-9]+$/i.test(image) ? image : `${image}.png`}`)
+        : null,
     onSelectionChange: (selection: EditorTextRange[] | null) => {
       setRanges(selection);
       props.onSelectionChange?.(selection);

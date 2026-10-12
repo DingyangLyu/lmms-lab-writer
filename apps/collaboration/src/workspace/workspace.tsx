@@ -250,6 +250,20 @@ export function Workspace({
   const windowWidth = useWindowWidth();
   const aiBeside = !narrow && windowWidth >= AI_BESIDE;
   const [editorSettings] = useEditorSettings();
+  // Code or visual mode, remembered in this browser.
+  const [visual, setVisual] = useState(() => {
+    try {
+      return localStorage.getItem("writer-editor-visual") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const chooseVisual = (on: boolean) => {
+    setVisual(on);
+    try {
+      localStorage.setItem("writer-editor-visual", on ? "1" : "0");
+    } catch {}
+  };
   // The rail's panel open beside it (null: closed); on phones it opens over the editor.
   const [panel, setPanel] = useState<RailPanel | null>(narrow ? null : "files"),
     // Files, editor, PDF and AI all start open on a wide screen, so a member sees at once
@@ -424,6 +438,14 @@ export function Workspace({
     comments: ops,
   };
   const b = useBuild(ws, data.latestBuild, data.sources, data.loaded);
+  const fileIssues = useMemo(
+    () =>
+      (b.build?.issues ?? [])
+        // LaTeX warnings name a line but no file: the main file's.
+        .filter((i) => i.line && (i.file ?? b.build?.main) === file?.path)
+        .map((i) => ({ line: i.line as number, level: i.level, message: i.message })),
+    [b.build, file?.path],
+  );
   const [centerWidth, centerRef] = useWidth();
   const activate = (id: string | null) => {
     setActiveComment(id);
@@ -789,6 +811,20 @@ export function Workspace({
         spellcheck={editorSettings.spellcheck && /\.(tex|ltx)$/i.test(file.path)}
         tracking={trackAll || data.members.some((m) => m.id === user.id && m.tracking)}
         onChanges={setTrackedChanges}
+        visual={visual}
+        onVisualChange={chooseVisual}
+        issues={fileIssues}
+        resolveImage={(path) => {
+          // As TeX looks: from the project's top and beside the file, with or without extension.
+          const folder = file.path.includes("/")
+            ? file.path.slice(0, file.path.lastIndexOf("/") + 1)
+            : "";
+          const names = [path, `${folder}${path}`].flatMap((name) =>
+            ["", ".png", ".jpg", ".jpeg", ".pdf", ".svg", ".gif", ".webp"].map((ext) => name + ext),
+          );
+          const found = names.map((name) => data.files.find((f) => f.path === name)).find(Boolean);
+          return found?.binary ? `/api${prefix}/files/${found.id}/raw?r=${found.revision}` : null;
+        }}
         user={user}
         role={role}
         comments={data.comments}
