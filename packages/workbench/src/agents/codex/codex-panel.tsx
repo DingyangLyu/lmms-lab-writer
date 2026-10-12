@@ -432,7 +432,22 @@ export function CodexPanel({
       sendingRef.current = true;
       setPreparing(true);
       setError(null);
-      let localId: string | undefined;
+      // Shown at once (Codex's own copy replaces it): saving the open files and recording the
+      // project before the AI's edits, below and when the turn starts, can take a moment.
+      const localId = `local-${randomId()}`;
+      setItems((current) => [
+        ...current,
+        {
+          id: localId,
+          type: "userMessage",
+          content: [
+            { type: "text", text: draft.raw.trim() },
+            ...draft.files
+              .filter((file) => file.kind !== "document")
+              .map((file) => ({ type: "image", url: file.url })),
+          ],
+        },
+      ]);
       try {
         await onBeforeSend?.(draft.selection);
         const payload = await prepareChatFiles(directory, draft.raw.trim(), draft.files, platform);
@@ -448,18 +463,6 @@ export function CodexPanel({
         await bridge.register(id);
         const text = withEditorSelection(payload.text, draft.selection),
           images = payload.images.map((file) => file.url);
-        localId = `local-${randomId()}`;
-        setItems((current) => [
-          ...current,
-          {
-            id: localId as string,
-            type: "userMessage",
-            content: [
-              { type: "text", text: payload.text },
-              ...images.map((url) => ({ type: "image", url })),
-            ],
-          },
-        ]);
         setNotice(null);
         if (steer)
           await backend.steerTurn({ threadId: id, expectedTurnId: turnId as string, text, images });
@@ -483,7 +486,7 @@ export function CodexPanel({
               .catch(() => {});
         }
       } catch (cause) {
-        if (localId) setItems((current) => current.filter((item) => item.id !== localId));
+        setItems((current) => current.filter((item) => item.id !== localId));
         if (!steer) setBusy(false);
         setError(t("codex.sendingFailedError", { error: String(cause) }));
         throw cause;
@@ -541,14 +544,20 @@ export function CodexPanel({
       if (!ready || preparing || attachments.loading || (!raw.trim() && !attachedFiles.length))
         return false;
       const draft: ChatDraft = { raw, files: [...attachedFiles], selection: editorSelection };
+      // The composer empties at once; the text comes back if the send fails.
+      setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
+      setInput((current) => (current === raw ? "" : current));
       try {
         if ((busy || bridgeWorking) && deliveryMode === "queue") await outbox.enqueue(draft);
         else await transmit(draft, busy || bridgeWorking);
-        setAttachedFiles((current) => current.filter((file) => !draft.files.includes(file)));
-        setInput((current) => (current === raw ? "" : current));
         if (draft.selection) onSelectionSent?.(draft.selection);
         return true;
       } catch (cause) {
+        setInput((current) => (current ? `${raw}\n${current}` : raw));
+        setAttachedFiles((current) => [
+          ...draft.files.filter((file) => !current.includes(file)),
+          ...current,
+        ]);
         setError(String(cause));
         return false;
       }

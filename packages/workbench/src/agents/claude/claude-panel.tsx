@@ -100,6 +100,23 @@ export function ClaudePanel({
   const [sessionId, setSessionId] = useState<string | null>(lifecycle.initialSessionId ?? null);
   const sessionRef = useRef<string | null>(lifecycle.initialSessionId ?? null);
   const [messages, setMessages] = useState<ClaudeMessages>({ items: [], messageId: "" });
+  /**
+   * The message just sent, shown at once until Claude Code's copy arrives: the desktop first
+   * saves the open files and records the project before the AI's edits.
+   */
+  const [pendingSend, setPendingSend] = useState<{
+    id: number;
+    /** The conversation it went to; none when sending starts a new one. */
+    session: string | null;
+    text: string;
+    images: string[];
+    /** User messages already shown: the next one beyond these is this message. */
+    known: Set<string>;
+    /** Claude Code has it; until then it waits as long as sending takes. */
+    sent: boolean;
+  } | null>(null);
+  const itemsRef = useRef(messages.items);
+  itemsRef.current = messages.items;
   useEffect(() => {
     const renamed = lifecycle.renamedConversation;
     if (renamed)
@@ -378,6 +395,21 @@ export function ClaudePanel({
       platform,
     ],
   );
+  useEffect(() => {
+    if (!pendingSend) return;
+    if (
+      messages.items.some((item) => item.type === "userMessage" && !pendingSend.known.has(item.id))
+    ) {
+      setPendingSend(null);
+      return;
+    }
+    if (!pendingSend.sent) return;
+    const timer = setTimeout(
+      () => setPendingSend((current) => (current?.id === pendingSend.id ? null : current)),
+      20_000,
+    );
+    return () => clearTimeout(timer);
+  }, [pendingSend, messages.items]);
   const outbox = useChatOutbox({
     scope: directory && sessionId ? JSON.stringify(["claude", directory, sessionId]) : null,
     ready,
@@ -412,13 +444,37 @@ export function ClaudePanel({
     async (raw: string) => {
       if (!ready || preparing || attachments.loading || (!raw.trim() && !files.length)) return;
       const draft: ChatDraft = { raw, files: [...files], selection: editorSelection };
+      const queue = busy && deliveryMode === "queue";
+      // The composer empties at once; the text comes back if the send fails.
+      setInput((current) => (current === raw ? "" : current));
+      setFiles((current) => current.filter((file) => !draft.files.includes(file)));
+      const pending = {
+        id: Date.now(),
+        session: sessionRef.current,
+        text: raw.trim(),
+        images: draft.files.filter((file) => file.kind !== "document").map((file) => file.url),
+        known: new Set(
+          itemsRef.current.filter((item) => item.type === "userMessage").map((item) => item.id),
+        ),
+        sent: false,
+      };
+      if (!queue) setPendingSend(pending);
       try {
-        if (busy && deliveryMode === "queue") await outbox.enqueue(draft);
-        else await transmit(draft, busy);
-        setInput((current) => (current === raw ? "" : current));
-        setFiles((current) => current.filter((file) => !draft.files.includes(file)));
+        if (queue) await outbox.enqueue(draft);
+        else {
+          await transmit(draft, busy);
+          setPendingSend((current) =>
+            current?.id === pending.id ? { ...current, sent: true } : current,
+          );
+        }
         if (draft.selection) onSelectionSent(draft.selection);
       } catch (cause) {
+        setPendingSend((current) => (current?.id === pending.id ? null : current));
+        setInput((current) => (current ? `${raw}\n${current}` : raw));
+        setFiles((current) => [
+          ...draft.files.filter((file) => !current.includes(file)),
+          ...current,
+        ]);
         setError(String(cause));
       }
     },
@@ -613,6 +669,24 @@ export function ClaudePanel({
           </div>
         )}
         <ChatHistoryItems items={messages.items} onFileClick={onFileClick} directory={directory} />
+        {pendingSend && (!pendingSend.session || pendingSend.session === sessionId) && (
+          <div aria-live="polite" className="opacity-70">
+            <ChatHistoryItems
+              items={[
+                {
+                  id: "pending",
+                  type: "userMessage",
+                  content: [
+                    { type: "text", text: pendingSend.text },
+                    ...pendingSend.images.map((url) => ({ type: "image", url })),
+                  ],
+                },
+              ]}
+              directory={directory}
+            />
+            <p className="mt-1 text-[11px] text-muted">{t("claude.sending")}</p>
+          </div>
+        )}
         {busy && (
           <p role="status" className="flex items-center gap-2 text-xs text-muted">
             <span className="size-2 bg-accent motion-safe:animate-pulse" />

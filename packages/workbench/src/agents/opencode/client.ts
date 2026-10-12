@@ -393,12 +393,13 @@ export class OpenCodeClient {
         const key = `${part.sessionID}:${part.messageID}`;
         const parts = this.store.parts.get(key) || [];
         const existingIndex = parts.findIndex((p) => p.id === part.id);
-        if (existingIndex >= 0) {
-          parts[existingIndex] = part;
-        } else {
-          parts.push(part);
-        }
-        this.store.parts.set(key, parts);
+        // A new array, as for messages, so state holding the old one sees the change.
+        this.store.parts.set(
+          key,
+          existingIndex >= 0
+            ? parts.map((p, index) => (index === existingIndex ? part : p))
+            : [...parts, part],
+        );
         break;
       }
 

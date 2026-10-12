@@ -438,6 +438,7 @@ export const agentsZh = {
   "relay.linkedFrom": "来自项目「{project}」· {name}",
   "opencode.sending": "发送中…",
   "opencode.sentWaiting": "已发送，等待 OpenCode 接收…",
+  "claude.sending": "发送中…",
 };
 export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "activity.analysing": "Analysing…",
@@ -921,4 +922,5 @@ export const agentsEn: Record<keyof typeof agentsZh, string> = {
   "relay.linkedFrom": "From “{project}” · {name}",
   "opencode.sending": "Sending…",
   "opencode.sentWaiting": "Sent, waiting for OpenCode…",
+  "claude.sending": "Sending…",
 };
