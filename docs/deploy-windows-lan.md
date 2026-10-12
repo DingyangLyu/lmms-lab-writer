@@ -21,7 +21,7 @@
 | `C:\writer\pgsql`、`C:\writer\pgdata` | PostgreSQL 17 程序和数据（服务 `postgresql-writer`，只监听 127.0.0.1） |
 | `C:\texlive\current` | TeX Live（服务端编译 PDF 用的 latexmk） |
 | `C:\writer\logs` | `server.log`、`runner.log`、`backup.log` |
-| `D:\writer-backups` | 每天 3 点的数据库备份，保留 14 天（D: 没接上时写到 `C:\writer\backups`） |
+| `D:\writer-backups` | 每 6 小时的数据库备份，保留 14 天（D: 没接上时写到 `C:\writer\backups`）；每份同时复制到北京服务器，见下文“备份、监控和提醒” |
 | `E:\writer-data\templates` | 模板库：官方会议/期刊模板和组员发布的模板，每个模板一个文件夹（`files/` 项目文件、`preview/` 预览图和示例 PDF）；`.cache` 是下载的官方作者包 |
 | `%USERPROFILE%\.writer-runner\projects` | AI 对话的项目工作副本（每个项目一份；可以删除，每轮开始前会从服务器重新同步） |
 | `%USERPROFILE%\.writer-runner\claude-sessions`、`opencode.pid` | Claude Code 对话记录；执行器启动的 `opencode serve` 的进程号（执行器重启时用来结束上一个） |
@@ -30,7 +30,7 @@
 
 - **Writer Server**：开机启动 `run-writer.ps1 -Name server`，进程退出 5 秒后自动重启。
 - **Writer Runner**：开机启动 `run-writer.ps1 -Name runner`，以最高权限运行。
-- **Writer Backup**：每天 3 点运行 `backup-writer.ps1`（`pg_dump`）。
+- **Writer Backup**：每天 0、6、12、18 点运行 `backup-writer.ps1`（仓库里的 `deploy/lab/backup-writer.ps1`）。
 
 `config` 下的文件只有 yuanbai 和 SYSTEM 能读。
 
@@ -70,7 +70,7 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 
 脚本把作者包下载到 `E:\writer-data\templates\.cache`，整理成模板，用 latexmk 编译示例 PDF，再用 TeX Live 自带的 Ghostscript（`rungs.exe`）渲染前 4 页预览和缩略图；新模板完整生成后才替换旧的。AAAI 的下载页有人机验证，脚本拿不到时会提示，把 zip 手动放进 `.cache`（文件名见清单的 `archive`）再运行即可。网页最多 30 秒后显示更新。
 
-组员发布的模板同样在这个目录（`template.json` 里 `official: false`），每天随数据库备份一起镜像到 `D:\writer-backups\templates`。
+组员发布的模板同样在这个目录（`template.json` 里 `official: false`），每次随数据库备份一起镜像到 `D:\writer-backups\templates`。
 
 ## 账号和注册
 
@@ -93,6 +93,32 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 - 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `C:\net\mihomo\mihomo.exe -t -d C:\net\mihomo` 检查后重启 Mihomo 任务；
 - 这台电脑接了网线（以太网，10.100.144.0/20 网段，目前 10.100.147.57）和 Wi-Fi（BJZGCA-Dorm，10.100.128.0/20，目前 10.100.131.101），两个地址都由 DHCP 分配。网线是首选出口（接口跃点 以太网 10、WLAN 35），Wi-Fi 连着时作为备用。有线网刚接上时曾对 HTTPS 做中间人拦截（连洛杉矶节点拿到伪造的证书），处理好之后恢复正常；代理日志再出现 `certificate signed by unknown authority`，先用浏览器在这台电脑上确认有线网是否需要重新认证，必要时把以太网跃点调到 75 临时改走 Wi-Fi；
 - FlClash 仍安装着（打开它会把辅助服务重新装成自动启动，单独运行的辅助服务不影响网络）；不要在 FlClash 里打开 TUN 或系统代理，否则会和 mihomo 抢路由和 7890 端口。
+
+## 备份、监控和提醒
+
+脚本和配置都在仓库的 `deploy/lab/`（`backup-writer.ps1`；`writer-monitor.py` 和 `monitor-config.*.json`；`nginx-writer-18089.conf`、`writer.caddy`、`writer-offline.html/.json`），改动后复制到对应机器。
+
+**备份**（`C:\writer\backup-writer.ps1`，任务 Writer Backup，每 6 小时）：
+
+1. `pg_dump` 整个数据库（项目、文件、版本、批注，除模板库外的全部数据）到 `D:\writer-backups`，保留 14 天，并用 `pg_restore --list` 检查能否读取；
+2. 用这台电脑连北京服务器的 SSH 配置（`~/.ssh/config` 的 `beijing`）复制到北京服务器 `~/writer-backups`，按 SHA-256 核对；北京那边保留最近两天的全部，以及 14 天内每天一份；
+3. 每周一次恢复演练：用 postgres 账号（密码在 `secrets.json`）把最新备份恢复到临时数据库 `writer_restore_check`，核对账号数、项目数和数据库版本后删掉，结果记在 `C:\writer\logs\restore-drill.json`；
+4. 把这次的结果（成功与否、各盘剩余空间、演练结果）写成 `C:\writer\logs\lab-status.json`，复制到北京服务器 `~/writer-monitor/lab-status.json` 给监控读。
+
+日志在 `C:\writer\logs\backup.log`。实验室电脑整台损坏时，从北京服务器取回最新的 `.dump`，在新机器上按“首次搭建要点”装好 PostgreSQL 后 `pg_restore` 即可。
+
+**监控**（`deploy/lab/writer-monitor.py`，北京服务器 `admin` 和洛杉矶服务器 `ytranslator` 的 crontab 每分钟运行一次，文件在各自的 `~/writer-monitor`）：
+
+- 经本机反向代理访问 `/api/health`，连续 3 分钟打不开就提醒，并区分是代理出错还是隧道/实验室电脑断了；之后每 2 小时提醒一次，恢复时再发一条；
+- `/api/health` 的 `ai` 为 false 超过 10 分钟：AI 执行器（Writer Runner）没连上；
+- 只在北京：超过 7 小时没收到 `lab-status.json`、备份或复制失败、恢复演练失败或超过 9 天没做、实验室 C: 少于 20 GB、D: 少于 50 GB；每周一 9 点（北京时间）发一份周报；
+- 本机磁盘：北京少于 3 GB、洛杉矶少于 1.5 GB。
+
+提醒由飞书应用 `cli_aa42ca90e8b8dbc0` 的机器人发给管理员本人（`~/writer-monitor/feishu.json`：`app_id`、`app_secret`、`receive_id_type`、`receive_id`，只有所有者能读）。要发到群里：把机器人拉进群，`receive_id_type` 改为 `chat_id`、`receive_id` 填群的 `oc_…`。`python3 ~/writer-monitor/writer-monitor.py --test` 发一条测试消息。日志 `monitor.log`，状态 `state.json`。
+
+**离线页**：北京 nginx（`/etc/nginx/conf.d/writer-18089.conf`）连不上实验室时，网页返回 `/var/www/writer/writer-offline.html`（说明情况，每 20 秒检查一次，恢复后自动刷新），API 返回 JSON 错误，状态码都是 503。洛杉矶的 Caddy 配置了 `admin off`，改配置必须重启 Caddy（会让那台服务器上的其他网站断开一两秒），同样的离线页配置已放在 `/etc/caddy/writer.caddy.offline-pending`，择时 `sudo cp /etc/caddy/writer.caddy.offline-pending /etc/caddy/writer.caddy && sudo systemctl restart caddy` 启用。
+
+**还需要人工做的**：给这台电脑配一台 UPS；在 BIOS 里打开“来电自动开机”（Restore on AC Power Loss），停电恢复后服务会随开机自动启动。
 
 ## 更新
 
@@ -120,4 +146,5 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 - **IP 变了**：地址由 DHCP 分配。用新 IP 打开网页可以直接登录；邀请链接用的是 `WRITER_ORIGIN` 的第一个地址，改成新地址并重启 Writer Server 即可。能管理路由器时为这台电脑做 DHCP 地址保留。用域名访问（经反向代理）时必须把域名写进 `WRITER_ORIGIN`。
 - **页面偶尔提示“项目权限已变更”或突然变成只读**：以前服务器在数据库短暂不可用（例如 PostgreSQL 重启）时会把在线页面当作失去权限。现在只有确实未登录、不再是成员或项目不存在时才会这样，临时故障时页面自动重连；页面收到这类断开时也会先向服务器确认一次权限。
 - **AI 任务一直排队**：看 `runner.log` 和任务计划程序里 Writer Runner 是否在运行。
-- **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。
+- **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。D: 上没有时，用北京服务器 `~/writer-backups` 里的副本。
+- **Zotero 导入失败**：服务器经本机代理（mihomo）访问 `api.zotero.org`；代理不通时网页会提示连不上 Zotero。

@@ -1,0 +1,20 @@
+{
+  "title": "Writer 北京线路",
+  "sites": [
+    {
+      "name": "北京线路 http://101.200.37.236:18089",
+      "url": "http://127.0.0.1:18089/api/health",
+      "direct": "http://127.0.0.1:18090/api/health",
+      "proxy": "北京服务器的 nginx "
+    }
+  ],
+  "lab_status": "lab-status.json",
+  "lab_max_age_hours": 7,
+  "lab_disk_min_gb": {
+    "C": 20,
+    "D": 50
+  },
+  "backups": "~/writer-backups",
+  "disk_min_gb": 3,
+  "weekly": true
+}

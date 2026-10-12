@@ -1,0 +1,34 @@
+writer.desire-drive.com {
+    encode zstd gzip
+    @runner path /api/runner/*
+    respond @runner 404
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy 127.0.0.1:18090 {
+        # Keep streamed AI output responsive and use secure cookies on this HTTPS entry.
+        flush_interval -1
+        header_down Set-Cookie "^(writer_session=.*)$" "$1; Secure"
+    }
+    # While the lab cannot be reached: a page saying so, or a JSON error for API calls (503).
+    handle_errors {
+        @down expression `{err.status_code} in [502, 503, 504]`
+        handle @down {
+            header Cache-Control "no-store"
+            @api path /api/*
+            handle @api {
+                root * /var/www/writer
+                rewrite * /writer-offline.json
+                header Content-Type "application/json; charset=utf-8"
+                file_server {
+                    status 503
+                }
+            }
+            handle {
+                root * /var/www/writer
+                rewrite * /writer-offline.html
+                file_server {
+                    status 503
+                }
+            }
+        }
+    }
+}

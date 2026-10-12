@@ -1,0 +1,12 @@
+{
+  "title": "Writer 海外线路",
+  "sites": [
+    {
+      "name": "海外线路 https://writer.desire-drive.com",
+      "url": "https://writer.desire-drive.com/api/health",
+      "direct": "http://127.0.0.1:18090/api/health",
+      "proxy": "洛杉矶服务器的 Caddy "
+    }
+  ],
+  "disk_min_gb": 1.5
+}

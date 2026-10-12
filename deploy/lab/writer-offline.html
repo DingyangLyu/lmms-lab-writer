@@ -1,0 +1,84 @@
+<!doctype html>
+<!-- Served by the public servers' reverse proxies while they cannot reach the lab machine. -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Writer 暂时离线</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #171717;
+        --muted: #6b6b6b;
+        --accent: #ea580c;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141414;
+          --fg: #ededed;
+          --muted: #9a9a9a;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.7 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        max-width: 34rem;
+        padding: 24px 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 12px;
+        border-left: 4px solid var(--accent);
+        padding-left: 12px;
+      }
+      p {
+        margin: 0 0 10px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Writer 暂时连不上实验室服务器</h1>
+      <p>Writer 运行在实验室的电脑上，这条线路现在连不过去（电脑、网络或转发隧道中断）。管理员已经自动收到通知。</p>
+      <p>已经打开的项目页面请先不要关闭，恢复后会自动重新连接。这个页面每 20 秒检查一次，恢复后会自动刷新。</p>
+      <p class="muted" id="state">正在检查…</p>
+      <hr />
+      <p lang="en">
+        Writer runs on a computer in the lab, and this route cannot reach it right now (the
+        computer, its network or the forwarding tunnel is down). The administrator has been
+        notified. Keep open project pages open; they reconnect by themselves. This page checks
+        every 20 seconds and reloads when Writer is back.
+      </p>
+    </main>
+    <script>
+      const state = document.getElementById("state");
+      async function check() {
+        try {
+          const response = await fetch("/api/health", { cache: "no-store" });
+          if (response.ok && (await response.json()).ok) return location.reload();
+        } catch {}
+        state.textContent = `最近检查：${new Date().toLocaleTimeString()}，仍未恢复`;
+      }
+      check();
+      setInterval(check, 20000);
+    </script>
+  </body>
+</html>
