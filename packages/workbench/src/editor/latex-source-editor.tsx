@@ -98,6 +98,7 @@ import {
   wrapSelection,
 } from "./format-commands";
 import { latexCompletion, type ProjectHints } from "./latex-completion";
+import { type EditorCursor, remoteCursors, setRemoteCursors } from "./remote-cursors";
 import { writerSearch } from "./search-panel";
 import { latexSpellcheck } from "./spellcheck";
 import {
@@ -140,6 +141,11 @@ export type LatexSourceEditorProps = {
   onVisualChange?: (visual: boolean) => void;
   /** A URL for a project image, for figures in visual mode. */
   resolveImage?: (path: string) => string | null;
+  /** Collaborators' cursors, shown while the editor holds exactly `remoteCursorText`. */
+  remoteCursors?: EditorCursor[] | null;
+  remoteCursorText?: string;
+  /** This editor's cursor or selection as it moves, with the text it is in. */
+  onCursor?: (cursor: { anchor: number; head: number; text: string }) => void;
 };
 const NO_HINTS: ProjectHints = { citations: [], labels: [] };
 
@@ -576,6 +582,20 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
         currentProps.current.onSelectionChange?.(ranges.length ? ranges : null);
       }
     };
+    // Collaborators see this cursor move; at most every 120 ms.
+    let cursorTimer: ReturnType<typeof setTimeout> | undefined;
+    const reportCursor = (view: EditorView) => {
+      if (!currentProps.current.onCursor || cursorTimer) return;
+      cursorTimer = setTimeout(() => {
+        cursorTimer = undefined;
+        const range = view.state.selection.main;
+        currentProps.current.onCursor?.({
+          anchor: range.anchor,
+          head: range.head,
+          text: view.state.doc.toString(),
+        });
+      }, 120);
+    };
     const view = new EditorView({
       parent: container.current,
       state: EditorState.create({
@@ -627,6 +647,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
           trackedTheme,
           trackedTooltip(() => currentProps.current.onDecideChanges ?? null),
           formatKeymap,
+          remoteCursors,
           visualMode_.current.of(
             visualMode(!!initial.visual, {
               resolveImage: (path) => currentProps.current.resolveImage?.(path) ?? null,
@@ -662,6 +683,8 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
             if (update.selectionSet && update.view.hasFocus && !currentProps.current.readOnly) {
               if (!drag?.state.active) reportSelection(update.view);
             }
+            if ((update.selectionSet || update.docChanged) && update.view.hasFocus)
+              reportCursor(update.view);
           }),
         ],
       }),
@@ -671,6 +694,7 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
     view.focus();
     return () => {
       if (compositionTimer) clearTimeout(compositionTimer);
+      if (cursorTimer) clearTimeout(cursorTimer);
       drag?.dispose();
       view.destroy();
       viewRef.current = null;
@@ -694,6 +718,17 @@ export const LatexSourceEditor = memo(function LatexSourceEditor(props: LatexSou
       effects: spelling.current.reconfigure(latexSpellcheck(!!props.spellcheck && !props.readOnly)),
     });
   }, [props.spellcheck, props.readOnly]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `content` changes mean the text may match again (or no longer).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const shown =
+      props.remoteCursors?.length &&
+      props.remoteCursorText?.replace(/\r\n/g, "\n") === view.state.doc.toString()
+        ? props.remoteCursors
+        : [];
+    view.dispatch({ effects: setRemoteCursors.of(shown) });
+  }, [props.remoteCursors, props.remoteCursorText, props.content]);
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: visualMode_.current.reconfigure(

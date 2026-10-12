@@ -3,6 +3,7 @@ export {
   FolderSync,
   type FolderSyncOptions,
   fromBase64,
+  type RemoteCursor,
   type ShownChange,
   SyncIncomplete,
   type TextOperation,

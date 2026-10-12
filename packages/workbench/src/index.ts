@@ -13,6 +13,7 @@ export * from "./editor/font-stacks";
 export * from "./editor/format-commands";
 export * from "./editor/latex-completion";
 export * from "./editor/latex-source-editor";
+export * from "./editor/remote-cursors";
 export * from "./editor/search-panel";
 export * from "./editor/spell/words";
 export * from "./editor/spellcheck";

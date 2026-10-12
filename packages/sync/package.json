@@ -14,8 +14,9 @@
   },
   "dependencies": {
     "diff": "^8.0.4",
-    "yjs": "^13.6.31",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

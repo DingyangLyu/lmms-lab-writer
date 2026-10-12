@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { FolderSync, RequestError, SyncIncomplete, type SyncNotice } from "@lmms-lab/sync";
 import { jsonFileStore, nodeFolder, nodeTransport } from "@lmms-lab/sync/node";
 import { afterEach, describe, expect, it } from "vitest";
+import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "y-protocols/awareness";
+import * as Y from "yjs";
 import { resolveChanges } from "../shared/tracked";
 import { fixture } from "./test-fixture";
 
@@ -76,6 +78,64 @@ async function setup(user = "owner") {
 }
 
 describe("desktop folder sync against the real server", () => {
+  it("shares cursors between the desktop and web editors", async () => {
+    const s = await setup();
+    const created = await s.api("/files", { path: "main.tex", content: "Hello shared world\n" });
+    const file = created.data.id as string;
+    const coauthor = await s.f.invite("editor", "coauthor");
+    let moved = 0;
+    const sync = await s.engine("owner", { onCursors: () => moved++ });
+    await until(async () => (await s.local("main.tex")) === "Hello shared world\n", "clone");
+    await sync.flush(5000);
+
+    // A web editor puts its cursor on "shared".
+    const web = await s.f.peer(coauthor, file);
+    const awareness = new Awareness(web.doc);
+    const text = web.doc.getText("content");
+    const at = (i: number) =>
+      Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(text, i));
+    awareness.setLocalState({ cursor: { anchor: at(6), head: at(12) } });
+    web.ws.send(
+      JSON.stringify({
+        type: "awareness",
+        update: Buffer.from(encodeAwarenessUpdate(awareness, [web.doc.clientID])).toString(
+          "base64",
+        ),
+      }),
+    );
+    await until(() => (sync.cursors("main.tex")?.cursors.length ?? 0) > 0, "web cursor on desktop");
+    expect(moved).toBeGreaterThan(0);
+    expect(sync.cursors("main.tex")?.cursors).toEqual([
+      expect.objectContaining({ name: "coauthor", anchor: 6, head: 12 }),
+    ]);
+
+    // The desktop's cursor reaches the web editor, placed in its copy of the text.
+    sync.setCursor("main.tex", { anchor: 0, head: 5, text: "Hello shared world\n" });
+    const seen = new Awareness(new Y.Doc());
+    applyAwarenessUpdate(
+      seen,
+      Buffer.from((await web.next("awareness")).update || "", "base64"),
+      "remote",
+    );
+    const state = [...seen.getStates().values()].find((v) => v.cursor);
+    expect(state?.user?.name).toBe("owner");
+    const head = Y.createAbsolutePositionFromRelativePosition(
+      Y.createRelativePositionFromJSON(state?.cursor.head),
+      web.doc,
+    );
+    expect(head?.index).toBe(5);
+    // A cursor on text the server does not have yet is not shared.
+    sync.setCursor("main.tex", { anchor: 0, head: 1, text: "edited locally\n" });
+    applyAwarenessUpdate(
+      seen,
+      Buffer.from((await web.next("awareness")).update || "", "base64"),
+      "remote",
+    );
+    expect([...seen.getStates().values()].some((v) => v.cursor)).toBe(false);
+    awareness.destroy();
+    seen.destroy();
+  });
+
   it("does not report a folder as up to date while the server refuses its files", async () => {
     const s = await setup();
     await s.api("/files", { path: "main.tex", content: "one\n" });

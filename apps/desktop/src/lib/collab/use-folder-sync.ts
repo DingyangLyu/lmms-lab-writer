@@ -53,6 +53,8 @@ export function useFolderSync(projectPath: string | null) {
   const author = useRef<ChangeAuthor | null>(null);
   /** Bumped when a shared document changes, so its tracked changes are read again. */
   const [documents, setDocuments] = useState(0);
+  /** Bumped when collaborators' cursors move. */
+  const [cursorMoves, setCursorMoves] = useState(0);
 
   useEffect(() => {
     setLinkState(null);
@@ -82,6 +84,7 @@ export function useFolderSync(projectPath: string | null) {
       onStatus: setStatus,
       tracking: () => author.current,
       onDocument: () => setDocuments((n) => n + 1),
+      onCursors: () => setCursorMoves((n) => n + 1),
       onNotice: (notice) => {
         if (notice.kind === "paused-missing") setMissing(notice.count);
         say.current.toast(
@@ -158,6 +161,18 @@ export function useFolderSync(projectPath: string | null) {
     (path: string) => engine.current?.trackedChanges(path) ?? null,
     [documents],
   );
+  /** Collaborators' cursors in a text file, and the shared text they are placed in. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new function when cursors or documents change, so they are read again.
+  const cursors = useCallback(
+    (path: string) => engine.current?.cursors(path) ?? null,
+    [cursorMoves, documents],
+  );
+  /** Shows this computer's cursor in the open file to collaborators. */
+  const setCursor = useCallback(
+    (path: string | null, cursor: { anchor: number; head: number; text: string } | null) =>
+      engine.current?.setCursor(path, cursor),
+    [],
+  );
   const decide = useCallback(
     (path: string, ids: string[] | null, accept: boolean) =>
       engine.current?.decide(path, ids, accept) ?? false,
@@ -228,6 +243,8 @@ export function useFolderSync(projectPath: string | null) {
     tracking,
     setTracking,
     trackedChanges,
+    cursors,
+    setCursor,
     decide,
   };
 }

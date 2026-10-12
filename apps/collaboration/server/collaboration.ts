@@ -305,11 +305,8 @@ export class Collaboration {
     // Only announce cursors the room actually knows; an unknown ID has no clock.
     const known = [...peer.clients].filter((id) => room.awareness.meta.has(id));
     removeAwarenessStates(room.awareness, known, peer);
-    if (known.length && room.peers.size) {
-      const update = base64(encodeAwarenessUpdate(room.awareness, known));
-      for (const other of room.peers)
-        if (!other.sync) send(other.socket, { type: "awareness", update });
-    }
+    if (known.length && room.peers.size)
+      this.relayCursors(room, null, base64(encodeAwarenessUpdate(room.awareness, known)));
     if (!room.peers.size)
       void this.release(room.project, room.file).catch(logFailure("room release"));
   }
@@ -488,31 +485,44 @@ export class Collaboration {
       await this.applyUpdate(peer, room, current, msg);
       send(peer.socket, { type: "ack", id: msg.id });
     } else if (msg.type === "awareness" && room) {
-      if (typeof msg.update !== "string" || msg.update.length > 16_000) fail(400, "无效光标信息");
-      const bytes = Buffer.from(msg.update, "base64");
-      // Validate the whole message before recording any client ID; a rejected
-      // message must leave no half-registered cursor behind.
-      const ids = awarenessClients(bytes);
-      for (const id of ids)
-        for (const other of room.peers)
-          if (other !== peer && other.clients.has(id)) {
-            if (other.user.id !== current.id) fail(403, "不能修改其他人的光标");
-            // The same page reconnected before its old connection was seen to drop (a
-            // sleeping laptop, a tunnel hiccup): the new one takes over and the old one goes.
-            other.clients.delete(id);
-            other.socket.terminate();
-          }
-      if (new Set([...peer.clients, ...ids]).size > 2) fail(400, "光标数量超限");
-      for (const id of ids) peer.clients.add(id);
-      const user = { name: current.username, ...cursorColors(current.id) };
-      const safe = modifyAwarenessUpdate(bytes, (state: Record<string, unknown> | null) =>
-        state === null ? null : { ...state, user },
-      );
-      applyAwarenessUpdate(room.awareness, safe, peer);
-      const update = base64(safe);
-      for (const other of room.peers)
-        if (other !== peer && !other.sync) send(other.socket, { type: "awareness", update });
+      this.cursor(peer, room, current, msg.update);
     } else fail(400, "未知消息");
+  }
+  /** A cursor update from `peer` in `room`, checked and relayed to the room's other editors. */
+  private cursor(peer: Peer, room: Room, current: User, update: unknown) {
+    if (typeof update !== "string" || update.length > 16_000) fail(400, "无效光标信息");
+    const bytes = Buffer.from(update, "base64");
+    // Validate the whole message before recording any client ID; a rejected
+    // message must leave no half-registered cursor behind.
+    const ids = awarenessClients(bytes);
+    for (const id of ids)
+      for (const other of room.peers)
+        if (other !== peer && other.clients.has(id)) {
+          if (other.user.id !== current.id) fail(403, "不能修改其他人的光标");
+          // The same page reconnected before its old connection was seen to drop (a
+          // sleeping laptop, a tunnel hiccup): the new one takes over and the old one goes.
+          other.clients.delete(id);
+          other.socket.terminate();
+        }
+    if (new Set([...peer.clients, ...ids]).size > 2) fail(400, "光标数量超限");
+    for (const id of ids) peer.clients.add(id);
+    const user = { name: current.username, ...cursorColors(current.id) };
+    const safe = modifyAwarenessUpdate(bytes, (state: Record<string, unknown> | null) =>
+      state === null ? null : { ...state, user },
+    );
+    applyAwarenessUpdate(room.awareness, safe, peer);
+    this.relayCursors(room, peer, base64(safe));
+  }
+  /** Web editors know their document; sync sockets are told whose cursors moved. */
+  private relayCursors(room: Room, from: Peer | null, update: string) {
+    for (const other of room.peers)
+      if (other !== from)
+        send(
+          other.socket,
+          other.sync
+            ? { type: "awareness", file: room.file, update }
+            : { type: "awareness", update },
+        );
   }
   /**
    * Desktop sync: `join` (optionally with the state vector it already has) answers with the
@@ -548,6 +558,14 @@ export class Collaboration {
             // Lets the client send back whatever the server is missing.
             vector: base64(Y.encodeStateVector(room.doc)),
           });
+          if (room.awareness.getStates().size)
+            send(peer.socket, {
+              type: "awareness",
+              file,
+              update: base64(
+                encodeAwarenessUpdate(room.awareness, [...room.awareness.getStates().keys()]),
+              ),
+            });
         });
       } else if (msg.type === "leave") {
         const room = peer.rooms.get(file);
@@ -557,6 +575,9 @@ export class Collaboration {
         if (!(await this.store.fileExists(project, file))) fail(404, "文档不存在");
         await this.applyUpdate(peer, room, current, msg);
         send(peer.socket, { type: "ack", file, id: msg.id });
+      } else if (msg.type === "awareness") {
+        const room = peer.rooms.get(file) ?? fail(409, "请先加入文档");
+        this.cursor(peer, room, current, msg.update);
       } else fail(400, "未知消息");
     } catch (error) {
       if (!(error instanceof HttpError) || error.status >= 500) throw error;

@@ -1,4 +1,10 @@
 import { diffChars, diffWordsWithSpace } from "diff";
+import {
+  Awareness,
+  applyAwarenessUpdate,
+  encodeAwarenessUpdate,
+  removeAwarenessStates,
+} from "y-protocols/awareness";
 import * as Y from "yjs";
 import { conflictCopyPath, isConflictCopy, isTextPath, validPath } from "./paths";
 import {
@@ -182,6 +188,16 @@ export type FolderSyncOptions = {
   tracking?: () => ChangeAuthor | null;
   /** A text file's shared document changed (its text or its tracked changes). */
   onDocument?: (path: string) => void;
+  /** Collaborators' cursors in a text file moved (see `cursors`). */
+  onCursors?: (path: string) => void;
+};
+/** A collaborator's cursor or selection, at places in the file's shared text. */
+export type RemoteCursor = {
+  id: number;
+  name: string;
+  color: string;
+  anchor: number;
+  head: number;
 };
 /** A tracked change as lists show it, with its text: what was inserted, or what was deleted. */
 export type ShownChange = ResolvedChange & { quote: string };
@@ -225,6 +241,13 @@ export class FolderSync {
   private paused = false;
   private stopped = true;
   private missingToConfirm: string[] = [];
+  /**
+   * Cursors, per text file: collaborators' and this folder's own (one awareness client for
+   * every file, so the server counts this computer once), as the web editors share them.
+   */
+  private cursorDoc = new Y.Doc();
+  private awareness = new Map<string, Awareness>();
+  private cursorFile: string | null = null;
 
   constructor(private options: FolderSyncOptions) {}
 
@@ -251,6 +274,8 @@ export class FolderSync {
 
   async stop() {
     this.stopped = true;
+    for (const awareness of this.awareness.values()) awareness.destroy();
+    this.awareness.clear();
     if (this.rescan) clearInterval(this.rescan);
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
@@ -435,6 +460,14 @@ export class FolderSync {
     this.socket = null;
     this.connected = false;
     for (const t of this.tracked.values()) t.joined = false;
+    for (const [file, awareness] of this.awareness) {
+      const others = [...awareness.getStates().keys()].filter((id) => id !== awareness.clientID);
+      if (others.length) {
+        removeAwarenessStates(awareness, others, "remote");
+        const t = this.tracked.get(file);
+        if (t) this.options.onCursors?.(t.path);
+      }
+    }
     this.unacked.clear();
     if (this.stopped) return;
     this.setState("offline");
@@ -500,7 +533,100 @@ export class FolderSync {
           reason: "server",
           detail: msg.message,
         });
+    } else if (msg.type === "awareness" && msg.file && msg.update) {
+      const t = this.tracked.get(msg.file);
+      if (!t || t.binary) return;
+      try {
+        applyAwarenessUpdate(this.cursorsOf(t.id), fromBase64(msg.update), "remote");
+      } catch {
+        return;
+      }
+      this.options.onCursors?.(t.path);
     } else if (msg.type === "closed" || msg.type === "project-changed") this.later("refresh", 100);
+  }
+
+  // ---- cursors ----------------------------------------------------------------------------
+
+  private cursorsOf(file: string) {
+    let awareness = this.awareness.get(file);
+    if (!awareness) {
+      awareness = new Awareness(this.cursorDoc);
+      awareness.setLocalState(null);
+      // Its own state, renewed every 15 seconds so others keep showing it.
+      awareness.on("update", (_: unknown, origin: unknown) => {
+        if (origin !== "local" || !awareness) return;
+        const t = this.tracked.get(file);
+        if (t?.joined && this.socket)
+          this.socket.send(
+            JSON.stringify({
+              type: "awareness",
+              file,
+              update: toBase64(encodeAwarenessUpdate(awareness, [awareness.clientID])),
+            }),
+          );
+      });
+      this.awareness.set(file, awareness);
+    }
+    return awareness;
+  }
+
+  /**
+   * Shows this folder's cursor in a text file to collaborators (null hides it); `text` is the
+   * editor's text, and positions count only while it matches the shared text. A cursor in
+   * another file is hidden first.
+   */
+  setCursor(path: string | null, cursor: { anchor: number; head: number; text: string } | null) {
+    const t = path ? this.byPath(path) : null;
+    if (this.cursorFile && this.cursorFile !== t?.id) {
+      this.awareness.get(this.cursorFile)?.setLocalState(null);
+      this.cursorFile = null;
+    }
+    if (!t?.doc || t.binary || this.readOnly) return;
+    const text = t.doc.getText("content");
+    const awareness = this.cursorsOf(t.id);
+    if (!cursor || cursor.text !== text.toString()) {
+      if (awareness.getLocalState() !== null) awareness.setLocalState(null);
+      return;
+    }
+    const at = (index: number) =>
+      Y.relativePositionToJSON(
+        Y.createRelativePositionFromTypeIndex(text, Math.max(0, Math.min(index, text.length))),
+      );
+    this.cursorFile = t.id;
+    awareness.setLocalState({ cursor: { anchor: at(cursor.anchor), head: at(cursor.head) } });
+  }
+
+  /** Collaborators' cursors in a text file, at places in its shared text (and that text). */
+  cursors(path: string): { text: string; cursors: RemoteCursor[] } | null {
+    const t = this.byPath(path);
+    const awareness = t ? this.awareness.get(t.id) : undefined;
+    if (!t?.doc || !awareness) return null;
+    const doc = t.doc;
+    const found: RemoteCursor[] = [];
+    for (const [id, state] of awareness.getStates()) {
+      if (id === awareness.clientID || !state?.cursor) continue;
+      const place = (json: unknown) => {
+        try {
+          return Y.createAbsolutePositionFromRelativePosition(
+            Y.createRelativePositionFromJSON(json),
+            doc,
+          )?.index;
+        } catch {
+          return undefined;
+        }
+      };
+      const anchor = place(state.cursor.anchor),
+        head = place(state.cursor.head);
+      if (anchor === undefined || head === undefined) continue;
+      found.push({
+        id,
+        name: String(state.user?.name ?? ""),
+        color: String(state.user?.color ?? "#ea580c"),
+        anchor,
+        head,
+      });
+    }
+    return { text: doc.getText("content").toString(), cursors: found };
   }
 
   private join(t: Tracked) {

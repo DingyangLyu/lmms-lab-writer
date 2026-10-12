@@ -3,6 +3,7 @@
 import "@/lib/monaco/config";
 
 import type { ResolvedChange } from "@lmms-lab/sync/tracked";
+import type { EditorCursor } from "@lmms-lab/workbench";
 import type { EditorTextRange } from "@lmms-lab/workbench/agents";
 import Editor, { type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -40,6 +41,10 @@ type Props = {
   trackedChanges?: ResolvedChange[] | null;
   trackedText?: string;
   onDecideChanges?: (ids: string[], accept: boolean) => void;
+  /** Collaborators' cursors (a linked folder), placed in `remoteCursorText`. */
+  remoteCursors?: EditorCursor[] | null;
+  remoteCursorText?: string;
+  onCursor?: (cursor: { anchor: number; head: number; text: string }) => void;
 };
 
 type VimModeController = {

@@ -367,6 +367,12 @@ export default function EditorPage() {
   // A linked folder's tracked changes in the open file (from its sync's copy of the document).
   const openTracked =
     folderSync.link && selectedFile ? folderSync.trackedChanges(selectedFile) : null;
+  // Collaborators' cursors in the open file, from the same copy.
+  const openCursors = folderSync.link && selectedFile ? folderSync.cursors(selectedFile) : null;
+  // Leaving a file (or the link) hides this computer's cursor there.
+  useEffect(() => {
+    if (!folderSync.link || !selectedFile) folderSync.setCursor(null, null);
+  }, [folderSync.link, selectedFile, folderSync.setCursor]);
   // A linked folder may build on the server; its PDFs answer SyncTeX lookups from there.
   const [buildOnServer, setBuildOnServer] = useState(false);
   useEffect(() => {
@@ -2054,6 +2060,13 @@ export default function EditorPage() {
                 goToLine={pendingGoToLine}
                 trackedChanges={openTracked?.changes}
                 trackedText={openTracked?.text}
+                remoteCursors={openCursors?.cursors}
+                remoteCursorText={openCursors?.text}
+                onCursor={
+                  folderSync.link && selectedFile
+                    ? (cursor) => folderSync.setCursor(selectedFile, cursor)
+                    : undefined
+                }
                 onDecideChanges={
                   folderSync.tracking?.canEdit && selectedFile
                     ? (ids, accept) => void folderSync.decide(selectedFile, ids, accept)
