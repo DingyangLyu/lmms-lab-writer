@@ -222,6 +222,37 @@ describe.skipIf(process.platform === "win32")("server builds", () => {
       await s.app.close();
     }
   });
+  it("makes the project's folders in the output folder, for \\include'd files", async () => {
+    // TeX writes build-output/chapters/intro.aux for \include{chapters/intro} but cannot make
+    // the folder; this stand-in says whether it was there.
+    const script = join(dir, "latexmk-folders");
+    await writeFile(
+      script,
+      `#!/bin/sh
+out=build-output
+for a; do main="$a"; case "$a" in -outdir=*) out="\${a#-outdir=}";; esac; done
+stem=$(basename "$main" .tex)
+[ -d "$out/chapters/deeper" ] && found=yes || found=no
+printf '%%PDF-1.4 fake\\n' > "$out/$stem.pdf"
+printf 'folders %s\\n' "$found" > "$out/$stem.log"
+`,
+    );
+    await chmod(script, 0o755);
+    const s = await server(script);
+    try {
+      const prefix = `/projects/${s.project}`;
+      await s.call(`${prefix}/files`, { path: "main.tex", content: "x" }, s.cookie);
+      await s.call(`${prefix}/files`, { path: "chapters/deeper/one.tex", content: "y" }, s.cookie);
+      const build = await s.call(
+        `${prefix}/builds`,
+        { main: "main.tex", engine: "pdflatex" },
+        s.cookie,
+      );
+      expect(build.data.log).toContain("folders yes");
+    } finally {
+      await s.app.close();
+    }
+  });
   it("chooses the engine from the sources when asked for an automatic build", async () => {
     const s = await server(await fakeLatexmk());
     try {

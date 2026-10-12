@@ -3,7 +3,7 @@
  * temporary directory with shell escape off and TeX file access restricted to that directory.
  */
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, posix } from "node:path";
 import { buildEngine } from "@lmms-lab/writing";
@@ -64,9 +64,26 @@ export const mainFolder = (main: string) => {
  * written relative to it still build. Paranoid file access forbids `..`, hence the absolute
  * output folder, allowed through TEXMFOUTPUT.
  */
-export function runLatexmk(dir: string, main: string, engine: Engine, options: CompileOptions) {
+/**
+ * The project's folders inside the output folder: TeX writes each \include'd file's .aux beside
+ * where it would be (build-output/chapters/intro.aux) but cannot make the folder itself.
+ */
+async function mirrorFolders(from: string, to: string) {
+  for (const entry of await readdir(from, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === OUTPUT_DIR) continue;
+    await mkdir(join(to, entry.name), { recursive: true });
+    await mirrorFolders(join(from, entry.name), join(to, entry.name));
+  }
+}
+export async function runLatexmk(
+  dir: string,
+  main: string,
+  engine: Engine,
+  options: CompileOptions,
+) {
   const latexmk = options.latexmk || "latexmk";
   const folder = mainFolder(main);
+  await mirrorFolders(folder ? join(dir, folder) : dir, join(dir, OUTPUT_DIR));
   const nested = folder
     ? {
         TEXMFOUTPUT: dir,

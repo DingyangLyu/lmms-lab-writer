@@ -104,11 +104,15 @@ function tex(file: string, latexmk: string | undefined) {
       ? join(dirname(latexmk), process.platform === "win32" ? "tex.exe" : "tex")
       : "tex";
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(binary, ["-interaction=batchmode", file.split("/").pop() ?? file], {
+    // Scroll mode lets docstrip read its questions' answers (whether to overwrite a file TeX
+    // Live already has), which batch mode refuses; every answer is yes.
+    const child = spawn(binary, ["-interaction=scrollmode", file.split("/").pop() ?? file], {
       cwd: dirname(file),
-      stdio: "ignore",
+      stdio: ["pipe", "ignore", "ignore"],
       windowsHide: true,
     });
+    child.stdin?.on("error", () => {});
+    child.stdin?.end("y\n".repeat(500));
     child.once("error", reject);
     child.once("close", (code) =>
       code === 0 ? resolve() : reject(new Error(`tex ${file} exited with ${code}`)),
