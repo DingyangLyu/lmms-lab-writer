@@ -31,6 +31,7 @@ import { Avatar } from "./avatar";
 import { type MessageKey, useI18n } from "./i18n";
 import { roleKey } from "./labels";
 import { Modal } from "./modal";
+import { PageHero } from "./page-hero";
 import { PublishTemplateDialog } from "./templates";
 import { useAction } from "./use-action";
 
@@ -76,6 +77,17 @@ export function ago(time: number | undefined, locale: string, justNow: string, n
   if (days < 30) return format.format(-days, "day");
   return new Date(time).toLocaleDateString(tag);
 }
+
+/** One of the eight colours of a project's tile (chrome.css), the same for it every time. */
+const tone = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 8, 0);
+
+/** The greeting above the project list, by the hour. */
+const greeting = (hour: number): MessageKey =>
+  hour >= 5 && hour < 11
+    ? "dash.greet.morning"
+    : hour >= 11 && hour < 18
+      ? "dash.greet.afternoon"
+      : "dash.greet.evening";
 
 /** A dialog with one name field: new, copy, rename, or the typed confirmation to delete. */
 function NameDialog({
@@ -460,6 +472,25 @@ export function Dashboard({
 
   return (
     <div className="dash">
+      <PageHero
+        wide
+        eyebrow={t(greeting(new Date().getHours()), { name: user.name })}
+        title={tag ?? t(FILTERS.find(([id]) => id === filter)?.[1] ?? "dash.projects")}
+        lead={projects && t("dash.countLine", { count: visible.length })}
+      >
+        {!!all.length && (
+          <label className="dash-search">
+            <MagnifyingGlassIcon aria-hidden="true" />
+            <input
+              type="search"
+              aria-label={t("dash.search")}
+              placeholder={t("dash.search")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        )}
+      </PageHero>
       <div className="dash-body">
         <aside className="dash-side">
           <div className="dash-new" ref={menuRef}>
@@ -578,7 +609,7 @@ export function Dashboard({
           )}
           {projects && !all.length ? (
             <section className="dash-welcome">
-              <h1>{t("dash.welcomeTitle")}</h1>
+              <h2>{t("dash.welcomeTitle")}</h2>
               <p>{t("dash.welcomeLead")}</p>
               <div className="row">
                 <button
@@ -601,8 +632,8 @@ export function Dashboard({
             </section>
           ) : (
             <>
-              <div className="dash-toolbar">
-                {chosen.length ? (
+              {!!chosen.length && (
+                <div className="dash-toolbar">
                   <div
                     className="dash-bulk"
                     role="toolbar"
@@ -656,20 +687,8 @@ export function Dashboard({
                       {t("dash.clearSelection")}
                     </button>
                   </div>
-                ) : (
-                  <h1>{t(FILTERS.find(([id]) => id === filter)?.[1] ?? "dash.projects")}</h1>
-                )}
-                <label className="dash-search">
-                  <MagnifyingGlassIcon aria-hidden="true" />
-                  <input
-                    type="search"
-                    aria-label={t("dash.search")}
-                    placeholder={t("dash.search")}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
-              </div>
+                </div>
+              )}
               {!projects ? (
                 <p className="muted">{t("common.loading")}</p>
               ) : !visible.length ? (
@@ -717,19 +736,41 @@ export function Dashboard({
                           />
                         </td>
                         <td className="dash-name">
-                          <a
-                            href={`/?project=${encodeURIComponent(p.id)}`}
-                            onClick={(event) => {
-                              if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-                              event.preventDefault();
-                              onOpen(p);
-                            }}
-                          >
-                            {p.name}
-                          </a>
-                          <span className="dash-meta">
-                            {t(roleKey[p.role])} · {ownerName(p)} ·{" "}
-                            {ago(p.updated ?? p.created, locale, t("dash.justNow"))}
+                          <span className="dash-name-cell">
+                            <span className={`dash-tile tone-${tone(p.id)}`} aria-hidden="true">
+                              {[...p.name.trim()][0]?.toUpperCase() ?? "·"}
+                            </span>
+                            <span className="dash-name-text">
+                              <a
+                                href={`/?project=${encodeURIComponent(p.id)}`}
+                                onClick={(event) => {
+                                  if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                                  event.preventDefault();
+                                  onOpen(p);
+                                }}
+                              >
+                                {p.name}
+                              </a>
+                              {!!p.tags?.length && (
+                                <span className="dash-row-tags">
+                                  {p.tags.map((name) => (
+                                    <button
+                                      key={name}
+                                      type="button"
+                                      className="dash-chip"
+                                      title={t("dash.showTag", { name })}
+                                      onClick={() => setTag(name)}
+                                    >
+                                      {name}
+                                    </button>
+                                  ))}
+                                </span>
+                              )}
+                              <span className="dash-meta">
+                                {t(roleKey[p.role])} · {ownerName(p)} ·{" "}
+                                {ago(p.updated ?? p.created, locale, t("dash.justNow"))}
+                              </span>
+                            </span>
                           </span>
                         </td>
                         <td className="dash-owner">

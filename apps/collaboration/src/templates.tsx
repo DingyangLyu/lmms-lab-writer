@@ -29,6 +29,7 @@ import {
 import { api, errorText } from "./api";
 import { type MessageKey, useI18n } from "./i18n";
 import { Modal } from "./modal";
+import { PageHero } from "./page-hero";
 import { useAction } from "./use-action";
 
 type Sort = "recommended" | "newest" | "name";
@@ -122,6 +123,29 @@ export function TemplateGallery({
 
   return (
     <div className="dash">
+      <PageHero wide title={t("tpl.title")} lead={t("tpl.lead")}>
+        <div className="tpl-toolbar">
+          <label className="dash-search">
+            <MagnifyingGlassIcon aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              placeholder={t("tpl.search")}
+              aria-label={t("tpl.search")}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <label className="tpl-sort">
+            {t("tpl.sortLabel")}
+            <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
+              <option value="recommended">{t("tpl.sort.recommended")}</option>
+              <option value="newest">{t("tpl.sort.newest")}</option>
+              <option value="name">{t("tpl.sort.name")}</option>
+            </select>
+          </label>
+          <span className="tpl-count">{t("tpl.count", { count: matching.length })}</span>
+        </div>
+      </PageHero>
       <div className="dash-body">
         <aside className="dash-side">
           <nav aria-label={t("tpl.categories")}>
@@ -167,31 +191,6 @@ export function TemplateGallery({
           </div>
         </aside>
         <main className="dash-main">
-          <section className="tpl-intro">
-            <h1>{t("tpl.title")}</h1>
-            <p className="muted">{t("tpl.lead")}</p>
-          </section>
-          <div className="dash-toolbar tpl-toolbar">
-            <label className="dash-search">
-              <MagnifyingGlassIcon aria-hidden="true" />
-              <input
-                type="search"
-                value={query}
-                placeholder={t("tpl.search")}
-                aria-label={t("tpl.search")}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <label className="tpl-sort">
-              {t("tpl.sortLabel")}
-              <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
-                <option value="recommended">{t("tpl.sort.recommended")}</option>
-                <option value="newest">{t("tpl.sort.newest")}</option>
-                <option value="name">{t("tpl.sort.name")}</option>
-              </select>
-            </label>
-            <span className="muted">{t("tpl.count", { count: matching.length })}</span>
-          </div>
           {error && (
             <p className="error" role="alert">
               {error}

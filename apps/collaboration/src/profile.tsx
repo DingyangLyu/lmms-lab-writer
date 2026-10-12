@@ -6,6 +6,7 @@ import { ChangePassword } from "./account";
 import { api, errorText } from "./api";
 import { Avatar } from "./avatar";
 import { i18n, useI18n } from "./i18n";
+import { PageHero } from "./page-hero";
 import { useAction } from "./use-action";
 
 /** The picture as the server keeps it: the centre square, 256 px. */
@@ -63,63 +64,62 @@ export function ProfilePage({
   const picture = useAction();
   const [passwordSaved, setPasswordSaved] = useState(false);
   return (
-    <main className="page">
-      <div className="page-head">
-        <h1>{t("profile.title")}</h1>
-        <p className="muted">{t("profile.lead")}</p>
-      </div>
-      <section className="panel">
-        <h2>{t("profile.picture")}</h2>
-        <div className="profile-picture">
-          <Avatar person={user} size={88} />
-          <div>
-            <strong className="profile-name">{user.name}</strong>
-            <p className="muted">{t("profile.pictureHint")}</p>
-            <div className="row">
-              <label className="button-like primary">
-                <UploadSimpleIcon aria-hidden="true" />
-                {picture.busy ? t("common.working") : t("profile.upload")}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  disabled={picture.busy}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file)
-                      picture.run(async () =>
-                        onUser({ ...user, avatar: await uploadAvatar(await shrink(file)) }),
-                      );
-                  }}
-                />
-              </label>
-              {user.avatar && (
-                <button
-                  type="button"
-                  disabled={picture.busy}
-                  onClick={() =>
-                    picture.run(async () => {
-                      await api("/me/avatar", {}, "DELETE");
-                      onUser({ ...user, avatar: null });
-                    })
-                  }
-                >
-                  {t("profile.remove")}
-                </button>
+    <main className="page-main">
+      <PageHero title={t("profile.title")} lead={t("profile.lead")} />
+      <div className="page">
+        <section className="panel">
+          <h2>{t("profile.picture")}</h2>
+          <div className="profile-picture">
+            <Avatar person={user} size={88} />
+            <div>
+              <strong className="profile-name">{user.name}</strong>
+              <p className="muted">{t("profile.pictureHint")}</p>
+              <div className="row">
+                <label className="button-like primary">
+                  <UploadSimpleIcon aria-hidden="true" />
+                  {picture.busy ? t("common.working") : t("profile.upload")}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    disabled={picture.busy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file)
+                        picture.run(async () =>
+                          onUser({ ...user, avatar: await uploadAvatar(await shrink(file)) }),
+                        );
+                    }}
+                  />
+                </label>
+                {user.avatar && (
+                  <button
+                    type="button"
+                    disabled={picture.busy}
+                    onClick={() =>
+                      picture.run(async () => {
+                        await api("/me/avatar", {}, "DELETE");
+                        onUser({ ...user, avatar: null });
+                      })
+                    }
+                  >
+                    {t("profile.remove")}
+                  </button>
+                )}
+              </div>
+              {picture.error && (
+                <p role="alert" className="error">
+                  {picture.error}
+                </p>
               )}
             </div>
-            {picture.error && (
-              <p role="alert" className="error">
-                {picture.error}
-              </p>
-            )}
           </div>
-        </div>
-      </section>
-      <section className="panel">
-        <ChangePassword onDone={() => setPasswordSaved(true)} />
-        {passwordSaved && <p className="notice-inline">{t("profile.passwordSaved")}</p>}
-      </section>
+        </section>
+        <section className="panel">
+          <ChangePassword onDone={() => setPasswordSaved(true)} />
+          {passwordSaved && <p className="notice-inline">{t("profile.passwordSaved")}</p>}
+        </section>
+      </div>
     </main>
   );
 }
@@ -181,96 +181,95 @@ export function FriendsPage() {
       </button>
     );
   return (
-    <main className="page">
-      <div className="page-head">
-        <h1>{t("friends.title")}</h1>
-        <p className="muted">{t("friends.lead")}</p>
-      </div>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {!!friends?.incoming.length && (
+    <main className="page-main">
+      <PageHero title={t("friends.title")} lead={t("friends.lead")} />
+      <div className="page">
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+        {!!friends?.incoming.length && (
+          <section className="panel">
+            <h2>{t("friends.incoming", { count: friends.incoming.length })}</h2>
+            <ul className="people">
+              {friends.incoming.map((p) =>
+                row(
+                  p,
+                  <>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={busy}
+                      onClick={() => accept(p)}
+                    >
+                      {t("friends.accept")}
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => drop(p)}>
+                      {t("friends.decline")}
+                    </button>
+                  </>,
+                ),
+              )}
+            </ul>
+          </section>
+        )}
         <section className="panel">
-          <h2>{t("friends.incoming", { count: friends.incoming.length })}</h2>
+          <h2>{t("friends.mine", { count: friends?.friends.length ?? 0 })}</h2>
           <ul className="people">
-            {friends.incoming.map((p) =>
+            {friends && !friends.friends.length && <li className="muted">{t("friends.none")}</li>}
+            {friends?.friends.map((p) =>
               row(
                 p,
-                <>
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={busy}
-                    onClick={() => accept(p)}
-                  >
-                    {t("friends.accept")}
-                  </button>
-                  <button type="button" disabled={busy} onClick={() => drop(p)}>
-                    {t("friends.decline")}
-                  </button>
-                </>,
-              ),
-            )}
-          </ul>
-        </section>
-      )}
-      <section className="panel">
-        <h2>{t("friends.mine", { count: friends?.friends.length ?? 0 })}</h2>
-        <ul className="people">
-          {friends && !friends.friends.length && <li className="muted">{t("friends.none")}</li>}
-          {friends?.friends.map((p) =>
-            row(
-              p,
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (confirm(t("friends.removeConfirm", { name: p.username }))) drop(p);
-                }}
-              >
-                {t("friends.remove")}
-              </button>,
-            ),
-          )}
-        </ul>
-      </section>
-      <section className="panel">
-        <h2>{t("friends.find")}</h2>
-        <p className="muted">{t("friends.findLead")}</p>
-        <label className="search-field">
-          <MagnifyingGlassIcon aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            placeholder={t("friends.search")}
-            aria-label={t("friends.search")}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <ul className="people">
-          {found && !found.length && (
-            <li className="muted">{query.trim() ? t("friends.noMatch") : t("friends.nobody")}</li>
-          )}
-          {found?.map((p) => row(p, relationActions(p)))}
-        </ul>
-      </section>
-      {!!friends?.outgoing.length && (
-        <section className="panel">
-          <h2>{t("friends.outgoing", { count: friends.outgoing.length })}</h2>
-          <ul className="people">
-            {friends.outgoing.map((p) =>
-              row(
-                p,
-                <button type="button" disabled={busy} onClick={() => drop(p)}>
-                  {t("friends.withdraw")}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    if (confirm(t("friends.removeConfirm", { name: p.username }))) drop(p);
+                  }}
+                >
+                  {t("friends.remove")}
                 </button>,
               ),
             )}
           </ul>
         </section>
-      )}
+        <section className="panel">
+          <h2>{t("friends.find")}</h2>
+          <p className="muted">{t("friends.findLead")}</p>
+          <label className="search-field">
+            <MagnifyingGlassIcon aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              placeholder={t("friends.search")}
+              aria-label={t("friends.search")}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <ul className="people">
+            {found && !found.length && (
+              <li className="muted">{query.trim() ? t("friends.noMatch") : t("friends.nobody")}</li>
+            )}
+            {found?.map((p) => row(p, relationActions(p)))}
+          </ul>
+        </section>
+        {!!friends?.outgoing.length && (
+          <section className="panel">
+            <h2>{t("friends.outgoing", { count: friends.outgoing.length })}</h2>
+            <ul className="people">
+              {friends.outgoing.map((p) =>
+                row(
+                  p,
+                  <button type="button" disabled={busy} onClick={() => drop(p)}>
+                    {t("friends.withdraw")}
+                  </button>,
+                ),
+              )}
+            </ul>
+          </section>
+        )}
+      </div>
     </main>
   );
 }

@@ -194,7 +194,7 @@ export function AuthPage({
                 ← {t("auth.home")}
               </button>
             )}
-            <AddressSwitch />
+            <AddressSwitch dark />
             <LanguageSwitch />
           </span>
         </header>

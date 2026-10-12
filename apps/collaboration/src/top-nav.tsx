@@ -138,7 +138,7 @@ export function TopNav({
   return (
     <header className="top-nav">
       <button type="button" className="nav-brand" onClick={() => onNavigate("projects")}>
-        <img src="/logo-light.svg" alt="Y-Writer" />
+        <img src="/logo-dark.svg" alt="Y-Writer" />
       </button>
       <nav aria-label={t("nav.label")}>
         {link("projects", t("nav.projects"))}

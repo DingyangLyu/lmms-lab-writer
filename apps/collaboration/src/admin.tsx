@@ -9,6 +9,7 @@ import type {
 import { api, errorText } from "./api";
 import { copyText } from "./clipboard";
 import { useI18n } from "./i18n";
+import { PageHero } from "./page-hero";
 
 type Tab = "pending" | "users" | "invites" | "settings";
 
@@ -43,36 +44,37 @@ export function AdminConsole({ me }: { me: string }) {
     ["settings", t("console.tab.settings")],
   ];
   return (
-    <main className="dashboard page">
-      <div className="page-head">
-        <h1>{t("console.title")}</h1>
-        <p className="muted">{t("console.lead")}</p>
+    <main className="page-main">
+      <PageHero title={t("console.title")} lead={t("console.lead")} />
+      <div className="page console">
+        <section className="panel console-panel">
+          <div className="auth-tabs console-tabs" role="tablist">
+            {tabs.map(([name, label]) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={tab === name}
+                className={tab === name ? "selected" : ""}
+                onClick={() => setTab(name)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {tab === "pending" && <Pending users={pending} busy={busy} run={run} />}
+          {tab === "users" && (
+            <Users users={users.filter((u) => !u.pending)} me={me} busy={busy} run={run} />
+          )}
+          {tab === "invites" && <Invites onError={setError} />}
+          {tab === "settings" && <Settings onError={setError} />}
+        </section>
       </div>
-      <div className="auth-tabs console-tabs" role="tablist">
-        {tabs.map(([name, label]) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            className={tab === name ? "selected" : ""}
-            onClick={() => setTab(name)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {tab === "pending" && <Pending users={pending} busy={busy} run={run} />}
-      {tab === "users" && (
-        <Users users={users.filter((u) => !u.pending)} me={me} busy={busy} run={run} />
-      )}
-      {tab === "invites" && <Invites onError={setError} />}
-      {tab === "settings" && <Settings onError={setError} />}
     </main>
   );
 }

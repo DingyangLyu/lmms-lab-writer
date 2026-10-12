@@ -125,16 +125,6 @@ label input:where(:not(.wb, .wb *)) {
   width: 100%;
   margin-top: 10px;
 }
-.dashboard {
-  max-width: 1120px;
-  margin: auto;
-  padding: 45px 26px;
-}
-.dashboard header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 .new-project {
   margin: 24px 0;
 }
@@ -357,7 +347,7 @@ input.narrow {
   display: grid;
   gap: 4px;
 }
-.dashboard .banner {
+.console .banner {
   justify-content: flex-start;
   align-items: center;
   flex-wrap: wrap;

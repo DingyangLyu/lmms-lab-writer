@@ -1,17 +1,26 @@
 /*
  * The pages around the editor (top bar, sign-in, projects, templates, profile, administration),
- * after Overleaf's: white bars, one accent colour, quiet lines and room to breathe. Loaded after
- * style.css in the same layer, so these rules refine the older ones.
+ * in the homepage's colours: its night above each page, its gradient on the main actions, and
+ * light cards with quiet lines below. Loaded after style.css in the same layer, so these rules
+ * refine the older ones.
  */
 :root {
-  --yw-accent: #1f6f8b;
-  --yw-accent-hover: #185a71;
-  --yw-accent-soft: #e8f2f6;
-  --yw-ink: #1c2733;
-  --yw-muted: #5d6a79;
-  --yw-line: #e2e6eb;
-  --yw-canvas: #f6f7f9;
+  --yw-accent: #0e7490;
+  --yw-accent-hover: #155e75;
+  --yw-accent-soft: #e6f4f7;
+  --yw-ink: #0f1d2b;
+  --yw-muted: #5b6878;
+  --yw-line: #e3e8ee;
+  --yw-canvas: #f4f6f9;
   --yw-danger: #b42318;
+  /* The homepage's night, lines and gradient (landing.css), for the bars above the pages. */
+  --yw-night: #070b10;
+  --yw-night-line: rgba(255, 255, 255, 0.08);
+  --yw-night-text: #e6edf3;
+  --yw-night-muted: #93a4b8;
+  --yw-gradient: linear-gradient(135deg, #14b8a6 0%, #3b82f6 55%, #8b5cf6 100%);
+  --yw-card-shadow: 0 1px 2px rgba(15, 29, 43, 0.04), 0 10px 28px -14px rgba(15, 29, 43, 0.16);
+  --yw-lift-shadow: 0 2px 4px rgba(15, 29, 43, 0.05), 0 24px 48px -22px rgba(15, 29, 43, 0.34);
 }
 body {
   background: var(--yw-canvas);
@@ -21,17 +30,37 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+/* Main actions wear the homepage's gradient. */
 button.primary,
 .button-like.primary {
-  border-color: var(--yw-accent);
-  background: var(--yw-accent);
+  border-color: transparent;
+  background: var(--yw-gradient);
   color: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow:
+    0 8px 18px -10px rgba(59, 130, 246, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition:
+    filter 0.2s,
+    box-shadow 0.2s,
+    transform 0.15s;
 }
 button.primary:hover:not(:disabled),
 .button-like.primary:hover {
-  border-color: var(--yw-accent-hover);
-  background: var(--yw-accent-hover);
+  border-color: transparent;
+  background: var(--yw-gradient);
+  filter: brightness(1.07) saturate(1.05);
+  box-shadow:
+    0 12px 24px -10px rgba(59, 130, 246, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+button.primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+button.primary:disabled {
+  box-shadow: none;
+  filter: grayscale(0.35);
 }
 button.link {
   border: 0;
@@ -63,11 +92,12 @@ button.link:hover:not(:disabled) {
   user-select: none;
 }
 
-/* The bar above every page but the editor */
+/* The bar above every page but the editor: the homepage's night, with its gradient underline. */
 .app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--yw-canvas);
 }
 .top-nav {
   position: sticky;
@@ -76,10 +106,13 @@ button.link:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 28px;
-  height: 56px;
-  padding: 0 20px;
-  background: #fff;
-  border-bottom: 1px solid var(--yw-line);
+  height: 60px;
+  padding: 0 clamp(14px, 3vw, 28px);
+  background: rgba(7, 11, 16, 0.94);
+  border-bottom: 1px solid var(--yw-night-line);
+  color: var(--yw-night-text);
+  color-scheme: dark;
+  backdrop-filter: blur(14px) saturate(140%);
 }
 .nav-brand {
   display: flex;
@@ -96,26 +129,31 @@ button.link:hover:not(:disabled) {
 }
 .top-nav nav {
   display: flex;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   height: 100%;
 }
 .nav-link {
   position: relative;
   display: flex;
   align-items: center;
+  height: 34px;
   padding: 0 12px;
   border: 0;
+  border-radius: 8px;
   background: none;
-  color: var(--yw-muted);
+  color: var(--yw-night-muted);
   font-weight: 500;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 .nav-link:hover:not(:disabled) {
-  background: none;
-  color: var(--yw-ink);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
 }
 .nav-link.current {
-  color: var(--yw-ink);
+  color: #fff;
   font-weight: 600;
 }
 .nav-link.current::after {
@@ -123,9 +161,11 @@ button.link:hover:not(:disabled) {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: -1px;
+  bottom: -13px;
   height: 2px;
-  background: var(--yw-accent);
+  border-radius: 2px;
+  background: var(--yw-gradient);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.7);
 }
 .nav-count {
   display: inline-block;
@@ -133,7 +173,7 @@ button.link:hover:not(:disabled) {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 9px;
-  background: #d92d20;
+  background: #ef4444;
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -143,16 +183,21 @@ button.link:hover:not(:disabled) {
 .nav-end {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   margin-left: auto;
 }
 .language-switch {
   height: 32px;
   padding: 0 8px;
   border-color: var(--yw-line);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--yw-muted);
   font-size: 13px;
+}
+.top-nav .language-switch {
+  border-color: var(--yw-night-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9d4e0;
 }
 .nav-account {
   position: relative;
@@ -162,19 +207,23 @@ button.link:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 3px 8px 3px 3px;
+  padding: 3px 10px 3px 3px;
   border: 0;
   border-radius: 999px;
   background: none;
-  color: var(--yw-ink);
+  color: var(--yw-night-text);
 }
-.nav-account-button:hover:not(:disabled) {
-  background: var(--yw-canvas);
+.nav-account-button:hover:not(:disabled),
+.nav-account-button[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+.nav-account-button .avatar {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
 }
 .nav-account-button svg {
   width: 12px;
   height: 12px;
-  color: var(--yw-muted);
+  color: var(--yw-night-muted);
 }
 .nav-name {
   max-width: 140px;
@@ -189,20 +238,22 @@ button.link:hover:not(:disabled) {
   left: 24px;
   width: 10px;
   height: 10px;
-  border: 2px solid #fff;
+  border: 2px solid var(--yw-night);
   border-radius: 50%;
-  background: #d92d20;
+  background: #ef4444;
 }
 .nav-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   right: 0;
   min-width: 240px;
   padding: 6px;
   background: #fff;
   border: 1px solid var(--yw-line);
-  border-radius: 10px;
-  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px -12px rgba(7, 11, 16, 0.35);
+  color: var(--yw-ink);
+  color-scheme: light;
 }
 .nav-menu-head {
   display: flex;
@@ -226,7 +277,7 @@ button.link:hover:not(:disabled) {
   width: 100%;
   padding: 9px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   color: var(--yw-ink);
   text-align: left;
@@ -243,14 +294,146 @@ button.link:hover:not(:disabled) {
   margin-left: auto;
 }
 
-/* Sign-in and registration: one quiet column */
+/* The dark band at the top of each page (page-hero.tsx); its cards rise into it. */
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 34px clamp(16px, 4vw, 40px) 86px;
+  background:
+    radial-gradient(720px 340px at 8% -30%, rgba(45, 212, 191, 0.24), transparent 70%),
+    radial-gradient(680px 320px at 92% -10%, rgba(139, 92, 246, 0.24), transparent 70%),
+    radial-gradient(620px 260px at 55% 130%, rgba(59, 130, 246, 0.2), transparent 70%),
+    var(--yw-night);
+  color: var(--yw-night-text);
+  color-scheme: dark;
+}
+/* The homepage's faint grid, fading out downwards. */
+.page-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, #000 10%, transparent 90%);
+  pointer-events: none;
+}
+.page-hero-inner {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 32px;
+  max-width: 880px;
+  margin: 0 auto;
+  animation: yw-rise 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.page-hero.wide .page-hero-inner {
+  max-width: none;
+}
+.page-hero-text {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+.page-hero-eyebrow {
+  display: inline-block;
+  margin: 0 0 8px;
+  background: linear-gradient(90deg, #5eead4, #93c5fd, #c4b5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.page-hero h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #fff;
+  font-size: clamp(26px, 2.6vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.page-hero-lead {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--yw-night-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.page-hero-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 10px;
+  border: 1px solid var(--yw-night-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #c9d4e0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.page-hero-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Search and choices on the band: glass on the night. */
+.page-hero .dash-search {
+  width: min(360px, 100%);
+}
+.page-hero .dash-search svg {
+  color: #7d8da0;
+}
+.page-hero input,
+.page-hero select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.page-hero .dash-search input {
+  height: 40px;
+  border-radius: 10px;
+}
+.page-hero input::placeholder {
+  color: #7d8da0;
+}
+.page-hero input:focus,
+.page-hero select:focus {
+  border-color: rgba(94, 234, 212, 0.6);
+  outline: 3px solid rgba(45, 212, 191, 0.18);
+  outline-offset: 0;
+  background: rgba(255, 255, 255, 0.09);
+}
+.page-hero select {
+  height: 40px;
+  border-radius: 10px;
+}
+
+/* Sign-in and registration: the homepage's night, the showcase beside a glass card. */
 .signin {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr);
-  background: #fff;
+  grid-template-columns: minmax(0, 1.15fr) minmax(400px, 1fr);
+  background:
+    radial-gradient(900px 560px at 14% -12%, rgba(45, 212, 191, 0.16), transparent 62%),
+    radial-gradient(820px 600px at 104% 104%, rgba(139, 92, 246, 0.2), transparent 62%),
+    radial-gradient(640px 460px at 64% 36%, rgba(59, 130, 246, 0.09), transparent 62%),
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 44px 44px,
+    #05090d;
+  /* The showcase's light drifts across both columns; the page itself stays in the window. */
+  overflow: clip;
+  color: var(--yw-night-text);
+  color-scheme: dark;
 }
 .signin-side {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -268,6 +451,11 @@ button.link:hover:not(:disabled) {
 .signin-top .signin-logo {
   visibility: hidden;
 }
+.signin .language-switch {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #c9d4e0;
+}
 .signin-main {
   flex: 1;
   display: flex;
@@ -276,25 +464,52 @@ button.link:hover:not(:disabled) {
   padding: 32px 20px 48px;
 }
 .signin-box {
+  position: relative;
   width: 100%;
-  max-width: 380px;
+  max-width: 420px;
+  padding: 36px 34px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    0 40px 90px -40px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
   animation: yw-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* A thread of the gradient along the card's top edge. */
+.signin-box::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(94, 234, 212, 0.8),
+    rgba(147, 197, 253, 0.8),
+    rgba(196, 181, 253, 0.8),
+    transparent
+  );
 }
 .signin-box h1 {
   margin: 0 0 8px;
+  color: #fff;
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.4px;
   text-align: center;
 }
 .signin-lead {
-  margin: 0 0 28px;
-  color: var(--yw-muted);
+  margin: 0 0 26px;
+  color: var(--yw-night-muted);
   text-align: center;
 }
 .signin-box form label {
   margin: 0 0 16px;
-  color: var(--yw-ink);
+  color: #c9d4e0;
   font-size: 13px;
   font-weight: 600;
 }
@@ -303,17 +518,33 @@ button.link:hover:not(:disabled) {
   display: block;
   width: 100%;
   margin-top: 6px;
-  padding: 10px 12px;
-  border-color: #cfd6dd;
-  border-radius: 6px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
   font-size: 14px;
   font-weight: 400;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.signin-box input::placeholder,
+.signin-box textarea::placeholder {
+  color: #6b7b8f;
 }
 .signin-box input:focus,
 .signin-box textarea:focus {
-  border-color: var(--yw-accent);
-  outline: 3px solid rgba(31, 111, 139, 0.18);
+  border-color: rgba(45, 212, 191, 0.7);
+  outline: 3px solid rgba(45, 212, 191, 0.2);
   outline-offset: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+/* The browser's saved logins keep the dark field. */
+.signin-box input:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  box-shadow: 0 0 0 40px #0f1820 inset;
+  caret-color: #fff;
 }
 .signin-box textarea {
   min-height: 70px;
@@ -322,22 +553,11 @@ button.link:hover:not(:disabled) {
   position: relative;
   overflow: hidden;
   width: 100%;
-  height: 44px;
-  margin-top: 4px;
-  border-radius: 8px;
+  height: 46px;
+  margin-top: 6px;
+  border-radius: 12px;
   font-size: 15px;
-  font-weight: 600;
-  transition:
-    transform 0.15s,
-    box-shadow 0.2s,
-    background 0.2s;
-}
-.signin-box .primary:hover:not(:disabled) {
-  box-shadow: 0 8px 20px -8px rgba(31, 111, 139, 0.7);
-  transform: translateY(-1px);
-}
-.signin-box .primary:active:not(:disabled) {
-  transform: translateY(0);
+  font-weight: 650;
 }
 /* A sheen passes over the button on hover. */
 .signin-box .primary::after {
@@ -356,32 +576,48 @@ button.link:hover:not(:disabled) {
   transform: translateX(120%);
   transition: transform 0.7s ease;
 }
+.signin-box button.link {
+  color: #5eead4;
+}
 .signin-switch {
   margin: 20px 0 0;
+  color: var(--yw-night-muted);
   text-align: center;
 }
 .signin-note {
   margin: 10px 0 0;
-  color: var(--yw-muted);
+  color: #7d8da0;
   font-size: 13px;
   text-align: center;
 }
 .signin-box > .muted {
-  color: var(--yw-muted);
+  margin: 0 0 16px;
+  color: var(--yw-night-muted);
   font-size: 13px;
+  line-height: 1.6;
+}
+.signin-box .error {
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
 }
 .signin-box .notice {
   margin-top: 0;
-  border-radius: 8px;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-left-width: 3px;
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.08);
+  color: var(--yw-night-text);
 }
 .signin-foot {
   padding: 20px;
-  color: var(--yw-muted);
+  color: #5d6b7c;
   font-size: 12px;
   text-align: center;
 }
 
-/* The sign-in page's showcase: brand gradient, drifting light, and the moving scene. */
+/* The sign-in page's showcase: drifting light on the page's night, and the moving scene. */
 .signin-hero {
   position: relative;
   display: flex;
@@ -389,16 +625,14 @@ button.link:hover:not(:disabled) {
   justify-content: center;
   gap: 18px;
   min-width: 0;
-  overflow: hidden;
   padding: 48px clamp(28px, 5vw, 72px);
-  background: linear-gradient(145deg, #0f2f3d 0%, #17495e 45%, #1f6f8b 100%);
   color: #e8f3f7;
 }
 .hero-glow span {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.55;
+  filter: blur(70px);
+  opacity: 0.3;
   animation: yw-drift 18s ease-in-out infinite alternate;
 }
 .hero-glow span:nth-child(1) {
@@ -790,9 +1024,15 @@ button.link:hover:not(:disabled) {
   .signin {
     grid-template-columns: 1fr;
   }
+  /* The showcase is a band above the form: its light stays in the band, and the corner
+     links sit at the top of the page. */
   .signin-hero {
     gap: 10px;
+    overflow: hidden;
     padding: 28px 22px 26px;
+  }
+  .signin-side {
+    position: static;
   }
   .hero-stage,
   .hero-features {
@@ -811,37 +1051,52 @@ button.link:hover:not(:disabled) {
     height: auto;
     padding: 0;
   }
-  .signin-top .language-switch {
-    border-color: transparent;
-    background: rgba(255, 255, 255, 0.92);
-  }
   .signin-main {
     align-items: flex-start;
-    padding-top: 28px;
+    padding-top: 8px;
+  }
+  .signin-box {
+    padding: 28px 22px 24px;
   }
 }
 
-/* Projects */
+/* Projects and templates: a sidebar card and the list, rising into the band. */
 .app-shell .dash {
+  min-height: 0;
   background: var(--yw-canvas);
 }
+.dash-body {
+  grid-template-columns: 252px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 0 clamp(16px, 4vw, 40px) 56px;
+}
 .dash-side {
-  gap: 20px;
-  padding: 20px 14px;
-  border-right-color: var(--yw-line);
+  position: sticky;
+  top: 76px;
+  gap: 18px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  padding: 14px 12px 16px;
+  border: 1px solid var(--yw-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--yw-card-shadow);
 }
-.dash-new > .primary {
-  height: 40px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--yw-accent);
-}
+.dash-new > .primary,
 .dash-new > .primary:hover:not(:disabled) {
-  background: var(--yw-accent-hover);
+  height: 42px;
+  border-radius: 10px;
+  background: var(--yw-gradient);
+}
+.dash-menu {
+  border-color: var(--yw-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px -12px rgba(15, 29, 43, 0.3);
 }
 .dash-side nav button {
   position: relative;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--yw-ink);
 }
 .dash-side nav button.selected {
@@ -856,48 +1111,187 @@ button.link:hover:not(:disabled) {
   bottom: 8px;
   width: 3px;
   border-radius: 2px;
-  background: var(--yw-accent);
+  background: var(--yw-gradient);
 }
-.dash-templates-link {
-  border-color: var(--yw-line);
-  border-radius: 6px;
+.dash-side .dash-count {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f1f4f8;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  text-align: center;
+}
+.dash-side nav button.selected .dash-count {
   background: #fff;
   color: var(--yw-accent-hover);
 }
+.dash-templates-link {
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(139, 92, 246, 0.1));
+  color: var(--yw-ink);
+}
+.dash-templates-link svg {
+  color: #3b82f6;
+}
 .dash-templates-link:hover {
-  background: var(--yw-accent-soft);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.14), rgba(139, 92, 246, 0.16));
 }
 .dash-main {
-  padding: 28px 32px;
+  padding: 0;
 }
-.dash-toolbar h1 {
-  font-size: 24px;
-  letter-spacing: -0.3px;
+/* Words that would otherwise sit on the band. */
+.dash-main > .muted,
+.dash-main > .error {
+  margin: 0 0 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--yw-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--yw-card-shadow);
+}
+.dash-main > .error {
+  color: #a93737;
+}
+.dash-main > .notice {
+  margin: 0 0 12px;
+  border-radius: 12px;
+  box-shadow: var(--yw-card-shadow);
+}
+/* The bar for the selected projects. */
+.dash-toolbar {
+  min-height: 0;
+  margin-bottom: 12px;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--yw-card-shadow);
+  animation: yw-pop 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .dash-table {
   border-color: var(--yw-line);
-  border-radius: 10px;
+  border-radius: 16px;
+  box-shadow: var(--yw-card-shadow);
 }
 .dash-table th {
-  height: 42px;
-  background: #fafbfc;
+  height: 44px;
+  background: #fafbfd;
   border-bottom-color: var(--yw-line);
   color: var(--yw-muted);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .dash-table td {
   padding: 12px;
-  border-bottom-color: #eef1f4;
+  border-bottom-color: #eef1f5;
+}
+.dash-table td:first-child,
+.dash-table th:first-child {
+  padding-left: 18px;
+}
+.dash-table td:last-child,
+.dash-table th:last-child {
+  padding-right: 16px;
+}
+.dash-table tbody tr {
+  transition: background 0.15s;
 }
 .dash-table tbody tr:hover td {
-  background: #fafcfd;
+  background: #f8fafc;
+}
+.dash-table tbody tr.selected td {
+  background: #eef6fb;
+}
+.dash-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.dash-name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 .dash-name a {
   color: var(--yw-ink);
+  font-size: 14.5px;
   font-weight: 600;
 }
 .dash-name a:hover {
   color: var(--yw-accent);
+}
+/* A project's tile: its first letter on one of eight gradients. */
+.dash-tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--from), var(--to));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 6px 14px -8px var(--to);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+.dash-tile.tone-0 {
+  --from: #2dd4bf;
+  --to: #0e7490;
+}
+.dash-tile.tone-1 {
+  --from: #60a5fa;
+  --to: #1d4ed8;
+}
+.dash-tile.tone-2 {
+  --from: #a78bfa;
+  --to: #6d28d9;
+}
+.dash-tile.tone-3 {
+  --from: #818cf8;
+  --to: #4338ca;
+}
+.dash-tile.tone-4 {
+  --from: #22d3ee;
+  --to: #0369a1;
+}
+.dash-tile.tone-5 {
+  --from: #fb7185;
+  --to: #be123c;
+}
+.dash-tile.tone-6 {
+  --from: #fbbf24;
+  --to: #c2410c;
+}
+.dash-tile.tone-7 {
+  --from: #34d399;
+  --to: #047857;
+}
+.dash-row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dash-chip {
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.dash-chip:hover:not(:disabled) {
+  background: #e0e7ff;
+  color: #312e81;
 }
 .dash-person {
   display: inline-flex;
@@ -912,55 +1306,145 @@ button.link:hover:not(:disabled) {
 .dash-updated {
   color: var(--yw-muted);
 }
+/* Where a pointer can hover, a row's buttons show for that row only. */
+@media (hover: hover) and (min-width: 761px) {
+  .dash-table .dash-actions > button {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .dash-table tbody tr:hover .dash-actions > button,
+  .dash-table tbody tr:focus-within .dash-actions > button,
+  .dash-table tbody tr.selected .dash-actions > button {
+    opacity: 1;
+  }
+}
+.dash-empty {
+  padding: 56px 20px;
+  border: 1px solid var(--yw-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--yw-card-shadow);
+}
+.dash-empty::before {
+  content: "";
+  display: block;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: var(--yw-gradient);
+  opacity: 0.18;
+}
+.dash-welcome {
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+  padding: 44px 32px 40px;
+  border: 1px solid var(--yw-line);
+  border-radius: 20px;
+  box-shadow: var(--yw-lift-shadow);
+}
+.dash-welcome::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--yw-gradient);
+}
+.dash-welcome h2 {
+  margin: 0 0 8px;
+  color: var(--yw-ink);
+  font-size: 26px;
+  letter-spacing: -0.3px;
+}
 
-/* Pages with sections: profile, administration */
+/* Pages with sections: profile, friends, desktop, administration */
+.app-shell > .dash,
+.app-shell > .page-main {
+  flex: 1;
+  min-height: 0;
+}
 .page {
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: 0 clamp(16px, 4vw, 24px) 64px;
 }
-.app-shell > .dash,
-.app-shell > .page {
-  flex: 1;
-  min-height: 0;
+.page.console {
+  max-width: 1120px;
 }
-.page-head {
-  margin-bottom: 24px;
-}
-.page-head h1 {
-  margin: 0 0 6px;
-  font-size: 26px;
-  letter-spacing: -0.4px;
-}
-.page-head p {
-  margin: 0;
+.page > .error {
+  margin: 0 0 16px;
+  border: 1px solid #f3d0d0;
+  border-radius: 12px;
+  box-shadow: var(--yw-card-shadow);
 }
 .panel {
-  margin-bottom: 20px;
-  padding: 22px 24px;
+  margin-bottom: 18px;
+  padding: 24px 26px;
   background: #fff;
   border: 1px solid var(--yw-line);
-  border-radius: 10px;
+  border-radius: 16px;
+  box-shadow: var(--yw-card-shadow);
 }
 .panel h2 {
   margin: 0 0 6px;
   font-size: 17px;
+  letter-spacing: -0.1px;
 }
 .panel h3 {
   margin: 22px 0 8px;
   color: var(--yw-muted);
   font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.02em;
+}
+/* Fields on the light pages and in their dialogs. */
+:is(.page, .dash-main, .dash-modal)
+  :is(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea) {
+  border-color: #d5dce4;
+  border-radius: 10px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+:is(.page, .dash-main, .dash-modal)
+  :is(input:not([type="checkbox"], [type="radio"], [type="file"]), select) {
+  min-height: 38px;
+}
+:is(.page, .dash-main, .dash-modal) :is(input, select, textarea):focus {
+  border-color: #3b82f6;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+.panel .account-form {
+  max-width: 460px;
 }
 .panel .account-form h2 {
   margin-top: 0;
+}
+.console-panel {
+  padding-top: 8px;
+}
+.console-panel > .console-tabs {
+  margin: 0 -26px 18px;
+  padding: 0 14px;
+}
+.console-panel .console-tabs button.selected {
+  border-bottom-color: #3b82f6;
+  color: var(--yw-ink);
 }
 .profile-picture {
   display: flex;
   align-items: center;
   gap: 22px;
   margin-top: 14px;
+}
+.profile-picture > .avatar {
+  box-shadow:
+    0 0 0 4px #fff,
+    0 0 0 6px rgba(59, 130, 246, 0.35),
+    0 14px 30px -12px rgba(59, 130, 246, 0.6);
 }
 .profile-name {
   font-size: 18px;
@@ -976,6 +1460,7 @@ button.link:hover:not(:disabled) {
   margin: 0;
   padding: 7px 12px;
   border: 1px solid var(--yw-line);
+  border-radius: 8px;
   cursor: pointer;
 }
 .button-like input {
@@ -991,7 +1476,7 @@ button.link:hover:not(:disabled) {
 .search-field svg {
   position: absolute;
   top: 50%;
-  left: 11px;
+  left: 12px;
   width: 16px;
   height: 16px;
   color: var(--yw-muted);
@@ -999,8 +1484,9 @@ button.link:hover:not(:disabled) {
 }
 .search-field input {
   width: 100%;
-  padding-left: 34px;
-  border-radius: 6px;
+  height: 40px;
+  padding-left: 36px;
+  border-radius: 10px;
 }
 .people {
   margin: 0;
@@ -1008,11 +1494,17 @@ button.link:hover:not(:disabled) {
   list-style: none;
 }
 .people > li {
-  padding: 8px 0;
-  border-bottom: 1px solid #eef1f4;
+  margin: 0 -10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef1f5;
+  border-radius: 10px;
+  transition: background 0.15s;
 }
 .people > li:last-child {
   border-bottom: 0;
+}
+.people > li.person-row:hover {
+  background: #f8fafc;
 }
 .person-row {
   display: flex;
@@ -1033,7 +1525,7 @@ button.link:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .notice-inline {
   margin: 8px 0 0;
@@ -1069,29 +1561,82 @@ button.link:hover:not(:disabled) {
   .dash-actions button.dash-wide-only {
     display: none;
   }
-  .signin-main {
-    padding-top: 40px;
-  }
   .profile-picture {
     align-items: flex-start;
   }
+  .page-hero {
+    padding: 24px 16px 70px;
+  }
+  .page-hero .dash-search,
+  .tpl-toolbar {
+    width: 100%;
+  }
+  .page-hero-chip {
+    margin: 6px 0 0;
+  }
   /* The sidebar sits above the list and takes only the room it needs. */
   .dash-body {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
+    gap: 14px;
+    padding: 0 12px 40px;
+  }
+  .dash-side {
+    position: static;
+    max-height: none;
+    padding: 10px;
+  }
+  .dash-tags h2 {
+    flex: none;
+    align-self: center;
+    margin: 0 4px;
+    white-space: nowrap;
+  }
+  .dash-table td:first-child,
+  .dash-table th:first-child {
+    padding-left: 12px;
+  }
+  .dash-tile {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  .panel {
+    padding: 18px 16px;
+  }
+  .console-panel > .console-tabs {
+    margin: 0 -16px 16px;
+    padding: 0 4px;
   }
 }
 
-/* Desktop downloads */
+/* The cards rise into the band above them (after the rules that place them). */
+.page-hero + .page,
+.page-hero + .dash-body {
+  position: relative;
+  margin-top: -50px;
+}
+
+/* Desktop downloads: this computer's installers on the band, the rest in a list. */
 .installer-picks {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
-  margin-top: 12px;
+}
+.installer-picks-label {
+  width: 100%;
+  color: var(--yw-night-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 .installer-picks .button-like {
-  padding: 10px 16px;
+  padding: 12px 20px;
+  border-radius: 12px;
   color: #fff;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
   text-decoration: none;
 }
 .installer-picks .installer-size {
@@ -1107,25 +1652,44 @@ button.link:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
+  margin: 0 -10px;
+  padding: 9px 10px;
   border-top: 1px solid var(--yw-line);
+  border-radius: 10px;
+  transition: background 0.15s;
 }
 .installers li:first-child {
   border-top: 0;
+}
+.installers li:hover {
+  background: #f8fafc;
 }
 .installer-kind {
   flex: 1;
   min-width: 0;
 }
 .installers a {
+  padding: 4px 12px;
+  border: 1px solid var(--yw-line);
+  border-radius: 999px;
   color: var(--yw-accent);
+  font-size: 13px;
   font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.installers a:hover {
+  border-color: rgba(14, 116, 144, 0.35);
+  background: var(--yw-accent-soft);
 }
 .installer-command {
   overflow-x: auto;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: var(--yw-canvas);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--yw-night);
+  color: #c9d4e0;
   font-size: 12px;
 }
 .nav-bell {
@@ -1138,12 +1702,12 @@ button.link:hover:not(:disabled) {
   border: 0;
   border-radius: 999px;
   background: none;
-  color: var(--yw-ink, #111);
+  color: #c9d4e0;
   cursor: pointer;
   transition: background 0.15s;
 }
 .nav-bell:hover {
-  background: var(--yw-canvas);
+  background: rgba(255, 255, 255, 0.08);
 }
 .nav-bell svg {
   width: 19px;
@@ -1156,7 +1720,7 @@ button.link:hover:not(:disabled) {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border: 2px solid #fff;
+  border: 2px solid var(--yw-night);
   border-radius: 999px;
   background: #0ea5e9;
   color: #fff;
@@ -1165,6 +1729,148 @@ button.link:hover:not(:disabled) {
   line-height: 12px;
   text-align: center;
   animation: wb-pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The template library: paper on a soft desk, venue badges in the gradient. */
+.tpl-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(620px, 100%);
+}
+.tpl-sort {
+  color: var(--yw-night-muted);
+}
+.tpl-count {
+  color: var(--yw-night-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tpl-side-title {
+  margin: 4px 4px -8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.tpl-dot {
+  background: linear-gradient(135deg, #2dd4bf, #8b5cf6);
+  opacity: 0.55;
+}
+.dash-side nav button.selected .tpl-dot {
+  opacity: 1;
+}
+.tpl-chips button {
+  border-color: var(--yw-line);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.tpl-chips button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+.dash-side .tpl-chips button.selected,
+.dash-side .tpl-chips button.selected:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--yw-gradient);
+  color: #fff;
+}
+.tpl-grid {
+  grid-template-columns: repeat(auto-fill, minmax(204px, 1fr));
+  gap: 20px;
+  margin-top: 0;
+}
+.tpl-card {
+  border-color: var(--yw-line);
+  border-radius: 16px;
+  box-shadow: var(--yw-card-shadow);
+}
+.tpl-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.25),
+    var(--yw-lift-shadow);
+}
+.tpl-thumb {
+  padding: 16px 18px 0;
+  align-items: flex-start;
+  background:
+    radial-gradient(160px 120px at 50% 0%, rgba(59, 130, 246, 0.1), transparent 70%),
+    linear-gradient(180deg, #eef2f7, #e4e9f0);
+  border-bottom-color: var(--yw-line);
+}
+.tpl-thumb img {
+  border-radius: 4px 4px 0 0;
+  background: #fff;
+  box-shadow: 0 10px 22px -10px rgba(15, 29, 43, 0.45);
+}
+.tpl-card-body {
+  gap: 6px;
+  padding: 12px 14px 14px;
+}
+.tpl-card-body strong {
+  color: var(--yw-ink);
+  font-size: 14.5px;
+}
+.tpl-venue {
+  background: var(--yw-gradient);
+}
+.tpl-pages {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eef2f7, #e4e9f0);
+}
+.tpl-use {
+  border-color: rgba(59, 130, 246, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.06), rgba(139, 92, 246, 0.08));
+}
+.tpl-use .primary {
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .tpl-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .tpl-thumb {
+    padding: 10px 12px 0;
+  }
+}
+
+/* Dialogs over the pages: a blurred night behind, a lifted card. */
+.dash-backdrop {
+  background: rgba(7, 11, 16, 0.5);
+  backdrop-filter: blur(6px);
+}
+.dash-modal {
+  padding: 22px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  box-shadow: 0 40px 90px -30px rgba(7, 11, 16, 0.6);
+  animation: yw-pop 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.dash-modal h2 {
+  color: var(--yw-ink);
+  font-size: 19px;
+  letter-spacing: -0.2px;
+}
+.dash-modal input,
+.dash-modal select,
+.dash-modal textarea {
+  border-radius: 10px;
+}
+.dash-modal footer button {
+  min-height: 36px;
+  padding: 0 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-hero-inner,
+  .dash-toolbar,
+  .dash-modal {
+    animation: none;
+  }
 }
 
 /* Motion on the pages around the editor: lists rise in, cards lift, menus pop. */
@@ -1197,8 +1903,7 @@ button.link:hover:not(:disabled) {
     border-color 0.2s;
 }
 .tpl-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 30px -14px rgba(28, 39, 51, 0.35);
+  transform: translateY(-4px);
 }
 .tpl-thumb img {
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1210,16 +1915,6 @@ button.link:hover:not(:disabled) {
 .nav-menu {
   animation: yw-pop 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   transform-origin: top;
-}
-.dash-new > .primary {
-  transition:
-    background 0.2s,
-    box-shadow 0.2s,
-    transform 0.15s;
-}
-.dash-new > .primary:hover:not(:disabled) {
-  box-shadow: 0 8px 18px -10px rgba(31, 111, 139, 0.8);
-  transform: translateY(-1px);
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-table tbody tr,
@@ -1259,14 +1954,14 @@ button.link:hover:not(:disabled) {
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--yw-accent);
+  color: #5eead4;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
 }
 .signin-back:hover {
-  background: var(--yw-accent-soft);
+  background: rgba(255, 255, 255, 0.07);
 }
 .hero-more {
   align-self: flex-start;
@@ -1282,11 +1977,6 @@ button.link:hover:not(:disabled) {
 }
 .hero-more:hover {
   border-bottom-color: #5eead4;
-}
-@media (max-width: 960px) {
-  .signin-back {
-    background: rgba(255, 255, 255, 0.92);
-  }
 }
 /* Which of the server's addresses to use (address-switch.tsx). */
 .addr-switch {
