@@ -1,0 +1,129 @@
+#!/bin/bash
+# Writer backup on ubuntu-lan (systemd user timer writer-backup.timer, every 6 hours Beijing time;
+# lives in ~/writer/bin). The Linux successor of deploy/lab/backup-writer.ps1.
+#
+# 1. pg_dump of the database (projects, files, history, comments: everything but templates) to
+#    the USB disk's writer-backups, kept 14 days; ~/writer/backups while it is unplugged. Each
+#    dump is checked with pg_restore --list.
+# 2. A copy to the Beijing server (~/writer-backups, checked by SHA-256). writer-monitor.py
+#    there keeps the last two days and one a day for 14 days.
+# 3. Once a week, a restore drill: the newest dump is restored into a scratch database and
+#    counted, then dropped.
+# 4. A status file for the monitor on the Beijing server (~/writer-monitor/lab-status.json):
+#    what worked, what did not, free disk space. The monitor alerts on Feishu when it is
+#    missing for 7 hours or reports a problem.
+#
+# PostgreSQL runs in the container writer-postgres; its tools are used through docker exec.
+# Restore: systemctl --user stop writer-server writer-runner, then
+#   docker exec -i writer-postgres pg_restore -U writer -d writer --clean --if-exists < <file>.dump
+set -u
+usb=/media/yuanbai/E0592753F720D15B
+log=$HOME/writer/logs/backup.log
+drill_mark=$HOME/writer/logs/restore-drill.json
+status_file=$HOME/writer/logs/lab-status.json
+ssh_args=(-F "$HOME/writer/config/ssh_config" -o ConnectTimeout=20)
+remote=beijing
+pg() { docker exec -i writer-postgres "$@"; }
+say() { echo "[$(date +%FT%T)] $*" >>"$log"; }
+problems=()
+problem() { problems+=("$1"); say "PROBLEM $1"; }
+# One line, "users|projects|files|schema".
+counts() {
+  pg psql -U "$2" -d "$1" -At -c "SELECT (SELECT count(*) FROM users)||'|'||(SELECT count(*) FROM projects)||'|'||(SELECT count(*) FROM files)||'|'||(SELECT max(version) FROM schema_migrations)" 2>/dev/null | head -1
+}
+
+if mountpoint -q "$usb" && mkdir -p "$usb/writer-backups" 2>/dev/null; then
+  dir=$usb/writer-backups
+else
+  dir=$HOME/writer/backups
+  mkdir -p "$dir"
+  problem "USB 备份盘没有接上，备份暂存在 ~/writer/backups"
+fi
+name=writer-$(TZ=Asia/Shanghai date +%Y%m%d-%H%M).dump
+file=$dir/$name
+dumped=false
+if pg pg_dump -U writer -d writer -Fc >"$file.partial" && mv "$file.partial" "$file"; then
+  dumped=true
+  if ! pg pg_restore --list <"$file" >/dev/null 2>&1; then
+    dumped=false
+    problem "备份文件 $name 无法读取（pg_restore --list 失败）"
+  fi
+else
+  rm -f "$file.partial"
+  problem "数据库备份（pg_dump）失败，见 ~/writer/logs/backup.log"
+fi
+say "backup $file $($dumped && echo ok || echo FAILED)"
+find "$dir" -maxdepth 1 -name 'writer-*.dump' -mtime +14 -delete
+
+# Templates members publish live in the template library; mirror it beside the dumps, without
+# the downloaded author kits, which template-build.ts fetches again.
+if [ -d "$HOME/writer/templates" ]; then
+  if rsync -a --delete --exclude .cache --exclude '*.partial' --exclude '*.old' --exclude '*.deleted-*' \
+    "$HOME/writer/templates/" "$dir/templates/" 2>>"$log"; then
+    say "templates mirrored to $dir/templates"
+  else
+    problem "模板库镜像到 $dir/templates 失败"
+  fi
+fi
+
+# Off-site copy.
+offsite=false
+if $dumped; then
+  if scp -q "${ssh_args[@]}" "$file" "$remote:writer-backups/$name"; then
+    local_sum=$(sha256sum "$file" | cut -d' ' -f1)
+    copied=$(ssh "${ssh_args[@]}" -n "$remote" "sha256sum writer-backups/$name" 2>/dev/null | cut -d' ' -f1)
+    [ -n "$copied" ] && [ "$copied" = "$local_sum" ] && offsite=true
+  fi
+  say "offsite copy to $remote $($offsite && echo ok || echo FAILED)"
+  $offsite || problem "备份没能复制到北京服务器"
+fi
+
+# Weekly restore drill into a scratch database, as the postgres superuser.
+drill=null
+[ -s "$drill_mark" ] && drill=$(cat "$drill_mark")
+last=$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(int((d or {}).get("time", 0)))' "$drill" 2>/dev/null || echo 0)
+if $dumped && (($(date +%s) - last > 7 * 86400)); then
+  scratch=writer_restore_check
+  pg dropdb -U postgres --if-exists "$scratch" 2>/dev/null
+  pg createdb -U postgres "$scratch"
+  pg pg_restore -U postgres -d "$scratch" --no-owner --no-privileges <"$file" 2>/dev/null
+  restore_exit=$?
+  restored=$(counts "$scratch" postgres)
+  pg dropdb -U postgres --if-exists "$scratch" 2>/dev/null
+  live=$(counts writer writer)
+  # Counts are logged beside the live ones (which may have moved on since the dump); the drill
+  # passes when the restore succeeds, has accounts and projects, and is at the live schema.
+  drill=$(python3 - "$restore_exit" "$restored" "$live" "$name" <<'EOF'
+import json, sys, time
+code, restored, live, name = sys.argv[1:]
+r, l = restored.split("|"), live.split("|")
+ok = code == "0" and len(r) == 4 and len(l) == 4 and int(r[0] or 0) > 0 and int(r[1] or 0) > 0 and r[3] == l[3]
+print(json.dumps({"time": int(time.time()), "ok": ok, "file": name, "restored": restored, "live": live}, ensure_ascii=False))
+EOF
+)
+  echo "$drill" >"$drill_mark"
+  say "restore drill: $drill (pg_restore exit $restore_exit)"
+fi
+failed=$(python3 -c '
+import json, sys
+d = json.loads(sys.argv[1])
+if d and not d.get("ok"):
+    print("%s：恢复出 %s，现有 %s" % (d.get("file"), d.get("restored"), d.get("live")))' "$drill" 2>/dev/null)
+[ -n "$failed" ] && problem "恢复演练失败（$failed），见 backup.log"
+
+# Status for the monitor.
+bytes=0
+$dumped && bytes=$(stat -c %s "$file")
+backup_free=
+mountpoint -q "$usb" && backup_free=$(df -B1 --output=avail "$usb" | tail -1)
+python3 - "$name" "$bytes" "$offsite" "$drill" "$(df -B1 --output=avail / | tail -1)" "$backup_free" \
+  "${problems[@]+"${problems[@]}"}" >"$status_file" <<'EOF'
+import json, sys, time
+name, size, offsite, drill, root_free, backup_free, *problems = sys.argv[1:]
+disks = {"系统盘": round(int(root_free) / 2**30, 1)}
+if backup_free:
+    disks["备份盘"] = round(int(backup_free) / 2**30, 1)
+print(json.dumps({"time": int(time.time()), "file": name, "bytes": int(size), "offsite": offsite == "true",
+                  "drill": json.loads(drill), "disks": disks, "problems": problems}, ensure_ascii=False, indent=2))
+EOF
+scp -q "${ssh_args[@]}" "$status_file" "$remote:writer-monitor/lab-status.json" || say "status not sent to $remote"

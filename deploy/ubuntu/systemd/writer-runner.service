@@ -1,0 +1,15 @@
+[Unit]
+Description=Writer shared runner (web AI chats: Codex, OpenCode)
+After=writer-server.service
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=%h/writer/app/apps/collaboration
+Environment=WRITER_ENV_FILE=%h/writer/config/runner.env
+Environment=PATH=%h/.local/opt/node/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:%h/texlive/2026/bin/x86_64-linux:%h/.local/opt/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/opt/node/bin/node node_modules/tsx/dist/cli.mjs server/runner.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

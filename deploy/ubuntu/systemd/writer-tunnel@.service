@@ -1,0 +1,13 @@
+[Unit]
+Description=Writer public address through %i (reverse SSH tunnel, relay port 18090)
+After=network-online.target writer-server.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/writer/bin/writer-tunnel %i
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

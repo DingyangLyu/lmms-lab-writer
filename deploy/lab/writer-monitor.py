@@ -233,8 +233,10 @@ def check_lab(config, state, problems):
         problems.have(f"lab:problem:{text}", text)
     for drive, free in (status.get("disks") or {}).items():
         least = config.get("lab_disk_min_gb", {}).get(drive)
+        # A Windows drive letter ("C") or a name the Ubuntu backup gives ("系统盘").
+        label = f"{drive}:" if len(drive) == 1 else drive
         if least and free < least:
-            problems.have(f"lab:disk:{drive}", f"实验室电脑 {drive}: 只剩 {free:.0f} GB")
+            problems.have(f"lab:disk:{drive}", f"实验室电脑 {label} 只剩 {free:.0f} GB")
     drill = status.get("drill") or {}
     if drill.get("time") and time.time() - drill["time"] > 9 * 86400:
         problems.have("lab:drill", f"恢复演练超过 9 天没有做（上次 {clock(drill['time'])}）")

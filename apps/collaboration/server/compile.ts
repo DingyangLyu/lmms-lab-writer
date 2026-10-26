@@ -124,6 +124,11 @@ export async function runLatexmk(
             // A shared cache keeps LuaLaTeX from rebuilding its font database per build.
             TEXMFVAR: process.env.WRITER_TEXMFVAR || join(dir, "texmf-var"),
             ...(process.env.TEXMFHOME ? { TEXMFHOME: process.env.TEXMFHOME } : {}),
+            // HOME being the build directory, fontconfig misses the fonts installed for the
+            // server's account (~/.local/share/fonts); a config naming them finds them for XeTeX.
+            ...(process.env.FONTCONFIG_FILE
+              ? { FONTCONFIG_FILE: process.env.FONTCONFIG_FILE }
+              : {}),
             ...nested,
           },
         },

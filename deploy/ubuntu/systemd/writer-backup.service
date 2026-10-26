@@ -1,0 +1,6 @@
+[Unit]
+Description=Writer backup (database dump, off-site copy, weekly restore drill, monitor status)
+
+[Service]
+Type=oneshot
+ExecStart=%h/writer/bin/writer-backup

@@ -1,0 +1,30 @@
+#!/bin/bash
+# One public address of Writer: a reverse SSH tunnel from 127.0.0.1:18090 on a relay (nginx in
+# Beijing, Caddy in Los Angeles forward to it) to the server on 127.0.0.1:8790 here. Run by the
+# systemd user unit writer-tunnel@<beijing|la>, which starts it again 5 s after it exits; lives
+# in ~/writer/bin on ubuntu-lan.
+#
+# A connection that dies silently (the lab network changes, a NAT forgets it) is not noticed by
+# the relay, whose sshd keeps holding the port: every new tunnel is then refused ("remote port
+# forwarding failed") and the address stays dead. So after a tunnel that failed at once, the
+# relay is asked to end whatever holds the port; this tunnel being down, it is stale.
+#
+# writer-tunnel <relay> [port]: another port only to try this beside the running tunnel.
+set -u
+relay=$1
+port=${2:-18090}
+common=(-F "$HOME/writer/config/ssh_config" -o ConnectionAttempts=1 -o ServerAliveInterval=20
+  -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o LogLevel=ERROR)
+free="for p in \$(sudo -n ss -ltnp 'sport = :$port' | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
+  sudo -n kill \"\$p\" && echo \"ended stale sshd \$p holding port $port\"; done"
+
+started=$(date +%s)
+echo "connecting $relay (port $port)"
+ssh "${common[@]}" -N -T -o ExitOnForwardFailure=yes -R "127.0.0.1:$port:127.0.0.1:8790" "$relay"
+code=$?
+echo "disconnected ($code)"
+if (($(date +%s) - started < 10)); then
+  ssh "${common[@]}" -n "$relay" "$free" 2>&1 | sed 's/^/relay: /'
+  sleep 10
+fi
+exit "$code"

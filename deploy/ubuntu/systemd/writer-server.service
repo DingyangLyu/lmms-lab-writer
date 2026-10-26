@@ -1,0 +1,17 @@
+[Unit]
+Description=Writer collaboration server (127.0.0.1:8790; PostgreSQL in container writer-postgres)
+After=network-online.target
+Wants=network-online.target
+# Until Docker has started PostgreSQL after a boot the server exits; keep restarting it.
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=%h/writer/app/apps/collaboration
+Environment=WRITER_ENV_FILE=%h/writer/config/server.env
+Environment=PATH=%h/texlive/2026/bin/x86_64-linux:%h/.local/opt/node/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/opt/node/bin/node node_modules/tsx/dist/cli.mjs server/main.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
