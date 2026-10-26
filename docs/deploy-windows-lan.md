@@ -1,5 +1,7 @@
 # 在实验室 Windows 电脑上部署（内网，不用 Docker）
 
+> **2026-10-26 起这台电脑只作备用**：Writer 服务器已迁到 Ubuntu 工作站 ubuntu-lan，见 [deploy-ubuntu-lan.md](deploy-ubuntu-lan.md)。这里的 `\Writer\` 任务已禁用，数据停在切换时；80 端口转发到新服务器。下文记录的是原来的部署，北京、洛杉矶的中转和监控部分仍然适用。
+
 实验室工作站 DESKTOP-0L24B21 用的就是这种方式：协作服务直接用 Node 跑在 Windows 上，数据放在本机 PostgreSQL，组员在校园网里打开 `http://<这台电脑的 IP>`。同一台电脑上的 Codex 作为“共享执行器”，为所有项目提供网页右侧的 AI 对话（与桌面端同一个面板）。需要公网访问时，再按 [deploy-windows.md](deploy-windows.md) 加 HTTPS 或经一台公网服务器转发。
 
 ```
