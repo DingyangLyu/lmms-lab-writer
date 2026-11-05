@@ -9,12 +9,19 @@
 # forwarding failed") and the address stays dead. So after a tunnel that failed at once, the
 # relay is asked to end whatever holds the port; this tunnel being down, it is stale.
 #
+# A system-wide proxy in TUN mode on the workstation can take every connection whose source
+# address is not bound and send an overseas relay through a proxy node, where the tunnel drops
+# whenever that node does (it did, 25-30 times a day). So both tunnels bind to the interface of
+# the main table's default route: policy routing sends sockets bound to the LAN address to the
+# main table, and the tunnel leaves straight from the local network.
+#
 # writer-tunnel <relay> [port]: another port only to try this beside the running tunnel.
 set -u
 relay=$1
 port=${2:-18090}
+nic=$(ip route show table main default 2>/dev/null | awk '{print $5; exit}')
 common=(-F "$HOME/writer/config/ssh_config" -o ConnectionAttempts=1 -o ServerAliveInterval=20
-  -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o LogLevel=ERROR)
+  -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o LogLevel=ERROR ${nic:+-o "BindInterface=$nic"})
 free="for p in \$(sudo -n ss -ltnp 'sport = :$port' | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
   sudo -n kill \"\$p\" && echo \"ended stale sshd \$p holding port $port\"; done"
 

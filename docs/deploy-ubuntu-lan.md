@@ -62,7 +62,7 @@ Windows 上 ctex 默认用 Windows 字体集，Linux 上默认用 Fandol，学�
 
 ## AI 执行器
 
-- Codex 用这台电脑 `~/.codex` 的登录（2804761170@qq.com，Pro；VS Code 插件和 codex-mailbox-worker 也在用，额度共享）。不要复制别处的 `auth.json`。
+- Codex 用这台电脑 `~/.codex` 里已登录的账号（Pro；VS Code 插件和 codex-mailbox-worker 也在用，额度共享）。不要复制别处的 `auth.json`。
 - `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 只提供“完全访问”（用户 2026-10-26 选择与 Windows 保持一致）：组员的提示词能以 yuanbai 的权限访问这台工作站上的所有文件，包括各处的 SSH 密钥。只给信任的组员编辑权限。想收紧时删掉这一行（Linux 上 Codex 沙箱可用），或用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview` 去掉完全访问，然后重启 `writer-runner`。
 - OpenCode 的配置和登录从 Windows 拷来（`~/.config/opencode`、`~/.local/share/opencode/auth.json`：Kimi、DeepSeek、OpenAI OAuth）。OpenAI 的 OAuth 刷新令牌会轮换，Windows 上的那份已不再使用，不要再在 Windows 上启动 OpenCode。
 - 代理：FlClash（桌面开机自动登录后启动，TUN 开着，混合端口 `127.0.0.1:7897`），`runner.env` 的 `HTTPS_PROXY` 指向它。
@@ -73,6 +73,7 @@ Windows 上 ctex 默认用 Windows 字体集，Linux 上默认用 Fandol，学�
 
 `writer-tunnel@<beijing|la>` 运行 `~/writer/bin/writer-tunnel`：`ssh -N -R 127.0.0.1:18090:127.0.0.1:8790`，退出 5 秒后由 systemd 重启。连接一开始就失败（多半是中转服务器上的旧会话还占着 18090）时，脚本登录中转服务器结束占着端口的 sshd，再重连，与 Windows 上的 `run-writer-tunnel.ps1` 相同。用的是这台电脑的专用密钥 `writer_tunnel_ed25519`（已加进北京 `admin` 和洛杉矶 `ytranslator` 的 `authorized_keys`）。
 
+- 两条隧道都绑定默认路由所在的网卡（脚本里的 `BindInterface`），从本地网络直接出去。原因：这台电脑上的系统代理开着 TUN 模式，没绑定地址的连接都会被它接管，海外的中转会被转进代理节点，节点一断隧道就断（迁移后洛杉矶那条每天断 25–30 次）；国内的中转虽然走直连规则，代理软件重启时也会断。2026-11-05 起改为直连，不要去掉这一项。
 - 重启隧道：`systemctl --user restart writer-tunnel@beijing`（或 `@la`）。
 - 试改脚本时可以 `~/writer/bin/writer-tunnel beijing 18091` 在另一个端口试，不影响正在用的隧道。
 - 不要同时让 Windows 和这台电脑都连 18090：两边的清理逻辑会互相踢掉对方。
