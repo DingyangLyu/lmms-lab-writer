@@ -2,14 +2,14 @@
   "title": "Writer 海外线路",
   "sites": [
     {
-      "name": "海外线路 https://writer.desire-drive.com",
-      "url": "https://writer.desire-drive.com/api/health",
+      "name": "海外线路 https://writer.example.com",
+      "url": "https://writer.example.com/api/health",
       "direct": "http://127.0.0.1:18090/api/health",
       "proxy": "洛杉矶服务器的 Caddy "
     },
     {
-      "name": "Y-Translator 海外线路 https://y-translator.desire-drive.com",
-      "url": "https://y-translator.desire-drive.com/health",
+      "name": "Y-Translator 海外线路 https://y-translator.example.com",
+      "url": "https://y-translator.example.com/health",
       "direct": "http://127.0.0.1:18190/health",
       "proxy": "洛杉矶服务器的 Caddy "
     }

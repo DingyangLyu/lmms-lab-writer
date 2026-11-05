@@ -2,7 +2,7 @@
 
 > **2026-10-26 起这台电脑只作备用**：Writer 服务器已迁到 Ubuntu 工作站 ubuntu-lan，见 [deploy-ubuntu-lan.md](deploy-ubuntu-lan.md)。这里的 `\Writer\` 任务已禁用，数据停在切换时；80 端口转发到新服务器。下文记录的是原来的部署，北京、洛杉矶的中转和监控部分仍然适用。
 
-实验室工作站 DESKTOP-0L24B21 用的就是这种方式：协作服务直接用 Node 跑在 Windows 上，数据放在本机 PostgreSQL，组员在校园网里打开 `http://<这台电脑的 IP>`。同一台电脑上的 Codex 作为“共享执行器”，为所有项目提供网页右侧的 AI 对话（与桌面端同一个面板）。需要公网访问时，再按 [deploy-windows.md](deploy-windows.md) 加 HTTPS 或经一台公网服务器转发。
+实验室的 Windows 工作站用的就是这种方式：协作服务直接用 Node 跑在 Windows 上，数据放在本机 PostgreSQL，组员在校园网里打开 `http://<这台电脑的 IP>`。同一台电脑上的 Codex 作为“共享执行器”，为所有项目提供网页右侧的 AI 对话（与桌面端同一个面板）。需要公网访问时，再按 [deploy-windows.md](deploy-windows.md) 加 HTTPS 或经一台公网服务器转发。
 
 ```
 组员浏览器 / 桌面端 ──HTTP :80──▶ node（Writer Server）──▶ PostgreSQL（本机）
@@ -12,7 +12,7 @@
 
 ## 目录和后台任务
 
-程序和数据都在内置 NVMe 固态盘 C: 上。D:、F: 是 USB 机械移动硬盘，E: 是 USB 固态移动硬盘：USB 盘的写缓存不保证数据库提交真正落盘，拔出、休眠或掉线都会让服务出错，所以只用 D: 存放备份。（2026 年 10 月从 D: 迁到 C:，旧目录暂留为 `D:\writer.old`、`D:\texlive.old`；网络代理 mihomo 同时从 `D:\net` 迁到 `C:\net`，旧目录为 `D:\net.old`。）
+程序和数据都在内置 NVMe 固态盘 C: 上。D:、F: 是 USB 机械移动硬盘，E: 是 USB 固态移动硬盘：USB 盘的写缓存不保证数据库提交真正落盘，拔出、休眠或掉线都会让服务出错，所以只用 D: 存放备份。（2026 年 10 月从 D: 迁到 C:，旧目录暂留为 `D:\writer.old`、`D:\texlive.old`；网络代理的目录同时从 `D:\net` 迁到 `C:\net`，旧目录为 `D:\net.old`。）
 
 | 位置 | 内容 |
 | --- | --- |
@@ -44,14 +44,14 @@
 4. 代码：`pnpm.cmd install --frozen-lockfile --filter "@lmms-lab/writer-collaboration..."`，`pnpm.cmd --filter @lmms-lab/writer-collaboration build`。
 5. `server.env`：`WRITER_HOST=0.0.0.0`、`WRITER_PORT=80`、`WRITER_ORIGIN=http://<IP>`（可用逗号写多个地址，第一个用于邀请链接；用 IP 打开网页时，浏览器访问的那个地址本身也被认可，所以有线、Wi-Fi 两个地址都能登录）、`WRITER_DATABASE_URL`、`WRITER_ADMIN_USER/PASSWORD`（只在数据库还没有用户时创建管理员）、`WRITER_SHARED_RUNNER_TOKEN`（`openssl rand -hex 32` 形式的 64 位十六进制）及其名称和能力（`codex,opencode`）。`WRITER_TEMPLATE_LIBRARY=E:\writer-data\templates`（模板库，放在 USB 固态盘 E: 上，节省 C: 空间；E: 暂时不可用时网页只显示内置模板）。可选 `WRITER_TEMPLATES_DIR=C:\writer\templates` 再加一个只读的实验室模板目录。`WRITER_DOWNLOADS_DIR=E:\writer-data\downloads`：网页“桌面端”页提供下载的安装包。发布新版本时，把 GitHub Release 里的 `.pkg`、`.dmg`、`-setup.exe`、`.msi`、`.AppImage`、`.deb`、`.rpm` 放进这个目录（先删掉旧版本），不需要重启服务。
 6. `runner.env`：`WRITER_SERVER=http://127.0.0.1`、`WRITER_RUNNER_TOKEN`（同上）、`WRITER_ALLOWED_HARNESSES`、`WRITER_CODEX_BIN`/`WRITER_OPENCODE_BIN`（指向 npm 包里的 `codex.exe`、`opencode.exe`，避开 `.cmd`）、`WRITER_CODEX_SANDBOX=danger-full-access`、`HTTPS_PROXY`/`HTTP_PROXY`（本机代理）和 `NO_PROXY=127.0.0.1,localhost,::1`。
-7. 防火墙：只放行校园网访问 80 端口，例如 `New-NetFirewallRule -Name Writer-HTTP-LAN -Direction Inbound -Protocol TCP -LocalPort 80 -RemoteAddress 10.100.0.0/16 -Action Allow`。
+7. 防火墙：只放行校园网访问 80 端口，例如 `New-NetFirewallRule -Name Writer-HTTP-LAN -Direction Inbound -Protocol TCP -LocalPort 80 -RemoteAddress <校园网网段> -Action Allow`。
 8. 接电源时不睡眠：`powercfg /change standby-timeout-ac 0`、`powercfg /change hibernate-timeout-ac 0`；硬盘 20 分钟无访问才停转（`powercfg /change disk-timeout-ac 20`，原来是 30 秒，USB 机械盘会频繁起停），并关闭 USB 选择性暂停。
 
 ## AI 执行器
 
 - Codex 用这台电脑上 `~/.codex` 的登录（与 Codex 桌面版共用，不要复制 `auth.json`，ChatGPT 登录的刷新令牌会轮换，副本会互相作废）；OpenCode 用 `~/.local/share/opencode/auth.json` 和 `~/.config/opencode/opencode.json`。所有 AI 任务都消耗这个账号的额度。
 - Codex 在 Windows 的后台任务里无法使用自身沙箱，所以设为 `danger-full-access`：组员的提示词能以 yuanbai 的权限访问这台电脑上的文件（包括上面的凭据）。只给信任的组员编辑权限。执行器不会把 `WRITER_*` 令牌、密码和数据库 URL 交给 AI。
-- 访问 OpenAI 需要本机代理（mihomo，见下文“网络”）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
+- 访问 OpenAI 需要本机代理（见下文“网络”）可用；代理不通时 Codex 对话会报错，OpenCode 用的国内模型不受影响。
 - 网页 AI 对话：Writer Runner 启用了 `codex`、`claude` 或 `opencode` 能力时，会再连一条 WebSocket 到服务器（`/api/runner/agents`，同一个共享执行器令牌）。网页显示执行器启用、且服务器 `WRITER_SHARED_RUNNER_HARNESSES` 也列出的那些（按 Codex、Claude Code、OpenCode 排）。一个 `codex app-server` 和一个 `opencode serve`（只监听 127.0.0.1 的随机端口）服务所有项目，Claude Code 每轮启动一次 CLI。每个项目在 `%USERPROFILE%\.writer-runner\projects\<项目 ID>` 有一份工作副本，每轮开始前和服务器同步；AI 每改完一步，改动就合并进共享正文（以发起这一轮的成员名义），与他人同时改到同一处的部分转为待审阅建议。每轮开始前服务器自动保存一个版本“AI 对话修改前”，可在“版本”里恢复。
 - 只有项目的所有者和编辑者能用 AI 对话；新对话默认共享给项目的所有者和编辑者，发起人可在对话标题旁或“历史对话”里设为私有。同一项目同时只运行一轮。
 - 因为 `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 的权限只提供“完全访问”；其他机器可用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview,fullAccess` 指定。Claude Code 的四种权限都提供，可用 `WRITER_CLAUDE_PERMISSIONS` 限制。OpenCode 在网页上默认不能运行 shell、不能访问项目以外的文件夹，可改 `WRITER_OPENCODE_PERMISSION`（OpenCode 的权限 JSON）。浏览器拿不到 OpenCode 的配置原文和供应商密钥：执行器只转发模型和智能体名称。
@@ -84,21 +84,16 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 
 项目所有者发出的项目邀请，如果对方是新用户，账号同样要管理员审核（管理员自己发的项目邀请除外）。
 
-## 网络（洛杉矶线路）
+## 网络
 
-这台电脑不再用 FlClash 的机场订阅，而是用 mihomo（FlClash 的同一内核）作为系统服务，不登录也在运行：
+这台电脑上的系统代理作为系统服务运行（不登录也在运行），Writer 执行器经它的本机端口访问 OpenAI（`runner.env` 的 `HTTPS_PROXY`）；国内网站和局域网地址直连。代理的程序、配置和分流规则不进仓库，在这台电脑上的网络配置目录里（只有 SYSTEM、管理员和 yuanbai 能改），另有一个看门狗任务在代理连续失败而直连正常时重启它。
 
-- 程序和配置：`C:\net\mihomo`（`config.yaml` 只有 SYSTEM、管理员和 yuanbai 能读；`C:\net` 的脚本以 SYSTEM 运行，所以整个目录只有这三者能改），日志 `C:\net\logs`；
-- 任务计划程序 `\Network\Mihomo`（开机启动，退出后自动重启）和 `\Network\Mihomo Watchdog`（每 5 分钟经代理测试一次，连续 3 次失败且直连正常时重启 mihomo；整个网络断开时只记日志）；
-- 境外流量走洛杉矶服务器（出口 IP 固定）；国内网站（GeoSite/GeoIP 中国列表）、B 站、ToDesk、百度网盘、微信、QQ、钉钉、飞书、Windows 更新等直连；局域网地址不进 TUN；
-- 本机代理端口仍是 `127.0.0.1:7890`，Writer 执行器经它访问 OpenAI；
-- 需要再加直连的网站或程序：在 `config.yaml` 的 `rules` 里 `GEOSITE,cn,DIRECT` 之前加 `DOMAIN-SUFFIX,<域名>,DIRECT` 或 `PROCESS-NAME,<程序>.exe,DIRECT`，用 `C:\net\mihomo\mihomo.exe -t -d C:\net\mihomo` 检查后重启 Mihomo 任务；
-- 这台电脑接了网线（以太网，10.100.144.0/20 网段，目前 10.100.147.57）和 Wi-Fi（BJZGCA-Dorm，10.100.128.0/20，目前 10.100.131.101），两个地址都由 DHCP 分配。网线是首选出口（接口跃点 以太网 10、WLAN 35），Wi-Fi 连着时作为备用。有线网刚接上时曾对 HTTPS 做中间人拦截（连洛杉矶节点拿到伪造的证书），处理好之后恢复正常；代理日志再出现 `certificate signed by unknown authority`，先用浏览器在这台电脑上确认有线网是否需要重新认证，必要时把以太网跃点调到 75 临时改走 Wi-Fi；
-- FlClash 仍安装着（打开它会把辅助服务重新装成自动启动，单独运行的辅助服务不影响网络）；不要在 FlClash 里打开 TUN 或系统代理，否则会和 mihomo 抢路由和 7890 端口。
+- 这台电脑接了网线和 Wi-Fi，两个地址都由 DHCP 分配，网线是首选出口，Wi-Fi 作为备用。有线网刚接上时曾对 HTTPS 做中间人拦截，代理日志出现 `certificate signed by unknown authority` 时，先用浏览器确认有线网是否需要重新认证，必要时临时改走 Wi-Fi；
+- 不要再在这台电脑上打开别的代理软件的 TUN 或系统代理，否则会和现在的代理抢路由和端口。
 
 ## 备份、监控和提醒
 
-脚本和配置都在仓库的 `deploy/lab/`（`backup-writer.ps1`；`writer-monitor.py` 和 `monitor-config.*.json`；`nginx-writer-18089.conf`、`writer.caddy`、`writer-offline.html/.json`），改动后复制到对应机器。
+脚本和配置都在仓库的 `deploy/lab/`（`backup-writer.ps1`；`writer-monitor.py` 和 `monitor-config.*.json`；`nginx-writer-18089.conf`、`writer.caddy`、`writer-offline.html/.json`），改动后复制到对应机器。仓库里的 IP 和域名是示例值（`203.0.113.10`、`example.com`），复制时换成实际值；实际值只在各台服务器现有的配置里，不进仓库。
 
 **备份**（`C:\writer\backup-writer.ps1`，任务 Writer Backup，每 6 小时）：
 
@@ -109,18 +104,18 @@ node node_modules\tsx\dist\cli.mjs server\template-build.ts --out E:\writer-data
 
 日志在 `C:\writer\logs\backup.log`。实验室电脑整台损坏时，从北京服务器取回最新的 `.dump`，在新机器上按“首次搭建要点”装好 PostgreSQL 后 `pg_restore` 即可。
 
-**监控**（`deploy/lab/writer-monitor.py`，北京服务器 `admin` 和洛杉矶服务器 `ytranslator` 的 crontab 每分钟运行一次，文件在各自的 `~/writer-monitor`）：
+**监控**（`deploy/lab/writer-monitor.py`，北京、洛杉矶两台中转服务器上监控账号的 crontab 每分钟运行一次，文件在各自的 `~/writer-monitor`）：
 
 - 经本机反向代理访问 `/api/health`，连续 3 分钟打不开就提醒，并区分是代理出错还是隧道/实验室电脑断了；之后每 2 小时提醒一次，恢复时再发一条；
 - `/api/health` 的 `ai` 为 false 超过 10 分钟：AI 执行器（Writer Runner）没连上；
 - 只在北京：超过 7 小时没收到 `lab-status.json`、备份或复制失败、恢复演练失败或超过 9 天没做、实验室 C: 少于 20 GB、D: 少于 50 GB；每周一 9 点（北京时间）发一份周报；
 - 本机磁盘：北京少于 3 GB、洛杉矶少于 1.5 GB。
 
-提醒由飞书应用 `cli_aa42ca90e8b8dbc0` 的机器人发给管理员本人（`~/writer-monitor/feishu.json`：`app_id`、`app_secret`、`receive_id_type`、`receive_id`，只有所有者能读）。要发到群里：把机器人拉进群，`receive_id_type` 改为 `chat_id`、`receive_id` 填群的 `oc_…`。`python3 ~/writer-monitor/writer-monitor.py --test` 发一条测试消息。日志 `monitor.log`，状态 `state.json`。
+提醒由监控用的飞书应用的机器人发给管理员本人（`~/writer-monitor/feishu.json`：`app_id`、`app_secret`、`receive_id_type`、`receive_id`，只有所有者能读）。要发到群里：把机器人拉进群，`receive_id_type` 改为 `chat_id`、`receive_id` 填群的 `oc_…`。`python3 ~/writer-monitor/writer-monitor.py --test` 发一条测试消息。日志 `monitor.log`，状态 `state.json`。
 
 **离线页**：北京 nginx（`/etc/nginx/conf.d/writer-18089.conf`）和洛杉矶 Caddy（`/etc/caddy/writer.caddy`）连不上实验室时，网页返回 `/var/www/writer/writer-offline.html`（说明情况，每 20 秒检查一次，恢复后自动刷新），API 返回 `writer-offline.json` 的 JSON 错误，状态码都是 503。洛杉矶的 Caddy 配置了 `admin off`，改配置后要 `sudo systemctl restart caddy`（那台服务器上的其他网站会断开一两秒），不能 reload。
 
-**这台电脑上的飞书 CLI**：全局装了 `lark-cli`（`npm.cmd install -g @larksuite/cli`，`.ps1` 包装脚本已改名，用 `lark-cli.cmd`），配置为同一个飞书应用（`lark-cli config init --app-id cli_aa42ca90e8b8dbc0 --app-secret-stdin`），密钥存在 yuanbai 的 Windows 凭据里，后台任务（Writer Runner、Writer Backup）也能用。以机器人身份发消息：`lark-cli im +messages-send --as bot --user-id <open_id> --text "…"`。以管理员本人身份用文档、日历等要先 `lark-cli auth login`（设备码登录，在手机上打开它给的链接确认）。
+**这台电脑上的飞书 CLI**：全局装了 `lark-cli`（`npm.cmd install -g @larksuite/cli`，`.ps1` 包装脚本已改名，用 `lark-cli.cmd`），配置为同一个飞书应用（`lark-cli config init --app-id <飞书应用 ID> --app-secret-stdin`），密钥存在 yuanbai 的 Windows 凭据里，后台任务（Writer Runner、Writer Backup）也能用。以机器人身份发消息：`lark-cli im +messages-send --as bot --user-id <open_id> --text "…"`。以管理员本人身份用文档、日历等要先 `lark-cli auth login`（设备码登录，在手机上打开它给的链接确认）。
 
 **还需要人工做的**：给这台电脑配一台 UPS；在 BIOS 里打开“来电自动开机”（Restore on AC Power Loss），停电恢复后服务会随开机自动启动。
 
@@ -137,7 +132,7 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 
 ## 公网访问
 
-服务器经两条 SSH 反向隧道对外：北京阿里云 `http://101.200.37.236:18089` 和洛杉矶 `https://writer.desire-drive.com`，这两个地址都写在 `WRITER_ORIGIN` 里（另设了 `WRITER_TRUST_PROXY=1`）。实测（2026-10-10）一次请求：校园网内直连约 10 毫秒，经北京约 60 毫秒，经洛杉矶 1–2 秒（这台电脑到洛杉矶往返约 220 毫秒，经洛杉矶访问要跨太平洋来回两次；从校园网直连该域名还会失败）。所以：
+服务器经两条 SSH 反向隧道对外：北京 `http://<北京中转 IP>:18089` 和洛杉矶 `https://<海外域名>`，这两个地址都写在 `WRITER_ORIGIN` 里（另设了 `WRITER_TRUST_PROXY=1`）。实测（2026-10-10）一次请求：校园网内直连约 10 毫秒，经北京约 60 毫秒，经洛杉矶 1–2 秒（这台电脑到洛杉矶往返约 220 毫秒，经洛杉矶访问要跨太平洋来回两次；从校园网直连该域名还会失败）。所以：
 
 - 校园网内用 `http://<这台电脑的 IP>`；国内校外用北京地址；洛杉矶域名只留给国外的合作者；
 - 浏览器开着全局代理时，国内地址也会绕到国外，访问 Writer 前请把这些地址设为直连；
@@ -148,7 +143,7 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 - 要重启隧道，重启 Writer Server 任务即可（网页会断开十几秒）。不要在 SSH 会话里用 `Start-Process` 启动隧道：Windows OpenSSH 在会话结束时会结束会话里启动的所有进程。
 - 在 Windows PowerShell 5 里用 `& ssh.exe ... 2>&1` 捕获 ssh 的输出会卡住不返回；需要输出时用 `Start-Process` 把输入输出重定向到文件。
 
-首页和登录页右上角有“线路”切换，列出 `server.env` 里 `WRITER_ADDRESSES=campus=http://10.100.147.57,china=http://101.200.37.236:18089,global=https://writer.desire-drive.com` 的三个地址（内网、国内、海外），访问者按自己所在的位置换到更快的那个。切换时停在同一页（登录、注册表单和邀请链接都保留）；各地址的登录状态互不相通，换过去可能要重新登录。改地址后重启 Writer Server。
+首页和登录页右上角有“线路”切换，列出 `server.env` 里 `WRITER_ADDRESSES=campus=http://<实验室 IP>,china=http://<北京中转 IP>:18089,global=https://<海外域名>` 的三个地址（内网、国内、海外），访问者按自己所在的位置换到更快的那个。切换时停在同一页（登录、注册表单和邀请链接都保留）；各地址的登录状态互不相通，换过去可能要重新登录。改地址后重启 Writer Server。
 
 ## 常见问题
 
@@ -156,4 +151,4 @@ Stop-ScheduledTask -TaskPath "\Writer\" -TaskName "Writer Runner"; Start-Schedul
 - **页面偶尔提示“项目权限已变更”或突然变成只读**：以前服务器在数据库短暂不可用（例如 PostgreSQL 重启）时会把在线页面当作失去权限。现在只有确实未登录、不再是成员或项目不存在时才会这样，临时故障时页面自动重连；页面收到这类断开时也会先向服务器确认一次权限。
 - **AI 任务一直排队**：看 `runner.log` 和任务计划程序里 Writer Runner 是否在运行。
 - **恢复备份**：停止 Writer Server，`pg_restore -h 127.0.0.1 -U writer -d writer --clean D:\writer-backups\<文件>.dump`，再启动。D: 上没有时，用北京服务器 `~/writer-backups` 里的副本。
-- **Zotero 导入失败**：服务器经本机代理（mihomo）访问 `api.zotero.org`；代理不通时网页会提示连不上 Zotero。
+- **Zotero 导入失败**：服务器经本机代理访问 `api.zotero.org`；代理不通时网页会提示连不上 Zotero。

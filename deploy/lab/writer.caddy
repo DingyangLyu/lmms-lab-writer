@@ -1,4 +1,5 @@
-writer.desire-drive.com {
+# The public domain of the overseas address (example below).
+writer.example.com {
     encode zstd gzip
     @runner path /api/runner/*
     respond @runner 404

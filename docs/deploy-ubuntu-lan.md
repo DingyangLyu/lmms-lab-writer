@@ -1,6 +1,6 @@
 # 在实验室 Ubuntu 工作站上部署（ubuntu-lan，现用）
 
-2026 年 10 月 26 日起，实验室的 Writer 服务器从 Windows 电脑 DESKTOP-0L24B21（见 [deploy-windows-lan.md](deploy-windows-lan.md)，现为备用）迁到 Ubuntu 24.04 工作站 ubuntu-lan（10.100.22.131，主机名 `yuanbai`，20 核、30 GB 内存）。数据、模板库、安装包、公网线路、备份和监控都一起迁了过来；组员在校园网里打开 `http://10.100.22.131`，校外仍用北京和洛杉矶两个地址。
+2026 年 10 月 26 日起，实验室的 Writer 服务器从实验室的 Windows 电脑（见 [deploy-windows-lan.md](deploy-windows-lan.md)，现为备用）迁到 Ubuntu 24.04 工作站 ubuntu-lan（20 核、30 GB 内存）。数据、模板库、安装包、公网线路、备份和监控都一起迁了过来；组员在校园网里打开 `http://<实验室 IP>`，校外仍用北京和洛杉矶两个地址。
 
 ```
 校园网浏览器 ──HTTP :80──▶ nginx 容器 writer-port80 ──┐
@@ -20,17 +20,18 @@
 | `~/writer/config/server.env`、`runner.env` | 服务端、执行器配置（权限 600，目录 700） |
 | `~/writer/config/secrets.json`、`postgres.env`、`pgpass.conf` | 数据库密码、管理员初始密码、执行器令牌（沿用 Windows 上的） |
 | `~/writer/config/ssh_config`、`writer_tunnel_ed25519`、`known_hosts` | 隧道和异地备份连北京、洛杉矶用的 SSH 配置和专用密钥 |
-| `~/writer/config/nginx-port80.conf` | 80 端口转发（只放行 10.100.0.0/16 和本机） |
+| `~/writer/config/nginx-port80.conf` | 80 端口转发（只放行校园网网段和本机） |
 | `~/writer/config/fonts.conf` | 编译用的 fontconfig 配置（见“中文字体”） |
 | `~/writer/config/windows-original/` | 从 Windows 拷来的原始配置，留作对照 |
 | `~/writer/templates`、`~/writer/downloads` | 模板库、网页“桌面端”页的安装包 |
+| `~/writer/config/backup.env` | `WRITER_BACKUP_DISK`：USB 备份盘的挂载点（`/media/yuanbai/<盘号>`） |
 | `~/writer/data` | `WRITER_DATA_DIR`，以及字体缓存 `fontconfig-cache` |
 | `~/writer/bin/writer-tunnel`、`writer-backup` | 隧道和备份脚本（仓库 `deploy/ubuntu/`） |
 | `~/writer/logs` | `backup.log`、`lab-status.json`、`restore-drill.json`（服务端和执行器的日志在 journald） |
 | Docker 卷 `writer-pgdata` | PostgreSQL 数据（容器 `writer-postgres`，镜像 `postgres:17`，`--locale=C` UTF8） |
 | `~/texlive/2026` | TeX Live 2026 scheme-full（不含文档和源码，A4）；`~/texlive/texmf-local` 放本地配置 |
 | `~/.local/opt/node` | Node 24.20.0；全局装了 pnpm 11.5.0、`@openai/codex`、`opencode-ai`、`@larksuite/cli` |
-| `/media/yuanbai/E0592753F720D15B/writer-backups` | 1 TB USB 机械盘上的数据库备份和模板库镜像 |
+| `<备份盘挂载点>/writer-backups` | 1 TB USB 机械盘上的数据库备份和模板库镜像 |
 
 systemd 用户服务（`~/.config/systemd/user`，仓库 `deploy/ubuntu/systemd/`）：
 
@@ -65,13 +66,13 @@ Windows 上 ctex 默认用 Windows 字体集，Linux 上默认用 Fandol，学�
 - Codex 用这台电脑 `~/.codex` 里已登录的账号（Pro；VS Code 插件和 codex-mailbox-worker 也在用，额度共享）。不要复制别处的 `auth.json`。
 - `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 只提供“完全访问”（用户 2026-10-26 选择与 Windows 保持一致）：组员的提示词能以 yuanbai 的权限访问这台工作站上的所有文件，包括各处的 SSH 密钥。只给信任的组员编辑权限。想收紧时删掉这一行（Linux 上 Codex 沙箱可用），或用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview` 去掉完全访问，然后重启 `writer-runner`。
 - OpenCode 的配置和登录从 Windows 拷来（`~/.config/opencode`、`~/.local/share/opencode/auth.json`：Kimi、DeepSeek、OpenAI OAuth）。OpenAI 的 OAuth 刷新令牌会轮换，Windows 上的那份已不再使用，不要再在 Windows 上启动 OpenCode。
-- 代理：FlClash（桌面开机自动登录后启动，TUN 开着，混合端口 `127.0.0.1:7897`），`runner.env` 的 `HTTPS_PROXY` 指向它。
+- 代理：这台电脑桌面上的代理软件（桌面开机自动登录后才启动，开着 TUN 模式），`runner.env` 的 `HTTPS_PROXY` 指向它的本机端口。不要关掉桌面自动登录。
 - 迁移前 Windows 上的 2 个网页 AI 对话的上下文在 Windows 的 Codex/OpenCode 里，这边不能接着聊，历史标题还在。
-- 飞书 CLI：`lark-cli` 配置为监控用的飞书应用（`cli_aa42ca90e8b8dbc0`，密钥加密存在 `~/.local/share/lark-cli`），后台服务里也能以机器人身份调用；以管理员本人身份用文档、日历要先 `lark-cli auth login`。
+- 飞书 CLI：`lark-cli` 配置为监控用的飞书应用（密钥加密存在 `~/.local/share/lark-cli`），后台服务里也能以机器人身份调用；以管理员本人身份用文档、日历要先 `lark-cli auth login`。
 
 ## 公网隧道
 
-`writer-tunnel@<beijing|la>` 运行 `~/writer/bin/writer-tunnel`：`ssh -N -R 127.0.0.1:18090:127.0.0.1:8790`，退出 5 秒后由 systemd 重启。连接一开始就失败（多半是中转服务器上的旧会话还占着 18090）时，脚本登录中转服务器结束占着端口的 sshd，再重连，与 Windows 上的 `run-writer-tunnel.ps1` 相同。用的是这台电脑的专用密钥 `writer_tunnel_ed25519`（已加进北京 `admin` 和洛杉矶 `ytranslator` 的 `authorized_keys`）。
+`writer-tunnel@<beijing|la>` 运行 `~/writer/bin/writer-tunnel`：`ssh -N -R 127.0.0.1:18090:127.0.0.1:8790`，退出 5 秒后由 systemd 重启。连接一开始就失败（多半是中转服务器上的旧会话还占着 18090）时，脚本登录中转服务器结束占着端口的 sshd，再重连，与 Windows 上的 `run-writer-tunnel.ps1` 相同。用的是这台电脑的专用密钥 `writer_tunnel_ed25519`（已加进北京、洛杉矶两台中转服务器上相应账号的 `authorized_keys`）。
 
 - 两条隧道都绑定默认路由所在的网卡（脚本里的 `BindInterface`），从本地网络直接出去。原因：这台电脑上的系统代理开着 TUN 模式，没绑定地址的连接都会被它接管，海外的中转会被转进代理节点，节点一断隧道就断（迁移后洛杉矶那条每天断 25–30 次）；国内的中转虽然走直连规则，代理软件重启时也会断。2026-11-05 起改为直连，不要去掉这一项。
 - 重启隧道：`systemctl --user restart writer-tunnel@beijing`（或 `@la`）。
@@ -96,17 +97,17 @@ pnpm --filter @lmms-lab/writer-collaboration build
 systemctl --user restart writer-server writer-runner
 ```
 
-带数据库迁移的更新，先 `systemctl --user start writer-backup` 并确认 `backup.log` 里成功。`deploy/ubuntu/` 下的脚本和服务改动后，复制到 `~/writer/bin`、`~/writer/config`、`~/.config/systemd/user`，再 `systemctl --user daemon-reload`。模板库重新构建见 Windows 文档“模板库”一节，路径换成 `--out ~/writer/templates`，`WRITER_LATEXMK=~/texlive/2026/bin/x86_64-linux/latexmk`。
+带数据库迁移的更新，先 `systemctl --user start writer-backup` 并确认 `backup.log` 里成功。`deploy/ubuntu/` 下的脚本和服务改动后，复制到 `~/writer/bin`、`~/writer/config`、`~/.config/systemd/user`，再 `systemctl --user daemon-reload`。仓库里的 IP、网段和域名是示例值（`nginx-port80.conf` 的 `allow` 网段等），复制时换成实际值；实际值只在服务器现有的配置里，带实际值的原版部署文档另存在这台电脑的 `~/writer/config/site/`（只有 yuanbai 能读）。模板库重新构建见 Windows 文档“模板库”一节，路径换成 `--out ~/writer/templates`，`WRITER_LATEXMK=~/texlive/2026/bin/x86_64-linux/latexmk`。
 
 ## 原 Windows 电脑
 
 - `\Writer\` 下的三个任务已禁用，PostgreSQL 服务和 `C:\writer` 原样保留（数据停在 2026-10-26 切换时）；切换前的最后一份备份是 `D:\writer-backups\writer-20261025-2251.dump`（北京也有）。
-- 它的 80 端口用 Windows 自带的端口转发指向这台电脑：`netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=80 connectaddress=10.100.22.131 connectport=80`，旧地址 `http://10.100.147.57` 的书签和桌面端设置继续可用（网页里看到的客户端地址会是那台 Windows）。不再需要时 `netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=80`。
-- 那台电脑上的 Y-Translator 隧道（18190 端口）和 mihomo 与 Writer 无关，照常运行。
+- 它的 80 端口用 Windows 自带的端口转发指向这台电脑：`netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=80 connectaddress=<实验室 IP> connectport=80`，旧地址 `http://<Windows 电脑的 IP>` 的书签和桌面端设置继续可用（网页里看到的客户端地址会是那台 Windows）。不再需要时 `netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=80`。
+- 那台电脑上的 Y-Translator 隧道（18190 端口）和网络代理与 Writer 无关，照常运行。
 - **回退**：停掉这边的 `writer-server writer-runner writer-tunnel@beijing writer-tunnel@la writer-backup.timer`，把这边的最新备份恢复到 Windows 的 PostgreSQL，删掉 portproxy，再启用并启动 Windows 上的三个任务。
 
 ## 常见问题
 
 - **IP 变了**：网卡地址由 DHCP 分配。改 `server.env` 的 `WRITER_ORIGIN`、`WRITER_ADDRESSES` 的 campus 地址和 Windows 上 portproxy 的目标，重启 `writer-server`。
-- **AI 对话不可用**：`journalctl --user -u writer-runner`；看 FlClash 是否在运行（`curl -x http://127.0.0.1:7897 https://api.openai.com`）。
+- **AI 对话不可用**：`journalctl --user -u writer-runner`；看本机代理是否在运行（`curl -x <runner.env 里的 HTTPS_PROXY> https://api.openai.com`）。
 - **编译时找不到中文字体**：确认 `server.env` 里有 `FONTCONFIG_FILE`，且 `HOME=$(mktemp -d) FONTCONFIG_FILE=… fc-match SimHei` 返回 `simhei.ttf`。

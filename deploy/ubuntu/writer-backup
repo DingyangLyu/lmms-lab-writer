@@ -17,7 +17,11 @@
 # Restore: systemctl --user stop writer-server writer-runner, then
 #   docker exec -i writer-postgres pg_restore -U writer -d writer --clean --if-exists < <file>.dump
 set -u
-usb=/media/yuanbai/E0592753F720D15B
+# The USB disk's mount point is site-specific: WRITER_BACKUP_DISK in ~/writer/config/backup.env
+# (e.g. WRITER_BACKUP_DISK=/media/<user>/<disk id>). Without it the dump goes to ~/writer/backups
+# and the monitor is told the disk is missing.
+[ -f "$HOME/writer/config/backup.env" ] && . "$HOME/writer/config/backup.env"
+usb=${WRITER_BACKUP_DISK:-}
 log=$HOME/writer/logs/backup.log
 drill_mark=$HOME/writer/logs/restore-drill.json
 status_file=$HOME/writer/logs/lab-status.json

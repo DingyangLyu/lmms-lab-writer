@@ -53,23 +53,23 @@ async function labServer(origin: string) {
 
 describe("request origins", () => {
   it("trusts the configured origins and same-origin pages opened by IP address", () => {
-    const lab = ["http://10.100.131.101", "http://writer.lab.example"];
-    expect(allowedOrigin("http://10.100.131.101", lab)).toBe(true);
+    const lab = ["http://192.168.1.20", "http://writer.lab.example"];
+    expect(allowedOrigin("http://192.168.1.20", lab)).toBe(true);
     expect(allowedOrigin("http://writer.lab.example", lab)).toBe(true);
     // The PC's other (wired) address, as the browser used it.
-    expect(allowedOrigin("http://10.100.147.57", lab, "10.100.147.57")).toBe(true);
+    expect(allowedOrigin("http://192.168.1.57", lab, "192.168.1.57")).toBe(true);
     expect(allowedOrigin("http://[fd00::5]:8787", lab, "[fd00::5]:8787")).toBe(true);
     // Another site, another port, or a name that could be rebound: not trusted.
-    expect(allowedOrigin("http://evil.example", lab, "10.100.147.57")).toBe(false);
-    expect(allowedOrigin("http://10.100.147.57:8080", lab, "10.100.147.57")).toBe(false);
+    expect(allowedOrigin("http://evil.example", lab, "192.168.1.57")).toBe(false);
+    expect(allowedOrigin("http://192.168.1.57:8080", lab, "192.168.1.57")).toBe(false);
     expect(allowedOrigin("http://attacker.example", lab, "attacker.example")).toBe(false);
-    expect(allowedOrigin(undefined, lab, "10.100.147.57")).toBe(false);
+    expect(allowedOrigin(undefined, lab, "192.168.1.57")).toBe(false);
     expect(allowedOrigin("http://localhost:8787", "http://127.0.0.1:8787")).toBe(true);
   });
 
   it("lets members sign in through any of the server's addresses and invites with the one in use", async () => {
-    const { port, send } = await labServer("http://10.100.131.101, http://writer.lab.example");
-    const wired = `10.100.147.57:${port}`;
+    const { port, send } = await labServer("http://192.168.1.20, http://writer.lab.example");
+    const wired = `192.168.1.57:${port}`;
     const wrong = { username: "owner", password: "wrong-password-0000" };
     // 401: the origin check passed and the password was wrong.
     expect(
@@ -103,21 +103,21 @@ describe("request origins", () => {
       { Host: wired, Origin: `http://${wired}`, Cookie: signedIn.cookie },
       { days: 1, uses: 1 },
     );
-    expect(invite.data.url).toMatch(new RegExp(`^http://10\\.100\\.147\\.57:${port}/\\?signup=`));
+    expect(invite.data.url).toMatch(new RegExp(`^http://192\\.168\\.1\\.57:${port}/\\?signup=`));
   });
 
   it("offers visitors the server's named addresses", async () => {
     expect(
-      parseAddresses(" campus=http://10.100.147.57, china=http://101.200.37.236:18089/ ,"),
+      parseAddresses(" campus=http://192.168.1.57, china=http://203.0.113.10:18089/ ,"),
     ).toEqual([
-      { name: "campus", url: "http://10.100.147.57" },
-      { name: "china", url: "http://101.200.37.236:18089" },
+      { name: "campus", url: "http://192.168.1.57" },
+      { name: "china", url: "http://203.0.113.10:18089" },
     ]);
     expect(parseAddresses(undefined)).toEqual([]);
     for (const wrong of [
-      "http://10.100.147.57",
-      "=http://10.100.147.57",
-      "lab=ftp://10.100.147.57",
+      "http://192.168.1.57",
+      "=http://192.168.1.57",
+      "lab=ftp://192.168.1.57",
       "lab=https://writer.example.com/app",
       "lab=writer.example.com",
     ])
@@ -126,8 +126,8 @@ describe("request origins", () => {
     const app = await createWriterServer({
       databaseUrl: "pglite:memory",
       port: 0,
-      origin: "https://writer.example.com,http://10.100.147.57",
-      addresses: "global=https://writer.example.com,campus=http://10.100.147.57",
+      origin: "https://writer.example.com,http://192.168.1.57",
+      addresses: "global=https://writer.example.com,campus=http://192.168.1.57",
       adminUser: "owner",
       adminPassword: "test-password-1234",
     });
@@ -138,7 +138,7 @@ describe("request origins", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
       { name: "global", url: "https://writer.example.com" },
-      { name: "campus", url: "http://10.100.147.57" },
+      { name: "campus", url: "http://192.168.1.57" },
     ]);
   });
 });
