@@ -1,13 +1,33 @@
 [Unit]
-Description=Writer shared runner (web AI chats: Codex, OpenCode)
-After=writer-server.service
+Description=Writer shared runner (web AI chats), in a container that sees only what it needs
+After=writer-server.service docker.service
 StartLimitIntervalSec=0
 
+# The runner and the OpenCode it starts run in the container writer-runner (image from
+# writer-runner-image), as yuanbai (uid 1000) without capabilities. Mounted: the app and the host's
+# Node/OpenCode read-only, runner.env read-only, OpenCode's settings, logins and caches, and the
+# project copies in ~/.writer-runner. Not mounted: the rest of the home folder (SSH keys,
+# ~/writer/config secrets, ~/.codex) and the Docker socket. Host network: it reaches the server on
+# 127.0.0.1:8790 and the desktop proxy on 127.0.0.1.
 [Service]
-WorkingDirectory=%h/writer/app/apps/collaboration
-Environment=WRITER_ENV_FILE=%h/writer/config/runner.env
-Environment=PATH=%h/.local/opt/node/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:%h/texlive/2026/bin/x86_64-linux:%h/.local/opt/node/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=%h/.local/opt/node/bin/node node_modules/tsx/dist/cli.mjs server/runner.ts
+ExecStartPre=-/usr/bin/docker rm -f writer-runner
+ExecStartPre=/usr/bin/mkdir -p %h/.writer-runner %h/.local/state/opencode
+ExecStart=/usr/bin/docker run --rm --name writer-runner --init --network host \
+  --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --pids-limit 1024 --memory 8g \
+  --tmpfs %h:rw,uid=1000,gid=1000,mode=700,size=512m --tmpfs /tmp:rw,size=1g \
+  -e HOME=%h -e WRITER_ENV_FILE=%h/writer/config/runner.env \
+  -e PATH=%h/.local/opt/node/bin:/usr/local/bin:/usr/bin:/bin \
+  -v %h/writer/app:%h/writer/app:ro \
+  -v %h/.local/opt:%h/.local/opt:ro \
+  -v %h/writer/config/runner.env:%h/writer/config/runner.env:ro \
+  -v %h/.writer-runner:%h/.writer-runner \
+  -v %h/.config/opencode:%h/.config/opencode \
+  -v %h/.local/share/opencode:%h/.local/share/opencode \
+  -v %h/.cache/opencode:%h/.cache/opencode \
+  -v %h/.local/state/opencode:%h/.local/state/opencode \
+  -w %h/writer/app/apps/collaboration \
+  writer-runner:1 %h/.local/opt/node/bin/node node_modules/tsx/dist/cli.mjs server/runner.ts
+ExecStop=/usr/bin/docker stop -t 10 writer-runner
 Restart=always
 RestartSec=5
 

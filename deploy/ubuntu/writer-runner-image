@@ -1,0 +1,17 @@
+#!/bin/bash
+# Builds writer-runner:1, the image of the Writer runner's container (systemd/writer-runner.service):
+# the same Ubuntu as the host, so the host's Node and OpenCode binaries run unchanged from
+# read-only mounts, plus git (OpenCode's snapshots), ps and CA certificates. The runner then sees
+# only its own code, OpenCode's settings and the project copies: no SSH keys, database passwords
+# or other files of the workstation, and no Docker socket. (Docker here has no `build`/buildx, so
+# the image is made by running the steps in a container and committing it.)
+set -eu
+docker rm -f writer-runner-build >/dev/null 2>&1 || true
+docker run --name writer-runner-build ubuntu:24.04 sh -c "
+  sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|; s|http://security.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|' /etc/apt/sources.list.d/ubuntu.sources &&
+  apt-get update -qq &&
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ca-certificates git procps >/dev/null &&
+  rm -rf /var/lib/apt/lists/*"
+docker commit -c 'CMD ["/bin/bash"]' writer-runner-build writer-runner:1 >/dev/null
+docker rm writer-runner-build >/dev/null
+docker images writer-runner

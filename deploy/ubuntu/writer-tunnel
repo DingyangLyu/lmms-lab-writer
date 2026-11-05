@@ -22,8 +22,8 @@ port=${2:-18090}
 nic=$(ip route show table main default 2>/dev/null | awk '{print $5; exit}')
 common=(-F "$HOME/writer/config/ssh_config" -o ConnectionAttempts=1 -o ServerAliveInterval=20
   -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o LogLevel=ERROR ${nic:+-o "BindInterface=$nic"})
-free="for p in \$(sudo -n ss -ltnp 'sport = :$port' | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
-  sudo -n kill \"\$p\" && echo \"ended stale sshd \$p holding port $port\"; done"
+# The relay only lets this key run the commands in deploy/lab/writer-relay-ops.
+free="free-port $port"
 
 started=$(date +%s)
 echo "connecting $relay (port $port)"

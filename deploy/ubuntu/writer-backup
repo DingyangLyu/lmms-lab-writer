@@ -73,11 +73,11 @@ fi
 # Off-site copy.
 offsite=false
 if $dumped; then
-  if scp -q "${ssh_args[@]}" "$file" "$remote:writer-backups/$name"; then
-    local_sum=$(sha256sum "$file" | cut -d' ' -f1)
-    copied=$(ssh "${ssh_args[@]}" -n "$remote" "sha256sum writer-backups/$name" 2>/dev/null | cut -d' ' -f1)
-    [ -n "$copied" ] && [ "$copied" = "$local_sum" ] && offsite=true
-  fi
+  # The relay only lets this key run deploy/lab/writer-relay-ops: put-backup stores stdin and
+  # prints the stored file's SHA-256.
+  local_sum=$(sha256sum "$file" | cut -d' ' -f1)
+  copied=$(ssh "${ssh_args[@]}" "$remote" "put-backup $name" <"$file" 2>>"$log")
+  [ -n "$copied" ] && [ "$copied" = "$local_sum" ] && offsite=true
   say "offsite copy to $remote $($offsite && echo ok || echo FAILED)"
   $offsite || problem "备份没能复制到北京服务器"
 fi
@@ -130,4 +130,4 @@ if backup_free:
 print(json.dumps({"time": int(time.time()), "file": name, "bytes": int(size), "offsite": offsite == "true",
                   "drill": json.loads(drill), "disks": disks, "problems": problems}, ensure_ascii=False, indent=2))
 EOF
-scp -q "${ssh_args[@]}" "$status_file" "$remote:writer-monitor/lab-status.json" || say "status not sent to $remote"
+ssh "${ssh_args[@]}" "$remote" put-status <"$status_file" 2>>"$log" || say "status not sent to $remote"

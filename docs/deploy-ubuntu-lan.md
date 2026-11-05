@@ -6,8 +6,8 @@
 校园网浏览器 ──HTTP :80──▶ nginx 容器 writer-port80 ──┐
 北京 nginx / 洛杉矶 Caddy ──SSH 反向隧道（18090）────────┴▶ node（Writer Server，127.0.0.1:8790）
                                                           ├─▶ PostgreSQL 17 容器 writer-postgres（127.0.0.1:5433）
-                                    Writer Runner ────────┤   └─▶ TeX Live 2026（PDF 预览编译）
-                       Codex / OpenCode（这台电脑登录的账号）
+                 Writer Runner（容器 writer-runner）────────┤   └─▶ TeX Live 2026（PDF 预览编译）
+                       OpenCode（DeepSeek）
 ```
 
 这台电脑上 yuanbai 没有 sudo（但在 docker 组里），所以：PostgreSQL 和 80 端口的转发放在 Docker 容器里（`--restart unless-stopped`，随 Docker 开机启动）；其余都是 yuanbai 的 systemd 用户服务（已开启 linger，不登录也运行）。这也是一台日常在用的工作站（COMSOL、Fluent、Y-Translator 的 PDF worker 等都在上面），改动时不要影响其他服务。
@@ -26,7 +26,7 @@
 | `~/writer/templates`、`~/writer/downloads` | 模板库、网页“桌面端”页的安装包 |
 | `~/writer/config/backup.env` | `WRITER_BACKUP_DISK`：USB 备份盘的挂载点（`/media/yuanbai/<盘号>`） |
 | `~/writer/data` | `WRITER_DATA_DIR`，以及字体缓存 `fontconfig-cache` |
-| `~/writer/bin/writer-tunnel`、`writer-backup` | 隧道和备份脚本（仓库 `deploy/ubuntu/`） |
+| `~/writer/bin/writer-tunnel`、`writer-backup`、`writer-runner-image` | 隧道和备份脚本、执行器镜像的构建脚本（仓库 `deploy/ubuntu/`） |
 | `~/writer/logs` | `backup.log`、`lab-status.json`、`restore-drill.json`（服务端和执行器的日志在 journald） |
 | Docker 卷 `writer-pgdata` | PostgreSQL 数据（容器 `writer-postgres`，镜像 `postgres:17`，`--locale=C` UTF8） |
 | `~/texlive/2026` | TeX Live 2026 scheme-full（不含文档和源码，A4）；`~/texlive/texmf-local` 放本地配置 |
@@ -36,7 +36,7 @@
 systemd 用户服务（`~/.config/systemd/user`，仓库 `deploy/ubuntu/systemd/`）：
 
 - `writer-server`：`server/main.ts`，退出 5 秒后重启。开机时 Docker 还没起好 PostgreSQL 就会退出重试，属正常。
-- `writer-runner`：`server/runner.ts`（网页 AI 对话）。
+- `writer-runner`：`server/runner.ts`（网页 AI 对话），跑在 Docker 容器 `writer-runner` 里（见“AI 执行器”）；日志 `journalctl --user -u writer-runner`。
 - `writer-tunnel@beijing`、`writer-tunnel@la`：两条公网隧道。
 - `writer-backup.timer`：北京时间 0、6、12、18 点运行 `writer-backup.service`。
 
@@ -63,16 +63,18 @@ Windows 上 ctex 默认用 Windows 字体集，Linux 上默认用 Fandol，学�
 
 ## AI 执行器
 
-- Codex 用这台电脑 `~/.codex` 里已登录的账号（Pro；VS Code 插件和 codex-mailbox-worker 也在用，额度共享）。不要复制别处的 `auth.json`。
-- `WRITER_CODEX_SANDBOX=danger-full-access`，网页上 Codex 只提供“完全访问”（用户 2026-10-26 选择与 Windows 保持一致）：组员的提示词能以 yuanbai 的权限访问这台工作站上的所有文件，包括各处的 SSH 密钥。只给信任的组员编辑权限。想收紧时删掉这一行（Linux 上 Codex 沙箱可用），或用 `WRITER_CODEX_PERMISSIONS=readOnly,askForApproval,autoReview` 去掉完全访问，然后重启 `writer-runner`。
-- OpenCode 的配置和登录从 Windows 拷来（`~/.config/opencode`、`~/.local/share/opencode/auth.json`：Kimi、DeepSeek、OpenAI OAuth）。OpenAI 的 OAuth 刷新令牌会轮换，Windows 上的那份已不再使用，不要再在 Windows 上启动 OpenCode。
-- 代理：这台电脑桌面上的代理软件（桌面开机自动登录后才启动，开着 TUN 模式），`runner.env` 的 `HTTPS_PROXY` 指向它的本机端口。不要关掉桌面自动登录。
+- **网页上只提供 OpenCode**（2026-11-05 起：`runner.env` 的 `WRITER_ALLOWED_HARNESSES=opencode`，`server.env` 的 `WRITER_SHARED_RUNNER_HARNESSES=opencode`）。之前的 Codex“完全访问”能让组员的提示词以 yuanbai 的身份读这台电脑上的所有文件（数据库密码、SSH 密钥）并通过 docker 组拿到 root。OpenCode 在网页上不能运行命令、不能访问项目以外的文件夹（`WRITER_OPENCODE_PERMISSION`）。要重新提供 Codex，先确认它也只能在容器里运行，再把 `codex` 加回这两处。
+- **执行器在容器里**：`writer-runner.service` 用 `docker run` 启动镜像 `writer-runner:1`（`~/writer/bin/writer-runner-image` 构建：Ubuntu 24.04 加 git、ps、证书），以 uid 1000、无任何特权运行，只挂载程序（只读）、这台电脑的 Node 和 OpenCode（只读）、`runner.env`（只读）、OpenCode 的配置、登录和缓存，以及项目工作副本 `~/.writer-runner`。家目录其余部分（`~/.ssh`、`~/writer/config` 里的其他文件、`~/.codex`）和 Docker 套接字都不在容器里。用宿主网络，连 127.0.0.1:8790 的服务端和本机代理。
+- **模型**：OpenCode 默认 `deepseek/deepseek-v4-pro`，`small_model` 为 `deepseek/deepseek-flash`（`~/.config/opencode/opencode.json`）。Kimi（订阅已失效）和 OpenAI（`oc-codex-multi-auth` 插件在这台电脑上缺少账号配置，迁移后一直不可用）在 `disabled_providers` 里停用，网页上不再列出；恢复时删掉对应项并重启 `writer-runner`。
+- **代理**：`runner.env` 的 `HTTPS_PROXY` 指向这台电脑桌面上的代理软件（桌面开机自动登录后才启动）；`NO_PROXY` 包含 `api.deepseek.com`，所以代理没启动时 DeepSeek 照常可用，只有境外模型受影响。不要关掉桌面自动登录。
 - 迁移前 Windows 上的 2 个网页 AI 对话的上下文在 Windows 的 Codex/OpenCode 里，这边不能接着聊，历史标题还在。
 - 飞书 CLI：`lark-cli` 配置为监控用的飞书应用（密钥加密存在 `~/.local/share/lark-cli`），后台服务里也能以机器人身份调用；以管理员本人身份用文档、日历要先 `lark-cli auth login`。
 
 ## 公网隧道
 
 `writer-tunnel@<beijing|la>` 运行 `~/writer/bin/writer-tunnel`：`ssh -N -R 127.0.0.1:18090:127.0.0.1:8790`，退出 5 秒后由 systemd 重启。连接一开始就失败（多半是中转服务器上的旧会话还占着 18090）时，脚本登录中转服务器结束占着端口的 sshd，再重连，与 Windows 上的 `run-writer-tunnel.ps1` 相同。用的是这台电脑的专用密钥 `writer_tunnel_ed25519`（已加进北京、洛杉矶两台中转服务器上相应账号的 `authorized_keys`）。
+
+这把密钥在两台中转服务器上受限（2026-11-05 起）：`authorized_keys` 里它那一行带 `restrict,port-forwarding,permitlisten="127.0.0.1:18090",permitlisten="127.0.0.1:18091",permitopen="127.0.0.1:9",command="<家目录>/writer-relay/ops"`，只能开 18090/18091 的反向隧道，并运行 `deploy/lab/writer-relay-ops` 里的三条命令（`free-port`、`put-backup`、`put-status`）；登录 shell、其他命令、其他端口和本地转发都会被拒绝。管理中转服务器请用各自的管理员密钥，不要用这一把。改 `writer-relay-ops` 后复制到两台服务器的 `~/writer-relay/ops`。
 
 - 两条隧道都绑定默认路由所在的网卡（脚本里的 `BindInterface`），从本地网络直接出去。原因：这台电脑上的系统代理开着 TUN 模式，没绑定地址的连接都会被它接管，海外的中转会被转进代理节点，节点一断隧道就断（迁移后洛杉矶那条每天断 25–30 次）；国内的中转虽然走直连规则，代理软件重启时也会断。2026-11-05 起改为直连，不要去掉这一项。
 - 重启隧道：`systemctl --user restart writer-tunnel@beijing`（或 `@la`）。
@@ -81,7 +83,7 @@ Windows 上 ctex 默认用 Windows 字体集，Linux 上默认用 Fandol，学�
 
 ## 备份、监控和提醒
 
-`writer-backup`（每 6 小时）：`pg_dump` 到 USB 盘 `writer-backups`（盘没接上时写到 `~/writer/backups` 并报警），保留 14 天，`pg_restore --list` 检查；模板库镜像到旁边的 `templates/`；复制到北京 `~/writer-backups` 并核对 SHA-256；每周一次恢复演练；状态写到北京 `~/writer-monitor/lab-status.json`。日志 `~/writer/logs/backup.log`，手动运行 `systemctl --user start writer-backup`。
+`writer-backup`（每 6 小时）：`pg_dump` 到 USB 盘 `writer-backups`（盘没接上时写到 `~/writer/backups` 并报警），保留 14 天，`pg_restore --list` 检查；模板库镜像到旁边的 `templates/`；经受限密钥的 `put-backup` 复制到北京 `~/writer-backups` 并核对 SHA-256；每周一次恢复演练；状态写到北京 `~/writer-monitor/lab-status.json`。日志 `~/writer/logs/backup.log`，手动运行 `systemctl --user start writer-backup`。
 
 北京和洛杉矶的 `writer-monitor.py` 不变（见 [deploy-windows-lan.md](deploy-windows-lan.md) 的“备份、监控和提醒”），磁盘阈值改为“系统盘”20 GB、“备份盘”50 GB（`deploy/lab/monitor-config.beijing.json`）。
 
@@ -109,5 +111,5 @@ systemctl --user restart writer-server writer-runner
 ## 常见问题
 
 - **IP 变了**：网卡地址由 DHCP 分配。改 `server.env` 的 `WRITER_ORIGIN`、`WRITER_ADDRESSES` 的 campus 地址和 Windows 上 portproxy 的目标，重启 `writer-server`。
-- **AI 对话不可用**：`journalctl --user -u writer-runner`；看本机代理是否在运行（`curl -x <runner.env 里的 HTTPS_PROXY> https://api.openai.com`）。
+- **AI 对话不可用**：`journalctl --user -u writer-runner`、`docker ps --filter name=writer-runner`；镜像丢了就运行 `~/writer/bin/writer-runner-image` 再 `systemctl --user restart writer-runner`。只有境外模型不可用时，看本机代理是否在运行（`curl -x <runner.env 里的 HTTPS_PROXY> https://api.openai.com`）。
 - **编译时找不到中文字体**：确认 `server.env` 里有 `FONTCONFIG_FILE`，且 `HOME=$(mktemp -d) FONTCONFIG_FILE=… fc-match SimHei` 返回 `simhei.ttf`。

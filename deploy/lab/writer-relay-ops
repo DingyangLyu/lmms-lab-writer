@@ -1,0 +1,42 @@
+#!/bin/bash
+# What the Writer lab machine's SSH key may do on a relay (the Beijing and LA servers), as the
+# forced command of its line in ~/.ssh/authorized_keys there:
+#
+#   restrict,port-forwarding,permitlisten="127.0.0.1:18090",permitlisten="127.0.0.1:18091",permitopen="127.0.0.1:9",command="~/writer-relay/ops" ssh-ed25519 AAAA... writer-tunnel@ubuntu-lan
+#
+# The reverse tunnel itself (ssh -N -R 127.0.0.1:18090:...) runs no command, so it is not affected;
+# a shell, other commands, other ports and local forwarding are refused. Without this, whoever can
+# read the key on the lab machine (any process running as its user) could log in here with sudo.
+#
+#   free-port <18090|18091>   end the sshd of a dead tunnel that still holds the port (writer-tunnel)
+#   put-backup <name>          store stdin as ~/writer-backups/<name>, print its SHA-256 (writer-backup)
+#   put-status                 store stdin (JSON) as ~/writer-monitor/lab-status.json (writer-backup)
+set -u
+read -r -a arg <<<"${SSH_ORIGINAL_COMMAND:-}"
+case "${arg[0]:-}" in
+free-port)
+  port=${arg[1]:-}
+  [[ $port == 18090 || $port == 18091 ]] || { echo "port not allowed" >&2; exit 2; }
+  for p in $(sudo -n ss -ltnp "sport = :$port" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
+    sudo -n kill "$p" && echo "ended stale sshd $p holding port $port"
+  done
+  ;;
+put-backup)
+  name=${arg[1]:-}
+  [[ $name =~ ^writer-[0-9]{8}-[0-9]{4}\.dump$ ]] || { echo "bad backup name" >&2; exit 2; }
+  dir=$HOME/writer-backups
+  mkdir -p "$dir"
+  tmp=$dir/.$name.partial
+  head -c 4000000000 >"$tmp" && mv -f "$tmp" "$dir/$name" && sha256sum "$dir/$name" | cut -d' ' -f1
+  ;;
+put-status)
+  dir=$HOME/writer-monitor
+  tmp=$dir/.lab-status.json.partial
+  head -c 1000000 >"$tmp" && python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$tmp" &&
+    mv -f "$tmp" "$dir/lab-status.json"
+  ;;
+*)
+  echo "not allowed for this key: ${arg[0]:-shell}" >&2
+  exit 1
+  ;;
+esac
